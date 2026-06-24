@@ -1,4 +1,4 @@
-import { Link, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import GuestLayout from '../../Layouts/GuestLayout';
 
 export default function Login() {
@@ -70,12 +70,6 @@ export default function Login() {
                     {processing ? 'Signing in...' : 'Sign in'}
                 </button>
 
-                <p className="text-center text-sm text-gray-600">
-                    Don't have an account?{' '}
-                    <Link href="/register" className="text-blue-600 hover:text-blue-500">
-                        Register
-                    </Link>
-                </p>
             </form>
         </GuestLayout>
     );

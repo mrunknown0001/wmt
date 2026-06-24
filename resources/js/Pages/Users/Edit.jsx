@@ -1,19 +1,30 @@
 import { Link, useForm, usePage } from '@inertiajs/react';
+import { useMemo } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 
 export default function Edit() {
-    const { user, roles, currentRole } = usePage().props;
+    const { user, roles, currentRole, departments, teams } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         name: user.name || '',
         email: user.email || '',
         password: '',
         password_confirmation: '',
-        department: user.department || '',
+        department_id: user.department_id || '',
+        team_id: user.team_id || '',
         position: user.position || '',
         is_active: user.is_active ?? true,
         role: currentRole || 'user',
     });
+
+    const filteredTeams = useMemo(() => {
+        if (!data.department_id) return [];
+        return teams.filter((t) => t.department_id === Number(data.department_id));
+    }, [data.department_id, teams]);
+
+    const handleDepartmentChange = (value) => {
+        setData((prev) => ({ ...prev, department_id: value, team_id: '' }));
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -24,9 +35,7 @@ export default function Edit() {
         <AuthenticatedLayout title="Edit User">
             <div className="max-w-2xl">
                 <div className="flex items-center gap-4 mb-4">
-                    <Link href="/users" className="text-gray-500 hover:text-gray-700">
-                        &larr; Back
-                    </Link>
+                    <Link href="/users" className="text-gray-500 hover:text-gray-700">&larr; Back</Link>
                     <h1 className="text-2xl font-semibold text-gray-800">Edit User</h1>
                 </div>
 
@@ -83,27 +92,50 @@ export default function Edit() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label htmlFor="department" className="block text-sm font-medium text-gray-700">Department</label>
-                            <input
-                                id="department"
-                                type="text"
-                                value={data.department}
-                                onChange={(e) => setData('department', e.target.value)}
+                            <label htmlFor="department_id" className="block text-sm font-medium text-gray-700">Department</label>
+                            <select
+                                id="department_id"
+                                value={data.department_id}
+                                onChange={(e) => handleDepartmentChange(e.target.value)}
                                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                            {errors.department && <p className="mt-1 text-sm text-red-600">{errors.department}</p>}
+                            >
+                                <option value="">— None —</option>
+                                {departments.map((dept) => (
+                                    <option key={dept.id} value={dept.id}>
+                                        {dept.name} ({dept.division?.name})
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.department_id && <p className="mt-1 text-sm text-red-600">{errors.department_id}</p>}
                         </div>
                         <div>
-                            <label htmlFor="position" className="block text-sm font-medium text-gray-700">Position</label>
-                            <input
-                                id="position"
-                                type="text"
-                                value={data.position}
-                                onChange={(e) => setData('position', e.target.value)}
-                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                            {errors.position && <p className="mt-1 text-sm text-red-600">{errors.position}</p>}
+                            <label htmlFor="team_id" className="block text-sm font-medium text-gray-700">Team</label>
+                            <select
+                                id="team_id"
+                                value={data.team_id}
+                                onChange={(e) => setData('team_id', e.target.value || '')}
+                                disabled={!data.department_id}
+                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                            >
+                                <option value="">— None —</option>
+                                {filteredTeams.map((team) => (
+                                    <option key={team.id} value={team.id}>{team.name}</option>
+                                ))}
+                            </select>
+                            {errors.team_id && <p className="mt-1 text-sm text-red-600">{errors.team_id}</p>}
                         </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="position" className="block text-sm font-medium text-gray-700">Position</label>
+                        <input
+                            id="position"
+                            type="text"
+                            value={data.position}
+                            onChange={(e) => setData('position', e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        {errors.position && <p className="mt-1 text-sm text-red-600">{errors.position}</p>}
                     </div>
 
                     <div>

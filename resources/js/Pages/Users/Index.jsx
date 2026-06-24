@@ -45,7 +45,7 @@ export default function Index() {
                                             {user.roles?.[0]?.name?.replace('_', ' ') || 'No role'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">{user.department || '—'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">{user.department?.name || '—'}</td>
                                     <td className="px-6 py-4 text-sm">
                                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                                             user.is_active

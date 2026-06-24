@@ -10,6 +10,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(RolePermissionSeeder::class);
+        $this->call(OrganizationSeeder::class);
 
         // Create default admin
         $admin = User::firstOrCreate(
@@ -17,7 +18,6 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Admin',
                 'password' => bcrypt('password'),
-                'department' => 'Administration',
                 'position' => 'System Administrator',
                 'is_active' => true,
                 'email_verified_at' => now(),

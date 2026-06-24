@@ -18,6 +18,12 @@ class RolePermissionSeeder extends Seeder
             'manage-users',
             'view-users',
             'manage-roles',
+            'manage-divisions',
+            'view-divisions',
+            'manage-departments',
+            'view-departments',
+            'manage-teams',
+            'view-teams',
         ];
 
         foreach ($permissions as $permission) {
@@ -29,15 +35,29 @@ class RolePermissionSeeder extends Seeder
         $admin->syncPermissions($permissions);
 
         $executive = Role::firstOrCreate(['name' => 'executive']);
-        $executive->syncPermissions(['view-users']);
+        $executive->syncPermissions([
+            'view-users',
+            'view-divisions',
+            'view-departments',
+            'view-teams',
+        ]);
 
         $divisionHead = Role::firstOrCreate(['name' => 'division_head']);
-        $divisionHead->syncPermissions(['view-users']);
+        $divisionHead->syncPermissions([
+            'view-users',
+            'view-divisions',
+            'view-departments',
+            'view-teams',
+        ]);
 
         $supervisor = Role::firstOrCreate(['name' => 'supervisor']);
-        $supervisor->syncPermissions(['view-users']);
+        $supervisor->syncPermissions([
+            'view-users',
+            'view-departments',
+            'view-teams',
+        ]);
 
         $user = Role::firstOrCreate(['name' => 'user']);
-        // user role has no special permissions in Phase 1
+        // user role has no special permissions
     }
 }

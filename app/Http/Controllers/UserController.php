@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Models\Department;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -16,7 +18,7 @@ class UserController extends Controller
     {
         $this->authorize('viewAny', User::class);
 
-        $users = User::with('roles')
+        $users = User::with('roles', 'department', 'team')
             ->orderBy('name')
             ->paginate(20);
 
@@ -31,6 +33,8 @@ class UserController extends Controller
 
         return Inertia::render('Users/Create', [
             'roles' => Role::orderBy('name')->pluck('name'),
+            'departments' => Department::with('division')->orderBy('name')->get(['id', 'name', 'division_id']),
+            'teams' => Team::orderBy('name')->get(['id', 'name', 'department_id']),
         ]);
     }
 
@@ -40,7 +44,8 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => $request->password,
-            'department' => $request->department,
+            'department_id' => $request->department_id,
+            'team_id' => $request->team_id,
             'position' => $request->position,
             'is_active' => $request->boolean('is_active', true),
         ]);
@@ -55,12 +60,14 @@ class UserController extends Controller
     {
         $this->authorize('update', $user);
 
-        $user->load('roles');
+        $user->load('roles', 'department', 'team');
 
         return Inertia::render('Users/Edit', [
             'user' => $user,
             'roles' => Role::orderBy('name')->pluck('name'),
             'currentRole' => $user->roles->first()?->name,
+            'departments' => Department::with('division')->orderBy('name')->get(['id', 'name', 'division_id']),
+            'teams' => Team::orderBy('name')->get(['id', 'name', 'department_id']),
         ]);
     }
 
@@ -69,7 +76,8 @@ class UserController extends Controller
         $data = [
             'name' => $request->name,
             'email' => $request->email,
-            'department' => $request->department,
+            'department_id' => $request->department_id,
+            'team_id' => $request->team_id,
             'position' => $request->position,
             'is_active' => $request->boolean('is_active', true),
         ];

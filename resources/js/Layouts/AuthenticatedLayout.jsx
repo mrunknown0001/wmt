@@ -57,20 +57,60 @@ export default function AuthenticatedLayout({ children, title }) {
                 <div className="flex">
                     {/* Sidebar */}
                     <aside className={`${sidebarOpen ? 'block' : 'hidden'} lg:block w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-4rem)]`}>
-                        <nav className="p-4 space-y-1">
-                            <Link
-                                href="/dashboard"
-                                className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                            >
-                                Dashboard
-                            </Link>
-                            {hasPermission('view-users') && (
+                        <nav className="p-4 space-y-4">
+                            <div className="space-y-1">
                                 <Link
-                                    href="/users"
+                                    href="/dashboard"
                                     className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
                                 >
-                                    Users
+                                    Dashboard
                                 </Link>
+                            </div>
+
+                            {(hasPermission('view-divisions') || hasPermission('view-departments') || hasPermission('view-teams')) && (
+                                <div>
+                                    <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Organization</p>
+                                    <div className="mt-1 space-y-1">
+                                        {hasPermission('view-divisions') && (
+                                            <Link
+                                                href="/divisions"
+                                                className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                            >
+                                                Divisions
+                                            </Link>
+                                        )}
+                                        {hasPermission('view-departments') && (
+                                            <Link
+                                                href="/departments"
+                                                className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                            >
+                                                Departments
+                                            </Link>
+                                        )}
+                                        {hasPermission('view-teams') && (
+                                            <Link
+                                                href="/teams"
+                                                className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                            >
+                                                Teams
+                                            </Link>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {hasPermission('view-users') && (
+                                <div>
+                                    <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</p>
+                                    <div className="mt-1 space-y-1">
+                                        <Link
+                                            href="/users"
+                                            className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                        >
+                                            Users
+                                        </Link>
+                                    </div>
+                                </div>
                             )}
                         </nav>
                     </aside>
