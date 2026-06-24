@@ -3,7 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { formatLabel, taskStatusColors } from '../utils';
 import TaskCard from './TaskCard';
 
-export default function KanbanColumn({ status, tasks, projectId, canManageTasks, auth, onDeleteTask }) {
+export default function KanbanColumn({ status, tasks, projectId, canManageTasks, auth, onDeleteTask, onToggleComplete }) {
     const canEditTask = (task) => canManageTasks || task.assigned_to === auth?.user?.id;
 
     const { setNodeRef, isOver } = useDroppable({ id: `column-${status}` });
@@ -33,6 +33,7 @@ export default function KanbanColumn({ status, tasks, projectId, canManageTasks,
                             canEdit={canEditTask(task)}
                             canDelete={canManageTasks}
                             onDelete={onDeleteTask}
+                            onToggleComplete={onToggleComplete}
                         />
                     ))}
                 </SortableContext>

@@ -61,7 +61,7 @@ const TrashIcon = () => (
 );
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, users, onTaskUpdate }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, users, onTaskUpdate, onToggleComplete }) {
     const {
         attributes,
         listeners,
@@ -78,6 +78,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
     };
 
     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
+    const isDone = task.status === 'done';
 
     const [openPopover, setOpenPopover] = useState(null);
 
@@ -93,7 +94,23 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
 
     return (
         <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
-            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{task.title}</td>
+            <td className="pl-6 pr-2 py-4 w-10">
+                <button
+                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id); }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        isDone
+                            ? 'bg-green-500 border-green-500 text-white'
+                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400'
+                    }`}
+                    title={isDone ? 'Mark incomplete' : 'Mark complete'}
+                >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                </button>
+            </td>
+            <td className={`px-6 py-4 text-sm font-medium ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>{task.title}</td>
             <td className="px-6 py-4 text-sm">
                 {canEditTask ? (
                     <StatusPicker
@@ -436,6 +453,13 @@ export default function Show() {
         setConfirmDelete(null);
     };
 
+    const handleToggleComplete = useCallback((taskId) => {
+        const task = localTasks.find((t) => t.id === taskId);
+        if (!task) return;
+        const newStatus = task.status === 'done' ? 'to_do' : 'done';
+        handleInlineUpdate(taskId, 'status', newStatus);
+    }, [localTasks, handleInlineUpdate]);
+
     const hasActiveFilters = filterStatus || filterPriority || filterAssignee;
 
     const activeTask = activeId ? localTasks.find((t) => t.id === activeId) : null;
@@ -595,6 +619,7 @@ export default function Show() {
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
+                                        <th className="pl-6 pr-2 py-3 w-10"></th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Title</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Priority</th>
@@ -615,6 +640,7 @@ export default function Show() {
                                                 handleDeleteTask={handleDeleteTask}
                                                 users={users}
                                                 onTaskUpdate={handleInlineUpdate}
+                                                onToggleComplete={handleToggleComplete}
                                             />
                                         ))}
                                     </SortableContext>
@@ -625,6 +651,7 @@ export default function Show() {
                                     <table className="min-w-full">
                                         <tbody>
                                             <tr className="bg-white dark:bg-gray-800 shadow-lg rounded-lg">
+                                                <td className="pl-6 pr-2 py-4 w-10"></td>
                                                 <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{activeTask.title}</td>
                                                 <td className="px-6 py-4 text-sm">
                                                     <StatusBadge status={activeTask.status} type="task" />
@@ -680,6 +707,7 @@ export default function Show() {
                                     canManageTasks={canManageTasks}
                                     auth={auth}
                                     onDeleteTask={handleDeleteTask}
+                                    onToggleComplete={handleToggleComplete}
                                 />
                             ))}
                         </div>
