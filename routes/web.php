@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardPreferenceController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\ProjectController;
@@ -31,6 +32,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', LogoutController::class)->name('logout');
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::patch('/dashboard/preferences', [DashboardPreferenceController::class, 'update'])->name('dashboard.preferences.update');
 
     // Inbox (Notifications)
     Route::get('/inbox', [NotificationController::class, 'index'])->name('inbox');

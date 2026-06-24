@@ -1,4 +1,5 @@
-import { Link, usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import { Link, usePage, router } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import Card from '../Components/Card';
 import Avatar from '../Components/Avatar';
@@ -6,6 +7,13 @@ import StatusBadge from '../Components/StatusBadge';
 import PriorityBadge from '../Components/PriorityBadge';
 import EmptyState from '../Components/EmptyState';
 import LinkButton from '../Components/LinkButton';
+import DashboardSettingsPopover from '../Components/Dashboard/DashboardSettingsPopover';
+import TaskStatsBar from '../Components/Dashboard/TaskStatsBar';
+import ProjectProgressBar from '../Components/Dashboard/ProjectProgressBar';
+import ActivityFeed from '../Components/Dashboard/ActivityFeed';
+import DonutChart from '../Components/Dashboard/DonutChart';
+import BarChart from '../Components/Dashboard/BarChart';
+import TeamWorkload from '../Components/Dashboard/TeamWorkload';
 import { formatDate } from '../utils';
 
 function StatCard({ label, value, icon, color = 'blue', href }) {
@@ -34,7 +42,27 @@ function StatCard({ label, value, icon, color = 'blue', href }) {
 }
 
 export default function Dashboard() {
-    const { auth, stats, recentProjects, myRecentTasks } = usePage().props;
+    const {
+        auth,
+        stats,
+        recentProjects,
+        myRecentTasks,
+        dashboardPreferences,
+        taskStats,
+        activityFeed,
+        charts,
+        urgentItems,
+        teamWorkload,
+    } = usePage().props;
+
+    const [preferences, setPreferences] = useState(dashboardPreferences || {});
+
+    const isAdmin = auth.user?.roles?.some((r) => ['admin', 'supervisor'].includes(r));
+
+    const handlePreferencesUpdate = (newPrefs) => {
+        setPreferences(newPrefs);
+        router.reload({ preserveScroll: true });
+    };
 
     const greeting = () => {
         const hour = new Date().getHours();
@@ -46,17 +74,77 @@ export default function Dashboard() {
     return (
         <AuthenticatedLayout title="Dashboard">
             <div>
-                <div className="mb-6">
-                    <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                        {greeting()}, {auth.user?.name}
-                    </h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
+                {/* Header */}
+                <div className="flex items-start justify-between mb-6">
+                    <div>
+                        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                            {greeting()}, {auth.user?.name}
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {preferences.showQuickActions && (
+                            <div className="flex items-center gap-2">
+                                <LinkButton href="/projects/create" size="sm" variant="secondary">
+                                    <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    New Project
+                                </LinkButton>
+                            </div>
+                        )}
+                        <DashboardSettingsPopover
+                            preferences={preferences}
+                            isAdmin={isAdmin}
+                            onUpdate={handlePreferencesUpdate}
+                        />
+                    </div>
                 </div>
 
+                {/* Due Today / Overdue — full width */}
+                {preferences.showDueToday && urgentItems?.length > 0 && (
+                    <div className="mb-6">
+                        <Card padding={false}>
+                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                <h2 className="text-base font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    Due Today & Overdue
+                                </h2>
+                            </div>
+                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {urgentItems.map((task) => {
+                                    const isOverdue = task.due_date && new Date(task.due_date) < new Date(new Date().toDateString());
+                                    return (
+                                        <Link
+                                            key={task.id}
+                                            href={`/projects/${task.project_id}/tasks/${task.id}/edit`}
+                                            className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                        >
+                                            <div className={`w-1 h-8 rounded-full ${isOverdue ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{task.title}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <PriorityBadge priority={task.priority} />
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">{task.project?.name}</span>
+                                                </div>
+                                            </div>
+                                            <span className={`text-xs whitespace-nowrap font-medium ${isOverdue ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                                {isOverdue ? 'Overdue' : 'Due today'} — {formatDate(task.due_date)}
+                                            </span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
                 {/* Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <StatCard
                         label="Total Projects"
                         value={stats?.totalProjects ?? 0}
@@ -84,8 +172,15 @@ export default function Dashboard() {
                     />
                 </div>
 
-                {/* Two-column layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Task Stats Bar */}
+                {preferences.showTaskStats && taskStats && (
+                    <div className="mb-6">
+                        <TaskStatsBar taskStats={taskStats} />
+                    </div>
+                )}
+
+                {/* Two-column: Projects + Tasks */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     {/* Recent Projects */}
                     <Card padding={false}>
                         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -98,18 +193,23 @@ export default function Dashboard() {
                                     <Link
                                         key={project.id}
                                         href={`/projects/${project.id}`}
-                                        className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                        className="block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                     >
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                <StatusBadge status={project.status} type="project" />
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {project.completed_tasks_count}/{project.tasks_count} tasks
-                                                </span>
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <StatusBadge status={project.status} type="project" />
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                        {project.completed_tasks_count}/{project.tasks_count} tasks
+                                                    </span>
+                                                </div>
                                             </div>
+                                            {project.owner && <Avatar name={project.owner.name} size="sm" />}
                                         </div>
-                                        {project.owner && <Avatar name={project.owner.name} size="sm" />}
+                                        {preferences.showProgressBars && project.tasks_count > 0 && (
+                                            <ProjectProgressBar project={project} />
+                                        )}
                                     </Link>
                                 ))}
                             </div>
@@ -161,6 +261,28 @@ export default function Dashboard() {
                         )}
                     </Card>
                 </div>
+
+                {/* Charts — two-column */}
+                {preferences.showCharts && charts && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <DonutChart data={charts.tasksByStatus} title="Tasks by Status" />
+                        <BarChart data={charts.tasksByPriority} title="Tasks by Priority" />
+                    </div>
+                )}
+
+                {/* Activity Feed */}
+                {preferences.showActivityFeed && activityFeed?.length > 0 && (
+                    <div className="mb-6">
+                        <ActivityFeed activities={activityFeed} />
+                    </div>
+                )}
+
+                {/* Team Workload — admin/supervisor only */}
+                {preferences.showTeamWorkload && isAdmin && teamWorkload?.length > 0 && (
+                    <div className="mb-6">
+                        <TeamWorkload users={teamWorkload} />
+                    </div>
+                )}
             </div>
         </AuthenticatedLayout>
     );

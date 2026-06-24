@@ -16,6 +16,16 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, HasRoles;
 
+    public const DASHBOARD_DEFAULTS = [
+        'showTaskStats'    => true,
+        'showProgressBars' => true,
+        'showActivityFeed' => true,
+        'showCharts'       => true,
+        'showDueToday'     => true,
+        'showQuickActions' => true,
+        'showTeamWorkload' => true,
+    ];
+
     protected $fillable = [
         'name',
         'email',
@@ -24,6 +34,7 @@ class User extends Authenticatable
         'department_id',
         'team_id',
         'is_active',
+        'dashboard_preferences',
     ];
 
     protected $hidden = [
@@ -37,7 +48,13 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'dashboard_preferences' => 'array',
         ];
+    }
+
+    public function getDashboardPreferences(): array
+    {
+        return array_merge(self::DASHBOARD_DEFAULTS, $this->dashboard_preferences ?? []);
     }
 
     public function department(): BelongsTo

@@ -43,6 +43,28 @@ export const formatDate = (value) => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+export const timeAgo = (dateString) => {
+    const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
+    const intervals = [
+        [31536000, 'year'], [2592000, 'month'], [604800, 'week'],
+        [86400, 'day'], [3600, 'hour'], [60, 'minute'],
+    ];
+    for (const [secs, label] of intervals) {
+        const count = Math.floor(seconds / secs);
+        if (count >= 1) return `${count} ${label}${count > 1 ? 's' : ''} ago`;
+    }
+    return 'just now';
+};
+
+export const svgStatusColors = {
+    backlog: '#9ca3af', to_do: '#3b82f6', in_progress: '#eab308',
+    in_review: '#a855f7', done: '#22c55e', cancelled: '#ef4444',
+};
+
+export const svgPriorityColors = {
+    low: '#9ca3af', medium: '#3b82f6', high: '#f97316', urgent: '#ef4444',
+};
+
 export const getInitials = (name) => {
     if (!name) return '?';
     return name
