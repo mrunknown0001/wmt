@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     DndContext,
@@ -60,8 +60,155 @@ const TrashIcon = () => (
     </svg>
 );
 
+// Sortable subtask row
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, onToggleComplete, users, onTaskUpdate }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: task.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
+    const isDone = task.status === 'done';
+
+    const [openPopover, setOpenPopover] = useState(null);
+
+    const togglePopover = (name) => (forceClose) => {
+        if (forceClose === false) { setOpenPopover(null); return; }
+        setOpenPopover((prev) => prev === name ? null : name);
+    };
+
+    const handleFieldUpdate = (field, value) => {
+        setOpenPopover(null);
+        onTaskUpdate(task.id, field, value);
+    };
+
+    return (
+        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
+            <td className="pl-10 pr-2 py-3 w-10">
+                <button
+                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id); }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className={`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        isDone
+                            ? 'bg-green-500 border-green-500 text-white'
+                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400'
+                    }`}
+                    title={isDone ? 'Mark incomplete' : 'Mark complete'}
+                >
+                    <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                </button>
+            </td>
+            <td className={`px-6 py-3 text-sm ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                <div className="flex items-center gap-1.5">
+                    <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                    {task.title}
+                </div>
+            </td>
+            <td className="px-6 py-3 text-sm">
+                {canEditTask ? (
+                    <StatusPicker
+                        currentStatus={task.status}
+                        isOpen={openPopover === 'status'}
+                        onToggle={togglePopover('status')}
+                        onSelect={(status) => handleFieldUpdate('status', status)}
+                    />
+                ) : (
+                    <StatusBadge status={task.status} type="task" />
+                )}
+            </td>
+            <td className="px-6 py-3 text-sm">
+                {canEditTask ? (
+                    <PriorityPicker
+                        currentPriority={task.priority}
+                        isOpen={openPopover === 'priority'}
+                        onToggle={togglePopover('priority')}
+                        onSelect={(priority) => handleFieldUpdate('priority', priority)}
+                    />
+                ) : (
+                    <PriorityBadge priority={task.priority} />
+                )}
+            </td>
+            <td className="px-6 py-3 text-sm">
+                {canEditTask ? (
+                    <AssigneePicker
+                        currentAssignee={task.assignee}
+                        users={users}
+                        isOpen={openPopover === 'assignee'}
+                        onToggle={togglePopover('assignee')}
+                        onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)}
+                    />
+                ) : (
+                    <div className="flex items-center gap-2">
+                        {task.assignee ? (
+                            <>
+                                <Avatar name={task.assignee.name} size="sm" />
+                                <span className="text-gray-700 dark:text-gray-300 text-xs">{task.assignee.name}</span>
+                            </>
+                        ) : (
+                            <span className="text-gray-400 text-xs">Unassigned</span>
+                        )}
+                    </div>
+                )}
+            </td>
+            <td className="px-6 py-3 text-sm">
+                {canEditTask ? (
+                    <InlineDatePicker
+                        currentDate={task.due_date}
+                        isOpen={openPopover === 'due_date'}
+                        onToggle={togglePopover('due_date')}
+                        onSelect={(date) => handleFieldUpdate('due_date', date)}
+                        isOverdue={isOverdue}
+                    />
+                ) : (
+                    <span className={`text-xs ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                        {formatDate(task.due_date) || '—'}
+                    </span>
+                )}
+            </td>
+            <td className="px-6 py-3 text-sm text-right">
+                <div className="flex items-center justify-end gap-1">
+                    {canEditTask && (
+                        <Link
+                            href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                            title="Edit"
+                        >
+                            <EditIcon />
+                        </Link>
+                    )}
+                    {canManageTasks && (
+                        <button
+                            onClick={() => handleDeleteTask(task.id, task.title)}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                            title="Delete"
+                        >
+                            <TrashIcon />
+                        </button>
+                    )}
+                </div>
+            </td>
+        </tr>
+    );
+}
+
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, users, onTaskUpdate, onToggleComplete }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand }) {
     const {
         attributes,
         listeners,
@@ -110,7 +257,28 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-4 text-sm font-medium ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>{task.title}</td>
+            <td className={`px-6 py-4 text-sm font-medium ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+                <div className="flex items-center gap-2">
+                    {(task.subtasks_count > 0 || canManageTasks) && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onToggleExpand(task.id); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                        >
+                            <svg className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    )}
+                    <span>{task.title}</span>
+                    {task.subtasks_count > 0 && (
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
+                            {task.completed_subtasks_count}/{task.subtasks_count}
+                        </span>
+                    )}
+                </div>
+            </td>
             <td className="px-6 py-4 text-sm">
                 {canEditTask ? (
                     <StatusPicker
@@ -218,6 +386,7 @@ export default function Show() {
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [localTasks, setLocalTasks] = useState(serverTasks);
     const [activeId, setActiveId] = useState(null);
+    const [expandedTasks, setExpandedTasks] = useState(new Set());
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -303,6 +472,35 @@ export default function Show() {
         });
     }, [project.id, users, serverTasks]);
 
+    // Inline update that also handles subtasks nested inside parent tasks
+    const handleSubtaskInlineUpdate = useCallback((taskId, field, value) => {
+        // Check if it's a parent task
+        const isParent = localTasks.some((t) => t.id === taskId);
+        if (isParent) {
+            handleInlineUpdate(taskId, field, value);
+            return;
+        }
+
+        // It's a subtask — update it inside its parent
+        setLocalTasks((prev) => prev.map((t) => {
+            const subIdx = t.subtasks?.findIndex((s) => s.id === taskId);
+            if (subIdx === undefined || subIdx === -1) return t;
+            const updatedSubs = [...t.subtasks];
+            updatedSubs[subIdx] = { ...updatedSubs[subIdx], [field]: value };
+            const completedCount = updatedSubs.filter((s) => s.status === 'done').length;
+            return { ...t, subtasks: updatedSubs, completed_subtasks_count: completedCount };
+        }));
+
+        apiFetch(`/projects/${project.id}/tasks/${taskId}/patch`, {
+            method: 'PATCH',
+            body: JSON.stringify({ [field]: value }),
+        }).then((res) => {
+            if (!res.ok) setLocalTasks(serverTasks);
+        }).catch(() => {
+            setLocalTasks(serverTasks);
+        });
+    }, [localTasks, project.id, serverTasks, handleInlineUpdate]);
+
     // --- List view drag handlers ---
     const handleListDragEnd = useCallback((event) => {
         const { active, over } = event;
@@ -341,6 +539,29 @@ export default function Show() {
             return result;
         });
     }, [filterStatus, filterPriority, filterAssignee, persistReorder]);
+
+    // --- Subtask drag handler (within a parent) ---
+    const handleSubtaskDragEnd = useCallback((parentId, event) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        setLocalTasks((prev) => prev.map((t) => {
+            if (t.id !== parentId || !t.subtasks) return t;
+            const oldIndex = t.subtasks.findIndex((s) => s.id === active.id);
+            const newIndex = t.subtasks.findIndex((s) => s.id === over.id);
+            if (oldIndex === -1 || newIndex === -1) return t;
+            const reordered = arrayMove(t.subtasks, oldIndex, newIndex);
+
+            // Persist subtask order
+            const payload = reordered.map((s, i) => ({ id: s.id, status: s.status, position: i }));
+            apiFetch(`/projects/${project.id}/tasks/reorder`, {
+                method: 'POST',
+                body: JSON.stringify({ tasks: payload }),
+            });
+
+            return { ...t, subtasks: reordered };
+        }));
+    }, [project.id]);
 
     // --- Board view drag handlers ---
     const handleBoardDragEnd = useCallback((event) => {
@@ -454,11 +675,27 @@ export default function Show() {
     };
 
     const handleToggleComplete = useCallback((taskId) => {
-        const task = localTasks.find((t) => t.id === taskId);
+        // Check parent tasks first, then subtasks
+        let task = localTasks.find((t) => t.id === taskId);
+        if (!task) {
+            for (const parent of localTasks) {
+                const sub = parent.subtasks?.find((s) => s.id === taskId);
+                if (sub) { task = sub; break; }
+            }
+        }
         if (!task) return;
         const newStatus = task.status === 'done' ? 'to_do' : 'done';
-        handleInlineUpdate(taskId, 'status', newStatus);
-    }, [localTasks, handleInlineUpdate]);
+        handleSubtaskInlineUpdate(taskId, 'status', newStatus);
+    }, [localTasks, handleSubtaskInlineUpdate]);
+
+    const handleToggleExpand = useCallback((taskId) => {
+        setExpandedTasks((prev) => {
+            const next = new Set(prev);
+            if (next.has(taskId)) next.delete(taskId);
+            else next.add(taskId);
+            return next;
+        });
+    }, []);
 
     const hasActiveFilters = filterStatus || filterPriority || filterAssignee;
 
@@ -631,17 +868,55 @@ export default function Show() {
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                     <SortableContext items={filteredTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                                         {filteredTasks.map((task) => (
-                                            <SortableRow
-                                                key={task.id}
-                                                task={task}
-                                                project={project}
-                                                canEditTask={canEditTask(task)}
-                                                canManageTasks={canManageTasks}
-                                                handleDeleteTask={handleDeleteTask}
-                                                users={users}
-                                                onTaskUpdate={handleInlineUpdate}
-                                                onToggleComplete={handleToggleComplete}
-                                            />
+                                            <React.Fragment key={task.id}>
+                                                <SortableRow
+                                                    task={task}
+                                                    project={project}
+                                                    canEditTask={canEditTask(task)}
+                                                    canManageTasks={canManageTasks}
+                                                    handleDeleteTask={handleDeleteTask}
+                                                    users={users}
+                                                    onTaskUpdate={handleInlineUpdate}
+                                                    onToggleComplete={handleToggleComplete}
+                                                    isExpanded={expandedTasks.has(task.id)}
+                                                    onToggleExpand={handleToggleExpand}
+                                                />
+                                                {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
+                                                    <DndContext
+                                                        sensors={sensors}
+                                                        collisionDetection={closestCorners}
+                                                        onDragEnd={(event) => handleSubtaskDragEnd(task.id, event)}
+                                                    >
+                                                        <SortableContext items={task.subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                                                            {task.subtasks.map((sub) => (
+                                                                <SortableSubtaskRow
+                                                                    key={sub.id}
+                                                                    task={sub}
+                                                                    project={project}
+                                                                    canEditTask={canEditTask(sub)}
+                                                                    canManageTasks={canManageTasks}
+                                                                    handleDeleteTask={handleDeleteTask}
+                                                                    onToggleComplete={handleToggleComplete}
+                                                                    users={users}
+                                                                    onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                />
+                                                            ))}
+                                                        </SortableContext>
+                                                    </DndContext>
+                                                )}
+                                                {expandedTasks.has(task.id) && canManageTasks && (
+                                                    <tr className="bg-gray-50/50 dark:bg-gray-800/30">
+                                                        <td colSpan={7} className="pl-14 py-2">
+                                                            <Link
+                                                                href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
+                                                                className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                            >
+                                                                + Add subtask
+                                                            </Link>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
                                         ))}
                                     </SortableContext>
                                 </tbody>

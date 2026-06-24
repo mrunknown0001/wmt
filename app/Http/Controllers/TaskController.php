@@ -18,14 +18,23 @@ use Inertia\Response;
 
 class TaskController extends Controller
 {
-    public function create(Project $project): Response
+    public function create(Request $request, Project $project): Response
     {
         if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id()) {
             abort(403);
         }
 
+        $parentTask = null;
+        if ($request->query('parent_id')) {
+            $parentTask = Task::where('id', $request->query('parent_id'))
+                ->where('project_id', $project->id)
+                ->whereNull('parent_id')
+                ->first(['id', 'title']);
+        }
+
         return Inertia::render('Tasks/Create', [
             'project' => $project,
+            'parentTask' => $parentTask,
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
@@ -34,11 +43,25 @@ class TaskController extends Controller
 
     public function store(StoreTaskRequest $request, Project $project): RedirectResponse
     {
-        $maxPosition = $project->tasks()
-            ->where('status', $request->status)
-            ->max('position') ?? -1;
-
         $validated = $request->validated();
+
+        // Validate parent_id constraints
+        if (!empty($validated['parent_id'])) {
+            $parent = Task::where('id', $validated['parent_id'])
+                ->where('project_id', $project->id)
+                ->whereNull('parent_id')
+                ->firstOrFail();
+
+            $maxPosition = Task::where('parent_id', $parent->id)
+                ->where('status', $request->status)
+                ->max('position') ?? -1;
+        } else {
+            $maxPosition = $project->tasks()
+                ->whereNull('parent_id')
+                ->where('status', $request->status)
+                ->max('position') ?? -1;
+        }
+
         $collaboratorIds = $validated['collaborator_ids'] ?? [];
         unset($validated['collaborator_ids']);
 
@@ -67,7 +90,8 @@ class TaskController extends Controller
     {
         $this->authorize('update', $task);
 
-        $task->load('assignee', 'creator', 'collaborators');
+        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title');
+        $task->loadCount('subtasks');
 
         $comments = $task->comments()->with('user')->latest()->take(10)->get()->map(fn ($c) => [
             'id' => $c->id,

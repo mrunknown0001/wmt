@@ -78,6 +78,14 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                 </div>
             </div>
             <p className={`text-sm font-medium mb-2 line-clamp-2 ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>{task.title}</p>
+            {task.subtasks_count > 0 && (
+                <div className="flex items-center gap-1.5 mb-2 text-xs text-gray-400 dark:text-gray-500">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{task.completed_subtasks_count}/{task.subtasks_count}</span>
+                </div>
+            )}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                     {task.assignee && (

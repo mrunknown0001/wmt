@@ -65,7 +65,10 @@ class ProjectController extends Controller
         $project->load('owner', 'members');
 
         $tasks = $project->tasks()
-            ->with('assignee', 'creator', 'collaborators')
+            ->whereNull('parent_id')
+            ->with(['assignee', 'creator', 'collaborators', 'subtasks.assignee', 'subtasks.collaborators'])
+            ->withCount('subtasks')
+            ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')])
             ->orderBy('position')
             ->orderBy('created_at', 'desc')
             ->get();

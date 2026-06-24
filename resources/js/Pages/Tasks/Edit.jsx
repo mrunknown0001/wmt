@@ -1,4 +1,4 @@
-import { useForm, usePage, router } from '@inertiajs/react';
+import { useForm, usePage, router, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
@@ -214,6 +214,28 @@ export default function Edit() {
                 {/* Task Form */}
                 <div className="lg:col-span-2">
                     <Card>
+                        {task.parent && (
+                            <div className="mb-5 flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
+                                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                                Subtask of:{' '}
+                                <Link
+                                    href={`/projects/${project.id}/tasks/${task.parent.id}/edit`}
+                                    className="font-medium hover:underline"
+                                >
+                                    {task.parent.title}
+                                </Link>
+                            </div>
+                        )}
+                        {task.subtasks_count > 0 && (
+                            <div className="mb-5 flex items-center gap-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                </svg>
+                                {task.subtasks_count} subtask{task.subtasks_count !== 1 ? 's' : ''}
+                            </div>
+                        )}
                         <form onSubmit={handleSubmit} className="space-y-5">
                             <Input label="Title" id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} error={errors.title} />
                             <Textarea label="Description" id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} error={errors.description} />

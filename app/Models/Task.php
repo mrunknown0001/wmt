@@ -14,6 +14,7 @@ class Task extends Model
 
     protected $fillable = [
         'project_id',
+        'parent_id',
         'title',
         'description',
         'status',
@@ -35,6 +36,16 @@ class Task extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function subtasks(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id')->orderBy('position');
     }
 
     public function assignee(): BelongsTo

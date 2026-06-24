@@ -23,6 +23,7 @@ class StoreTaskRequest extends FormRequest
             'priority' => ['required', 'string', 'in:low,medium,high,urgent'],
             'assigned_to' => ['nullable', 'exists:users,id'],
             'due_date' => ['nullable', 'date'],
+            'parent_id' => ['nullable', 'exists:tasks,id'],
             'collaborator_ids' => ['nullable', 'array'],
             'collaborator_ids.*' => ['exists:users,id'],
         ];

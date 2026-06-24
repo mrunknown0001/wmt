@@ -13,7 +13,7 @@ class MyTaskController extends Controller
         $user = auth()->user();
         $today = now()->startOfDay();
 
-        $tasks = Task::with('project')
+        $tasks = Task::with('project', 'parent:id,title')
             ->where('assigned_to', $user->id)
             ->whereNotIn('status', ['done', 'cancelled'])
             ->orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END')
