@@ -1,5 +1,12 @@
-import { Link, useForm, usePage } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
+import PageHeader from '../../Components/PageHeader';
+import Card from '../../Components/Card';
+import Input from '../../Components/Input';
+import Select from '../../Components/Select';
+import Textarea from '../../Components/Textarea';
+import Button from '../../Components/Button';
+import LinkButton from '../../Components/LinkButton';
 
 export default function Edit() {
     const { division, users } = usePage().props;
@@ -18,61 +25,33 @@ export default function Edit() {
     return (
         <AuthenticatedLayout title="Edit Division">
             <div className="max-w-2xl">
-                <div className="flex items-center gap-4 mb-4">
-                    <Link href="/divisions" className="text-gray-500 hover:text-gray-700">&larr; Back</Link>
-                    <h1 className="text-2xl font-semibold text-gray-800">Edit Division</h1>
-                </div>
+                <PageHeader
+                    title="Edit Division"
+                    breadcrumbs={[
+                        { label: 'Dashboard', href: '/dashboard' },
+                        { label: 'Divisions', href: '/divisions' },
+                        { label: 'Edit Division' },
+                    ]}
+                />
 
-                <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-4">
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
-                        <input
-                            id="name"
-                            type="text"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                        {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-                    </div>
-
-                    <div>
-                        <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
-                        <textarea
-                            id="description"
-                            value={data.description}
-                            onChange={(e) => setData('description', e.target.value)}
-                            rows={3}
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                        {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
-                    </div>
-
-                    <div>
-                        <label htmlFor="head_id" className="block text-sm font-medium text-gray-700">Division Head</label>
-                        <select
-                            id="head_id"
-                            value={data.head_id}
+                <Card>
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <Input label="Name" id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} error={errors.name} />
+                        <Textarea label="Description" id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} error={errors.description} />
+                        <Select
+                            label="Division Head" id="head_id" value={data.head_id}
                             onChange={(e) => setData('head_id', e.target.value || '')}
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                            <option value="">— None —</option>
-                            {users.map((user) => (
-                                <option key={user.id} value={user.id}>{user.name}</option>
-                            ))}
-                        </select>
-                        {errors.head_id && <p className="mt-1 text-sm text-red-600">{errors.head_id}</p>}
-                    </div>
+                            placeholder="— None —"
+                            options={users.map((u) => ({ value: u.id, label: u.name }))}
+                            error={errors.head_id}
+                        />
 
-                    <div className="flex justify-end gap-3 pt-4">
-                        <Link href="/divisions" className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                            Cancel
-                        </Link>
-                        <button type="submit" disabled={processing} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                            {processing ? 'Saving...' : 'Save Changes'}
-                        </button>
-                    </div>
-                </form>
+                        <div className="flex justify-end gap-3 pt-4">
+                            <LinkButton href="/divisions" variant="secondary">Cancel</LinkButton>
+                            <Button type="submit" processing={processing} processingText="Saving...">Save Changes</Button>
+                        </div>
+                    </form>
+                </Card>
             </div>
         </AuthenticatedLayout>
     );

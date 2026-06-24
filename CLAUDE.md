@@ -43,11 +43,22 @@ Operational workload management platform (Asana-like task management + operation
 ### Org Hierarchy
 Division → Department → Team → Users (fixed hierarchy)
 
+### Projects
+- `name`, `description`, `status` (active/on_hold/completed/archived), `owner_id` (FK → users, nullable), `due_date`
+- Has many tasks
+
+### Tasks
+- `project_id` (FK → projects, cascadeOnDelete), `title`, `description`
+- `status` (backlog/to_do/in_progress/in_review/done/cancelled), `priority` (low/medium/high/urgent)
+- `assigned_to` (FK → users, nullable), `created_by` (FK → users, nullable), `due_date`, `position`
+
 ### Permissions
 - `manage-users`, `view-users`, `manage-roles`
 - `manage-divisions`, `view-divisions`
 - `manage-departments`, `view-departments`
 - `manage-teams`, `view-teams`
+- `manage-projects`, `view-projects`
+- `manage-tasks`, `view-tasks`
 
 ## Key Decisions
 - Public registration is disabled; new users are created by admins/privileged users via user management UI
@@ -60,13 +71,17 @@ Division → Department → Team → Users (fixed hierarchy)
 - Deleting a division cascades to departments and teams
 - Deleting a department cascades to teams
 - User team dropdown filters by selected department
+- Projects have flexible ownership — any active user can be assigned tasks
+- Project owners can edit their project and manage tasks within it
+- Task assignees can update their own tasks (status changes, etc.)
+- Deleting a project cascades to its tasks
 
 ## Phase Status
 
 ### Phase 1: Auth + Roles + Permissions — COMPLETE
 - Inertia.js + React configured
 - Login, Logout (registration disabled — users created via admin panel)
-- spatie roles & permissions seeded (5 roles, 3 permissions)
+- spatie roles & permissions seeded (5 roles, 9 permissions — Phase 2 added 6, Phase 3 added 4)
 - User management CRUD (admin only)
 - UserPolicy for authorization
 - HandleInertiaRequests shares auth data (user, roles, permissions, flash)
@@ -84,12 +99,28 @@ Division → Department → Team → Users (fixed hierarchy)
 - User forms updated with department/team dropdowns (team filters by department)
 - Sidebar organized into "Organization" and "Administration" sections
 
+### Phase 3: Projects & Tasks — COMPLETE
+- Project and Task models with full relationships
+- 2 migrations (projects, tasks)
+- 4 new permissions (manage-projects, view-projects, manage-tasks, view-tasks)
+- All roles get view-projects/view-tasks; supervisor gets manage-tasks; admin gets all
+- ProjectPolicy: create/delete for manage-projects; update for manage-projects OR owner
+- TaskPolicy: create for manage-tasks OR project owner; update adds assignee; delete for manage-tasks OR owner
+- ProjectController with full CRUD including show (task board)
+- TaskController nested under projects (create/store/edit/update/destroy)
+- Frontend: Projects Index/Create/Edit/Show; Tasks Create/Edit
+- Project show page displays task list with status/priority badges
+- Sidebar updated with Projects link (visible to all authenticated users)
+- Task statuses: backlog, to_do, in_progress, in_review, done, cancelled
+- Task priorities: low, medium, high, urgent
+- Project statuses: active, on_hold, completed, archived
+
 ## Running
 ```bash
 # Docker
 docker compose up -d
 
-# Fresh migrate & seed (required after Phase 2 — schema changed)
+# Fresh migrate & seed (required after Phase 3 — schema changed)
 php artisan migrate:fresh --seed
 
 # Dev server
@@ -110,6 +141,8 @@ app/
 │   │   ├── DashboardController.php
 │   │   ├── DepartmentController.php
 │   │   ├── DivisionController.php
+│   │   ├── ProjectController.php
+│   │   ├── TaskController.php
 │   │   ├── TeamController.php
 │   │   └── UserController.php
 │   ├── Middleware/
@@ -118,16 +151,20 @@ app/
 │       ├── Auth/
 │       │   ├── LoginRequest.php
 │       │   └── RegisterRequest.php
-│       ├── Store{Division,Department,Team,User}Request.php
-│       └── Update{Division,Department,Team,User}Request.php
+│       ├── Store{Division,Department,Team,User,Project,Task}Request.php
+│       └── Update{Division,Department,Team,User,Project,Task}Request.php
 ├── Models/
 │   ├── Department.php
 │   ├── Division.php
+│   ├── Project.php
+│   ├── Task.php
 │   ├── Team.php
 │   └── User.php
 ├── Policies/
 │   ├── DepartmentPolicy.php
 │   ├── DivisionPolicy.php
+│   ├── ProjectPolicy.php
+│   ├── TaskPolicy.php
 │   ├── TeamPolicy.php
 │   └── UserPolicy.php
 resources/js/
@@ -144,6 +181,10 @@ resources/js/
 │   │   ├── Index.jsx, Create.jsx, Edit.jsx
 │   ├── Divisions/
 │   │   ├── Index.jsx, Create.jsx, Edit.jsx
+│   ├── Projects/
+│   │   ├── Index.jsx, Create.jsx, Edit.jsx, Show.jsx
+│   ├── Tasks/
+│   │   ├── Create.jsx, Edit.jsx
 │   ├── Teams/
 │   │   ├── Index.jsx, Create.jsx, Edit.jsx
 │   └── Users/
@@ -155,7 +196,9 @@ database/
 │   ├── ...create_divisions_table.php
 │   ├── ...create_departments_table.php
 │   ├── ...create_teams_table.php
-│   └── ...update_users_table_org_structure.php
+│   ├── ...update_users_table_org_structure.php
+│   ├── ...create_projects_table.php
+│   └── ...create_tasks_table.php
 ├── seeders/
 │   ├── DatabaseSeeder.php
 │   ├── OrganizationSeeder.php

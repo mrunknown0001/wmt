@@ -11,6 +11,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolePermissionSeeder::class);
         $this->call(OrganizationSeeder::class);
+        $this->call(SettingSeeder::class);
 
         // Create default admin
         $admin = User::firstOrCreate(

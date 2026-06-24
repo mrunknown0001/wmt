@@ -1,37 +1,165 @@
-import { usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
+import Card from '../Components/Card';
+import Avatar from '../Components/Avatar';
+import StatusBadge from '../Components/StatusBadge';
+import PriorityBadge from '../Components/PriorityBadge';
+import EmptyState from '../Components/EmptyState';
+import LinkButton from '../Components/LinkButton';
+import { formatDate } from '../utils';
+
+function StatCard({ label, value, icon, color = 'blue', href }) {
+    const colors = {
+        blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+        green: 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+        purple: 'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+        red: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+    };
+
+    const content = (
+        <Card className="hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-4">
+                <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${colors[color]}`}>
+                    {icon}
+                </div>
+                <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{value}</p>
+                </div>
+            </div>
+        </Card>
+    );
+
+    return href ? <Link href={href} className="block">{content}</Link> : content;
+}
 
 export default function Dashboard() {
-    const { auth } = usePage().props;
+    const { auth, stats, recentProjects, myRecentTasks } = usePage().props;
+
+    const greeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good morning';
+        if (hour < 18) return 'Good afternoon';
+        return 'Good evening';
+    };
 
     return (
         <AuthenticatedLayout title="Dashboard">
-            <div className="max-w-4xl">
-                <h1 className="text-2xl font-semibold text-gray-800 mb-4">Dashboard</h1>
-                <div className="bg-white rounded-lg shadow p-6">
-                    <p className="text-gray-600">
-                        Welcome back, <span className="font-medium">{auth.user?.name}</span>.
+            <div>
+                <div className="mb-6">
+                    <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                        {greeting()}, {auth.user?.name}
+                    </h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </p>
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="bg-blue-50 rounded-lg p-4">
-                            <p className="text-sm text-blue-600 font-medium">Role</p>
-                            <p className="text-lg font-semibold text-blue-900 capitalize">
-                                {auth.user?.roles?.[0]?.replace('_', ' ')}
-                            </p>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <StatCard
+                        label="Total Projects"
+                        value={stats?.totalProjects ?? 0}
+                        href="/projects"
+                        color="blue"
+                        icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>}
+                    />
+                    <StatCard
+                        label="Active Projects"
+                        value={stats?.activeProjects ?? 0}
+                        color="green"
+                        icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
+                    />
+                    <StatCard
+                        label="My Tasks"
+                        value={stats?.myTasks ?? 0}
+                        color="purple"
+                        icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>}
+                    />
+                    <StatCard
+                        label="Overdue"
+                        value={stats?.overdueTasks ?? 0}
+                        color="red"
+                        icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                    />
+                </div>
+
+                {/* Two-column layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Recent Projects */}
+                    <Card padding={false}>
+                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Recent Projects</h2>
+                            <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">View all</Link>
                         </div>
-                        <div className="bg-green-50 rounded-lg p-4">
-                            <p className="text-sm text-green-600 font-medium">Department</p>
-                            <p className="text-lg font-semibold text-green-900">
-                                {auth.user?.department || 'Not set'}
-                            </p>
+                        {recentProjects?.length > 0 ? (
+                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {recentProjects.map((project) => (
+                                    <Link
+                                        key={project.id}
+                                        href={`/projects/${project.id}`}
+                                        className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <StatusBadge status={project.status} type="project" />
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {project.completed_tasks_count}/{project.tasks_count} tasks
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {project.owner && <Avatar name={project.owner.name} size="sm" />}
+                                    </Link>
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                title="No projects yet"
+                                description="Create your first project to get started"
+                                action={<LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
+                            />
+                        )}
+                    </Card>
+
+                    {/* My Upcoming Tasks */}
+                    <Card padding={false}>
+                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">My Upcoming Tasks</h2>
                         </div>
-                        <div className="bg-purple-50 rounded-lg p-4">
-                            <p className="text-sm text-purple-600 font-medium">Position</p>
-                            <p className="text-lg font-semibold text-purple-900">
-                                {auth.user?.position || 'Not set'}
-                            </p>
-                        </div>
-                    </div>
+                        {myRecentTasks?.length > 0 ? (
+                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {myRecentTasks.map((task) => {
+                                    const isOverdue = task.due_date && new Date(task.due_date) < new Date();
+                                    return (
+                                        <Link
+                                            key={task.id}
+                                            href={`/projects/${task.project_id}/tasks/${task.id}/edit`}
+                                            className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{task.title}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <PriorityBadge priority={task.priority} />
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">{task.project?.name}</span>
+                                                </div>
+                                            </div>
+                                            {task.due_date && (
+                                                <span className={`text-xs whitespace-nowrap ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                    {formatDate(task.due_date)}
+                                                </span>
+                                            )}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                title="No pending tasks"
+                                description="Tasks assigned to you will appear here"
+                            />
+                        )}
+                    </Card>
                 </div>
             </div>
         </AuthenticatedLayout>

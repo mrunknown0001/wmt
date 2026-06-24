@@ -1,15 +1,22 @@
 import { Head } from '@inertiajs/react';
+import ThemeToggle from '../Components/ThemeToggle';
 
 export default function GuestLayout({ children, title }) {
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen flex items-center justify-center bg-gray-100">
-                <div className="w-full max-w-md">
-                    <div className="bg-white shadow-md rounded-lg px-8 py-6">
-                        <h1 className="text-2xl font-semibold text-center text-gray-800 mb-6">
-                            WMT
-                        </h1>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 relative">
+                <div className="absolute top-4 right-4">
+                    <ThemeToggle className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
+                </div>
+                <div className="w-full max-w-md px-4">
+                    <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 px-8 py-8">
+                        <div className="text-center mb-8">
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+                                WMT
+                            </h1>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Workload Management Tool</p>
+                        </div>
                         {children}
                     </div>
                 </div>

@@ -1,0 +1,21 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateSettingRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user()->hasRole('admin');
+    }
+
+    public function rules(): array
+    {
+        return [
+            'app_name' => ['required', 'string', 'max:255'],
+            'primary_color' => ['required', 'string', 'in:blue,indigo,violet,teal,green,red,orange,rose'],
+        ];
+    }
+}
