@@ -1,19 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function InlinePopover({ isOpen, onClose, anchorRef, children, className = '' }) {
     const popoverRef = useRef(null);
     const [position, setPosition] = useState({ top: 0, left: 0 });
 
-    useEffect(() => {
-        if (isOpen && anchorRef?.current) {
-            const rect = anchorRef.current.getBoundingClientRect();
-            setPosition({
-                top: rect.bottom + window.scrollY + 4,
-                left: rect.left + window.scrollX,
-            });
-        }
-    }, [isOpen, anchorRef]);
+    useLayoutEffect(() => {
+        if (!isOpen || !anchorRef?.current || !popoverRef?.current) return;
+
+        const rect = anchorRef.current.getBoundingClientRect();
+        const popoverRect = popoverRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const openAbove = spaceBelow < popoverRect.height + 8 && rect.top > popoverRect.height + 8;
+
+        // Clamp left so popover doesn't overflow the right edge
+        const maxLeft = window.innerWidth - popoverRect.width - 8;
+        const left = Math.min(rect.left + window.scrollX, maxLeft);
+
+        setPosition({
+            top: openAbove
+                ? rect.top + window.scrollY - popoverRect.height - 4
+                : rect.bottom + window.scrollY + 4,
+            left: Math.max(8, left),
+        });
+    }, [isOpen, anchorRef, children]);
 
     useEffect(() => {
         if (!isOpen) return;

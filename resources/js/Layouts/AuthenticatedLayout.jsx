@@ -1,11 +1,13 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import NavLink from '../Components/NavLink';
 import NavSection from '../Components/NavSection';
 import Avatar from '../Components/Avatar';
 import Badge from '../Components/Badge';
 import FlashMessage from '../Components/FlashMessage';
 import ThemeToggle from '../Components/ThemeToggle';
+import NotificationBell from '../Components/NotificationBell';
+import NotificationToast from '../Components/NotificationToast';
 
 const HomeIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -66,6 +68,19 @@ export default function AuthenticatedLayout({ children, title }) {
     const { auth, flash, settings, unreadNotificationsCount } = usePage().props;
     const currentUrl = usePage().url;
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [toasts, setToasts] = useState([]);
+
+    const handleToast = useCallback((notification) => {
+        setToasts((prev) => {
+            // Deduplicate — two NotificationBell instances (sidebar + mobile) both fire this
+            if (prev.some((t) => t.id === notification.id)) return prev;
+            return [...prev, { id: notification.id, data: notification, timestamp: Date.now() }];
+        });
+    }, []);
+
+    const dismissToast = useCallback((id) => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, []);
 
     const hasPermission = (permission) => {
         return auth.user?.permissions?.includes(permission);
@@ -164,6 +179,7 @@ export default function AuthenticatedLayout({ children, title }) {
                         <Badge color="blue" className="mt-0.5">{auth.user?.roles?.[0]}</Badge>
                     </div>
                     <ThemeToggle className="text-gray-400 hover:text-white" />
+                    <NotificationBell onToast={handleToast} />
                     <button
                         onClick={handleLogout}
                         className="text-gray-400 hover:text-white transition-colors p-1"
@@ -212,6 +228,9 @@ export default function AuthenticatedLayout({ children, title }) {
                             </svg>
                         </button>
                         <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">{appName}</span>
+                        <div className="ml-auto">
+                            <NotificationBell onToast={handleToast} />
+                        </div>
                     </div>
 
                     {/* Content */}
@@ -223,6 +242,7 @@ export default function AuthenticatedLayout({ children, title }) {
                 {/* Flash messages */}
                 {flash?.success && <FlashMessage type="success" message={flash.success} />}
                 {flash?.error && <FlashMessage type="error" message={flash.error} />}
+                <NotificationToast toasts={toasts} onDismiss={dismissToast} />
             </div>
         </>
     );

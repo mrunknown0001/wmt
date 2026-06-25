@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
 
     // Inbox (Notifications)
     Route::get('/inbox', [NotificationController::class, 'index'])->name('inbox');
+    Route::get('/api/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
     Route::patch('/inbox/{id}/read', [NotificationController::class, 'markAsRead'])->name('inbox.read');
     Route::post('/inbox/read-all', [NotificationController::class, 'markAllAsRead'])->name('inbox.readAll');
 
