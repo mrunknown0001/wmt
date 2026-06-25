@@ -26,6 +26,9 @@ class StoreTaskRequest extends FormRequest
             'parent_id' => ['nullable', 'exists:tasks,id'],
             'collaborator_ids' => ['nullable', 'array'],
             'collaborator_ids.*' => ['exists:users,id'],
+            'is_recurring' => ['sometimes', 'boolean'],
+            'recurrence_frequency' => ['required_if:is_recurring,true', 'nullable', 'string', 'in:daily,weekly,monthly,yearly'],
+            'recurrence_interval' => ['required_if:is_recurring,true', 'nullable', 'integer', 'min:1', 'max:365'],
         ];
     }
 }

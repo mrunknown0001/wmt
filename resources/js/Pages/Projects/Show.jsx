@@ -284,6 +284,11 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
                         </button>
                     )}
                     <span>{task.title}</span>
+                    {task.is_recurring && (
+                        <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    )}
                     {task.subtasks_count > 0 && (
                         <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
                             {task.completed_subtasks_count}/{task.subtasks_count}
@@ -578,7 +583,13 @@ export default function Show() {
         apiFetch(`/projects/${project.id}/tasks/reorder`, {
             method: 'POST',
             body: JSON.stringify({ tasks: payload }),
-        });
+        }).then(async (res) => {
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.new_tasks?.length > 0) {
+                setLocalTasks((prev) => [...prev, ...data.new_tasks]);
+            }
+        }).catch(() => {});
     }, [project.id]);
 
     // Inline field update (optimistic)
@@ -595,8 +606,12 @@ export default function Show() {
         apiFetch(`/projects/${project.id}/tasks/${taskId}/patch`, {
             method: 'PATCH',
             body: JSON.stringify({ [field]: value }),
-        }).then((res) => {
-            if (!res.ok) setLocalTasks(serverTasks);
+        }).then(async (res) => {
+            if (!res.ok) { setLocalTasks(serverTasks); return; }
+            const data = await res.json();
+            if (data.recurring_task_created && data.new_task) {
+                setLocalTasks((prev) => [...prev, data.new_task]);
+            }
         }).catch(() => {
             setLocalTasks(serverTasks);
         });
@@ -624,8 +639,12 @@ export default function Show() {
         apiFetch(`/projects/${project.id}/tasks/${taskId}/patch`, {
             method: 'PATCH',
             body: JSON.stringify({ [field]: value }),
-        }).then((res) => {
-            if (!res.ok) setLocalTasks(serverTasks);
+        }).then(async (res) => {
+            if (!res.ok) { setLocalTasks(serverTasks); return; }
+            const data = await res.json();
+            if (data.recurring_task_created && data.new_task) {
+                setLocalTasks((prev) => [...prev, data.new_task]);
+            }
         }).catch(() => {
             setLocalTasks(serverTasks);
         });

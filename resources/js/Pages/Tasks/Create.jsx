@@ -11,7 +11,7 @@ import UserMultiSelect from '../../Components/UserMultiSelect';
 import { formatLabel } from '../../utils';
 
 export default function Create() {
-    const { project, parentTask, users, statuses, priorities } = usePage().props;
+    const { project, parentTask, users, statuses, priorities, recurrenceFrequencies } = usePage().props;
 
     const { data, setData, post, processing, errors } = useForm({
         title: '',
@@ -22,6 +22,9 @@ export default function Create() {
         due_date: '',
         collaborator_ids: [],
         parent_id: parentTask?.id || '',
+        is_recurring: false,
+        recurrence_frequency: 'weekly',
+        recurrence_interval: 1,
     });
 
     const handleSubmit = (e) => {
@@ -64,6 +67,55 @@ export default function Create() {
                             <Select label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(e) => setData('assigned_to', e.target.value || '')} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} />
                             <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
                         </div>
+
+                        {!parentTask && (
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.is_recurring}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setData({ ...data, is_recurring: true });
+                                            } else {
+                                                setData({ ...data, is_recurring: false, recurrence_frequency: 'weekly', recurrence_interval: 1 });
+                                            }
+                                        }}
+                                        className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                    />
+                                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Recurring task</span>
+                                </label>
+
+                                {data.is_recurring && (
+                                    <>
+                                        <div className="mt-3 grid grid-cols-2 gap-4">
+                                            <Input
+                                                label="Every"
+                                                id="recurrence_interval"
+                                                type="number"
+                                                min={1}
+                                                max={365}
+                                                value={data.recurrence_interval}
+                                                onChange={(e) => setData('recurrence_interval', parseInt(e.target.value) || 1)}
+                                                error={errors.recurrence_interval}
+                                            />
+                                            <Select
+                                                label="Frequency"
+                                                id="recurrence_frequency"
+                                                value={data.recurrence_frequency}
+                                                onChange={(e) => setData('recurrence_frequency', e.target.value)}
+                                                options={recurrenceFrequencies.map((f) => ({ value: f, label: formatLabel(f) }))}
+                                                error={errors.recurrence_frequency}
+                                            />
+                                        </div>
+                                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                            A new task will be created automatically when this task is marked as done.
+                                            {data.due_date && ' Next due date will be calculated from the current due date.'}
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        )}
 
                         <UserMultiSelect
                             label="Collaborators"

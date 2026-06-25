@@ -77,7 +77,14 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                     )}
                 </div>
             </div>
-            <p className={`text-sm font-medium mb-2 line-clamp-2 ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>{task.title}</p>
+            <div className={`flex items-start gap-1 mb-2 ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+                <p className="text-sm font-medium line-clamp-2">{task.title}</p>
+                {task.is_recurring && (
+                    <svg className="h-3.5 w-3.5 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                )}
+            </div>
             {task.subtasks_count > 0 && (
                 <div className="flex items-center gap-1.5 mb-2 text-xs text-gray-400 dark:text-gray-500">
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

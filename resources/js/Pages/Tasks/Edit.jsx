@@ -132,7 +132,7 @@ function CommentItem({ item, currentUserId, projectId, taskId }) {
 
 
 export default function Edit() {
-    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth } = usePage().props;
+    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -142,6 +142,9 @@ export default function Edit() {
         assigned_to: task.assigned_to || '',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         collaborator_ids: (task.collaborators || []).map((c) => c.id),
+        is_recurring: task.is_recurring || false,
+        recurrence_frequency: task.recurrence_frequency || 'weekly',
+        recurrence_interval: task.recurrence_interval || 1,
     });
 
     const [activeTab, setActiveTab] = useState('comments');
@@ -250,6 +253,55 @@ export default function Edit() {
                                 <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
                             </div>
 
+                            {!task.parent_id && (
+                                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.is_recurring}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setData({ ...data, is_recurring: true });
+                                                } else {
+                                                    setData({ ...data, is_recurring: false, recurrence_frequency: 'weekly', recurrence_interval: 1 });
+                                                }
+                                            }}
+                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Recurring task</span>
+                                    </label>
+
+                                    {data.is_recurring && (
+                                        <>
+                                            <div className="mt-3 grid grid-cols-2 gap-4">
+                                                <Input
+                                                    label="Every"
+                                                    id="recurrence_interval"
+                                                    type="number"
+                                                    min={1}
+                                                    max={365}
+                                                    value={data.recurrence_interval}
+                                                    onChange={(e) => setData('recurrence_interval', parseInt(e.target.value) || 1)}
+                                                    error={errors.recurrence_interval}
+                                                />
+                                                <Select
+                                                    label="Frequency"
+                                                    id="recurrence_frequency"
+                                                    value={data.recurrence_frequency}
+                                                    onChange={(e) => setData('recurrence_frequency', e.target.value)}
+                                                    options={(recurrenceFrequencies || []).map((f) => ({ value: f, label: formatLabel(f) }))}
+                                                    error={errors.recurrence_frequency}
+                                                />
+                                            </div>
+                                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                                A new task will be created automatically when this task is marked as done.
+                                                {data.due_date && ' Next due date will be calculated from the current due date.'}
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
                             <UserMultiSelect
                                 label="Collaborators"
                                 users={users}
@@ -291,6 +343,18 @@ export default function Edit() {
                             >
                                 Activities {totalActivities > 0 && <span className="ml-1 text-xs text-gray-400">({totalActivities})</span>}
                             </button>
+                            {recurrenceChain && recurrenceChain.length > 0 && (
+                                <button
+                                    onClick={() => setActiveTab('recurrence')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        activeTab === 'recurrence'
+                                            ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                    }`}
+                                >
+                                    Recurrence
+                                </button>
+                            )}
                         </div>
 
                         {/* Comments Tab */}
@@ -366,6 +430,62 @@ export default function Edit() {
                                     </div>
                                 )}
                             </>
+                        )}
+
+                        {/* Recurrence Tab */}
+                        {activeTab === 'recurrence' && recurrenceChain && recurrenceChain.length > 0 && (
+                            <div className="space-y-1">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                    Occurrence history ({recurrenceChain.length} total)
+                                </p>
+                                {recurrenceChain.map((item, index) => (
+                                    <div
+                                        key={item.id}
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+                                            item.is_current
+                                                ? 'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                        }`}
+                                    >
+                                        <div className="flex flex-col items-center w-4">
+                                            {index > 0 && <div className="w-px h-2 bg-gray-300 dark:bg-gray-600" />}
+                                            <div className={`h-2 w-2 rounded-full shrink-0 ${
+                                                item.status === 'done' ? 'bg-green-500' :
+                                                item.status === 'cancelled' ? 'bg-gray-400' :
+                                                item.is_current ? 'bg-primary-500' : 'bg-gray-300'
+                                            }`} />
+                                            {index < recurrenceChain.length - 1 && <div className="w-px h-2 bg-gray-300 dark:bg-gray-600" />}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            {item.is_current ? (
+                                                <span className="font-medium text-gray-900 dark:text-gray-100 truncate block">
+                                                    {item.title} <span className="text-xs text-gray-400">(current)</span>
+                                                </span>
+                                            ) : (
+                                                <Link
+                                                    href={`/projects/${item.project_id}/tasks/${item.id}/edit`}
+                                                    className="text-primary-600 dark:text-primary-400 hover:underline truncate block"
+                                                >
+                                                    {item.title}
+                                                </Link>
+                                            )}
+                                        </div>
+
+                                        <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                                            {item.due_date || 'No date'}
+                                        </span>
+
+                                        <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${
+                                            item.status === 'done' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                            item.status === 'cancelled' ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' :
+                                            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                        }`}>
+                                            {formatLabel(item.status)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </Card>
                 </div>

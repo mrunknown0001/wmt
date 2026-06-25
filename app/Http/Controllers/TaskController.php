@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
+use App\Services\RecurringTaskService;
 use App\Services\TaskActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -38,6 +39,7 @@ class TaskController extends Controller
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
+            'recurrenceFrequencies' => Task::RECURRENCE_FREQUENCIES,
         ]);
     }
 
@@ -114,6 +116,44 @@ class TaskController extends Controller
 
         $timeline = $comments->concat($activities)->sortByDesc('created_at')->values();
 
+        // Build recurrence chain
+        $recurrenceChain = [];
+        if ($task->is_recurring || $task->recurring_source_id) {
+            $current = $task;
+            $ancestors = [];
+            while ($current->recurring_source_id) {
+                $current = Task::select('id', 'title', 'status', 'due_date', 'recurring_source_id', 'project_id')
+                    ->find($current->recurring_source_id);
+                if (!$current) break;
+                array_unshift($ancestors, $current);
+                if (count($ancestors) > 10) break;
+            }
+
+            $descendants = [];
+            $next = Task::select('id', 'title', 'status', 'due_date', 'recurring_source_id', 'project_id')
+                ->where('recurring_source_id', $task->id)->first();
+            while ($next) {
+                $descendants[] = $next;
+                $next = Task::select('id', 'title', 'status', 'due_date', 'recurring_source_id', 'project_id')
+                    ->where('recurring_source_id', $next->id)->first();
+                if (count($descendants) > 10) break;
+            }
+
+            $recurrenceChain = collect($ancestors)
+                ->push($task)
+                ->concat($descendants)
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'title' => $t->title,
+                    'status' => $t->status,
+                    'due_date' => $t->due_date?->toDateString(),
+                    'is_current' => $t->id === $task->id,
+                    'project_id' => $t->project_id,
+                ])
+                ->values()
+                ->toArray();
+        }
+
         return Inertia::render('Tasks/Edit', [
             'project' => $project,
             'task' => $task,
@@ -123,6 +163,8 @@ class TaskController extends Controller
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
+            'recurrenceFrequencies' => Task::RECURRENCE_FREQUENCIES,
+            'recurrenceChain' => $recurrenceChain,
         ]);
     }
 
@@ -149,8 +191,10 @@ class TaskController extends Controller
             $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
         }
 
+        $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
+
         return redirect("/projects/{$project->id}")
-            ->with('success', 'Task updated successfully.');
+            ->with('success', $newTask ? 'Task completed. Next recurring occurrence created.' : 'Task updated successfully.');
     }
 
     public function destroy(Project $project, Task $task): RedirectResponse
@@ -184,10 +228,21 @@ class TaskController extends Controller
             $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
         }
 
-        return response()->json([
+        $response = [
             'success' => true,
             'task' => $task,
-        ]);
+        ];
+
+        if ($request->has('status')) {
+            $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
+            if ($newTask) {
+                $newTask->load('assignee', 'collaborators');
+                $response['recurring_task_created'] = true;
+                $response['new_task'] = $newTask;
+            }
+        }
+
+        return response()->json($response);
     }
 
     public function timeline(Request $request, Project $project, Task $task): JsonResponse
@@ -234,6 +289,18 @@ class TaskController extends Controller
             'tasks.*.position' => 'required|integer|min:0',
         ]);
 
+        // Pre-fetch recurring tasks that are transitioning to 'done'
+        $doneTaskIds = collect($validated['tasks'])->where('status', 'done')->pluck('id')->toArray();
+        $recurringDoneCandidates = [];
+        if (!empty($doneTaskIds)) {
+            $recurringDoneCandidates = Task::whereIn('id', $doneTaskIds)
+                ->where('project_id', $project->id)
+                ->where('is_recurring', true)
+                ->where('status', '!=', 'done')
+                ->get()
+                ->keyBy('id');
+        }
+
         foreach ($validated['tasks'] as $item) {
             Task::where('id', $item['id'])
                 ->where('project_id', $project->id)
@@ -243,6 +310,21 @@ class TaskController extends Controller
                 ]);
         }
 
-        return response()->json(['success' => true]);
+        // Generate next occurrences for recurring tasks that just moved to done
+        $newTasks = [];
+        foreach ($recurringDoneCandidates as $candidate) {
+            $oldStatus = $candidate->status;
+            $candidate->status = 'done';
+            $newTask = RecurringTaskService::generateNextIfCompleted($candidate, $oldStatus, $request->user());
+            if ($newTask) {
+                $newTask->load('assignee', 'collaborators');
+                $newTasks[] = $newTask;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'new_tasks' => $newTasks,
+        ]);
     }
 }
