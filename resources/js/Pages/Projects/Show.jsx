@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     DndContext,
@@ -45,6 +45,18 @@ const ListIcon = () => (
 const BoardIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+    </svg>
+);
+
+const CalendarIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+);
+
+const GanttIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h10M4 12h16M4 18h7" />
     </svg>
 );
 
@@ -376,6 +388,104 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
     );
 }
 
+// Board view wrapper with custom horizontal slider
+function BoardScrollWrapper({ children }) {
+    const scrollRef = useRef(null);
+    const trackRef = useRef(null);
+    const draggingRef = useRef(false);
+    const [thumb, setThumb] = useState({ width: 0, left: 0, visible: false });
+
+    const updateThumb = useCallback(() => {
+        const el = scrollRef.current;
+        const track = trackRef.current;
+        if (!el || !track) return;
+        const { scrollWidth, clientWidth, scrollLeft } = el;
+        if (scrollWidth <= clientWidth) {
+            setThumb({ width: 0, left: 0, visible: false });
+            return;
+        }
+        const trackW = track.clientWidth;
+        const tw = Math.max((clientWidth / scrollWidth) * trackW, 40);
+        const maxLeft = trackW - tw;
+        const ratio = scrollLeft / (scrollWidth - clientWidth);
+        setThumb({ width: tw, left: ratio * maxLeft, visible: true });
+    }, []);
+
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        updateThumb();
+        el.addEventListener('scroll', updateThumb, { passive: true });
+        const ro = new ResizeObserver(updateThumb);
+        ro.observe(el);
+        // Also observe the inner content for size changes
+        if (el.firstElementChild) ro.observe(el.firstElementChild);
+        return () => { el.removeEventListener('scroll', updateThumb); ro.disconnect(); };
+    }, [updateThumb]);
+
+    const handleThumbPointerDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const track = trackRef.current;
+        const el = scrollRef.current;
+        if (!track || !el) return;
+        draggingRef.current = true;
+        const startX = e.clientX;
+        const startLeft = thumb.left;
+        const trackW = track.clientWidth;
+        const maxThumbLeft = trackW - thumb.width;
+        const maxScroll = el.scrollWidth - el.clientWidth;
+
+        const onMove = (ev) => {
+            const dx = ev.clientX - startX;
+            const newLeft = Math.max(0, Math.min(maxThumbLeft, startLeft + dx));
+            el.scrollLeft = maxThumbLeft > 0 ? (newLeft / maxThumbLeft) * maxScroll : 0;
+        };
+        const onUp = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            setTimeout(() => { draggingRef.current = false; }, 0);
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+    };
+
+    const handleTrackClick = (e) => {
+        if (draggingRef.current) return;
+        const track = trackRef.current;
+        const el = scrollRef.current;
+        if (!track || !el) return;
+        const rect = track.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const maxThumbLeft = track.clientWidth - thumb.width;
+        const targetCenter = clickX - thumb.width / 2;
+        const ratio = Math.max(0, Math.min(1, targetCenter / maxThumbLeft));
+        el.scrollTo({ left: ratio * (el.scrollWidth - el.clientWidth), behavior: 'smooth' });
+    };
+
+    return (
+        <div>
+            <style>{`.board-no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
+            {children(scrollRef)}
+            {thumb.visible && (
+                <div className="mt-2 px-1">
+                    <div
+                        ref={trackRef}
+                        onClick={handleTrackClick}
+                        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer"
+                    >
+                        <div
+                            onPointerDown={handleThumbPointerDown}
+                            className="absolute top-0 h-2 rounded-full bg-gray-400 dark:bg-gray-500 hover:bg-gray-500 dark:hover:bg-gray-400 active:bg-blue-500 dark:active:bg-blue-400 transition-colors cursor-grab active:cursor-grabbing"
+                            style={{ width: `${thumb.width}px`, left: `${thumb.left}px` }}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function Show() {
     const { project, tasks: serverTasks, canManageProject, canManageTasks, auth, users } = usePage().props;
 
@@ -383,10 +493,16 @@ export default function Show() {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
     const [filterAssignee, setFilterAssignee] = useState('');
+    const [filterSearch, setFilterSearch] = useState('');
+    const [filterDueDate, setFilterDueDate] = useState('');
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [localTasks, setLocalTasks] = useState(serverTasks);
     const [activeId, setActiveId] = useState(null);
     const [expandedTasks, setExpandedTasks] = useState(new Set());
+    const [calendarMonth, setCalendarMonth] = useState(() => {
+        const now = new Date();
+        return { month: now.getMonth() + 1, year: now.getFullYear() };
+    });
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -406,14 +522,28 @@ export default function Show() {
     }, [localTasks]);
 
     // Filter tasks
+    const matchesFilters = useCallback((t) => {
+        if (filterStatus && t.status !== filterStatus) return false;
+        if (filterPriority && t.priority !== filterPriority) return false;
+        if (filterAssignee && String(t.assigned_to) !== filterAssignee) return false;
+        if (filterSearch && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false;
+        if (filterDueDate) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const dueDate = t.due_date ? new Date(t.due_date) : null;
+            if (dueDate) dueDate.setHours(0, 0, 0, 0);
+            switch (filterDueDate) {
+                case 'overdue': if (!dueDate || dueDate >= today) return false; break;
+                case 'today': if (!dueDate || dueDate.getTime() !== today.getTime()) return false; break;
+                case 'this_week': { const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() + 7); if (!dueDate || dueDate < today || dueDate > weekEnd) return false; break; }
+                case 'no_date': if (dueDate) return false; break;
+            }
+        }
+        return true;
+    }, [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate]);
+
     const filteredTasks = useMemo(() => {
-        return localTasks.filter((t) => {
-            if (filterStatus && t.status !== filterStatus) return false;
-            if (filterPriority && t.priority !== filterPriority) return false;
-            if (filterAssignee && String(t.assigned_to) !== filterAssignee) return false;
-            return true;
-        });
-    }, [localTasks, filterStatus, filterPriority, filterAssignee]);
+        return localTasks.filter(matchesFilters);
+    }, [localTasks, matchesFilters]);
 
     // Group filtered tasks by status for board view
     const tasksByStatus = useMemo(() => {
@@ -509,12 +639,7 @@ export default function Show() {
         if (!over || active.id === over.id) return;
 
         setLocalTasks((prev) => {
-            const filtered = prev.filter((t) => {
-                if (filterStatus && t.status !== filterStatus) return false;
-                if (filterPriority && t.priority !== filterPriority) return false;
-                if (filterAssignee && String(t.assigned_to) !== filterAssignee) return false;
-                return true;
-            });
+            const filtered = prev.filter(matchesFilters);
             const unfilteredIds = new Set(filtered.map((t) => t.id));
 
             const oldIndex = filtered.findIndex((t) => t.id === active.id);
@@ -538,7 +663,7 @@ export default function Show() {
             persistReorder(reordered);
             return result;
         });
-    }, [filterStatus, filterPriority, filterAssignee, persistReorder]);
+    }, [matchesFilters, persistReorder]);
 
     // --- Subtask drag handler (within a parent) ---
     const handleSubtaskDragEnd = useCallback((parentId, event) => {
@@ -697,7 +822,8 @@ export default function Show() {
         });
     }, []);
 
-    const hasActiveFilters = filterStatus || filterPriority || filterAssignee;
+    const hasActiveFilters = filterStatus || filterPriority || filterAssignee || filterSearch || filterDueDate;
+    const activeFilterCount = [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate].filter(Boolean).length;
 
     const activeTask = activeId ? localTasks.find((t) => t.id === activeId) : null;
 
@@ -790,9 +916,41 @@ export default function Show() {
                         >
                             <BoardIcon /> Board
                         </button>
+                        <button
+                            onClick={() => setView('calendar')}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                view === 'calendar'
+                                    ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                            }`}
+                        >
+                            <CalendarIcon /> Calendar
+                        </button>
+                        <button
+                            onClick={() => setView('gantt')}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                view === 'gantt'
+                                    ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                            }`}
+                        >
+                            <GanttIcon /> Gantt
+                        </button>
                     </div>
 
                     {/* Filters */}
+                    <div className="relative">
+                        <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            value={filterSearch}
+                            onChange={(e) => setFilterSearch(e.target.value)}
+                            placeholder="Search tasks..."
+                            className="pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-44"
+                        />
+                    </div>
                     <select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
@@ -823,12 +981,23 @@ export default function Show() {
                             <option key={a.id} value={a.id}>{a.name}</option>
                         ))}
                     </select>
+                    <select
+                        value={filterDueDate}
+                        onChange={(e) => setFilterDueDate(e.target.value)}
+                        className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                        <option value="">All Dates</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="today">Due Today</option>
+                        <option value="this_week">This Week</option>
+                        <option value="no_date">No Due Date</option>
+                    </select>
                     {hasActiveFilters && (
                         <button
-                            onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); }}
+                            onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterSearch(''); setFilterDueDate(''); }}
                             className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
                         >
-                            Clear
+                            Clear ({activeFilterCount})
                         </button>
                     )}
                 </div>
@@ -965,49 +1134,425 @@ export default function Show() {
 
             {/* Board View */}
             {view === 'board' && (
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCorners}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleBoardDragEnd}
-                >
-                    <div className="overflow-x-auto pb-4">
-                        <div className="inline-flex gap-4 min-w-full">
-                            {TASK_STATUSES.map((status) => (
-                                <KanbanColumn
-                                    key={status}
-                                    status={status}
-                                    tasks={tasksByStatus[status]}
-                                    projectId={project.id}
-                                    canManageTasks={canManageTasks}
-                                    auth={auth}
-                                    onDeleteTask={handleDeleteTask}
-                                    onToggleComplete={handleToggleComplete}
-                                />
+                <BoardScrollWrapper>
+                    {(boardScrollRef) => (
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCorners}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleBoardDragEnd}
+                        >
+                            <div ref={boardScrollRef} className="overflow-x-auto pb-2 board-no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+                                <div className="inline-flex gap-4 min-w-full">
+                                    {TASK_STATUSES.map((status) => (
+                                        <KanbanColumn
+                                            key={status}
+                                            status={status}
+                                            tasks={tasksByStatus[status]}
+                                            projectId={project.id}
+                                            canManageTasks={canManageTasks}
+                                            auth={auth}
+                                            onDeleteTask={handleDeleteTask}
+                                            onToggleComplete={handleToggleComplete}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <DragOverlay>
+                                {activeTask ? (
+                                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg w-65 rotate-2">
+                                        <div className="flex items-center gap-1.5 mb-2">
+                                            <PriorityBadge priority={activeTask.priority} />
+                                        </div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 line-clamp-2">{activeTask.title}</p>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5">
+                                                {activeTask.assignee && <Avatar name={activeTask.assignee.name} size="sm" />}
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{activeTask.assignee?.name || 'Unassigned'}</span>
+                                            </div>
+                                            {activeTask.due_date && (
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(activeTask.due_date)}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </DragOverlay>
+                        </DndContext>
+                    )}
+                </BoardScrollWrapper>
+            )}
+
+            {/* Calendar View */}
+            {view === 'calendar' && (() => {
+                const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                const PRIORITY_PILL = {
+                    urgent: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
+                    high: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800',
+                    medium: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
+                    low: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-700/40 dark:text-gray-300 dark:border-gray-600',
+                };
+                const PRIORITY_DOT = { urgent: 'bg-red-500', high: 'bg-orange-500', medium: 'bg-blue-500', low: 'bg-gray-400' };
+                const { month, year } = calendarMonth;
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+                // Flatten all tasks (parents + subtasks) with due dates
+                const allTasks = [];
+                filteredTasks.forEach((t) => {
+                    allTasks.push(t);
+                    if (t.subtasks) t.subtasks.forEach((s) => allTasks.push(s));
+                });
+
+                // Group by date
+                const tasksByDate = new Map();
+                allTasks.forEach((t) => {
+                    const key = t.due_date?.split('T')[0];
+                    if (!key) return;
+                    if (!tasksByDate.has(key)) tasksByDate.set(key, []);
+                    tasksByDate.get(key).push(t);
+                });
+
+                // Build calendar grid
+                const first = new Date(year, month - 1, 1);
+                const startDay = first.getDay();
+                const daysInMonth = new Date(year, month, 0).getDate();
+                const daysInPrevMonth = new Date(year, month - 1, 0).getDate();
+                const cells = [];
+                for (let i = startDay - 1; i >= 0; i--) {
+                    const d = daysInPrevMonth - i;
+                    const m = month === 1 ? 12 : month - 1;
+                    const y = month === 1 ? year - 1 : year;
+                    cells.push({ date: new Date(y, m - 1, d), dateStr: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, outside: true });
+                }
+                for (let d = 1; d <= daysInMonth; d++) {
+                    cells.push({ date: new Date(year, month - 1, d), dateStr: `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`, outside: false });
+                }
+                const remaining = 7 - (cells.length % 7);
+                if (remaining < 7) {
+                    const nm = month === 12 ? 1 : month + 1;
+                    const ny = month === 12 ? year + 1 : year;
+                    for (let d = 1; d <= remaining; d++) {
+                        cells.push({ date: new Date(ny, nm - 1, d), dateStr: `${ny}-${String(nm).padStart(2, '0')}-${String(d).padStart(2, '0')}`, outside: true });
+                    }
+                }
+                const weeks = [];
+                for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+                return (
+                    <div>
+                        {/* Month navigation */}
+                        <div className="flex items-center gap-2 mb-4">
+                            <button
+                                onClick={() => setCalendarMonth((p) => p.month === 1 ? { month: 12, year: p.year - 1 } : { month: p.month - 1, year: p.year })}
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+                            >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 min-w-[180px] text-center">
+                                {MONTHS[month - 1]} {year}
+                            </h3>
+                            <button
+                                onClick={() => setCalendarMonth((p) => p.month === 12 ? { month: 1, year: p.year + 1 } : { month: p.month + 1, year: p.year })}
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+                            >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <button
+                                onClick={() => { const now = new Date(); setCalendarMonth({ month: now.getMonth() + 1, year: now.getFullYear() }); }}
+                                className="ml-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                Today
+                            </button>
+                        </div>
+
+                        {/* Calendar grid */}
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <div className="grid grid-cols-7 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+                                {DAYS.map((day) => (
+                                    <div key={day} className="px-2 py-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{day}</div>
+                                ))}
+                            </div>
+                            {weeks.map((week, wi) => (
+                                <div key={wi} className="grid grid-cols-7 divide-x divide-gray-200 dark:divide-gray-700">
+                                    {week.map((cell) => {
+                                        const dayTasks = tasksByDate.get(cell.dateStr) || [];
+                                        const isToday = cell.dateStr === todayStr;
+                                        const visible = dayTasks.slice(0, 3);
+                                        const overflow = dayTasks.length - 3;
+                                        return (
+                                            <div
+                                                key={cell.dateStr}
+                                                className={`min-h-[100px] border-t border-gray-200 dark:border-gray-700 p-1 ${cell.outside ? 'bg-gray-50/50 dark:bg-gray-800/30' : 'bg-white dark:bg-gray-800'}`}
+                                            >
+                                                <div className="flex items-center justify-between mb-0.5">
+                                                    <span className={`text-xs font-medium h-6 w-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : cell.outside ? 'text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                        {cell.date.getDate()}
+                                                    </span>
+                                                    {dayTasks.length > 0 && cell.outside && (
+                                                        <span className="flex gap-0.5">
+                                                            {dayTasks.slice(0, 3).map((t) => (
+                                                                <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${PRIORITY_DOT[t.priority] || PRIORITY_DOT.low}`} />
+                                                            ))}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {!cell.outside && (
+                                                    <div className="space-y-0.5">
+                                                        {visible.map((task) => (
+                                                            <Link
+                                                                key={task.id}
+                                                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                                                className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
+                                                                title={task.title}
+                                                            >
+                                                                {task.title}
+                                                            </Link>
+                                                        ))}
+                                                        {overflow > 0 && (
+                                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1">+{overflow} more</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex items-center gap-4 mt-3 px-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Priority:</span>
+                            {Object.entries(PRIORITY_DOT).map(([key, cls]) => (
+                                <span key={key} className="flex items-center gap-1">
+                                    <span className={`h-2 w-2 rounded-full ${cls}`} />
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{key}</span>
+                                </span>
                             ))}
                         </div>
                     </div>
-                    <DragOverlay>
-                        {activeTask ? (
-                            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg w-65 rotate-2">
-                                <div className="flex items-center gap-1.5 mb-2">
-                                    <PriorityBadge priority={activeTask.priority} />
-                                </div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 line-clamp-2">{activeTask.title}</p>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                        {activeTask.assignee && <Avatar name={activeTask.assignee.name} size="sm" />}
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">{activeTask.assignee?.name || 'Unassigned'}</span>
+                );
+            })()}
+
+            {/* Gantt View */}
+            {view === 'gantt' && (() => {
+                const PRIORITY_BAR = {
+                    urgent: 'bg-red-500',
+                    high: 'bg-orange-500',
+                    medium: 'bg-blue-500',
+                    low: 'bg-gray-400',
+                };
+                const STATUS_OPACITY = { done: 'opacity-50', cancelled: 'opacity-30' };
+
+                // Flatten all tasks with due dates for range calculation
+                const allTasks = [];
+                filteredTasks.forEach((t) => {
+                    allTasks.push({ ...t, isSubtask: false });
+                    if (t.subtasks) t.subtasks.forEach((s) => allTasks.push({ ...s, isSubtask: true, parentTitle: t.title }));
+                });
+
+                const tasksWithDate = allTasks.filter((t) => t.due_date);
+                const tasksNoDate = allTasks.filter((t) => !t.due_date);
+
+                // Calculate date range
+                let rangeStart, rangeEnd;
+                if (tasksWithDate.length > 0) {
+                    const dates = tasksWithDate.map((t) => new Date(t.due_date.split('T')[0]));
+                    const minDate = new Date(Math.min(...dates));
+                    const maxDate = new Date(Math.max(...dates));
+                    // Pad range by 3 days on each side
+                    rangeStart = new Date(minDate);
+                    rangeStart.setDate(rangeStart.getDate() - 3);
+                    rangeEnd = new Date(maxDate);
+                    rangeEnd.setDate(rangeEnd.getDate() + 3);
+                    // Minimum 14 days range
+                    const diffDays = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 14) {
+                        rangeEnd = new Date(rangeStart);
+                        rangeEnd.setDate(rangeEnd.getDate() + 14);
+                    }
+                } else {
+                    const now = new Date();
+                    rangeStart = new Date(now);
+                    rangeStart.setDate(rangeStart.getDate() - 3);
+                    rangeEnd = new Date(now);
+                    rangeEnd.setDate(rangeEnd.getDate() + 14);
+                }
+
+                // Generate day columns
+                const days = [];
+                const d = new Date(rangeStart);
+                while (d <= rangeEnd) {
+                    days.push(new Date(d));
+                    d.setDate(d.getDate() + 1);
+                }
+
+                const todayStr = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; })();
+                const COL_WIDTH = 40; // px per day column
+                const totalWidth = days.length * COL_WIDTH;
+
+                // Group days by month for header
+                const monthGroups = [];
+                let current = null;
+                days.forEach((day, idx) => {
+                    const key = `${day.getFullYear()}-${day.getMonth()}`;
+                    if (!current || current.key !== key) {
+                        current = { key, label: day.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), start: idx, span: 1 };
+                        monthGroups.push(current);
+                    } else {
+                        current.span++;
+                    }
+                });
+
+                const getDayOffset = (dateStr) => {
+                    const target = new Date(dateStr.split('T')[0]);
+                    return Math.round((target - rangeStart) / (1000 * 60 * 60 * 24));
+                };
+
+                return (
+                    <div>
+                        {tasksWithDate.length === 0 && tasksNoDate.length === 0 ? (
+                            <EmptyState
+                                title="No tasks to display"
+                                description="Add tasks with due dates to see them on the Gantt chart."
+                            />
+                        ) : (
+                            <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <div style={{ minWidth: `${240 + totalWidth}px` }}>
+                                        {/* Header: month row */}
+                                        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="w-60 shrink-0 px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase border-r border-gray-200 dark:border-gray-700">Task</div>
+                                            <div className="flex">
+                                                {monthGroups.map((mg) => (
+                                                    <div key={mg.key} style={{ width: `${mg.span * COL_WIDTH}px` }} className="text-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 py-1.5 border-r border-gray-100 dark:border-gray-700/50">{mg.label}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Header: day row */}
+                                        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="w-60 shrink-0 border-r border-gray-200 dark:border-gray-700" />
+                                            <div className="flex">
+                                                {days.map((day) => {
+                                                    const ds = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+                                                    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                                                    return (
+                                                        <div
+                                                            key={ds}
+                                                            style={{ width: `${COL_WIDTH}px` }}
+                                                            className={`text-center text-[10px] py-1 border-r border-gray-100 dark:border-gray-700/50 ${ds === todayStr ? 'bg-blue-50 dark:bg-blue-900/20 font-bold text-blue-600 dark:text-blue-400' : isWeekend ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}
+                                                        >
+                                                            <div>{day.getDate()}</div>
+                                                            <div className="text-[9px]">{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][day.getDay()]}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Task rows */}
+                                        {tasksWithDate.map((task) => {
+                                            const offset = getDayOffset(task.due_date);
+                                            const isDone = task.status === 'done';
+                                            const barColor = PRIORITY_BAR[task.priority] || PRIORITY_BAR.low;
+                                            const opacityCls = STATUS_OPACITY[task.status] || '';
+                                            return (
+                                                <div key={task.id} className={`flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${opacityCls}`}>
+                                                    <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
+                                                        <Link
+                                                            href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                                            className={`text-sm truncate block max-w-full hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
+                                                            title={task.title}
+                                                        >
+                                                            {task.isSubtask && (
+                                                                <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                                            )}
+                                                            {task.title}
+                                                        </Link>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            {task.assignee && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate">{task.assignee.name}</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="relative flex-1" style={{ width: `${totalWidth}px` }}>
+                                                        {/* Grid lines */}
+                                                        <div className="absolute inset-0 flex">
+                                                            {days.map((day) => {
+                                                                const ds = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+                                                                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                                                                return (
+                                                                    <div
+                                                                        key={ds}
+                                                                        style={{ width: `${COL_WIDTH}px` }}
+                                                                        className={`border-r border-gray-100 dark:border-gray-700/30 ${ds === todayStr ? 'bg-blue-50/50 dark:bg-blue-900/10' : isWeekend ? 'bg-gray-50/30 dark:bg-gray-800/20' : ''}`}
+                                                                    />
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {/* Task bar (diamond marker on due date) */}
+                                                        {offset >= 0 && offset < days.length && (
+                                                            <Link
+                                                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                                                className="absolute top-1/2 -translate-y-1/2 group z-10"
+                                                                style={{ left: `${offset * COL_WIDTH + COL_WIDTH / 2 - 12}px` }}
+                                                                title={`${task.title} — Due: ${formatDate(task.due_date)} — ${formatLabel(task.status)}`}
+                                                            >
+                                                                <div className={`h-5 w-24 rounded-full ${barColor} shadow-sm group-hover:shadow-md transition-shadow flex items-center justify-center`}>
+                                                                    <span className="text-[9px] text-white font-medium truncate px-1.5">{task.title}</span>
+                                                                </div>
+                                                            </Link>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {/* Tasks without due date */}
+                                        {tasksNoDate.length > 0 && (
+                                            <>
+                                                <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30">
+                                                    <div className="w-60 shrink-0 px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700">No Due Date</div>
+                                                    <div className="flex-1" />
+                                                </div>
+                                                {tasksNoDate.map((task) => (
+                                                    <div key={task.id} className="flex border-b border-gray-100 dark:border-gray-700/50">
+                                                        <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
+                                                            <Link
+                                                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                                                className="text-sm text-gray-500 dark:text-gray-400 truncate block hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                            >
+                                                                {task.isSubtask && (
+                                                                    <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                                                )}
+                                                                {task.title}
+                                                            </Link>
+                                                        </div>
+                                                        <div className="flex-1 flex items-center px-4">
+                                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">No due date set</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        )}
                                     </div>
-                                    {activeTask.due_date && (
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(activeTask.due_date)}</span>
-                                    )}
                                 </div>
                             </div>
-                        ) : null}
-                    </DragOverlay>
-                </DndContext>
-            )}
+                        )}
+
+                        {/* Legend */}
+                        <div className="flex items-center gap-4 mt-3 px-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Priority:</span>
+                            {Object.entries(PRIORITY_BAR).map(([key, cls]) => (
+                                <span key={key} className="flex items-center gap-1">
+                                    <span className={`h-2 w-6 rounded-full ${cls}`} />
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{key}</span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Confirm Delete Modal */}
             <ConfirmModal

@@ -11,6 +11,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\MyTaskController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\UserController;
@@ -42,6 +43,9 @@ Route::middleware('auth')->group(function () {
 
     // My Tasks
     Route::get('/my-tasks', [MyTaskController::class, 'index'])->name('my-tasks');
+
+    // Calendar
+    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
 
     // User management (admin)
     Route::resource('users', UserController::class)->except(['show']);

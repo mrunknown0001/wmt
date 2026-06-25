@@ -7,23 +7,38 @@ use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ProjectController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', Project::class);
 
-        $projects = Project::with('owner')
+        $query = Project::with('owner')
             ->withCount('tasks')
-            ->withCount(['tasks as completed_tasks_count' => fn ($query) => $query->where('status', 'done')])
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        $projects = $query->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
 
         return Inertia::render('Projects/Index', [
             'projects' => $projects,
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'status' => $request->input('status', ''),
+            ],
         ]);
     }
 
