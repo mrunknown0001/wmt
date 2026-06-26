@@ -1,9 +1,12 @@
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
-import { useEffect, useCallback } from 'react';
+import Mention from '@tiptap/extension-mention';
+import { useEffect, useCallback, useMemo } from 'react';
+import tippy from 'tippy.js';
+import MentionList from './MentionList';
 
 function ToolbarButton({ onClick, active, title, children }) {
     return (
@@ -66,9 +69,60 @@ function Toolbar({ editor }) {
     );
 }
 
-export default function RichTextEditor({ label, id, value, onChange, error, placeholder, className = '', minimal = false }) {
-    const editor = useEditor({
-        extensions: [
+export default function RichTextEditor({ label, id, value, onChange, error, placeholder, className = '', minimal = false, users = [] }) {
+    const suggestion = useMemo(() => ({
+        items: ({ query }) => {
+            return users
+                .filter((u) => u.name.toLowerCase().includes(query.toLowerCase()))
+                .slice(0, 8)
+                .map((u) => ({ id: u.id, label: u.name }));
+        },
+        render: () => {
+            let component;
+            let popup;
+
+            return {
+                onStart: (props) => {
+                    component = new ReactRenderer(MentionList, {
+                        props,
+                        editor: props.editor,
+                    });
+
+                    if (!props.clientRect) return;
+
+                    popup = tippy('body', {
+                        getReferenceClientRect: props.clientRect,
+                        appendTo: () => document.body,
+                        content: component.element,
+                        showOnCreate: true,
+                        interactive: true,
+                        trigger: 'manual',
+                        placement: 'bottom-start',
+                    });
+                },
+                onUpdate: (props) => {
+                    component?.updateProps(props);
+                    if (props.clientRect && popup?.[0]) {
+                        popup[0].setProps({ getReferenceClientRect: props.clientRect });
+                    }
+                },
+                onKeyDown: (props) => {
+                    if (props.event.key === 'Escape') {
+                        popup?.[0]?.hide();
+                        return true;
+                    }
+                    return component?.ref?.onKeyDown(props) || false;
+                },
+                onExit: () => {
+                    popup?.[0]?.destroy();
+                    component?.destroy();
+                },
+            };
+        },
+    }), [users]);
+
+    const extensions = useMemo(() => {
+        const exts = [
             StarterKit.configure({
                 heading: minimal ? false : { levels: [2, 3] },
                 codeBlock: false,
@@ -84,11 +138,30 @@ export default function RichTextEditor({ label, id, value, onChange, error, plac
             Placeholder.configure({
                 placeholder: placeholder || '',
             }),
-        ],
+        ];
+
+        if (users.length > 0) {
+            exts.push(
+                Mention.configure({
+                    HTMLAttributes: {
+                        class: 'mention',
+                    },
+                    suggestion,
+                    renderHTML({ node }) {
+                        return ['span', { class: 'mention', 'data-id': node.attrs.id, 'data-label': node.attrs.label }, `@${node.attrs.label}`];
+                    },
+                })
+            );
+        }
+
+        return exts;
+    }, [minimal, placeholder, users.length > 0]);
+
+    const editor = useEditor({
+        extensions,
         content: value || '',
         onUpdate: ({ editor }) => {
             const html = editor.getHTML();
-            // If content is just an empty paragraph, treat as empty
             onChange(html === '<p></p>' ? '' : html);
         },
         editorProps: {

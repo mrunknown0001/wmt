@@ -14,6 +14,10 @@ function notificationMessage(data) {
             return <>Task <strong>{data.task_title}</strong> is overdue</>;
         case 'task_comment_mention':
             return <><strong>{data.mentioned_by}</strong> mentioned you in <strong>{data.task_title}</strong></>;
+        case 'task_comment':
+            return <><strong>{data.commented_by}</strong> commented on <strong>{data.task_title}</strong></>;
+        case 'subtask_comment':
+            return <><strong>{data.commented_by}</strong> commented on subtask <strong>{data.task_title}</strong></>;
         case 'comment_deleted':
             return <><strong>{data.deleted_by}</strong> deleted a comment mentioning you in <strong>{data.task_title}</strong></>;
         default:

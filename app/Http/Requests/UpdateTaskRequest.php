@@ -35,6 +35,26 @@ class UpdateTaskRequest extends FormRequest
         ];
     }
 
+    public function validated($key = null, $default = null): mixed
+    {
+        $validated = parent::validated($key, $default);
+
+        if ($key !== null) {
+            return $validated;
+        }
+
+        // Only admins and project owners can change assignee and dates
+        $task = $this->route('task');
+        $canManage = $this->user()->can('manage-tasks')
+            || $task->project->owner_id === $this->user()->id;
+
+        if (!$canManage) {
+            unset($validated['assigned_to'], $validated['start_date'], $validated['due_date']);
+        }
+
+        return $validated;
+    }
+
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {

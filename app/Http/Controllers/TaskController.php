@@ -159,6 +159,9 @@ class TaskController extends Controller
                 ->toArray();
         }
 
+        $canManageTaskDetails = auth()->user()->can('manage-tasks')
+            || $project->owner_id === auth()->id();
+
         return Inertia::render('Tasks/Edit', [
             'project' => $project,
             'task' => $task,
@@ -170,6 +173,7 @@ class TaskController extends Controller
             'priorities' => ['low', 'medium', 'high', 'urgent'],
             'recurrenceFrequencies' => Task::RECURRENCE_FREQUENCIES,
             'recurrenceChain' => $recurrenceChain,
+            'canManageTaskDetails' => $canManageTaskDetails,
         ]);
     }
 

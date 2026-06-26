@@ -5,6 +5,7 @@ import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
+import SearchableSelect from '../../Components/SearchableSelect';
 import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
@@ -140,7 +141,7 @@ function CommentItem({ item, currentUserId, projectId, taskId }) {
 
 
 export default function Edit() {
-    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain } = usePage().props;
+    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -266,16 +267,16 @@ export default function Edit() {
                                 <Select label="Priority" id="priority" value={data.priority} onChange={(e) => setData('priority', e.target.value)} options={priorities.map((p) => ({ value: p, label: formatLabel(p) }))} error={errors.priority} />
                             </div>
 
-                            <Select label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(e) => setData('assigned_to', e.target.value || '')} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} />
+                            <SearchableSelect label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(val) => setData('assigned_to', val)} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} disabled={!canManageTaskDetails} showAvatar />
 
                             <div>
                                 <div className="grid grid-cols-2 gap-4">
                                     {showStartDate && (
-                                        <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} error={errors.start_date} />
+                                        <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} error={errors.start_date} disabled={!canManageTaskDetails} />
                                     )}
-                                    <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                                    <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} disabled={!canManageTaskDetails} />
                                 </div>
-                                {!showStartDate && (
+                                {!showStartDate && canManageTaskDetails && (
                                     <button
                                         type="button"
                                         onClick={() => setShowStartDate(true)}
@@ -284,7 +285,7 @@ export default function Edit() {
                                         + Add start date
                                     </button>
                                 )}
-                                {showStartDate && (
+                                {showStartDate && canManageTaskDetails && (
                                     <button
                                         type="button"
                                         onClick={() => { setShowStartDate(false); setData('start_date', ''); }}
@@ -406,8 +407,9 @@ export default function Edit() {
                                     <RichTextEditor
                                         value={commentBody}
                                         onChange={setCommentBody}
-                                        placeholder="Leave a comment..."
+                                        placeholder="Leave a comment... Use @ to mention someone"
                                         minimal
+                                        users={users}
                                     />
                                     <div className="flex justify-end mt-2">
                                         <Button type="submit" size="sm" processing={posting} processingText="Posting..." disabled={!commentBody || commentBody === '<p></p>'}>

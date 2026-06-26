@@ -15,6 +15,8 @@
 }
 
 /* TipTap editor content styles */
+.prose.prose-sm { color: #111827; }
+.dark .prose.prose-sm { color: #f3f4f6; }
 .prose.prose-sm ul { list-style-type: disc; padding-left: 1.25em; }
 .prose.prose-sm ol { list-style-type: decimal; padding-left: 1.25em; }
 .prose.prose-sm li { margin-top: 0.25em; margin-bottom: 0.25em; }
@@ -24,10 +26,25 @@
 .rich-text ul { list-style-type: disc; padding-left: 1.25em; }
 .rich-text ol { list-style-type: decimal; padding-left: 1.25em; }
 .rich-text li { margin-top: 0.125em; margin-bottom: 0.125em; }
-.rich-text a { text-decoration: underline; }
+.rich-text a { text-decoration: underline; color: var(--color-primary-600); }
+.dark .rich-text a { color: var(--color-primary-400); }
 .rich-text p { margin-top: 0.125em; margin-bottom: 0.125em; }
 .rich-text p:first-child { margin-top: 0; }
 .rich-text p:last-child { margin-bottom: 0; }
+
+/* Mention styles (editor + rendered content) */
+.mention {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.dark .mention {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+}
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

@@ -31,6 +31,10 @@ function notificationMessage(data) {
             return <>Task <strong>{data.task_title}</strong> in {data.project_name} is overdue</>;
         case 'task_comment_mention':
             return <><strong>{data.mentioned_by}</strong> mentioned you in a comment on <strong>{data.task_title}</strong> in {data.project_name}</>;
+        case 'task_comment':
+            return <><strong>{data.commented_by}</strong> commented on <strong>{data.task_title}</strong> in {data.project_name}</>;
+        case 'subtask_comment':
+            return <><strong>{data.commented_by}</strong> commented on subtask <strong>{data.task_title}</strong> in {data.project_name}</>;
         case 'comment_deleted':
             return <><strong>{data.deleted_by}</strong> deleted a comment mentioning you in <strong>{data.task_title}</strong> in {data.project_name}</>;
         default:
@@ -68,6 +72,15 @@ function notificationIcon(type) {
             return (
                 <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
                     <svg className="h-4 w-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                </div>
+            );
+        case 'task_comment':
+        case 'subtask_comment':
+            return (
+                <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                     </svg>
                 </div>

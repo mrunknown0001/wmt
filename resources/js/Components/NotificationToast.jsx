@@ -8,6 +8,12 @@ function toastMessage(data) {
             return `Task "${data.task_title}" is due tomorrow`;
         case 'task_overdue':
             return `Task "${data.task_title}" is overdue`;
+        case 'task_comment':
+            return `${data.commented_by} commented on "${data.task_title}"`;
+        case 'subtask_comment':
+            return `${data.commented_by} commented on subtask "${data.task_title}"`;
+        case 'task_comment_mention':
+            return `${data.mentioned_by} mentioned you in "${data.task_title}"`;
         default:
             return 'New notification';
     }

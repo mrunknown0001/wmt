@@ -5,6 +5,7 @@ import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
+import SearchableSelect from '../../Components/SearchableSelect';
 import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
@@ -68,7 +69,7 @@ export default function Create() {
                             <Select label="Priority" id="priority" value={data.priority} onChange={(e) => setData('priority', e.target.value)} options={priorities.map((p) => ({ value: p, label: formatLabel(p) }))} error={errors.priority} />
                         </div>
 
-                        <Select label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(e) => setData('assigned_to', e.target.value || '')} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} />
+                        <SearchableSelect label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(val) => setData('assigned_to', val)} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} showAvatar />
 
                         <div>
                             <div className="grid grid-cols-2 gap-4">

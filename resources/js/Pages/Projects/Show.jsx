@@ -74,7 +74,7 @@ const TrashIcon = () => (
 );
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, onToggleComplete, users, onTaskUpdate }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate }) {
     const {
         attributes,
         listeners,
@@ -156,7 +156,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, handle
                 )}
             </td>
             <td className="px-6 py-3 text-sm">
-                {canEditTask ? (
+                {canManageTaskDetails ? (
                     <AssigneePicker
                         currentAssignee={task.assignee}
                         users={users}
@@ -179,7 +179,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, handle
             </td>
             <td className="px-6 py-3 text-sm">
                 <div className="flex items-center gap-1">
-                    {canEditTask ? (
+                    {canManageTaskDetails ? (
                         <>
                             {task.start_date && (
                                 <>
@@ -258,7 +258,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, handle
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect }) {
     const {
         attributes,
         listeners,
@@ -367,7 +367,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
             </td>
             <td className="px-6 py-4 text-sm">
                 <div className="flex items-center gap-2">
-                    {canEditTask ? (
+                    {canManageTaskDetails ? (
                         <AssigneePicker
                             currentAssignee={task.assignee}
                             users={users}
@@ -399,7 +399,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
             </td>
             <td className="px-6 py-4 text-sm">
                 <div className="flex items-center gap-1">
-                    {canEditTask ? (
+                    {canManageTaskDetails ? (
                         <>
                             {task.start_date && (
                                 <>
@@ -1570,6 +1570,7 @@ export default function Show() {
                                                                         project={project}
                                                                         canEditTask={canEditTask(task)}
                                                                         canManageTasks={canManageTasks}
+                                                                        canManageTaskDetails={canManageTasks}
                                                                         handleDeleteTask={handleDeleteTask}
                                                                         users={users}
                                                                         onTaskUpdate={handleInlineUpdate}
@@ -1593,6 +1594,7 @@ export default function Show() {
                                                                                         project={project}
                                                                                         canEditTask={canEditTask(sub)}
                                                                                         canManageTasks={canManageTasks}
+                                                                                        canManageTaskDetails={canManageTasks}
                                                                                         handleDeleteTask={handleDeleteTask}
                                                                                         onToggleComplete={handleToggleComplete}
                                                                                         users={users}
@@ -1661,6 +1663,7 @@ export default function Show() {
                                                             project={project}
                                                             canEditTask={canEditTask(task)}
                                                             canManageTasks={canManageTasks}
+                                                            canManageTaskDetails={canManageTasks}
                                                             handleDeleteTask={handleDeleteTask}
                                                             users={users}
                                                             onTaskUpdate={handleInlineUpdate}
@@ -1684,6 +1687,7 @@ export default function Show() {
                                                                             project={project}
                                                                             canEditTask={canEditTask(sub)}
                                                                             canManageTasks={canManageTasks}
+                                                                            canManageTaskDetails={canManageTasks}
                                                                             handleDeleteTask={handleDeleteTask}
                                                                             onToggleComplete={handleToggleComplete}
                                                                             users={users}

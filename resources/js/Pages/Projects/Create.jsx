@@ -4,6 +4,7 @@ import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
+import SearchableSelect from '../../Components/SearchableSelect';
 import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
@@ -51,12 +52,13 @@ export default function Create() {
                                 options={statuses.map((s) => ({ value: s, label: formatLabel(s) }))}
                                 error={errors.status}
                             />
-                            <Select
+                            <SearchableSelect
                                 label="Owner" id="owner_id" value={data.owner_id}
-                                onChange={(e) => setData('owner_id', e.target.value)}
+                                onChange={(val) => setData('owner_id', val)}
                                 placeholder="— Unassigned —"
                                 options={users.map((u) => ({ value: u.id, label: u.name }))}
                                 error={errors.owner_id}
+                                showAvatar
                             />
                         </div>
 

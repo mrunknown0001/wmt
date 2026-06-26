@@ -31,6 +31,18 @@ class PatchTaskRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             $task = $this->route('task');
+
+            // Only admins and project owners can change assignee and dates
+            $canManage = $this->user()->can('manage-tasks')
+                || $task->project->owner_id === $this->user()->id;
+
+            if (!$canManage) {
+                $restricted = array_intersect(['assigned_to', 'start_date', 'due_date'], array_keys($this->all()));
+                if (!empty($restricted)) {
+                    $validator->errors()->add('authorization', 'You do not have permission to modify assignment or dates.');
+                }
+            }
+
             $startDate = $this->has('start_date') ? $this->start_date : $task->start_date?->toDateString();
             $dueDate = $this->has('due_date') ? $this->due_date : $task->due_date?->toDateString();
 
