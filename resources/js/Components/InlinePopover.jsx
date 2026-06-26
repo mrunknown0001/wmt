@@ -4,17 +4,20 @@ import { createPortal } from 'react-dom';
 export default function InlinePopover({ isOpen, onClose, anchorRef, children, className = '' }) {
     const popoverRef = useRef(null);
     const [position, setPosition] = useState({ top: 0, left: 0 });
+    const [positioned, setPositioned] = useState(false);
 
     useLayoutEffect(() => {
-        if (!isOpen || !anchorRef?.current || !popoverRef?.current) return;
+        if (!isOpen) { setPositioned(false); return; }
+        if (!anchorRef?.current || !popoverRef?.current) return;
 
         const rect = anchorRef.current.getBoundingClientRect();
         const popoverRect = popoverRef.current.getBoundingClientRect();
         const spaceBelow = window.innerHeight - rect.bottom;
         const openAbove = spaceBelow < popoverRect.height + 8 && rect.top > popoverRect.height + 8;
 
-        // Clamp left so popover doesn't overflow the right edge
-        const maxLeft = window.innerWidth - popoverRect.width - 8;
+        // Use clientWidth to exclude scrollbar width and prevent overflow
+        const viewportWidth = document.documentElement.clientWidth;
+        const maxLeft = viewportWidth - popoverRect.width - 8;
         const left = Math.min(rect.left + window.scrollX, maxLeft);
 
         setPosition({
@@ -23,6 +26,7 @@ export default function InlinePopover({ isOpen, onClose, anchorRef, children, cl
                 : rect.bottom + window.scrollY + 4,
             left: Math.max(8, left),
         });
+        setPositioned(true);
     }, [isOpen, anchorRef, children]);
 
     useEffect(() => {
@@ -53,7 +57,7 @@ export default function InlinePopover({ isOpen, onClose, anchorRef, children, cl
     return createPortal(
         <div
             ref={popoverRef}
-            style={{ position: 'absolute', top: position.top, left: position.left, zIndex: 50 }}
+            style={{ position: 'absolute', top: position.top, left: position.left, zIndex: 50, visibility: positioned ? 'visible' : 'hidden' }}
             className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg ${className}`}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
