@@ -17,6 +17,7 @@ use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\ProjectAutomationRuleController;
 use App\Http\Controllers\AiChatController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
@@ -40,6 +41,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::patch('/dashboard/preferences', [DashboardPreferenceController::class, 'update'])->name('dashboard.preferences.update');
+
+    // Global search
+    Route::get('/api/search', SearchController::class)->name('search');
 
     // Inbox (Notifications)
     Route::get('/inbox', [NotificationController::class, 'index'])->name('inbox');

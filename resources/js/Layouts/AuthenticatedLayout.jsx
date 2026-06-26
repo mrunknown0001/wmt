@@ -9,6 +9,7 @@ import ThemeToggle from '../Components/ThemeToggle';
 import NotificationBell from '../Components/NotificationBell';
 import NotificationToast from '../Components/NotificationToast';
 import AiChatWidget from '../Components/AiChat/AiChatWidget';
+import GlobalSearch from '../Components/GlobalSearch';
 
 const HomeIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -305,7 +306,9 @@ export default function AuthenticatedLayout({ children, title }) {
                             </svg>
                         </button>
                         <span className="text-lg font-semibold text-gray-800 dark:text-gray-100 lg:hidden">{appName}</span>
-                        <div className="flex-1" />
+                        <div className="flex-1 flex justify-center">
+                            <GlobalSearch />
+                        </div>
                         <ThemeToggle className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
                         <NotificationBell onToast={handleToast} />
                     </div>
