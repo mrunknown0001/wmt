@@ -187,8 +187,6 @@ export default function AuthenticatedLayout({ children, title }) {
                         <p className="text-sm font-medium text-white truncate">{auth.user?.name}</p>
                         <Badge color="blue" className="mt-0.5">{auth.user?.roles?.[0]}</Badge>
                     </div>
-                    <ThemeToggle className="text-gray-400 hover:text-white" />
-                    <NotificationBell onToast={handleToast} />
                     <button
                         onClick={handleLogout}
                         className="text-gray-400 hover:text-white transition-colors p-1"
@@ -226,20 +224,20 @@ export default function AuthenticatedLayout({ children, title }) {
 
                 {/* Main area */}
                 <div className="flex-1 flex flex-col min-w-0">
-                    {/* Mobile header */}
-                    <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    {/* Top header bar */}
+                    <div className="flex items-center gap-3 px-4 lg:px-8 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                         <button
                             onClick={() => setSidebarOpen(true)}
-                            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 lg:hidden"
                         >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </button>
-                        <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">{appName}</span>
-                        <div className="ml-auto">
-                            <NotificationBell onToast={handleToast} />
-                        </div>
+                        <span className="text-lg font-semibold text-gray-800 dark:text-gray-100 lg:hidden">{appName}</span>
+                        <div className="flex-1" />
+                        <ThemeToggle className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
+                        <NotificationBell onToast={handleToast} />
                     </div>
 
                     {/* Content */}

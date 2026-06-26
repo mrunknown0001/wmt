@@ -1,5 +1,5 @@
 import { useForm, usePage, router, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -10,6 +10,7 @@ import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import MentionTextarea from '../../Components/MentionTextarea';
 import { formatLabel, apiFetch } from '../../utils';
 
 function timeAgo(dateString) {
@@ -91,7 +92,27 @@ function ActivityItem({ item }) {
     );
 }
 
-function CommentItem({ item, currentUserId, projectId, taskId }) {
+function renderCommentBody(body, users = []) {
+    if (!users.length) return body;
+
+    // Build regex from known user names to match exactly @Name
+    const escaped = users.map((u) => u.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const pattern = new RegExp(`(@(?:${escaped.join('|')}))(?=\\s|[.,!?;:]|$)`, 'g');
+    const parts = body.split(pattern);
+
+    return parts.map((part, i) => {
+        if (part.startsWith('@') && users.some((u) => part === `@${u.name}`)) {
+            return (
+                <span key={i} className="font-semibold text-primary-600 dark:text-primary-400">
+                    {part}
+                </span>
+            );
+        }
+        return part;
+    });
+}
+
+function CommentItem({ item, currentUserId, projectId, taskId, users }) {
     const [deleting, setDeleting] = useState(false);
 
     const handleDelete = () => {
@@ -124,7 +145,7 @@ function CommentItem({ item, currentUserId, projectId, taskId }) {
                         </button>
                     )}
                 </div>
-                <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{item.body}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{renderCommentBody(item.body, users)}</p>
             </div>
         </div>
     );
@@ -159,6 +180,14 @@ export default function Edit() {
     const [activities, setActivities] = useState(initialActivities);
     const [loadingComments, setLoadingComments] = useState(false);
     const [loadingActivities, setLoadingActivities] = useState(false);
+
+    // Sync state when server props change (e.g. after posting a comment)
+    useEffect(() => {
+        setComments(initialComments);
+    }, [initialTimeline]);
+    useEffect(() => {
+        setActivities(initialActivities);
+    }, [initialTimeline]);
 
     const hasMoreComments = comments.length < (totalComments || 0);
     const hasMoreActivities = activities.length < (totalActivities || 0);
@@ -361,12 +390,12 @@ export default function Edit() {
                         {activeTab === 'comments' && (
                             <>
                                 <form onSubmit={handleComment} className="mb-4">
-                                    <textarea
+                                    <MentionTextarea
                                         value={commentBody}
-                                        onChange={(e) => setCommentBody(e.target.value)}
-                                        placeholder="Leave a comment..."
+                                        onChange={setCommentBody}
+                                        users={users}
+                                        placeholder="Leave a comment... Use @ to mention users"
                                         rows={2}
-                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
                                     />
                                     <div className="flex justify-end mt-2">
                                         <Button type="submit" size="sm" processing={posting} processingText="Posting..." disabled={!commentBody.trim()}>
@@ -384,6 +413,7 @@ export default function Edit() {
                                                 currentUserId={auth.user?.id}
                                                 projectId={project.id}
                                                 taskId={task.id}
+                                                users={users}
                                             />
                                         ))
                                     ) : (

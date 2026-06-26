@@ -12,6 +12,10 @@ function notificationMessage(data) {
             return <>Task <strong>{data.task_title}</strong> is due tomorrow</>;
         case 'task_overdue':
             return <>Task <strong>{data.task_title}</strong> is overdue</>;
+        case 'task_comment_mention':
+            return <><strong>{data.mentioned_by}</strong> mentioned you in <strong>{data.task_title}</strong></>;
+        case 'comment_deleted':
+            return <><strong>{data.deleted_by}</strong> deleted a comment mentioning you in <strong>{data.task_title}</strong></>;
         default:
             return 'New notification';
     }
@@ -121,7 +125,7 @@ export default function NotificationBell({ onToast }) {
             <button
                 ref={anchorRef}
                 onClick={() => isOpen ? setIsOpen(false) : handleOpen()}
-                className="relative p-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-colors"
+                className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700/50 transition-colors"
                 title="Notifications"
             >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
