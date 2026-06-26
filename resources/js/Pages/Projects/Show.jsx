@@ -589,6 +589,96 @@ function SectionDropZone({ sectionId }) {
     );
 }
 
+// Draggable section header row
+function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditing, editingName, onEditName, onStartEditing, onRename, onCancelEditing, onAddTask, onDelete, canManage, projectId, taskCount }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: `section-header-${section.id}` });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+    };
+
+    return (
+        <tr ref={setNodeRef} style={style} className="bg-gray-100 dark:bg-gray-800/80">
+            <td colSpan={7} className="px-4 py-2">
+                <div className="flex items-center gap-2">
+                    {canManage && (
+                        <button
+                            {...attributes}
+                            {...listeners}
+                            className="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                            title="Drag to reorder section"
+                        >
+                            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                            </svg>
+                        </button>
+                    )}
+                    <button
+                        onClick={onToggleCollapse}
+                        className="p-0.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                    >
+                        <svg className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    {isEditing ? (
+                        <input
+                            autoFocus
+                            className="text-sm font-semibold bg-white dark:bg-gray-700 border border-primary-300 dark:border-primary-600 rounded px-2 py-0.5 text-gray-900 dark:text-gray-100 outline-none"
+                            value={editingName}
+                            onChange={(e) => onEditName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') onRename();
+                                if (e.key === 'Escape') onCancelEditing();
+                            }}
+                            onBlur={onRename}
+                        />
+                    ) : (
+                        <span
+                            className="text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400"
+                            onClick={onStartEditing}
+                        >
+                            {section.name}
+                        </span>
+                    )}
+                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">{taskCount}</span>
+                    {canManage && (
+                        <>
+                            <Link
+                                href={`/projects/${projectId}/tasks/create?section_id=${section.id}`}
+                                className="ml-auto text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                title="Add task to section"
+                            >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                            </Link>
+                            <button
+                                onClick={onDelete}
+                                className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                title="Delete section"
+                            >
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </>
+                    )}
+                </div>
+            </td>
+        </tr>
+    );
+}
+
 export default function Show() {
     const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, auth, users } = usePage().props;
 
@@ -774,6 +864,21 @@ export default function Show() {
         }).catch(() => {});
     }, [project.id]);
 
+    // Persist section reorder to backend
+    const persistSectionReorder = useCallback((reorderedSections) => {
+        const payload = reorderedSections.map((s, index) => ({
+            id: s.id,
+            position: index,
+        }));
+
+        apiFetch(`/projects/${project.id}/sections/reorder`, {
+            method: 'POST',
+            body: JSON.stringify({ sections: payload }),
+        }).catch(() => {
+            setLocalSections(serverSections);
+        });
+    }, [project.id, serverSections]);
+
     // Inline field update (optimistic)
     const handleInlineUpdate = useCallback((taskId, field, value) => {
         setLocalTasks((prev) => prev.map((t) => {
@@ -837,6 +942,9 @@ export default function Show() {
         const { active, over } = event;
         if (!over || !tasksBySection) return;
 
+        // Ignore section header drags — those only reorder sections
+        if (String(active.id).startsWith('section-header-')) return;
+
         const activeId = active.id;
         const overId = String(over.id);
 
@@ -866,6 +974,23 @@ export default function Show() {
         setActiveId(null);
 
         if (!over || active.id === over.id) return;
+
+        const activeIdStr = String(active.id);
+        const overIdStr = String(over.id);
+
+        // Section header drag — reorder sections
+        if (activeIdStr.startsWith('section-header-') && overIdStr.startsWith('section-header-')) {
+            const activeSecId = parseInt(activeIdStr.replace('section-header-', ''));
+            const overSecId = parseInt(overIdStr.replace('section-header-', ''));
+            const oldIndex = localSections.findIndex((s) => s.id === activeSecId);
+            const newIndex = localSections.findIndex((s) => s.id === overSecId);
+            if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+                const reordered = arrayMove(localSections, oldIndex, newIndex);
+                setLocalSections(reordered);
+                persistSectionReorder(reordered);
+            }
+            return;
+        }
 
         if (tasksBySection) {
             // Section-aware drag end
@@ -928,7 +1053,7 @@ export default function Show() {
                 return result;
             });
         }
-    }, [tasksBySection, localTasks, matchesFilters, persistReorder]);
+    }, [tasksBySection, localTasks, localSections, matchesFilters, persistReorder, persistSectionReorder]);
 
     // --- Subtask drag handler (within a parent) ---
     const handleSubtaskDragEnd = useCallback((parentId, event) => {
@@ -1408,68 +1533,27 @@ export default function Show() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                     {tasksBySection ? (
-                                        <>
+                                        <SortableContext items={localSections.map((s) => `section-header-${s.id}`)} strategy={verticalListSortingStrategy}>
                                             {tasksBySection.map((group) => (
                                                 <React.Fragment key={group.id ?? '__unsectioned'}>
-                                                    {/* Section header — skip for unsectioned if it's the only group or empty */}
+                                                    {/* Section header — skip for unsectioned */}
                                                     {group.id !== null && (
-                                                        <tr className="bg-gray-100 dark:bg-gray-800/80">
-                                                            <td colSpan={7} className="px-4 py-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <button
-                                                                        onClick={() => toggleSectionCollapse(group.id)}
-                                                                        className="p-0.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                                                                    >
-                                                                        <svg className={`h-3.5 w-3.5 transition-transform ${collapsedSections.has(group.id) ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                                                        </svg>
-                                                                    </button>
-                                                                    {editingSectionId === group.id ? (
-                                                                        <input
-                                                                            autoFocus
-                                                                            className="text-sm font-semibold bg-white dark:bg-gray-700 border border-primary-300 dark:border-primary-600 rounded px-2 py-0.5 text-gray-900 dark:text-gray-100 outline-none"
-                                                                            value={editingSectionName}
-                                                                            onChange={(e) => setEditingSectionName(e.target.value)}
-                                                                            onKeyDown={(e) => {
-                                                                                if (e.key === 'Enter') handleRenameSection(group.id, editingSectionName);
-                                                                                if (e.key === 'Escape') setEditingSectionId(null);
-                                                                            }}
-                                                                            onBlur={() => handleRenameSection(group.id, editingSectionName)}
-                                                                        />
-                                                                    ) : (
-                                                                        <span
-                                                                            className="text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400"
-                                                                            onClick={() => { setEditingSectionId(group.id); setEditingSectionName(group.name); }}
-                                                                        >
-                                                                            {group.name}
-                                                                        </span>
-                                                                    )}
-                                                                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">{group.tasks.length}</span>
-                                                                    {canManageTasks && (
-                                                                        <>
-                                                                            <Link
-                                                                                href={`/projects/${project.id}/tasks/create?section_id=${group.id}`}
-                                                                                className="ml-auto text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                                                                title="Add task to section"
-                                                                            >
-                                                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                                                                </svg>
-                                                                            </Link>
-                                                                            <button
-                                                                                onClick={() => handleDeleteSection(group.id, group.name)}
-                                                                                className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                                                                                title="Delete section"
-                                                                            >
-                                                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                                </svg>
-                                                                            </button>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
+                                                        <SortableSectionHeader
+                                                            section={{ id: group.id, name: group.name }}
+                                                            isCollapsed={collapsedSections.has(group.id)}
+                                                            onToggleCollapse={() => toggleSectionCollapse(group.id)}
+                                                            isEditing={editingSectionId === group.id}
+                                                            editingName={editingSectionName}
+                                                            onEditName={setEditingSectionName}
+                                                            onStartEditing={() => { setEditingSectionId(group.id); setEditingSectionName(group.name); }}
+                                                            onRename={() => handleRenameSection(group.id, editingSectionName)}
+                                                            onCancelEditing={() => setEditingSectionId(null)}
+                                                            onAddTask={() => {}}
+                                                            onDelete={() => handleDeleteSection(group.id, group.name)}
+                                                            canManage={canManageTasks}
+                                                            projectId={project.id}
+                                                            taskCount={group.tasks.length}
+                                                        />
                                                     )}
                                                     {/* Collapsed section drop zone */}
                                                     {group.id !== null && collapsedSections.has(group.id) && (
@@ -1566,7 +1650,7 @@ export default function Show() {
                                                     </td>
                                                 </tr>
                                             )}
-                                        </>
+                                        </SortableContext>
                                     ) : (
                                         <>
                                             <SortableContext items={filteredTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
