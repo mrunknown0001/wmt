@@ -21,7 +21,7 @@ class TaskController extends Controller
 {
     public function create(Request $request, Project $project): Response
     {
-        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id()) {
+        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id() && !$project->isProjectAdmin(auth()->user())) {
             abort(403);
         }
 
@@ -160,7 +160,8 @@ class TaskController extends Controller
         }
 
         $canManageTaskDetails = auth()->user()->can('manage-tasks')
-            || $project->owner_id === auth()->id();
+            || $project->owner_id === auth()->id()
+            || $project->isProjectAdmin(auth()->user());
 
         return Inertia::render('Tasks/Edit', [
             'project' => $project,
@@ -288,7 +289,7 @@ class TaskController extends Controller
 
     public function bulkAction(Request $request, Project $project): JsonResponse
     {
-        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id()) {
+        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id() && !$project->isProjectAdmin(auth()->user())) {
             abort(403);
         }
 
@@ -387,8 +388,8 @@ class TaskController extends Controller
 
     public function reorder(Request $request, Project $project): JsonResponse
     {
-        // Authorize: must be able to manage tasks or be the project owner
-        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id()) {
+        // Authorize: must be able to manage tasks, be the project owner, or be a project admin
+        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id() && !$project->isProjectAdmin(auth()->user())) {
             abort(403);
         }
 

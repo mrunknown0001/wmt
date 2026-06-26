@@ -8,7 +8,7 @@ class StoreProjectRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('manage-projects');
+        return true;
     }
 
     public function rules(): array
@@ -21,7 +21,7 @@ class StoreProjectRequest extends FormRequest
             'due_date' => ['nullable', 'date'],
             'members' => ['nullable', 'array'],
             'members.*.user_id' => ['required', 'exists:users,id'],
-            'members.*.role' => ['required', 'string', 'in:viewer,editor'],
+            'members.*.role' => ['required', 'string', 'in:viewer,editor,admin'],
         ];
     }
 }

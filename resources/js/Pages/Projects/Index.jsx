@@ -27,7 +27,8 @@ const PROJECT_STATUSES = ['active', 'on_hold', 'completed', 'archived'];
 
 export default function Index() {
     const { projects, auth, filters } = usePage().props;
-    const canManage = auth.user?.permissions?.includes('manage-projects');
+    const canManageAll = auth.user?.permissions?.includes('manage-projects');
+    const canManage = (project) => canManageAll || project.owner_id === auth.user?.id || project.user_is_admin;
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
     const [status, setStatus] = useState(filters?.status || '');
@@ -77,7 +78,7 @@ export default function Index() {
                         { label: 'Dashboard', href: '/dashboard' },
                         { label: 'Projects' },
                     ]}
-                    actions={canManage && <LinkButton href="/projects/create">New Project</LinkButton>}
+                    actions={<LinkButton href="/projects/create">New Project</LinkButton>}
                 />
 
                 {/* Filter Bar */}
@@ -152,7 +153,7 @@ export default function Index() {
                                             <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(project.due_date) || '—'}</td>
                                             <td className="px-6 py-4 text-sm text-right" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center justify-end gap-1">
-                                                    {canManage && (
+                                                    {canManage(project) && (
                                                         <>
                                                             <Link
                                                                 href={`/projects/${project.id}/edit`}
@@ -182,7 +183,7 @@ export default function Index() {
                         <EmptyState
                             title={hasActiveFilters ? "No matching projects" : "No projects yet"}
                             description={hasActiveFilters ? "Try adjusting your filters." : "Create your first project to get started"}
-                            action={!hasActiveFilters && canManage && <LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
+                            action={!hasActiveFilters && <LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
                         />
                     )}
                 </Card>

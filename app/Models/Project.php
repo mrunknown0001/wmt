@@ -48,4 +48,9 @@ class Project extends Model
             ->withPivot('role')
             ->withTimestamps();
     }
+
+    public function isProjectAdmin(User $user): bool
+    {
+        return $this->members()->where('user_id', $user->id)->where('role', 'admin')->exists();
+    }
 }

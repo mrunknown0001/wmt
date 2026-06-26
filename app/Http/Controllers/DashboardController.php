@@ -17,12 +17,33 @@ class DashboardController extends Controller
         $prefs = $user->getDashboardPreferences();
 
         // --- Always present ---
-        $recentProjects = Project::with('owner')
+        $myProjects = Project::with('owner')
+            ->where('owner_id', $user->id)
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
             ->orderBy('updated_at', 'desc')
             ->take(5)
             ->get();
+
+        // Projects where the user is assigned tasks or is a member, but not the owner
+        $involvedProjectIds = Task::where('assigned_to', $user->id)
+            ->distinct()
+            ->pluck('project_id')
+            ->merge(
+                $user->memberProjects()->pluck('projects.id')
+            )
+            ->unique()
+            ->diff($myProjects->pluck('id'));
+
+        $involvedProjects = $involvedProjectIds->isNotEmpty()
+            ? Project::with('owner')
+                ->whereIn('id', $involvedProjectIds)
+                ->withCount('tasks')
+                ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
+                ->orderBy('updated_at', 'desc')
+                ->take(5)
+                ->get()
+            : collect();
 
         $myRecentTasks = Task::with('project')
             ->where('assigned_to', $user->id)
@@ -33,8 +54,8 @@ class DashboardController extends Controller
 
         $data = [
             'stats' => [
-                'totalProjects' => Project::count(),
-                'activeProjects' => Project::where('status', 'active')->count(),
+                'myProjects' => Project::where('owner_id', $user->id)->count(),
+                'activeProjects' => Project::where('owner_id', $user->id)->where('status', 'active')->count(),
                 'myTasks' => Task::where('assigned_to', $user->id)
                     ->whereNotIn('status', ['done', 'cancelled'])
                     ->count(),
@@ -44,7 +65,8 @@ class DashboardController extends Controller
                     ->whereNotIn('status', ['done', 'cancelled'])
                     ->count(),
             ],
-            'recentProjects' => $recentProjects,
+            'myProjects' => $myProjects,
+            'involvedProjects' => $involvedProjects,
             'myRecentTasks' => $myRecentTasks,
             'dashboardPreferences' => $prefs,
         ];

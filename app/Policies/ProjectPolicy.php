@@ -19,17 +19,20 @@ class ProjectPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('manage-projects');
+        return true;
     }
 
     public function update(User $user, Project $project): bool
     {
         return $user->hasPermissionTo('manage-projects')
-            || $project->owner_id === $user->id;
+            || $project->owner_id === $user->id
+            || $project->isProjectAdmin($user);
     }
 
     public function delete(User $user, Project $project): bool
     {
-        return $user->hasPermissionTo('manage-projects');
+        return $user->hasPermissionTo('manage-projects')
+            || $project->owner_id === $user->id
+            || $project->isProjectAdmin($user);
     }
 }

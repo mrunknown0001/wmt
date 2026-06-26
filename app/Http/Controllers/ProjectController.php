@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -33,6 +34,19 @@ class ProjectController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        // Flag projects where current user is a project admin member
+        $adminProjectIds = DB::table('project_members')
+            ->where('user_id', auth()->id())
+            ->where('role', 'admin')
+            ->whereIn('project_id', $projects->pluck('id'))
+            ->pluck('project_id')
+            ->toArray();
+
+        $projects->getCollection()->transform(function ($project) use ($adminProjectIds) {
+            $project->user_is_admin = in_array($project->id, $adminProjectIds);
+            return $project;
+        });
+
         return Inertia::render('Projects/Index', [
             'projects' => $projects,
             'filters' => [
@@ -49,7 +63,7 @@ class ProjectController extends Controller
         return Inertia::render('Projects/Create', [
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['active', 'on_hold', 'completed', 'archived'],
-            'memberRoles' => ['viewer', 'editor'],
+            'memberRoles' => ['viewer', 'editor', 'admin'],
         ]);
     }
 
@@ -90,11 +104,15 @@ class ProjectController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $isProjectAdmin = $project->isProjectAdmin(auth()->user());
+
         $canManageProject = auth()->user()->can('manage-projects')
-            || $project->owner_id === auth()->id();
+            || $project->owner_id === auth()->id()
+            || $isProjectAdmin;
 
         $canManageTasks = auth()->user()->can('manage-tasks')
-            || $project->owner_id === auth()->id();
+            || $project->owner_id === auth()->id()
+            || $isProjectAdmin;
 
         return Inertia::render('Projects/Show', [
             'project' => $project,
@@ -118,7 +136,7 @@ class ProjectController extends Controller
             'project' => $project,
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['active', 'on_hold', 'completed', 'archived'],
-            'memberRoles' => ['viewer', 'editor'],
+            'memberRoles' => ['viewer', 'editor', 'admin'],
         ]);
     }
 

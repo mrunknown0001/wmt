@@ -11,7 +11,8 @@ class UpdateProjectRequest extends FormRequest
         $project = $this->route('project');
 
         return $this->user()->can('manage-projects')
-            || $project->owner_id === $this->user()->id;
+            || $project->owner_id === $this->user()->id
+            || $project->isProjectAdmin($this->user());
     }
 
     public function rules(): array
@@ -24,7 +25,7 @@ class UpdateProjectRequest extends FormRequest
             'due_date' => ['nullable', 'date'],
             'members' => ['nullable', 'array'],
             'members.*.user_id' => ['required', 'exists:users,id'],
-            'members.*.role' => ['required', 'string', 'in:viewer,editor'],
+            'members.*.role' => ['required', 'string', 'in:viewer,editor,admin'],
         ];
     }
 }

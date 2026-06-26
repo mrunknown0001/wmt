@@ -26,12 +26,14 @@ class TaskPolicy
     {
         return $user->hasPermissionTo('manage-tasks')
             || $task->project->owner_id === $user->id
+            || $task->project->isProjectAdmin($user)
             || $task->assigned_to === $user->id;
     }
 
     public function delete(User $user, Task $task): bool
     {
         return $user->hasPermissionTo('manage-tasks')
-            || $task->project->owner_id === $user->id;
+            || $task->project->owner_id === $user->id
+            || $task->project->isProjectAdmin($user);
     }
 }

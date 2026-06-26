@@ -45,7 +45,8 @@ export default function Dashboard() {
     const {
         auth,
         stats,
-        recentProjects,
+        myProjects,
+        involvedProjects,
         myRecentTasks,
         dashboardPreferences,
         taskStats,
@@ -146,8 +147,8 @@ export default function Dashboard() {
                 {/* Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <StatCard
-                        label="Total Projects"
-                        value={stats?.totalProjects ?? 0}
+                        label="My Projects"
+                        value={stats?.myProjects ?? 0}
                         href="/projects"
                         color="blue"
                         icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>}
@@ -179,17 +180,58 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* Two-column: Projects + Tasks */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    {/* Recent Projects */}
+                {/* My Projects */}
+                <div className="mb-6">
                     <Card padding={false}>
                         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Recent Projects</h2>
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">My Projects</h2>
                             <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">View all</Link>
                         </div>
-                        {recentProjects?.length > 0 ? (
+                        {myProjects?.length > 0 ? (
                             <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {recentProjects.map((project) => (
+                                {myProjects.map((project) => (
+                                    <Link
+                                        key={project.id}
+                                        href={`/projects/${project.id}`}
+                                        className="block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <StatusBadge status={project.status} type="project" />
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                        {project.completed_tasks_count}/{project.tasks_count} tasks
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {preferences.showProgressBars && project.tasks_count > 0 && (
+                                            <ProjectProgressBar project={project} />
+                                        )}
+                                    </Link>
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                title="No projects yet"
+                                description="Create your first project to get started"
+                                action={<LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
+                            />
+                        )}
+                    </Card>
+                </div>
+
+                {/* Two-column: Project Involvements + My Upcoming Tasks */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    {/* Project Involvements */}
+                    <Card padding={false}>
+                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Project Involvements</h2>
+                        </div>
+                        {involvedProjects?.length > 0 ? (
+                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {involvedProjects.map((project) => (
                                     <Link
                                         key={project.id}
                                         href={`/projects/${project.id}`}
@@ -215,9 +257,8 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <EmptyState
-                                title="No projects yet"
-                                description="Create your first project to get started"
-                                action={<LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
+                                title="No involvements"
+                                description="Projects where you have assigned tasks will appear here"
                             />
                         )}
                     </Card>
