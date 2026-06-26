@@ -244,9 +244,9 @@ export default function Dashboard() {
                                                     <span className="text-xs text-gray-500 dark:text-gray-400">{task.project?.name}</span>
                                                 </div>
                                             </div>
-                                            {task.due_date && (
+                                            {(task.start_date || task.due_date) && (
                                                 <span className={`text-xs whitespace-nowrap ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                    {formatDate(task.due_date)}
+                                                    {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date)}
                                                 </span>
                                             )}
                                         </Link>

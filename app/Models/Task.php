@@ -24,6 +24,7 @@ class Task extends Model
         'priority',
         'assigned_to',
         'created_by',
+        'start_date',
         'due_date',
         'position',
         'is_recurring',
@@ -36,6 +37,7 @@ class Task extends Model
     protected function casts(): array
     {
         return [
+            'start_date' => 'date',
             'due_date' => 'date',
             'position' => 'integer',
             'is_recurring' => 'boolean',

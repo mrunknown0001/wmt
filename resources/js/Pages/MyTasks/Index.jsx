@@ -76,11 +76,11 @@ function TaskSection({ section, tasks }) {
                             <div className="flex items-center gap-2 shrink-0">
                                 <PriorityBadge priority={task.priority} />
                                 <StatusBadge status={task.status} type="task" />
-                                {task.due_date && (
+                                {(task.start_date || task.due_date) && (
                                     <span className={`text-xs whitespace-nowrap ${
                                         section.key === 'overdue' ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'
                                     }`}>
-                                        {formatDate(task.due_date)}
+                                        {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date)}
                                     </span>
                                 )}
                             </div>

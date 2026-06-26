@@ -21,8 +21,22 @@ class PatchTaskRequest extends FormRequest
             'status' => ['sometimes', 'required', 'string', 'in:backlog,to_do,in_progress,in_review,done,cancelled'],
             'priority' => ['sometimes', 'required', 'string', 'in:low,medium,high,urgent'],
             'assigned_to' => ['sometimes', 'nullable', 'exists:users,id'],
+            'start_date' => ['sometimes', 'nullable', 'date'],
             'due_date' => ['sometimes', 'nullable', 'date'],
             'section_id' => ['sometimes', 'nullable', 'exists:task_sections,id'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $task = $this->route('task');
+            $startDate = $this->has('start_date') ? $this->start_date : $task->start_date?->toDateString();
+            $dueDate = $this->has('due_date') ? $this->due_date : $task->due_date?->toDateString();
+
+            if ($startDate && $dueDate && $startDate > $dueDate) {
+                $validator->errors()->add('start_date', 'The start date must be before or equal to the due date.');
+            }
+        });
     }
 }

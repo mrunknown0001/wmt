@@ -34,6 +34,24 @@ class RecurringTaskService
     {
         $nextDueDate = $task->calculateNextDueDate();
 
+        // Shift start_date by the same offset to preserve task duration
+        $nextStartDate = null;
+        if ($task->start_date) {
+            if ($task->due_date && $nextDueDate) {
+                $duration = $task->start_date->diffInDays($task->due_date);
+                $nextStartDate = $nextDueDate->copy()->subDays($duration);
+            } else {
+                // No due_date, just shift start_date by recurrence interval
+                $nextStartDate = match ($task->recurrence_frequency) {
+                    'daily' => $task->start_date->copy()->addDays($task->recurrence_interval),
+                    'weekly' => $task->start_date->copy()->addWeeks($task->recurrence_interval),
+                    'monthly' => $task->start_date->copy()->addMonths($task->recurrence_interval),
+                    'yearly' => $task->start_date->copy()->addYears($task->recurrence_interval),
+                    default => null,
+                };
+            }
+        }
+
         $maxPosition = Task::where('project_id', $task->project_id)
             ->whereNull('parent_id')
             ->where('status', 'to_do')
@@ -47,6 +65,7 @@ class RecurringTaskService
             'priority' => $task->priority,
             'assigned_to' => $task->assigned_to,
             'created_by' => $actor->id,
+            'start_date' => $nextStartDate,
             'due_date' => $nextDueDate,
             'position' => $maxPosition + 1,
             'is_recurring' => true,

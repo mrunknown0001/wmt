@@ -5,12 +5,11 @@ import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
-import Textarea from '../../Components/Textarea';
+import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
-import MentionTextarea from '../../Components/MentionTextarea';
 import { formatLabel, apiFetch } from '../../utils';
 
 function timeAgo(dateString) {
@@ -92,27 +91,11 @@ function ActivityItem({ item }) {
     );
 }
 
-function renderCommentBody(body, users = []) {
-    if (!users.length) return body;
-
-    // Build regex from known user names to match exactly @Name
-    const escaped = users.map((u) => u.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const pattern = new RegExp(`(@(?:${escaped.join('|')}))(?=\\s|[.,!?;:]|$)`, 'g');
-    const parts = body.split(pattern);
-
-    return parts.map((part, i) => {
-        if (part.startsWith('@') && users.some((u) => part === `@${u.name}`)) {
-            return (
-                <span key={i} className="font-semibold text-primary-600 dark:text-primary-400">
-                    {part}
-                </span>
-            );
-        }
-        return part;
-    });
+function isHtml(str) {
+    return /<[a-z][\s\S]*>/i.test(str);
 }
 
-function CommentItem({ item, currentUserId, projectId, taskId, users }) {
+function CommentItem({ item, currentUserId, projectId, taskId }) {
     const [deleting, setDeleting] = useState(false);
 
     const handleDelete = () => {
@@ -145,7 +128,11 @@ function CommentItem({ item, currentUserId, projectId, taskId, users }) {
                         </button>
                     )}
                 </div>
-                <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{renderCommentBody(item.body, users)}</p>
+                {isHtml(item.body) ? (
+                    <div className="text-sm text-gray-700 dark:text-gray-300 mt-1 rich-text" dangerouslySetInnerHTML={{ __html: item.body }} />
+                ) : (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{item.body}</p>
+                )}
             </div>
         </div>
     );
@@ -161,6 +148,7 @@ export default function Edit() {
         status: task.status || 'to_do',
         priority: task.priority || 'medium',
         assigned_to: task.assigned_to || '',
+        start_date: task.start_date ? task.start_date.split('T')[0] : '',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         collaborator_ids: (task.collaborators || []).map((c) => c.id),
         is_recurring: task.is_recurring || false,
@@ -168,6 +156,7 @@ export default function Edit() {
         recurrence_interval: task.recurrence_interval || 1,
     });
 
+    const [showStartDate, setShowStartDate] = useState(!!task.start_date);
     const [activeTab, setActiveTab] = useState('comments');
     const [commentBody, setCommentBody] = useState('');
     const [posting, setPosting] = useState(false);
@@ -221,7 +210,7 @@ export default function Edit() {
 
     const handleComment = (e) => {
         e.preventDefault();
-        if (!commentBody.trim()) return;
+        if (!commentBody || commentBody === '<p></p>') return;
         setPosting(true);
         router.post(`/projects/${project.id}/tasks/${task.id}/comments`, { body: commentBody }, {
             preserveScroll: true,
@@ -270,16 +259,40 @@ export default function Edit() {
                         )}
                         <form onSubmit={handleSubmit} className="space-y-5">
                             <Input label="Title" id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} error={errors.title} />
-                            <Textarea label="Description" id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} error={errors.description} />
+                            <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
                             <div className="grid grid-cols-2 gap-4">
                                 <Select label="Status" id="status" value={data.status} onChange={(e) => setData('status', e.target.value)} options={statuses.map((s) => ({ value: s, label: formatLabel(s) }))} error={errors.status} />
                                 <Select label="Priority" id="priority" value={data.priority} onChange={(e) => setData('priority', e.target.value)} options={priorities.map((p) => ({ value: p, label: formatLabel(p) }))} error={errors.priority} />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <Select label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(e) => setData('assigned_to', e.target.value || '')} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} />
-                                <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                            <Select label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(e) => setData('assigned_to', e.target.value || '')} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} />
+
+                            <div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {showStartDate && (
+                                        <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} error={errors.start_date} />
+                                    )}
+                                    <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                                </div>
+                                {!showStartDate && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowStartDate(true)}
+                                        className="mt-1.5 text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                                    >
+                                        + Add start date
+                                    </button>
+                                )}
+                                {showStartDate && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowStartDate(false); setData('start_date', ''); }}
+                                        className="mt-1.5 text-xs text-gray-400 hover:text-red-500 hover:underline"
+                                    >
+                                        Remove start date
+                                    </button>
+                                )}
                             </div>
 
                             {!task.parent_id && (
@@ -390,15 +403,14 @@ export default function Edit() {
                         {activeTab === 'comments' && (
                             <>
                                 <form onSubmit={handleComment} className="mb-4">
-                                    <MentionTextarea
+                                    <RichTextEditor
                                         value={commentBody}
                                         onChange={setCommentBody}
-                                        users={users}
-                                        placeholder="Leave a comment... Use @ to mention users"
-                                        rows={2}
+                                        placeholder="Leave a comment..."
+                                        minimal
                                     />
                                     <div className="flex justify-end mt-2">
-                                        <Button type="submit" size="sm" processing={posting} processingText="Posting..." disabled={!commentBody.trim()}>
+                                        <Button type="submit" size="sm" processing={posting} processingText="Posting..." disabled={!commentBody || commentBody === '<p></p>'}>
                                             Comment
                                         </Button>
                                     </div>
@@ -413,7 +425,6 @@ export default function Edit() {
                                                 currentUserId={auth.user?.id}
                                                 projectId={project.id}
                                                 taskId={task.id}
-                                                users={users}
                                             />
                                         ))
                                     ) : (
@@ -503,7 +514,7 @@ export default function Edit() {
                                         </div>
 
                                         <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                                            {item.due_date || 'No date'}
+                                            {item.start_date && item.due_date ? `${item.start_date} → ${item.due_date}` : item.due_date || item.start_date || 'No date'}
                                         </span>
 
                                         <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${

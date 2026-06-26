@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
-import Textarea from '../../Components/Textarea';
+import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
@@ -19,6 +20,7 @@ export default function Create() {
         status: 'to_do',
         priority: 'medium',
         assigned_to: '',
+        start_date: '',
         due_date: '',
         collaborator_ids: [],
         parent_id: parentTask?.id || '',
@@ -27,6 +29,8 @@ export default function Create() {
         recurrence_frequency: 'weekly',
         recurrence_interval: 1,
     });
+
+    const [showStartDate, setShowStartDate] = useState(false);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -57,16 +61,43 @@ export default function Create() {
                     )}
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <Input label="Title" id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} error={errors.title} />
-                        <Textarea label="Description" id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} error={errors.description} />
+                        <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
                         <div className="grid grid-cols-2 gap-4">
                             <Select label="Status" id="status" value={data.status} onChange={(e) => setData('status', e.target.value)} options={statuses.map((s) => ({ value: s, label: formatLabel(s) }))} error={errors.status} />
                             <Select label="Priority" id="priority" value={data.priority} onChange={(e) => setData('priority', e.target.value)} options={priorities.map((p) => ({ value: p, label: formatLabel(p) }))} error={errors.priority} />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <Select label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(e) => setData('assigned_to', e.target.value || '')} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} />
-                            <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                        <Select label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(e) => setData('assigned_to', e.target.value || '')} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} />
+
+                        <div>
+                            <div className="grid grid-cols-2 gap-4">
+                                {showStartDate && (
+                                    <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} error={errors.start_date} />
+                                )}
+                                <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                            </div>
+                            {!showStartDate && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowStartDate(true)}
+                                    className="mt-1.5 text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                                >
+                                    + Add start date
+                                </button>
+                            )}
+                            {showStartDate && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowStartDate(false); setData('start_date', ''); }}
+                                    className="mt-1.5 text-xs text-gray-400 hover:text-red-500 hover:underline"
+                                >
+                                    Remove start date
+                                </button>
+                            )}
+                            {errors.start_date && !showStartDate && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.start_date}</p>
+                            )}
                         </div>
 
                         {!parentTask && sections.length > 0 && (

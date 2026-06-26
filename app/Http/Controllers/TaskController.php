@@ -126,7 +126,7 @@ class TaskController extends Controller
             $current = $task;
             $ancestors = [];
             while ($current->recurring_source_id) {
-                $current = Task::select('id', 'title', 'status', 'due_date', 'recurring_source_id', 'project_id')
+                $current = Task::select('id', 'title', 'status', 'start_date', 'due_date', 'recurring_source_id', 'project_id')
                     ->find($current->recurring_source_id);
                 if (!$current) break;
                 array_unshift($ancestors, $current);
@@ -134,11 +134,11 @@ class TaskController extends Controller
             }
 
             $descendants = [];
-            $next = Task::select('id', 'title', 'status', 'due_date', 'recurring_source_id', 'project_id')
+            $next = Task::select('id', 'title', 'status', 'start_date', 'due_date', 'recurring_source_id', 'project_id')
                 ->where('recurring_source_id', $task->id)->first();
             while ($next) {
                 $descendants[] = $next;
-                $next = Task::select('id', 'title', 'status', 'due_date', 'recurring_source_id', 'project_id')
+                $next = Task::select('id', 'title', 'status', 'start_date', 'due_date', 'recurring_source_id', 'project_id')
                     ->where('recurring_source_id', $next->id)->first();
                 if (count($descendants) > 10) break;
             }
@@ -150,6 +150,7 @@ class TaskController extends Controller
                     'id' => $t->id,
                     'title' => $t->title,
                     'status' => $t->status,
+                    'start_date' => $t->start_date?->toDateString(),
                     'due_date' => $t->due_date?->toDateString(),
                     'is_current' => $t->id === $task->id,
                     'project_id' => $t->project_id,
@@ -174,7 +175,8 @@ class TaskController extends Controller
 
     public function update(UpdateTaskRequest $request, Project $project, Task $task): RedirectResponse
     {
-        $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'due_date']);
+        $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+        $oldValues['start_date'] = $task->start_date?->toDateString();
         $oldValues['due_date'] = $task->due_date?->toDateString();
         $oldAssignee = $task->assigned_to;
 
@@ -213,7 +215,8 @@ class TaskController extends Controller
 
     public function patchField(PatchTaskRequest $request, Project $project, Task $task): JsonResponse
     {
-        $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'due_date']);
+        $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+        $oldValues['start_date'] = $task->start_date?->toDateString();
         $oldValues['due_date'] = $task->due_date?->toDateString();
         $oldAssignee = $task->assigned_to;
 
@@ -312,7 +315,8 @@ class TaskController extends Controller
                 foreach ($tasks as $task) {
                     $oldStatus = $task->status;
                     if ($oldStatus === $status) continue;
-                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'due_date']);
+                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+                    $oldValues['start_date'] = $task->start_date?->toDateString();
                     $oldValues['due_date'] = $task->due_date?->toDateString();
                     $task->update(['status' => $status]);
                     TaskActivityLogger::logChanges($task, $oldValues, $user);
@@ -331,7 +335,8 @@ class TaskController extends Controller
                 }
                 foreach ($tasks as $task) {
                     if ($task->priority === $priority) continue;
-                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'due_date']);
+                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+                    $oldValues['start_date'] = $task->start_date?->toDateString();
                     $oldValues['due_date'] = $task->due_date?->toDateString();
                     $task->update(['priority' => $priority]);
                     TaskActivityLogger::logChanges($task, $oldValues, $user);
@@ -349,7 +354,8 @@ class TaskController extends Controller
                 foreach ($tasks as $task) {
                     $oldAssignee = $task->assigned_to;
                     if ($oldAssignee == $assigneeId) continue;
-                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'due_date']);
+                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+                    $oldValues['start_date'] = $task->start_date?->toDateString();
                     $oldValues['due_date'] = $task->due_date?->toDateString();
                     $task->update(['assigned_to' => $assigneeId]);
                     $task->load('assignee');

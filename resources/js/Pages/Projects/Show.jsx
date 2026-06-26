@@ -178,19 +178,56 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, handle
                 )}
             </td>
             <td className="px-6 py-3 text-sm">
-                {canEditTask ? (
-                    <InlineDatePicker
-                        currentDate={task.due_date}
-                        isOpen={openPopover === 'due_date'}
-                        onToggle={togglePopover('due_date')}
-                        onSelect={(date) => handleFieldUpdate('due_date', date)}
-                        isOverdue={isOverdue}
-                    />
-                ) : (
-                    <span className={`text-xs ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {formatDate(task.due_date) || '—'}
-                    </span>
-                )}
+                <div className="flex items-center gap-1">
+                    {canEditTask ? (
+                        <>
+                            {task.start_date && (
+                                <>
+                                    <InlineDatePicker
+                                        currentDate={task.start_date}
+                                        isOpen={openPopover === 'start_date'}
+                                        onToggle={togglePopover('start_date')}
+                                        onSelect={(date) => handleFieldUpdate('start_date', date)}
+                                        onClear={() => handleFieldUpdate('start_date', null)}
+                                    />
+                                    <span className="text-gray-300 dark:text-gray-600">→</span>
+                                </>
+                            )}
+                            <InlineDatePicker
+                                currentDate={task.due_date}
+                                isOpen={openPopover === 'due_date'}
+                                onToggle={togglePopover('due_date')}
+                                onSelect={(date) => handleFieldUpdate('due_date', date)}
+                                isOverdue={isOverdue}
+                            />
+                            {!task.start_date && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+                                    title="Add start date"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </button>
+                            )}
+                            {!task.start_date && openPopover === 'start_date' && (
+                                <InlineDatePicker
+                                    currentDate={null}
+                                    isOpen={true}
+                                    onToggle={togglePopover('start_date')}
+                                    onSelect={(date) => handleFieldUpdate('start_date', date)}
+                                    hidden
+                                />
+                            )}
+                        </>
+                    ) : (
+                        <span className={`text-xs ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
+                        </span>
+                    )}
+                </div>
             </td>
             <td className="px-6 py-3 text-sm text-right">
                 <div className="flex items-center justify-end gap-1">
@@ -361,19 +398,56 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
                 </div>
             </td>
             <td className="px-6 py-4 text-sm">
-                {canEditTask ? (
-                    <InlineDatePicker
-                        currentDate={task.due_date}
-                        isOpen={openPopover === 'due_date'}
-                        onToggle={togglePopover('due_date')}
-                        onSelect={(date) => handleFieldUpdate('due_date', date)}
-                        isOverdue={isOverdue}
-                    />
-                ) : (
-                    <span className={`text-sm ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {formatDate(task.due_date) || '—'}
-                    </span>
-                )}
+                <div className="flex items-center gap-1">
+                    {canEditTask ? (
+                        <>
+                            {task.start_date && (
+                                <>
+                                    <InlineDatePicker
+                                        currentDate={task.start_date}
+                                        isOpen={openPopover === 'start_date'}
+                                        onToggle={togglePopover('start_date')}
+                                        onSelect={(date) => handleFieldUpdate('start_date', date)}
+                                        onClear={() => handleFieldUpdate('start_date', null)}
+                                    />
+                                    <span className="text-gray-300 dark:text-gray-600">→</span>
+                                </>
+                            )}
+                            <InlineDatePicker
+                                currentDate={task.due_date}
+                                isOpen={openPopover === 'due_date'}
+                                onToggle={togglePopover('due_date')}
+                                onSelect={(date) => handleFieldUpdate('due_date', date)}
+                                isOverdue={isOverdue}
+                            />
+                            {!task.start_date && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+                                    title="Add start date"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </button>
+                            )}
+                            {!task.start_date && openPopover === 'start_date' && (
+                                <InlineDatePicker
+                                    currentDate={null}
+                                    isOpen={true}
+                                    onToggle={togglePopover('start_date')}
+                                    onSelect={(date) => handleFieldUpdate('start_date', date)}
+                                    hidden
+                                />
+                            )}
+                        </>
+                    ) : (
+                        <span className={`text-sm ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
+                        </span>
+                    )}
+                </div>
             </td>
             <td className="px-6 py-4 text-sm text-right">
                 <div className="flex items-center justify-end gap-1">
@@ -518,6 +592,7 @@ function SectionDropZone({ sectionId }) {
 export default function Show() {
     const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, auth, users } = usePage().props;
 
+    const [showDetails, setShowDetails] = useState(false);
     const [view, setView] = useState('list');
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
@@ -1131,45 +1206,60 @@ export default function Show() {
                 }
             />
 
-            {/* Project Info Card */}
+            {/* Project Info Toggle */}
             <Card className="mb-6">
-                <div className="flex flex-wrap items-start gap-6">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                            <StatusBadge status={project.status} type="project" />
-                            {project.due_date && (
-                                <span className="text-sm text-gray-500 dark:text-gray-400">Due {formatDate(project.due_date)}</span>
-                            )}
-                        </div>
-                        {project.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{project.description}</p>
+                <button
+                    type="button"
+                    onClick={() => setShowDetails((v) => !v)}
+                    className="flex w-full items-center justify-between text-left"
+                >
+                    <div className="flex items-center gap-3">
+                        <StatusBadge status={project.status} type="project" />
+                        {project.due_date && (
+                            <span className="text-sm text-gray-500 dark:text-gray-400">Due {formatDate(project.due_date)}</span>
+                        )}
+                        {project.owner && !showDetails && (
+                            <span className="text-sm text-gray-400 dark:text-gray-500">· {project.owner.name}</span>
                         )}
                     </div>
-                    <div className="flex flex-col items-end gap-2 text-sm text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-2">
-                            {project.owner ? (
-                                <>
-                                    <Avatar name={project.owner.name} size="sm" />
-                                    <span>{project.owner.name}</span>
-                                    <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">Owner</span>
-                                </>
-                            ) : (
-                                <span className="text-gray-400">No owner</span>
+                    <svg className={`h-4 w-4 text-gray-400 transition-transform ${showDetails ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                {showDetails && (
+                    <div className="mt-4 flex flex-wrap items-start gap-6 border-t border-gray-100 dark:border-gray-700 pt-4">
+                        <div className="flex-1 min-w-0">
+                            {project.description && (
+                                <div className="text-sm text-gray-600 dark:text-gray-300 rich-text" dangerouslySetInnerHTML={{ __html: project.description }} />
                             )}
                         </div>
-                        {project.members?.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-2">
-                                {project.members.map((member) => (
-                                    <div key={member.id} className="flex items-center gap-1.5">
-                                        <Avatar name={member.name} size="sm" />
-                                        <span className="text-xs text-gray-600 dark:text-gray-400">{member.name}</span>
-                                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded capitalize">{member.pivot.role}</span>
-                                    </div>
-                                ))}
+                        <div className="flex flex-col items-end gap-2 text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-2">
+                                {project.owner ? (
+                                    <>
+                                        <Avatar name={project.owner.name} size="sm" />
+                                        <span>{project.owner.name}</span>
+                                        <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">Owner</span>
+                                    </>
+                                ) : (
+                                    <span className="text-gray-400">No owner</span>
+                                )}
                             </div>
-                        )}
+                            {project.members?.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {project.members.map((member) => (
+                                        <div key={member.id} className="flex items-center gap-1.5">
+                                            <Avatar name={member.name} size="sm" />
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">{member.name}</span>
+                                            <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded capitalize">{member.pivot.role}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
             </Card>
 
             {/* View Toggle + Filters + Add Task */}
@@ -1312,7 +1402,7 @@ export default function Show() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Priority</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assignee</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Due Date</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dates</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
@@ -1583,7 +1673,7 @@ export default function Show() {
                                                     {activeTask.assignee ? activeTask.assignee.name : 'Unassigned'}
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                                    {formatDate(activeTask.due_date) || '—'}
+                                                    {activeTask.start_date && activeTask.due_date ? `${formatDate(activeTask.start_date)} → ${formatDate(activeTask.due_date)}` : formatDate(activeTask.due_date) || formatDate(activeTask.start_date) || '—'}
                                                 </td>
                                                 <td className="px-6 py-4"></td>
                                             </tr>
@@ -1648,8 +1738,10 @@ export default function Show() {
                                                 {activeTask.assignee && <Avatar name={activeTask.assignee.name} size="sm" />}
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">{activeTask.assignee?.name || 'Unassigned'}</span>
                                             </div>
-                                            {activeTask.due_date && (
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(activeTask.due_date)}</span>
+                                            {(activeTask.start_date || activeTask.due_date) && (
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {activeTask.start_date && activeTask.due_date ? `${formatDate(activeTask.start_date)} → ${formatDate(activeTask.due_date)}` : formatDate(activeTask.due_date) || formatDate(activeTask.start_date)}
+                                                </span>
                                             )}
                                         </div>
                                     </div>
@@ -1830,13 +1922,13 @@ export default function Show() {
                     if (t.subtasks) t.subtasks.forEach((s) => allTasks.push({ ...s, isSubtask: true, parentTitle: t.title }));
                 });
 
-                const tasksWithDate = allTasks.filter((t) => t.due_date);
-                const tasksNoDate = allTasks.filter((t) => !t.due_date);
+                const tasksWithDate = allTasks.filter((t) => t.due_date || t.start_date);
+                const tasksNoDate = allTasks.filter((t) => !t.due_date && !t.start_date);
 
                 // Calculate date range
                 let rangeStart, rangeEnd;
                 if (tasksWithDate.length > 0) {
-                    const dates = tasksWithDate.map((t) => new Date(t.due_date.split('T')[0]));
+                    const dates = tasksWithDate.flatMap((t) => [t.start_date, t.due_date].filter(Boolean).map((d) => new Date(d.split('T')[0])));
                     const minDate = new Date(Math.min(...dates));
                     const maxDate = new Date(Math.max(...dates));
                     // Pad range by 3 days on each side
@@ -1932,10 +2024,16 @@ export default function Show() {
 
                                         {/* Task rows */}
                                         {tasksWithDate.map((task) => {
-                                            const offset = getDayOffset(task.due_date);
+                                            const startOffset = task.start_date ? getDayOffset(task.start_date) : null;
+                                            const endOffset = task.due_date ? getDayOffset(task.due_date) : null;
+                                            const hasRange = startOffset !== null && endOffset !== null;
+                                            const barOffset = hasRange ? startOffset : (endOffset ?? startOffset);
+                                            const barSpan = hasRange ? Math.max(endOffset - startOffset + 1, 1) : 1;
+                                            const barWidth = hasRange ? barSpan * COL_WIDTH : 96; // 96px = w-24 for single-date pill
                                             const isDone = task.status === 'done';
                                             const barColor = PRIORITY_BAR[task.priority] || PRIORITY_BAR.low;
                                             const opacityCls = STATUS_OPACITY[task.status] || '';
+                                            const tooltipDate = hasRange ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : task.due_date ? `Due: ${formatDate(task.due_date)}` : `Start: ${formatDate(task.start_date)}`;
                                             return (
                                                 <div key={task.id} className={`flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${opacityCls}`}>
                                                     <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
@@ -1968,15 +2066,18 @@ export default function Show() {
                                                                 );
                                                             })}
                                                         </div>
-                                                        {/* Task bar (diamond marker on due date) */}
-                                                        {offset >= 0 && offset < days.length && (
+                                                        {/* Task bar */}
+                                                        {barOffset >= 0 && barOffset < days.length && (
                                                             <Link
                                                                 href={`/projects/${project.id}/tasks/${task.id}/edit`}
                                                                 className="absolute top-1/2 -translate-y-1/2 group z-10"
-                                                                style={{ left: `${offset * COL_WIDTH + COL_WIDTH / 2 - 12}px` }}
-                                                                title={`${task.title} — Due: ${formatDate(task.due_date)} — ${formatLabel(task.status)}`}
+                                                                style={{ left: `${barOffset * COL_WIDTH + (hasRange ? 0 : COL_WIDTH / 2 - 12)}px` }}
+                                                                title={`${task.title} — ${tooltipDate} — ${formatLabel(task.status)}`}
                                                             >
-                                                                <div className={`h-5 w-24 rounded-full ${barColor} shadow-sm group-hover:shadow-md transition-shadow flex items-center justify-center`}>
+                                                                <div
+                                                                    className={`h-5 rounded-full ${barColor} shadow-sm group-hover:shadow-md transition-shadow flex items-center justify-center`}
+                                                                    style={{ width: `${barWidth}px` }}
+                                                                >
                                                                     <span className="text-[9px] text-white font-medium truncate px-1.5">{task.title}</span>
                                                                 </div>
                                                             </Link>
@@ -1990,7 +2091,7 @@ export default function Show() {
                                         {tasksNoDate.length > 0 && (
                                             <>
                                                 <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30">
-                                                    <div className="w-60 shrink-0 px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700">No Due Date</div>
+                                                    <div className="w-60 shrink-0 px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700">No Dates</div>
                                                     <div className="flex-1" />
                                                 </div>
                                                 {tasksNoDate.map((task) => (
@@ -2007,7 +2108,7 @@ export default function Show() {
                                                             </Link>
                                                         </div>
                                                         <div className="flex-1 flex items-center px-4">
-                                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">No due date set</span>
+                                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">No dates set</span>
                                                         </div>
                                                     </div>
                                                 ))}

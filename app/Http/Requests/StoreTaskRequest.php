@@ -22,6 +22,7 @@ class StoreTaskRequest extends FormRequest
             'status' => ['required', 'string', 'in:backlog,to_do,in_progress,in_review,done,cancelled'],
             'priority' => ['required', 'string', 'in:low,medium,high,urgent'],
             'assigned_to' => ['nullable', 'exists:users,id'],
+            'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
             'parent_id' => ['nullable', 'exists:tasks,id'],
             'collaborator_ids' => ['nullable', 'array'],
@@ -31,5 +32,14 @@ class StoreTaskRequest extends FormRequest
             'recurrence_interval' => ['required_if:is_recurring,true', 'nullable', 'integer', 'min:1', 'max:365'],
             'section_id' => ['nullable', 'exists:task_sections,id'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($this->start_date && $this->due_date && $this->start_date > $this->due_date) {
+                $validator->errors()->add('start_date', 'The start date must be before or equal to the due date.');
+            }
+        });
     }
 }

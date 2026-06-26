@@ -113,9 +113,9 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                         </div>
                     )}
                 </div>
-                {task.due_date && (
+                {(task.start_date || task.due_date) && (
                     <span className={`text-xs ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {formatDate(task.due_date)}
+                        {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date)}
                     </span>
                 )}
             </div>

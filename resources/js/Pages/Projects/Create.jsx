@@ -4,7 +4,7 @@ import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
-import Textarea from '../../Components/Textarea';
+import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
@@ -42,7 +42,7 @@ export default function Create() {
                 <Card>
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <Input label="Name" id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} error={errors.name} />
-                        <Textarea label="Description" id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} error={errors.description} />
+                        <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
                         <div className="grid grid-cols-2 gap-4">
                             <Select

@@ -128,7 +128,7 @@ function CalendarGrid({ selectedDate, onSelect }) {
     );
 }
 
-export default function InlineDatePicker({ currentDate, isOpen, onToggle, onSelect, isOverdue }) {
+export default function InlineDatePicker({ currentDate, isOpen, onToggle, onSelect, isOverdue, onClear, hidden }) {
     const anchorRef = useRef(null);
     const selectedStr = currentDate ? currentDate.split('T')[0] : null;
 
@@ -142,18 +142,18 @@ export default function InlineDatePicker({ currentDate, isOpen, onToggle, onSele
                 ref={anchorRef}
                 onClick={(e) => { e.stopPropagation(); onToggle(); }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className={`cursor-pointer text-sm ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}
+                className={`cursor-pointer text-sm ${hidden ? 'sr-only' : ''} ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}
             >
                 {formatDate(currentDate) || '—'}
             </button>
             <InlinePopover isOpen={isOpen} onClose={() => onToggle(false)} anchorRef={anchorRef} className="p-3">
                 <CalendarGrid selectedDate={selectedStr} onSelect={handleSelect} />
-                {currentDate && (
+                {(currentDate || onClear) && (
                     <button
-                        onClick={() => onSelect(null)}
+                        onClick={() => { if (onClear) { onClear(); } else { onSelect(null); } }}
                         className="mt-2 w-full text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors text-center"
                     >
-                        Clear date
+                        {onClear ? 'Remove start date' : 'Clear date'}
                     </button>
                 )}
             </InlinePopover>
