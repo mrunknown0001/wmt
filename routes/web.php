@@ -13,6 +13,7 @@ use App\Http\Controllers\MyTaskController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
@@ -69,6 +70,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('/projects/{project}/sections/{section}', [TaskSectionController::class, 'update'])->name('projects.sections.update');
     Route::delete('/projects/{project}/sections/{section}', [TaskSectionController::class, 'destroy'])->name('projects.sections.destroy');
     Route::post('/projects/{project}/sections/reorder', [TaskSectionController::class, 'reorder'])->name('projects.sections.reorder');
+
+    // Executive Dashboard (admin + executive)
+    Route::get('/executive-dashboard', [ExecutiveDashboardController::class, 'index'])->name('executive-dashboard');
+    Route::get('/executive-dashboard/divisions/{division}', [ExecutiveDashboardController::class, 'division'])->name('executive-dashboard.division');
+    Route::get('/executive-dashboard/departments/{department}', [ExecutiveDashboardController::class, 'department'])->name('executive-dashboard.department');
+    Route::get('/executive-dashboard/teams/{team}', [ExecutiveDashboardController::class, 'team'])->name('executive-dashboard.team');
 
     // Activity Log (admin)
     Route::get('/activity-log', [ActivityLogController::class, 'index'])->name('activity-log');
