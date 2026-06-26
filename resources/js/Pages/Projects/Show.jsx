@@ -29,6 +29,7 @@ import Button from '../../Components/Button';
 import EmptyState from '../../Components/EmptyState';
 import KanbanColumn from '../../Components/KanbanColumn';
 import { ConfirmModal } from '../../Components/Modal';
+import AutomationRuleBuilder from '../../Components/AutomationRuleBuilder';
 import StatusPicker from '../../Components/StatusPicker';
 import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
@@ -58,6 +59,12 @@ const CalendarIcon = () => (
 const GanttIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h10M4 12h16M4 18h7" />
+    </svg>
+);
+
+const AutomationIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
     </svg>
 );
 
@@ -680,7 +687,7 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
 }
 
 export default function Show() {
-    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, auth, users } = usePage().props;
+    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, auth, users } = usePage().props;
 
     const [showDetails, setShowDetails] = useState(false);
     const [view, setView] = useState('list');
@@ -704,6 +711,7 @@ export default function Show() {
     const [editingSectionId, setEditingSectionId] = useState(null);
     const [editingSectionName, setEditingSectionName] = useState('');
     const [addingSectionName, setAddingSectionName] = useState(null); // null = not adding, string = input value
+    const [showAutomation, setShowAutomation] = useState(false);
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -1320,6 +1328,11 @@ export default function Show() {
                 actions={
                     canManageProject && (
                         <div className="flex items-center gap-2">
+                            {canManageTasks && (
+                                <Button variant="secondary" size="sm" onClick={() => setShowAutomation(v => !v)}>
+                                    <AutomationIcon /> Automation
+                                </Button>
+                            )}
                             <LinkButton href={`/projects/${project.id}/edit`} variant="secondary" size="sm">
                                 <EditIcon /> Edit
                             </LinkButton>
@@ -1330,6 +1343,18 @@ export default function Show() {
                     )
                 }
             />
+
+            {/* Automation Rules Panel */}
+            {showAutomation && canManageTasks && (
+                <Card className="mb-6">
+                    <AutomationRuleBuilder
+                        projectId={project.id}
+                        rules={automationRules || []}
+                        users={users}
+                        sections={localSections}
+                    />
+                </Card>
+            )}
 
             {/* Project Info Toggle */}
             <Card className="mb-6">

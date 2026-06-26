@@ -3,28 +3,25 @@
 namespace App\Notifications;
 
 use App\Models\Task;
-use App\Models\TaskComment;
-use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Str;
 
-class TaskCommentMentionNotification extends Notification implements ShouldQueue
+class TaskEscalatedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
     public function __construct(
         public Task $task,
-        public User $mentionedBy,
-        public TaskComment $comment,
+        public int $escalationLevel,
+        public string $escalationLabel,
     ) {}
 
     public function via(object $notifiable): array
     {
         $channels = ['database', 'broadcast'];
-        if ($notifiable->wantsEmail('task_mention')) {
+        if ($notifiable->wantsEmail('task_escalated')) {
             $channels[] = 'mail';
         }
         return $channels;
@@ -32,28 +29,32 @@ class TaskCommentMentionNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $preview = Str::limit(strip_tags($this->comment->body), 200);
+        $daysOverdue = now()->startOfDay()->diffInDays($this->task->due_date);
 
         return (new MailMessage)
-            ->subject("You were mentioned in: {$this->task->title}")
+            ->subject("Escalation (Level {$this->escalationLevel}): {$this->task->title}")
             ->greeting("Hello {$notifiable->name},")
-            ->line("{$this->mentionedBy->name} mentioned you in a comment.")
+            ->line("A task has been overdue for {$daysOverdue} days and has been escalated.")
             ->line("**{$this->task->title}** in project {$this->task->project?->name}")
-            ->line("\"{$preview}\"")
+            ->line("Assigned to: {$this->task->assignee?->name}")
+            ->line("Due date: {$this->task->due_date->toFormattedDateString()}")
+            ->line("Escalation level: {$this->escalationLabel}")
             ->action('View Task', url("/projects/{$this->task->project_id}/tasks/{$this->task->id}/edit"))
-            ->line('Thank you for using ' . config('app.name') . '!');
+            ->salutation('Please take action on this overdue task.');
     }
 
     public function toArray(object $notifiable): array
     {
         return [
-            'type' => 'task_comment_mention',
+            'type' => 'task_escalated',
             'task_id' => $this->task->id,
             'task_title' => $this->task->title,
             'project_id' => $this->task->project_id,
             'project_name' => $this->task->project?->name,
-            'mentioned_by' => $this->mentionedBy->name,
-            'comment_preview' => Str::limit($this->comment->body, 100),
+            'due_date' => $this->task->due_date->toDateString(),
+            'escalation_level' => $this->escalationLevel,
+            'escalation_label' => $this->escalationLabel,
+            'assigned_to_name' => $this->task->assignee?->name,
         ];
     }
 }

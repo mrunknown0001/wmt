@@ -42,6 +42,11 @@ class Project extends Model
         return $this->hasMany(TaskSection::class);
     }
 
+    public function automationRules(): HasMany
+    {
+        return $this->hasMany(ProjectAutomationRule::class);
+    }
+
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_members')

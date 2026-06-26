@@ -117,6 +117,10 @@ class ProjectController extends Controller
             || $project->owner_id === auth()->id()
             || $isProjectAdmin;
 
+        $automationRules = $canManageTasks
+            ? $project->automationRules()->with('creator:id,name')->orderBy('created_at', 'desc')->get()
+            : [];
+
         return Inertia::render('Projects/Show', [
             'project' => $project,
             'tasks' => $tasks,
@@ -124,6 +128,7 @@ class ProjectController extends Controller
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'canManageProject' => $canManageProject,
             'canManageTasks' => $canManageTasks,
+            'automationRules' => $automationRules,
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
         ]);

@@ -14,6 +14,8 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ExecutiveDashboardController;
+use App\Http\Controllers\NotificationPreferenceController;
+use App\Http\Controllers\ProjectAutomationRuleController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
@@ -80,9 +82,20 @@ Route::middleware('auth')->group(function () {
     // Activity Log (admin)
     Route::get('/activity-log', [ActivityLogController::class, 'index'])->name('activity-log');
 
+    // Notification Preferences
+    Route::get('/settings/notifications', [NotificationPreferenceController::class, 'edit'])->name('settings.notifications');
+    Route::put('/settings/notifications', [NotificationPreferenceController::class, 'update'])->name('settings.notifications.update');
+
     // Settings (admin)
     Route::get('/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
+
+    // Project Automation Rules
+    Route::get('/projects/{project}/automation-rules', [ProjectAutomationRuleController::class, 'index'])->name('projects.automation-rules.index');
+    Route::post('/projects/{project}/automation-rules', [ProjectAutomationRuleController::class, 'store'])->name('projects.automation-rules.store');
+    Route::put('/projects/{project}/automation-rules/{rule}', [ProjectAutomationRuleController::class, 'update'])->name('projects.automation-rules.update');
+    Route::delete('/projects/{project}/automation-rules/{rule}', [ProjectAutomationRuleController::class, 'destroy'])->name('projects.automation-rules.destroy');
+    Route::patch('/projects/{project}/automation-rules/{rule}/toggle', [ProjectAutomationRuleController::class, 'toggle'])->name('projects.automation-rules.toggle');
 
     // Organization structure
     Route::resource('divisions', DivisionController::class)->except(['show']);

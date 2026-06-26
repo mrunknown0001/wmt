@@ -71,10 +71,10 @@ export default function UserMultiSelect({ users, selected = [], onChange, label,
                                 <select
                                     value={getRoleForUser(user.id)}
                                     onChange={(e) => onRoleChange(user.id, e.target.value)}
-                                    className="text-xs bg-transparent border-none text-gray-500 dark:text-gray-400 focus:ring-0 p-0 pl-1 cursor-pointer"
+                                    className="text-xs border-none focus:ring-0 p-0 pl-1 pr-5 cursor-pointer rounded bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-200"
                                 >
                                     {roles.map((r) => (
-                                        <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                                        <option key={r} value={r} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">{r.charAt(0).toUpperCase() + r.slice(1)}</option>
                                     ))}
                                 </select>
                             )}

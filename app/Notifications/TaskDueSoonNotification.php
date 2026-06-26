@@ -4,9 +4,11 @@ namespace App\Notifications;
 
 use App\Models\Task;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TaskDueSoonNotification extends Notification
+class TaskDueSoonNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -16,7 +18,23 @@ class TaskDueSoonNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'broadcast'];
+        $channels = ['database', 'broadcast'];
+        if ($notifiable->wantsEmail('task_due_soon')) {
+            $channels[] = 'mail';
+        }
+        return $channels;
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject("Task Due Tomorrow: {$this->task->title}")
+            ->greeting("Hello {$notifiable->name},")
+            ->line("Your task is due tomorrow.")
+            ->line("**{$this->task->title}** in project {$this->task->project?->name}")
+            ->line("Due date: {$this->task->due_date->toFormattedDateString()}")
+            ->action('View Task', url("/projects/{$this->task->project_id}/tasks/{$this->task->id}/edit"))
+            ->line('Thank you for using ' . config('app.name') . '!');
     }
 
     public function toArray(object $notifiable): array

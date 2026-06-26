@@ -15,6 +15,13 @@ class Task extends Model
 
     public const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
 
+    public const ESCALATION_TIERS = [
+        1 => ['days' => 1,  'label' => 'Assignee Reminder'],
+        2 => ['days' => 3,  'label' => 'Supervisor & Project Owner'],
+        3 => ['days' => 7,  'label' => 'Department Head'],
+        4 => ['days' => 14, 'label' => 'Executives'],
+    ];
+
     protected $fillable = [
         'project_id',
         'parent_id',
@@ -32,6 +39,7 @@ class Task extends Model
         'recurrence_interval',
         'recurring_source_id',
         'section_id',
+        'escalation_level',
     ];
 
     protected function casts(): array
@@ -42,6 +50,7 @@ class Task extends Model
             'position' => 'integer',
             'is_recurring' => 'boolean',
             'recurrence_interval' => 'integer',
+            'escalation_level' => 'integer',
         ];
     }
 

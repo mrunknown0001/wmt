@@ -5,9 +5,11 @@ namespace App\Notifications;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class CommentDeletedNotification extends Notification
+class CommentDeletedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -19,7 +21,23 @@ class CommentDeletedNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'broadcast'];
+        $channels = ['database', 'broadcast'];
+        if ($notifiable->wantsEmail('comment_deleted')) {
+            $channels[] = 'mail';
+        }
+        return $channels;
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->subject("Comment Deleted on: {$this->task->title}")
+            ->greeting("Hello {$notifiable->name},")
+            ->line("{$this->deletedBy->name} deleted a comment that mentioned you.")
+            ->line("**{$this->task->title}** in project {$this->task->project?->name}")
+            ->line("\"{$this->commentPreview}\"")
+            ->action('View Task', url("/projects/{$this->task->project_id}/tasks/{$this->task->id}/edit"))
+            ->line('Thank you for using ' . config('app.name') . '!');
     }
 
     public function toArray(object $notifiable): array

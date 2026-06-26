@@ -20,6 +20,8 @@ function notificationMessage(data) {
             return <><strong>{data.commented_by}</strong> commented on subtask <strong>{data.task_title}</strong></>;
         case 'comment_deleted':
             return <><strong>{data.deleted_by}</strong> deleted a comment mentioning you in <strong>{data.task_title}</strong></>;
+        case 'task_escalated':
+            return <>Task <strong>{data.task_title}</strong> escalated — {data.escalation_label}</>;
         default:
             return 'New notification';
     }
@@ -28,10 +30,36 @@ function notificationMessage(data) {
 // Module-level flag to prevent duplicate Echo subscriptions across re-renders
 let subscribedUserId = null;
 
+// Shared AudioContext — reused across calls, resumed on first user interaction
+let audioCtx = null;
+
+function ensureAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // Resume if suspended (browser autoplay policy)
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
+
+// Resume audio context on first user interaction so future notifications can play
+if (typeof window !== 'undefined') {
+    const resumeOnInteraction = () => {
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    };
+    window.addEventListener('click', resumeOnInteraction, { once: false, passive: true });
+    window.addEventListener('keydown', resumeOnInteraction, { once: false, passive: true });
+}
+
 // Play a short two-tone chime using Web Audio API (no external file needed)
 function playNotificationSound() {
     try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = ensureAudioContext();
+        if (ctx.state === 'suspended') return; // Can't play yet — no user interaction
         const playTone = (freq, start, duration) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();

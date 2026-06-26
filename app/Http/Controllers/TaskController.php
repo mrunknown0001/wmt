@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\ActivityLogger;
+use App\Services\AutomationRuleEngine;
 use App\Services\RecurringTaskService;
 use App\Services\TaskActivityLogger;
 use Illuminate\Http\JsonResponse;
@@ -89,6 +90,8 @@ class TaskController extends Controller
             $task->load('project');
             $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
         }
+
+        AutomationRuleEngine::evaluate($task, 'task_created');
 
         return redirect("/projects/{$project->id}")
             ->with('success', 'Task created successfully.');
@@ -205,6 +208,25 @@ class TaskController extends Controller
             $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
         }
 
+        // Reset escalation when task is completed/cancelled
+        if (in_array($task->status, ['done', 'cancelled']) && $task->escalation_level > 0) {
+            $task->update(['escalation_level' => 0]);
+        }
+
+        // Automation rules
+        if (($oldValues['status'] ?? null) !== $task->status) {
+            AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
+            if ($task->status === 'done') {
+                AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
+            }
+        }
+        if (($oldValues['priority'] ?? null) !== $task->priority) {
+            AutomationRuleEngine::evaluate($task, 'task_priority_changed', $oldValues);
+        }
+        if (($oldValues['assigned_to'] ?? null) != $task->assigned_to) {
+            AutomationRuleEngine::evaluate($task, 'task_assigned', $oldValues);
+        }
+
         $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
 
         return redirect("/projects/{$project->id}")
@@ -244,6 +266,25 @@ class TaskController extends Controller
         ) {
             $task->load('project');
             $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
+        }
+
+        // Reset escalation when task is completed/cancelled
+        if ($request->has('status') && in_array($task->status, ['done', 'cancelled']) && $task->escalation_level > 0) {
+            $task->update(['escalation_level' => 0]);
+        }
+
+        // Automation rules
+        if ($request->has('status') && ($oldValues['status'] ?? null) !== $task->status) {
+            AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
+            if ($task->status === 'done') {
+                AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
+            }
+        }
+        if ($request->has('priority') && ($oldValues['priority'] ?? null) !== $task->priority) {
+            AutomationRuleEngine::evaluate($task, 'task_priority_changed', $oldValues);
+        }
+        if ($request->has('assigned_to') && ($oldValues['assigned_to'] ?? null) != $task->assigned_to) {
+            AutomationRuleEngine::evaluate($task, 'task_assigned', $oldValues);
         }
 
         $response = [
@@ -332,6 +373,13 @@ class TaskController extends Controller
                     $task->update(['status' => $status]);
                     TaskActivityLogger::logChanges($task, $oldValues, $user);
                     ActivityLogger::logChanges($task, $oldValues, $user);
+                    if (in_array($status, ['done', 'cancelled']) && $task->escalation_level > 0) {
+                        $task->update(['escalation_level' => 0]);
+                    }
+                    AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
+                    if ($status === 'done') {
+                        AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
+                    }
                     $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $user);
                     if ($newTask) {
                         $newTask->load('assignee', 'collaborators');

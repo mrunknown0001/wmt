@@ -75,6 +75,12 @@ const ChartBarIcon = () => (
     </svg>
 );
 
+const BellIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+    </svg>
+);
+
 const SettingsIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z" />
@@ -86,7 +92,18 @@ export default function AuthenticatedLayout({ children, title }) {
     const { auth, flash, settings, unreadNotificationsCount } = usePage().props;
     const currentUrl = usePage().url;
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+        try { return localStorage.getItem('sidebar_collapsed') === '1'; } catch { return false; }
+    });
     const [toasts, setToasts] = useState([]);
+
+    const toggleSidebarCollapsed = () => {
+        setSidebarCollapsed((prev) => {
+            const next = !prev;
+            try { localStorage.setItem('sidebar_collapsed', next ? '1' : '0'); } catch {}
+            return next;
+        });
+    };
 
     const handleToast = useCallback((notification) => {
         setToasts((prev) => {
@@ -120,33 +137,33 @@ export default function AuthenticatedLayout({ children, title }) {
         router.post('/logout');
     };
 
-    const sidebarContent = (
+    const sidebarContent = (collapsed = false) => (
         <div className="flex flex-col h-full">
             {/* Brand */}
-            <div className="flex items-center gap-2 px-5 py-5 border-b border-gray-700/50">
-                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
+            <div className={`flex items-center gap-2 ${collapsed ? 'justify-center px-2' : 'px-5'} py-5 border-b border-gray-700/50`}>
+                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
                     <span className="text-white font-bold text-sm">{appName.charAt(0).toUpperCase()}</span>
                 </div>
-                <span className="text-lg font-semibold text-white tracking-tight">{appName}</span>
+                {!collapsed && <span className="text-lg font-semibold text-white tracking-tight">{appName}</span>}
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+            <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-3'} py-4 space-y-6 overflow-y-auto`}>
                 <div className="space-y-0.5">
-                    <NavLink href="/dashboard" icon={<HomeIcon />} active={isActive('/dashboard')}>
+                    <NavLink href="/dashboard" icon={<HomeIcon />} active={isActive('/dashboard')} collapsed={collapsed}>
                         Dashboard
                     </NavLink>
-                    <NavLink href="/inbox" icon={<InboxIcon />} active={isActive('/inbox')} badge={unreadNotificationsCount || null}>
+                    <NavLink href="/inbox" icon={<InboxIcon />} active={isActive('/inbox')} badge={unreadNotificationsCount || null} collapsed={collapsed}>
                         Inbox
                     </NavLink>
-                    <NavLink href="/my-tasks" icon={<ChecklistIcon />} active={isActive('/my-tasks')}>
+                    <NavLink href="/my-tasks" icon={<ChecklistIcon />} active={isActive('/my-tasks')} collapsed={collapsed}>
                         My Tasks
                     </NavLink>
-                    <NavLink href="/calendar" icon={<CalendarIcon />} active={isActive('/calendar')}>
+                    <NavLink href="/calendar" icon={<CalendarIcon />} active={isActive('/calendar')} collapsed={collapsed}>
                         Calendar
                     </NavLink>
                     {(hasRole('admin') || hasRole('executive')) && (
-                        <NavLink href="/executive-dashboard" icon={<ChartBarIcon />} active={isActive('/executive-dashboard')}>
+                        <NavLink href="/executive-dashboard" icon={<ChartBarIcon />} active={isActive('/executive-dashboard')} collapsed={collapsed}>
                             Executive Dashboard
                         </NavLink>
                     )}
@@ -154,46 +171,52 @@ export default function AuthenticatedLayout({ children, title }) {
 
                 {hasPermission('view-projects') && (
                     <div className="space-y-0.5">
-                        <NavLink href="/projects" icon={<FolderIcon />} active={isActive('/projects')}>
+                        <NavLink href="/projects" icon={<FolderIcon />} active={isActive('/projects')} collapsed={collapsed}>
                             Projects
                         </NavLink>
                     </div>
                 )}
 
                 {(hasPermission('view-divisions') || hasPermission('view-departments') || hasPermission('view-teams')) && (
-                    <NavSection title="Organization">
+                    <NavSection title="Organization" collapsed={collapsed}>
                         {hasPermission('view-divisions') && (
-                            <NavLink href="/divisions" icon={<BuildingIcon />} active={isActive('/divisions')}>
+                            <NavLink href="/divisions" icon={<BuildingIcon />} active={isActive('/divisions')} collapsed={collapsed}>
                                 Divisions
                             </NavLink>
                         )}
                         {hasPermission('view-departments') && (
-                            <NavLink href="/departments" icon={<SitemapIcon />} active={isActive('/departments')}>
+                            <NavLink href="/departments" icon={<SitemapIcon />} active={isActive('/departments')} collapsed={collapsed}>
                                 Departments
                             </NavLink>
                         )}
                         {hasPermission('view-teams') && (
-                            <NavLink href="/teams" icon={<UsersGroupIcon />} active={isActive('/teams')}>
+                            <NavLink href="/teams" icon={<UsersGroupIcon />} active={isActive('/teams')} collapsed={collapsed}>
                                 Teams
                             </NavLink>
                         )}
                     </NavSection>
                 )}
 
+                <NavSection title="Preferences" collapsed={collapsed}>
+                    <NavLink href="/settings/notifications" icon={<BellIcon />} active={isActive('/settings/notifications')} collapsed={collapsed}>
+                        Notifications
+                    </NavLink>
+                </NavSection>
+
                 {(hasPermission('view-users') || hasRole('admin')) && (
-                    <NavSection title="Administration">
+                    <NavSection title="Administration" collapsed={collapsed}>
                         {hasPermission('view-users') && (
-                            <NavLink href="/users" icon={<UserIcon />} active={isActive('/users')}>
+                            <NavLink href="/users" icon={<UserIcon />} active={isActive('/users')} collapsed={collapsed}>
                                 Users
                             </NavLink>
                         )}
                         {hasRole('admin') && (
-                            <NavLink href="/activity-log" icon={<ActivityLogIcon />} active={isActive('/activity-log')}>
+                            <NavLink href="/activity-log" icon={<ActivityLogIcon />} active={isActive('/activity-log')} collapsed={collapsed}>
                                 Activity Log
                             </NavLink>
                         )}
                         {hasRole('admin') && (
-                            <NavLink href="/settings" icon={<SettingsIcon />} active={isActive('/settings')}>
+                            <NavLink href="/settings" icon={<SettingsIcon />} active={isActive('/settings')} collapsed={collapsed}>
                                 Settings
                             </NavLink>
                         )}
@@ -201,23 +224,41 @@ export default function AuthenticatedLayout({ children, title }) {
                 )}
             </nav>
 
+            {/* Collapse toggle (desktop only) */}
+            <div className="hidden lg:block border-t border-gray-700/50 px-2 py-2">
+                <button
+                    onClick={toggleSidebarCollapsed}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-700/50 hover:text-white transition-colors text-sm"
+                    title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                    <svg className={`h-4 w-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    </svg>
+                    {!collapsed && <span>Collapse</span>}
+                </button>
+            </div>
+
             {/* User area */}
             <div className="border-t border-gray-700/50 px-4 py-3">
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
                     <Avatar name={auth.user?.name} size="md" />
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{auth.user?.name}</p>
-                        <Badge color="blue" className="mt-0.5">{auth.user?.roles?.[0]}</Badge>
-                    </div>
-                    <button
-                        onClick={handleLogout}
-                        className="text-gray-400 hover:text-white transition-colors p-1"
-                        title="Logout"
-                    >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                    </button>
+                    {!collapsed && (
+                        <>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-white truncate">{auth.user?.name}</p>
+                                <Badge color="blue" className="mt-0.5">{auth.user?.roles?.[0]}</Badge>
+                            </div>
+                            <button
+                                onClick={handleLogout}
+                                className="text-gray-400 hover:text-white transition-colors p-1"
+                                title="Logout"
+                            >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
@@ -235,13 +276,22 @@ export default function AuthenticatedLayout({ children, title }) {
                     />
                 )}
 
-                {/* Sidebar */}
+                {/* Sidebar — mobile (always full width) */}
                 <aside
-                    className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 dark:bg-gray-950 transform transition-transform lg:translate-x-0 lg:static lg:z-auto ${
+                    className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 dark:bg-gray-950 transform transition-transform lg:hidden ${
                         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                     }`}
                 >
-                    {sidebarContent}
+                    {sidebarContent(false)}
+                </aside>
+
+                {/* Sidebar — desktop (collapsible) */}
+                <aside
+                    className={`hidden lg:block bg-gray-900 dark:bg-gray-950 transition-all duration-200 shrink-0 ${
+                        sidebarCollapsed ? 'w-16' : 'w-64'
+                    }`}
+                >
+                    {sidebarContent(sidebarCollapsed)}
                 </aside>
 
                 {/* Main area */}

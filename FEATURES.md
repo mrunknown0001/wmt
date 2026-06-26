@@ -17,23 +17,31 @@
 - Cascade deletes: division → departments → teams
 
 ## Projects
-- Full CRUD with owner assignment
+- Full CRUD — any authenticated user can create projects
 - Statuses: active, on_hold, completed, archived
-- Project members with roles (viewer, editor)
+- Project owner + project admin/co-owner member role
+- Project members with roles (viewer, editor, admin)
 - Task count and completion stats on index
 - Due date tracking
 - Search and status filtering on index page (paginated)
-- Owner and manage-projects permission holders can edit
+- Owner, project admins, and manage-projects permission holders can edit
 
 ## Tasks
 - Full CRUD nested under projects
 - Statuses: backlog, to_do, in_progress, in_review, done, cancelled
 - Priorities: low, medium, high, urgent
 - Assignee and creator tracking
-- Due date with overdue detection
+- Start date and due date with overdue detection
 - Subtasks (self-referential parent_id)
 - Collaborators (many-to-many with users)
 - Position-based ordering within status columns
+- Rich text descriptions via TipTap WYSIWYG editor
+
+### Task Sections
+- Asana-style sections for grouping tasks within a project
+- Create, rename, reorder, and delete sections
+- Drag-and-drop section reordering
+- Tasks organized within sections on the board
 
 ### Kanban Board (Projects/Show)
 - Dual view toggle: Kanban board and list view
@@ -44,6 +52,8 @@
 - Subtask progress indicator (completed/total)
 - Collaborator avatars stacked on cards
 - Priority and status badges
+- Sticky header for scrollable boards
+- Collapsible project details panel
 
 ### Inline Editing Components
 - **StatusPicker** — popover dropdown for quick status changes
@@ -58,6 +68,8 @@
 
 ### Task Comments
 - Add/delete comments on tasks
+- Rich text comments with TipTap editor
+- **@mentions** — mention users in comments with searchable dropdown (triggers notification)
 - Combined timeline view with activities (sorted by date)
 - Paginated loading (offset-based, 10 per page)
 - Filter tabs: All, Comments, Activity
@@ -74,8 +86,18 @@
 - Collaborators synced to new occurrence
 - Guards against duplicate generation
 
+## Workflow Automation Rules
+- Project-level rule builder accessible from project show page
+- Define custom rules: trigger → conditions → actions
+- **Triggers**: task created, status changed, priority changed, task assigned, task completed
+- **Conditions**: filter by status, priority, assigned user, section (with equals/not_equals/in/not_in operators)
+- **Actions**: change status, change priority, assign user, move to section, send notification
+- Toggle rules active/inactive
+- Infinite loop prevention (rules don't re-trigger from rule-caused changes)
+- Only visible to project owners, admins, and manage-tasks permission holders
+
 ## Dashboard
-- Personalized with 7 togglable widgets (persisted per-user)
+- Personalized with 7 togglable widgets (persisted per-user via `dashboard_preferences`)
 - Time-of-day greeting
 - 4 stat cards: Total Projects, Active Projects, My Tasks, Overdue Tasks
 - Due Today & Overdue alert panel
@@ -87,6 +109,13 @@
 - Activity feed (recent task changes)
 - Team workload view (admin/supervisor only — ranked by open task count)
 - Quick action button (New Project)
+- My Projects & Involved Projects sections
+
+## Executive Dashboard
+- Organization-wide statistics and drill-down views
+- Hierarchical navigation: Org Overview → Division → Department → Team
+- Aggregate task/project metrics at each level
+- Accessible to admin, supervisor, division_head, and executive roles
 
 ## My Tasks Page
 - All tasks assigned to current user
@@ -101,13 +130,23 @@
 - Month navigation with jump-to-today
 - Tasks link to their edit page
 
+## Centralized Activity Log
+- Org-wide audit trail across all projects and tasks
+- Filterable and searchable activity history
+- Accessible from sidebar navigation
+
 ## Notifications
 - **Real-time** via Soketi (Pusher-protocol WebSockets) + Laravel Echo
 - Private channel per user (`App.Models.User.{id}`)
-- Three notification types:
+- 8 notification types:
   - **Task Assigned** — when assigned to a task or reassigned
   - **Task Due Soon** — for tasks due tomorrow (scheduled daily at 08:00)
   - **Task Overdue** — for past-due active tasks (scheduled daily at 08:00)
+  - **Task Comment** — when someone comments on your task
+  - **Task Mention** — when @mentioned in a comment
+  - **Comment Deleted** — when a comment mentioning you is deleted
+  - **Task Escalated** — tiered overdue escalation (see below)
+  - **Subtask Comment** — comments on subtasks
 - Notification bell with unread count badge
 - Dropdown preview (last 5 notifications)
 - Full inbox page (paginated, 15/page)
@@ -115,6 +154,25 @@
 - Audio chime on new notification (Web Audio API)
 - Toast notification popup (top-right, auto-dismiss 5s)
 - Deduplication — won't double-notify same task same day
+
+### Email Notifications
+- All notification types support queued email delivery (`ShouldQueue`)
+- Per-user notification preferences with toggle switches
+- Preferences page accessible from sidebar (Settings → Notifications)
+- Defaults: all on except comment_deleted
+- Mail driver configurable via `.env` (`MAIL_MAILER=log` for development)
+
+### Escalated Due Date Notifications
+- Tiered escalation for overdue tasks, traversing org hierarchy:
+  - **Level 1** (1 day overdue) — Assignee reminder
+  - **Level 2** (3 days overdue) — Team leader + Project owner
+  - **Level 3** (7 days overdue) — Department head
+  - **Level 4** (14 days overdue) — Division head + all executive-role users
+- Escalation level tracked per task (`escalation_level` column)
+- Only escalates upward (won't re-send for same level)
+- Resets to 0 when task is completed or cancelled
+- Configurable tier thresholds in `Task::ESCALATION_TIERS`
+- Runs daily via `tasks:send-reminders` scheduled command
 
 ## Theme & Settings
 - Dark/light mode toggle (persisted to localStorage)
@@ -128,8 +186,11 @@
 - Docker Compose dev environment (Laravel, MySQL, Redis, Soketi, phpMyAdmin)
 - Inertia.js SSR with React (JSX)
 - Tailwind CSS v4 for styling
+- TipTap WYSIWYG rich text editor
+- @dnd-kit for drag-and-drop interactions
 - CSRF-protected API fetches
 - Policy-based authorization on all resources
 - Form request validation on all create/update operations
-- Queued notifications
+- Queued notifications via Redis
 - HandleInertiaRequests middleware shares auth data, settings, unread count, flash messages
+- SearchableSelect reusable component for user pickers

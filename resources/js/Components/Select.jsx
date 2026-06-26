@@ -14,9 +14,9 @@ export default function Select({ label, id, error, options = [], placeholder, ch
                 } ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
                 {...props}
             >
-                {placeholder && <option value="">{placeholder}</option>}
+                {placeholder && <option value="" className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">{placeholder}</option>}
                 {options.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
+                    <option key={opt.value} value={opt.value} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                         {opt.label}
                     </option>
                 ))}

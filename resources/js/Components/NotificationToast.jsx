@@ -14,6 +14,10 @@ function toastMessage(data) {
             return `${data.commented_by} commented on subtask "${data.task_title}"`;
         case 'task_comment_mention':
             return `${data.mentioned_by} mentioned you in "${data.task_title}"`;
+        case 'comment_deleted':
+            return `${data.deleted_by} deleted a comment mentioning you in "${data.task_title}"`;
+        case 'task_escalated':
+            return `Task "${data.task_title}" escalated — ${data.escalation_label}`;
         default:
             return 'New notification';
     }

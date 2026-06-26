@@ -26,6 +26,16 @@ class User extends Authenticatable
         'showTeamWorkload' => true,
     ];
 
+    public const NOTIFICATION_DEFAULTS = [
+        'email_task_assigned'    => true,
+        'email_task_due_soon'    => true,
+        'email_task_overdue'     => true,
+        'email_task_comment'     => true,
+        'email_task_mention'     => true,
+        'email_comment_deleted'  => false,
+        'email_task_escalated'   => true,
+    ];
+
     protected $fillable = [
         'name',
         'email',
@@ -35,6 +45,7 @@ class User extends Authenticatable
         'team_id',
         'is_active',
         'dashboard_preferences',
+        'notification_preferences',
     ];
 
     protected $hidden = [
@@ -49,12 +60,24 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'dashboard_preferences' => 'array',
+            'notification_preferences' => 'array',
         ];
     }
 
     public function getDashboardPreferences(): array
     {
         return array_merge(self::DASHBOARD_DEFAULTS, $this->dashboard_preferences ?? []);
+    }
+
+    public function getNotificationPreferences(): array
+    {
+        return array_merge(self::NOTIFICATION_DEFAULTS, $this->notification_preferences ?? []);
+    }
+
+    public function wantsEmail(string $type): bool
+    {
+        $prefs = $this->getNotificationPreferences();
+        return $prefs["email_{$type}"] ?? false;
     }
 
     public function department(): BelongsTo
