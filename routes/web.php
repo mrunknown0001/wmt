@@ -16,6 +16,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\ProjectAutomationRuleController;
+use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
@@ -96,6 +97,13 @@ Route::middleware('auth')->group(function () {
     Route::put('/projects/{project}/automation-rules/{rule}', [ProjectAutomationRuleController::class, 'update'])->name('projects.automation-rules.update');
     Route::delete('/projects/{project}/automation-rules/{rule}', [ProjectAutomationRuleController::class, 'destroy'])->name('projects.automation-rules.destroy');
     Route::patch('/projects/{project}/automation-rules/{rule}/toggle', [ProjectAutomationRuleController::class, 'toggle'])->name('projects.automation-rules.toggle');
+
+    // AI Chat
+    Route::get('/api/ai/conversations', [AiChatController::class, 'index'])->name('ai.conversations.index');
+    Route::post('/api/ai/conversations', [AiChatController::class, 'store'])->name('ai.conversations.store');
+    Route::get('/api/ai/conversations/{conversation}', [AiChatController::class, 'show'])->name('ai.conversations.show');
+    Route::delete('/api/ai/conversations/{conversation}', [AiChatController::class, 'destroy'])->name('ai.conversations.destroy');
+    Route::post('/api/ai/conversations/{conversation}/messages', [AiChatController::class, 'sendMessage'])->name('ai.conversations.sendMessage');
 
     // Organization structure
     Route::resource('divisions', DivisionController::class)->except(['show']);

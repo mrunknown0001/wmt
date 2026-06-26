@@ -112,4 +112,9 @@ class User extends Authenticatable
         return $this->belongsToMany(Task::class, 'task_collaborators')
             ->withTimestamps();
     }
+
+    public function aiConversations(): HasMany
+    {
+        return $this->hasMany(AiConversation::class);
+    }
 }

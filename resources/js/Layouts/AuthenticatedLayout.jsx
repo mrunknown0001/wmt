@@ -8,6 +8,7 @@ import FlashMessage from '../Components/FlashMessage';
 import ThemeToggle from '../Components/ThemeToggle';
 import NotificationBell from '../Components/NotificationBell';
 import NotificationToast from '../Components/NotificationToast';
+import AiChatWidget from '../Components/AiChat/AiChatWidget';
 
 const HomeIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -322,6 +323,7 @@ export default function AuthenticatedLayout({ children, title }) {
                 {flash?.success && <FlashMessage type="success" message={flash.success} />}
                 {flash?.error && <FlashMessage type="error" message={flash.error} />}
                 <NotificationToast toasts={toasts} onDismiss={dismissToast} />
+                <AiChatWidget />
             </div>
         </>
     );
