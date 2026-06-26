@@ -149,7 +149,7 @@ export default function AuthenticatedLayout({ children, title }) {
             </div>
 
             {/* Navigation */}
-            <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-3'} py-4 space-y-6 overflow-y-auto`}>
+            <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-3'} py-4 space-y-6 overflow-y-auto scrollbar-thin`}>
                 <div className="space-y-0.5">
                     <NavLink href="/dashboard" icon={<HomeIcon />} active={isActive('/dashboard')} collapsed={collapsed}>
                         Dashboard
@@ -225,20 +225,6 @@ export default function AuthenticatedLayout({ children, title }) {
                 )}
             </nav>
 
-            {/* Collapse toggle (desktop only) */}
-            <div className="hidden lg:block border-t border-gray-700/50 px-2 py-2">
-                <button
-                    onClick={toggleSidebarCollapsed}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-700/50 hover:text-white transition-colors text-sm"
-                    title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                >
-                    <svg className={`h-4 w-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                    </svg>
-                    {!collapsed && <span>Collapse</span>}
-                </button>
-            </div>
-
             {/* User area */}
             <div className="border-t border-gray-700/50 px-4 py-3">
                 <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
@@ -288,7 +274,7 @@ export default function AuthenticatedLayout({ children, title }) {
 
                 {/* Sidebar — desktop (collapsible) */}
                 <aside
-                    className={`hidden lg:block bg-gray-900 dark:bg-gray-950 transition-all duration-200 shrink-0 ${
+                    className={`hidden lg:block bg-gray-900 dark:bg-gray-950 transition-all duration-200 shrink-0 sticky top-0 h-screen ${
                         sidebarCollapsed ? 'w-16' : 'w-64'
                     }`}
                 >
@@ -299,9 +285,20 @@ export default function AuthenticatedLayout({ children, title }) {
                 <div className="flex-1 flex flex-col min-w-0">
                     {/* Top header bar */}
                     <div className="sticky top-0 z-30 flex items-center gap-3 px-4 lg:px-8 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                        {/* Mobile hamburger — opens sidebar overlay */}
                         <button
                             onClick={() => setSidebarOpen(true)}
                             className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 lg:hidden"
+                        >
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                        {/* Desktop hamburger — collapses/expands sidebar */}
+                        <button
+                            onClick={toggleSidebarCollapsed}
+                            className="hidden lg:flex p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                         >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />

@@ -5,15 +5,14 @@ import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import StatusBadge from '../../Components/StatusBadge';
 import Avatar from '../../Components/Avatar';
-import LinkButton from '../../Components/LinkButton';
 import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
-import { formatDate, formatLabel } from '../../utils';
+import { formatDate } from '../../utils';
 import { ConfirmModal } from '../../Components/Modal';
 
-const EditIcon = () => (
+const UnarchiveIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4l2-2m0 0l2 2m-2-2v4" />
     </svg>
 );
 
@@ -23,56 +22,25 @@ const TrashIcon = () => (
     </svg>
 );
 
-const ArchiveIcon = () => (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-    </svg>
-);
-
-const UnarchiveIcon = () => (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4l2-2m0 0l2 2m-2-2v4" />
-    </svg>
-);
-
-const PROJECT_STATUSES = ['active', 'on_hold', 'completed', 'archived'];
-
-export default function Index() {
+export default function Archived() {
     const { projects, auth, filters } = usePage().props;
     const canManageAll = auth.user?.permissions?.includes('manage-projects');
     const canManage = (project) => canManageAll || project.owner_id === auth.user?.id || project.user_is_admin;
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
-    const [status, setStatus] = useState(filters?.status || '');
     const debounceRef = useRef(null);
 
     const applyFilters = useCallback((overrides = {}) => {
-        const params = {
-            search: overrides.search ?? search,
-            status: overrides.status ?? status,
-        };
+        const params = { search: overrides.search ?? search };
         Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; });
-        router.get('/projects', params, { preserveState: true, preserveScroll: true });
-    }, [search, status]);
+        router.get('/projects/archived', params, { preserveState: true, preserveScroll: true });
+    }, [search]);
 
     const handleSearchChange = (value) => {
         setSearch(value);
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => applyFilters({ search: value }), 300);
     };
-
-    const handleStatusChange = (value) => {
-        setStatus(value);
-        applyFilters({ status: value });
-    };
-
-    const clearFilters = () => {
-        setSearch('');
-        setStatus('');
-        router.get('/projects', {}, { preserveState: true, preserveScroll: true });
-    };
-
-    const hasActiveFilters = search || status;
 
     const handleDelete = () => {
         if (deleteTarget) {
@@ -82,18 +50,18 @@ export default function Index() {
     };
 
     return (
-        <AuthenticatedLayout title="Projects">
+        <AuthenticatedLayout title="Archived Projects">
             <div>
                 <PageHeader
-                    title="Projects"
+                    title="Archived Projects"
                     breadcrumbs={[
                         { label: 'Dashboard', href: '/dashboard' },
-                        { label: 'Projects' },
+                        { label: 'Projects', href: '/projects' },
+                        { label: 'Archived' },
                     ]}
-                    actions={<LinkButton href="/projects/create">New Project</LinkButton>}
                 />
 
-                {/* Filter Bar */}
+                {/* Search */}
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                     <div className="relative flex-1 max-w-xs">
                         <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -103,23 +71,13 @@ export default function Index() {
                             type="text"
                             value={search}
                             onChange={(e) => handleSearchChange(e.target.value)}
-                            placeholder="Search projects..."
+                            placeholder="Search archived projects..."
                             className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                         />
                     </div>
-                    <select
-                        value={status}
-                        onChange={(e) => handleStatusChange(e.target.value)}
-                        className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                        <option value="">All Statuses</option>
-                        {PROJECT_STATUSES.map((s) => (
-                            <option key={s} value={s}>{formatLabel(s)}</option>
-                        ))}
-                    </select>
-                    {hasActiveFilters && (
+                    {search && (
                         <button
-                            onClick={clearFilters}
+                            onClick={() => { setSearch(''); router.get('/projects/archived', {}, { preserveState: true, preserveScroll: true }); }}
                             className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
                         >
                             Clear
@@ -134,7 +92,6 @@ export default function Index() {
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Owner</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tasks</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Due Date</th>
@@ -149,9 +106,6 @@ export default function Index() {
                                             onClick={() => router.visit(`/projects/${project.id}`)}
                                         >
                                             <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{project.name}</td>
-                                            <td className="px-6 py-4 text-sm">
-                                                <StatusBadge status={project.status} type="project" />
-                                            </td>
                                             <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                                 <div className="flex items-center gap-2">
                                                     {project.owner && <Avatar name={project.owner.name} size="sm" />}
@@ -169,18 +123,11 @@ export default function Index() {
                                                         <>
                                                             <button
                                                                 onClick={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
-                                                                className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
-                                                                title={project.status === 'archived' ? 'Unarchive' : 'Archive'}
+                                                                className="p-1.5 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
+                                                                title="Unarchive"
                                                             >
-                                                                {project.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
+                                                                <UnarchiveIcon />
                                                             </button>
-                                                            <Link
-                                                                href={`/projects/${project.id}/edit`}
-                                                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                                                                title="Edit"
-                                                            >
-                                                                <EditIcon />
-                                                            </Link>
                                                             <button
                                                                 onClick={() => setDeleteTarget(project)}
                                                                 className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
@@ -200,9 +147,8 @@ export default function Index() {
                         </>
                     ) : (
                         <EmptyState
-                            title={hasActiveFilters ? "No matching projects" : "No projects yet"}
-                            description={hasActiveFilters ? "Try adjusting your filters." : "Create your first project to get started"}
-                            action={!hasActiveFilters && <LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
+                            title={search ? "No matching archived projects" : "No archived projects"}
+                            description={search ? "Try adjusting your search." : "Archived projects will appear here."}
                         />
                     )}
                 </Card>

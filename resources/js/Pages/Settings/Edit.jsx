@@ -24,9 +24,20 @@ export default function Edit() {
         primary_color: settings.primary_color || 'blue',
     });
 
+    const applyColorPalette = (colorKey) => {
+        const palette = colorPalettes[colorKey];
+        if (!palette) return;
+        const root = document.documentElement;
+        Object.entries(palette).forEach(([shade, value]) => {
+            root.style.setProperty(`--primary-${shade}`, value);
+        });
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        put('/settings');
+        put('/settings', {
+            onSuccess: () => applyColorPalette(data.primary_color),
+        });
     };
 
     return (

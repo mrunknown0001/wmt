@@ -57,10 +57,12 @@ Route::middleware('auth')->group(function () {
     Route::resource('users', UserController::class)->except(['show']);
 
     // Projects & Tasks
+    Route::get('/projects/archived', [ProjectController::class, 'archived'])->name('projects.archived');
     Route::resource('projects', ProjectController::class);
     Route::resource('projects.tasks', TaskController::class)
         ->except(['index', 'show'])
         ->scoped();
+    Route::patch('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
     Route::post('/projects/{project}/tasks/reorder', [TaskController::class, 'reorder'])->name('projects.tasks.reorder');
     Route::post('/projects/{project}/tasks/bulk', [TaskController::class, 'bulkAction'])->name('projects.tasks.bulk');
     Route::patch('/projects/{project}/tasks/{task}/patch', [TaskController::class, 'patchField'])->name('projects.tasks.patch');

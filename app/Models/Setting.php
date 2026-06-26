@@ -18,7 +18,10 @@ class Setting extends Model
             ])->attributesToArray();
         });
 
-        return (new static)->forceFill($attributes)->syncOriginal();
+        $instance = (new static)->forceFill($attributes)->syncOriginal();
+        $instance->exists = true;
+
+        return $instance;
     }
 
     public static function clearCache(): void

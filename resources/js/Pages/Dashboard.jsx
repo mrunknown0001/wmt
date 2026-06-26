@@ -46,6 +46,7 @@ export default function Dashboard() {
         auth,
         stats,
         myProjects,
+        archivedProjects,
         involvedProjects,
         myRecentTasks,
         dashboardPreferences,
@@ -207,7 +208,7 @@ export default function Dashboard() {
                                             </div>
                                         </div>
                                         {preferences.showProgressBars && project.tasks_count > 0 && (
-                                            <ProjectProgressBar project={project} />
+                                            <ProjectProgressBar completed={project.completed_tasks_count} total={project.tasks_count} />
                                         )}
                                     </Link>
                                 ))}
@@ -250,7 +251,7 @@ export default function Dashboard() {
                                             {project.owner && <Avatar name={project.owner.name} size="sm" />}
                                         </div>
                                         {preferences.showProgressBars && project.tasks_count > 0 && (
-                                            <ProjectProgressBar project={project} />
+                                            <ProjectProgressBar completed={project.completed_tasks_count} total={project.tasks_count} />
                                         )}
                                     </Link>
                                 ))}
@@ -302,6 +303,50 @@ export default function Dashboard() {
                         )}
                     </Card>
                 </div>
+
+                {/* Archived Projects */}
+                {archivedProjects?.length > 0 && (
+                    <div className="mb-6">
+                        <Card padding={false}>
+                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                    </svg>
+                                    Archived Projects
+                                </h2>
+                                <Link href="/projects?status=archived" className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">View all</Link>
+                            </div>
+                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {archivedProjects.map((project) => (
+                                    <div
+                                        key={project.id}
+                                        className="flex items-center gap-4 px-6 py-3"
+                                    >
+                                        <Link
+                                            href={`/projects/${project.id}`}
+                                            className="flex-1 min-w-0 hover:underline"
+                                        >
+                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{project.name}</p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <StatusBadge status={project.status} type="project" />
+                                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                                    {project.completed_tasks_count}/{project.tasks_count} tasks
+                                                </span>
+                                            </div>
+                                        </Link>
+                                        <button
+                                            onClick={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
+                                            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 whitespace-nowrap"
+                                        >
+                                            Unarchive
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </div>
+                )}
 
                 {/* Charts — two-column */}
                 {preferences.showCharts && charts && (

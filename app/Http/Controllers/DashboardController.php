@@ -19,6 +19,16 @@ class DashboardController extends Controller
         // --- Always present ---
         $myProjects = Project::with('owner')
             ->where('owner_id', $user->id)
+            ->where('status', '!=', 'archived')
+            ->withCount('tasks')
+            ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
+            ->orderBy('updated_at', 'desc')
+            ->take(5)
+            ->get();
+
+        $archivedProjects = Project::with('owner')
+            ->where('owner_id', $user->id)
+            ->where('status', 'archived')
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
             ->orderBy('updated_at', 'desc')
@@ -38,6 +48,7 @@ class DashboardController extends Controller
         $involvedProjects = $involvedProjectIds->isNotEmpty()
             ? Project::with('owner')
                 ->whereIn('id', $involvedProjectIds)
+                ->where('status', '!=', 'archived')
                 ->withCount('tasks')
                 ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
                 ->orderBy('updated_at', 'desc')
@@ -66,6 +77,7 @@ class DashboardController extends Controller
                     ->count(),
             ],
             'myProjects' => $myProjects,
+            'archivedProjects' => $archivedProjects,
             'involvedProjects' => $involvedProjects,
             'myRecentTasks' => $myRecentTasks,
             'dashboardPreferences' => $prefs,

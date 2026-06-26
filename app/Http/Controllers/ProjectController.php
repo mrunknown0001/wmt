@@ -57,6 +57,43 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function archived(Request $request): Response
+    {
+        $this->authorize('viewAny', Project::class);
+
+        $query = Project::with('owner')
+            ->where('status', 'archived')
+            ->withCount('tasks')
+            ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        $projects = $query->orderBy('updated_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        $adminProjectIds = DB::table('project_members')
+            ->where('user_id', auth()->id())
+            ->where('role', 'admin')
+            ->whereIn('project_id', $projects->pluck('id'))
+            ->pluck('project_id')
+            ->toArray();
+
+        $projects->getCollection()->transform(function ($project) use ($adminProjectIds) {
+            $project->user_is_admin = in_array($project->id, $adminProjectIds);
+            return $project;
+        });
+
+        return Inertia::render('Projects/Archived', [
+            'projects' => $projects,
+            'filters' => [
+                'search' => $request->input('search', ''),
+            ],
+        ]);
+    }
+
     public function create(): Response
     {
         $this->authorize('create', Project::class);
@@ -165,6 +202,22 @@ class ProjectController extends Controller
 
         return redirect("/projects/{$project->id}")
             ->with('success', 'Project updated successfully.');
+    }
+
+    public function archive(Project $project): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        $oldStatus = $project->status;
+        $newStatus = $oldStatus === 'archived' ? 'active' : 'archived';
+
+        $project->update(['status' => $newStatus]);
+
+        ActivityLogger::logChanges($project, ['status' => $oldStatus], auth()->user());
+
+        $label = $newStatus === 'archived' ? 'archived' : 'unarchived';
+
+        return back()->with('success', "Project {$label} successfully.");
     }
 
     public function destroy(Project $project): RedirectResponse
