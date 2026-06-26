@@ -80,6 +80,7 @@ class RecurringTaskService
         }
 
         TaskActivityLogger::logCreated($newTask, $actor);
+        ActivityLogger::logCreated($newTask, $actor);
 
         TaskActivity::create([
             'task_id' => $task->id,

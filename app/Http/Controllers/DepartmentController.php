@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateDepartmentRequest;
 use App\Models\Department;
 use App\Models\Division;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,7 +40,9 @@ class DepartmentController extends Controller
 
     public function store(StoreDepartmentRequest $request): RedirectResponse
     {
-        Department::create($request->validated());
+        $department = Department::create($request->validated());
+
+        ActivityLogger::logCreated($department, $request->user());
 
         return redirect()->route('departments.index')
             ->with('success', 'Department created successfully.');
@@ -60,7 +63,11 @@ class DepartmentController extends Controller
 
     public function update(UpdateDepartmentRequest $request, Department $department): RedirectResponse
     {
+        $oldValues = $department->only(['name', 'description', 'division_id', 'head_id']);
+
         $department->update($request->validated());
+
+        ActivityLogger::logChanges($department, $oldValues, $request->user());
 
         return redirect()->route('departments.index')
             ->with('success', 'Department updated successfully.');
@@ -69,6 +76,8 @@ class DepartmentController extends Controller
     public function destroy(Department $department): RedirectResponse
     {
         $this->authorize('delete', $department);
+
+        ActivityLogger::logDeleted($department, auth()->user());
 
         $department->delete();
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\TaskSection;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -31,6 +32,8 @@ class TaskSectionController extends Controller
             'position' => $maxPosition + 1,
         ]);
 
+        ActivityLogger::logCreated($section, auth()->user());
+
         return response()->json($section, 201);
     }
 
@@ -46,7 +49,11 @@ class TaskSectionController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
+        $oldValues = $section->only(['name']);
+
         $section->update($validated);
+
+        ActivityLogger::logChanges($section, $oldValues, auth()->user());
 
         return response()->json($section);
     }
@@ -61,6 +68,8 @@ class TaskSectionController extends Controller
 
         // Unassign tasks from this section
         $section->tasks()->update(['section_id' => null]);
+
+        ActivityLogger::logDeleted($section, auth()->user());
 
         $section->delete();
 

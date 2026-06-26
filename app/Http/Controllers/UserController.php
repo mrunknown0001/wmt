@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\Department;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -52,6 +53,8 @@ class UserController extends Controller
 
         $user->assignRole($request->role);
 
+        ActivityLogger::logCreated($user, $request->user());
+
         return redirect()->route('users.index')
             ->with('success', 'User created successfully.');
     }
@@ -73,6 +76,8 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
+        $oldValues = $user->only(['name', 'email', 'position', 'department_id', 'team_id', 'is_active']);
+
         $data = [
             'name' => $request->name,
             'email' => $request->email,
@@ -89,6 +94,8 @@ class UserController extends Controller
         $user->update($data);
         $user->syncRoles([$request->role]);
 
+        ActivityLogger::logChanges($user, $oldValues, $request->user());
+
         return redirect()->route('users.index')
             ->with('success', 'User updated successfully.');
     }
@@ -96,6 +103,8 @@ class UserController extends Controller
     public function destroy(User $user): RedirectResponse
     {
         $this->authorize('delete', $user);
+
+        ActivityLogger::logDeleted($user, auth()->user());
 
         $user->delete();
 

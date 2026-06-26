@@ -6,6 +6,7 @@ use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +78,8 @@ class ProjectController extends Controller
 
         $project = Project::create(collect($data)->except('members')->toArray());
 
+        ActivityLogger::logCreated($project, $request->user());
+
         if (!empty($data['members'])) {
             $members = collect($data['members'])
                 ->mapWithKeys(fn ($m) => [$m['user_id'] => ['role' => $m['role'] ?? 'viewer']]);
@@ -144,7 +147,12 @@ class ProjectController extends Controller
     {
         $validated = $request->validated();
 
+        $oldValues = $project->only(['name', 'description', 'status', 'owner_id', 'due_date']);
+        $oldValues['due_date'] = $project->due_date?->toDateString();
+
         $project->update(collect($validated)->except('members')->toArray());
+
+        ActivityLogger::logChanges($project, $oldValues, $request->user());
 
         $members = collect($validated['members'] ?? [])
             ->mapWithKeys(fn ($m) => [$m['user_id'] => ['role' => $m['role'] ?? 'viewer']]);
@@ -157,6 +165,8 @@ class ProjectController extends Controller
     public function destroy(Project $project): RedirectResponse
     {
         $this->authorize('delete', $project);
+
+        ActivityLogger::logDeleted($project, auth()->user());
 
         $project->delete();
 

@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateTeamRequest;
 use App\Models\Department;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,7 +40,9 @@ class TeamController extends Controller
 
     public function store(StoreTeamRequest $request): RedirectResponse
     {
-        Team::create($request->validated());
+        $team = Team::create($request->validated());
+
+        ActivityLogger::logCreated($team, $request->user());
 
         return redirect()->route('teams.index')
             ->with('success', 'Team created successfully.');
@@ -60,7 +63,11 @@ class TeamController extends Controller
 
     public function update(UpdateTeamRequest $request, Team $team): RedirectResponse
     {
+        $oldValues = $team->only(['name', 'description', 'department_id', 'leader_id']);
+
         $team->update($request->validated());
+
+        ActivityLogger::logChanges($team, $oldValues, $request->user());
 
         return redirect()->route('teams.index')
             ->with('success', 'Team updated successfully.');
@@ -69,6 +76,8 @@ class TeamController extends Controller
     public function destroy(Team $team): RedirectResponse
     {
         $this->authorize('delete', $team);
+
+        ActivityLogger::logDeleted($team, auth()->user());
 
         $team->delete();
 

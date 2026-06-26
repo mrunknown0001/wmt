@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
+use App\Services\ActivityLogger;
 use App\Services\RecurringTaskService;
 use App\Services\TaskActivityLogger;
 use Illuminate\Http\JsonResponse;
@@ -82,6 +83,7 @@ class TaskController extends Controller
         }
 
         TaskActivityLogger::logCreated($task, $request->user());
+        ActivityLogger::logCreated($task, $request->user());
 
         if ($task->assigned_to && $task->assigned_to !== $request->user()->id) {
             $task->load('project');
@@ -196,6 +198,7 @@ class TaskController extends Controller
         }
 
         TaskActivityLogger::logChanges($task, $oldValues, $request->user());
+        ActivityLogger::logChanges($task, $oldValues, $request->user());
 
         if ($task->assigned_to && $task->assigned_to !== $oldAssignee && $task->assigned_to !== $request->user()->id) {
             $task->load('project');
@@ -211,6 +214,8 @@ class TaskController extends Controller
     public function destroy(Project $project, Task $task): RedirectResponse
     {
         $this->authorize('delete', $task);
+
+        ActivityLogger::logDeleted($task, auth()->user());
 
         $task->delete();
 
@@ -229,6 +234,7 @@ class TaskController extends Controller
         $task->load('assignee');
 
         TaskActivityLogger::logChanges($task, $oldValues, $request->user());
+        ActivityLogger::logChanges($task, $oldValues, $request->user());
 
         if (
             $request->has('assigned_to')
@@ -325,6 +331,7 @@ class TaskController extends Controller
                     $oldValues['due_date'] = $task->due_date?->toDateString();
                     $task->update(['status' => $status]);
                     TaskActivityLogger::logChanges($task, $oldValues, $user);
+                    ActivityLogger::logChanges($task, $oldValues, $user);
                     $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $user);
                     if ($newTask) {
                         $newTask->load('assignee', 'collaborators');
@@ -345,6 +352,7 @@ class TaskController extends Controller
                     $oldValues['due_date'] = $task->due_date?->toDateString();
                     $task->update(['priority' => $priority]);
                     TaskActivityLogger::logChanges($task, $oldValues, $user);
+                    ActivityLogger::logChanges($task, $oldValues, $user);
                 }
                 break;
 
@@ -365,6 +373,7 @@ class TaskController extends Controller
                     $task->update(['assigned_to' => $assigneeId]);
                     $task->load('assignee');
                     TaskActivityLogger::logChanges($task, $oldValues, $user);
+                    ActivityLogger::logChanges($task, $oldValues, $user);
                     if ($assigneeId && $assigneeId !== $user->id) {
                         $task->load('project');
                         $task->assignee->notify(new TaskAssignedNotification($task, $user));
@@ -374,6 +383,7 @@ class TaskController extends Controller
 
             case 'delete':
                 foreach ($tasks as $task) {
+                    ActivityLogger::logDeleted($task, $user);
                     $task->delete();
                 }
                 break;

@@ -12,6 +12,7 @@ use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\MyTaskController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
@@ -68,6 +69,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('/projects/{project}/sections/{section}', [TaskSectionController::class, 'update'])->name('projects.sections.update');
     Route::delete('/projects/{project}/sections/{section}', [TaskSectionController::class, 'destroy'])->name('projects.sections.destroy');
     Route::post('/projects/{project}/sections/reorder', [TaskSectionController::class, 'reorder'])->name('projects.sections.reorder');
+
+    // Activity Log (admin)
+    Route::get('/activity-log', [ActivityLogController::class, 'index'])->name('activity-log');
 
     // Settings (admin)
     Route::get('/settings', [SettingController::class, 'edit'])->name('settings.edit');

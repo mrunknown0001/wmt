@@ -6,6 +6,7 @@ use App\Http\Requests\StoreDivisionRequest;
 use App\Http\Requests\UpdateDivisionRequest;
 use App\Models\Division;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -37,7 +38,9 @@ class DivisionController extends Controller
 
     public function store(StoreDivisionRequest $request): RedirectResponse
     {
-        Division::create($request->validated());
+        $division = Division::create($request->validated());
+
+        ActivityLogger::logCreated($division, $request->user());
 
         return redirect()->route('divisions.index')
             ->with('success', 'Division created successfully.');
@@ -57,7 +60,11 @@ class DivisionController extends Controller
 
     public function update(UpdateDivisionRequest $request, Division $division): RedirectResponse
     {
+        $oldValues = $division->only(['name', 'description', 'head_id']);
+
         $division->update($request->validated());
+
+        ActivityLogger::logChanges($division, $oldValues, $request->user());
 
         return redirect()->route('divisions.index')
             ->with('success', 'Division updated successfully.');
@@ -66,6 +73,8 @@ class DivisionController extends Controller
     public function destroy(Division $division): RedirectResponse
     {
         $this->authorize('delete', $division);
+
+        ActivityLogger::logDeleted($division, auth()->user());
 
         $division->delete();
 
