@@ -11,7 +11,7 @@ import UserMultiSelect from '../../Components/UserMultiSelect';
 import { formatLabel } from '../../utils';
 
 export default function Create() {
-    const { project, parentTask, users, statuses, priorities, recurrenceFrequencies } = usePage().props;
+    const { project, parentTask, sections = [], defaultSectionId, users, statuses, priorities, recurrenceFrequencies } = usePage().props;
 
     const { data, setData, post, processing, errors } = useForm({
         title: '',
@@ -22,6 +22,7 @@ export default function Create() {
         due_date: '',
         collaborator_ids: [],
         parent_id: parentTask?.id || '',
+        section_id: defaultSectionId || '',
         is_recurring: false,
         recurrence_frequency: 'weekly',
         recurrence_interval: 1,
@@ -67,6 +68,10 @@ export default function Create() {
                             <Select label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(e) => setData('assigned_to', e.target.value || '')} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} />
                             <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
                         </div>
+
+                        {!parentTask && sections.length > 0 && (
+                            <Select label="Section" id="section_id" value={data.section_id} onChange={(e) => setData('section_id', e.target.value || '')} placeholder="— No section —" options={sections.map((s) => ({ value: s.id, label: s.name }))} error={errors.section_id} />
+                        )}
 
                         {!parentTask && (
                             <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">

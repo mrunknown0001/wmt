@@ -22,6 +22,7 @@ class PatchTaskRequest extends FormRequest
             'priority' => ['sometimes', 'required', 'string', 'in:low,medium,high,urgent'],
             'assigned_to' => ['sometimes', 'nullable', 'exists:users,id'],
             'due_date' => ['sometimes', 'nullable', 'date'],
+            'section_id' => ['sometimes', 'nullable', 'exists:task_sections,id'],
         ];
     }
 }

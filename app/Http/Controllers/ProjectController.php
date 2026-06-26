@@ -79,6 +79,8 @@ class ProjectController extends Controller
 
         $project->load('owner', 'members');
 
+        $sections = $project->sections()->orderBy('position')->get();
+
         $tasks = $project->tasks()
             ->whereNull('parent_id')
             ->with(['assignee', 'creator', 'collaborators', 'subtasks.assignee', 'subtasks.collaborators'])
@@ -97,6 +99,7 @@ class ProjectController extends Controller
         return Inertia::render('Projects/Show', [
             'project' => $project,
             'tasks' => $tasks,
+            'sections' => $sections,
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'canManageProject' => $canManageProject,
             'canManageTasks' => $canManageTasks,

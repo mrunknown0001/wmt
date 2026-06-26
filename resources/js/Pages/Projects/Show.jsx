@@ -6,6 +6,7 @@ import {
     closestCorners,
     KeyboardSensor,
     PointerSensor,
+    useDroppable,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
@@ -220,7 +221,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, handle
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect }) {
     const {
         attributes,
         listeners,
@@ -252,7 +253,14 @@ function SortableRow({ task, project, canEditTask, canManageTasks, handleDeleteT
     };
 
     return (
-        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
+        <tr
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            {...listeners}
+            onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
+            className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
+        >
             <td className="pl-6 pr-2 py-4 w-10">
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id); }}
@@ -491,8 +499,24 @@ function BoardScrollWrapper({ children }) {
     );
 }
 
+// Droppable zone for sections (allows dropping tasks into/between sections)
+function SectionDropZone({ sectionId }) {
+    const { setNodeRef, isOver } = useDroppable({ id: `section-${sectionId ?? 'null'}` });
+    return (
+        <tr ref={setNodeRef}>
+            <td colSpan={7} className={`transition-colors ${isOver ? 'py-2' : 'py-0'}`}>
+                {isOver && (
+                    <div className="mx-4 border-2 border-dashed border-primary-300 dark:border-primary-600 rounded py-2 text-center text-xs text-primary-500 font-medium">
+                        Drop here
+                    </div>
+                )}
+            </td>
+        </tr>
+    );
+}
+
 export default function Show() {
-    const { project, tasks: serverTasks, canManageProject, canManageTasks, auth, users } = usePage().props;
+    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, auth, users } = usePage().props;
 
     const [view, setView] = useState('list');
     const [filterStatus, setFilterStatus] = useState('');
@@ -508,11 +532,19 @@ export default function Show() {
         const now = new Date();
         return { month: now.getMonth() + 1, year: now.getFullYear() };
     });
+    const [selectedTasks, setSelectedTasks] = useState(new Set());
+    const [bulkDropdown, setBulkDropdown] = useState(null); // 'status' | 'priority' | 'assign' | null
+    const [localSections, setLocalSections] = useState(serverSections);
+    const [collapsedSections, setCollapsedSections] = useState(new Set());
+    const [editingSectionId, setEditingSectionId] = useState(null);
+    const [editingSectionName, setEditingSectionName] = useState('');
+    const [addingSectionName, setAddingSectionName] = useState(null); // null = not adding, string = input value
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
         setLocalTasks(serverTasks);
-    }, [serverTasks]);
+        setLocalSections(serverSections);
+    }, [serverTasks, serverSections]);
 
     const canEditTask = (task) =>
         canManageTasks || task.assigned_to === auth.user?.id;
@@ -560,6 +592,80 @@ export default function Show() {
         return grouped;
     }, [filteredTasks]);
 
+    // Group filtered tasks by section for list view
+    const tasksBySection = useMemo(() => {
+        if (localSections.length === 0) return null; // No sections — render flat list
+        const groups = [];
+        // Unsectioned tasks first
+        const unsectioned = filteredTasks.filter((t) => !t.section_id);
+        groups.push({ id: null, name: 'Unsectioned', tasks: unsectioned });
+        // Then each section in order
+        localSections.forEach((s) => {
+            const sectionTasks = filteredTasks.filter((t) => t.section_id === s.id);
+            groups.push({ id: s.id, name: s.name, tasks: sectionTasks });
+        });
+        return groups;
+    }, [filteredTasks, localSections]);
+
+    // Section management handlers
+    const handleCreateSection = useCallback(async (name) => {
+        if (!name.trim()) return;
+        try {
+            const res = await apiFetch(`/projects/${project.id}/sections`, {
+                method: 'POST',
+                body: JSON.stringify({ name: name.trim() }),
+            });
+            if (res.ok) {
+                const section = await res.json();
+                setLocalSections((prev) => [...prev, section]);
+            }
+        } catch {}
+        setAddingSectionName(null);
+    }, [project.id]);
+
+    const handleRenameSection = useCallback(async (sectionId, name) => {
+        if (!name.trim()) { setEditingSectionId(null); return; }
+        setLocalSections((prev) => prev.map((s) => s.id === sectionId ? { ...s, name: name.trim() } : s));
+        setEditingSectionId(null);
+        try {
+            await apiFetch(`/projects/${project.id}/sections/${sectionId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ name: name.trim() }),
+            });
+        } catch {
+            setLocalSections(serverSections);
+        }
+    }, [project.id, serverSections]);
+
+    const handleDeleteSection = useCallback((sectionId, sectionName) => {
+        setConfirmDelete({
+            type: 'section',
+            sectionId,
+            title: 'Delete Section',
+            message: `Delete section "${sectionName}"? Tasks in this section will become unsectioned.`,
+        });
+    }, []);
+
+    const handleConfirmDeleteSection = useCallback(async (sectionId) => {
+        setLocalSections((prev) => prev.filter((s) => s.id !== sectionId));
+        setLocalTasks((prev) => prev.map((t) => t.section_id === sectionId ? { ...t, section_id: null } : t));
+        try {
+            await apiFetch(`/projects/${project.id}/sections/${sectionId}`, { method: 'DELETE' });
+        } catch {
+            setLocalSections(serverSections);
+            setLocalTasks(serverTasks);
+        }
+    }, [project.id, serverSections, serverTasks]);
+
+    const toggleSectionCollapse = useCallback((sectionId) => {
+        setCollapsedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(sectionId)) next.delete(sectionId);
+            else next.add(sectionId);
+            return next;
+        });
+    }, []);
+
     // DnD sensors with activation distance to allow clicks
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -578,6 +684,7 @@ export default function Show() {
             id: t.id,
             status: t.status,
             position: index,
+            section_id: t.section_id ?? null,
         }));
 
         apiFetch(`/projects/${project.id}/tasks/reorder`, {
@@ -650,6 +757,34 @@ export default function Show() {
         });
     }, [localTasks, project.id, serverTasks, handleInlineUpdate]);
 
+    // --- List view drag over (cross-section movement) ---
+    const handleListDragOver = useCallback((event) => {
+        const { active, over } = event;
+        if (!over || !tasksBySection) return;
+
+        const activeId = active.id;
+        const overId = String(over.id);
+
+        if (activeId === over.id) return;
+
+        let targetSectionId;
+        if (overId.startsWith('section-')) {
+            const part = overId.replace('section-', '');
+            targetSectionId = part === 'null' ? null : parseInt(part);
+        } else {
+            const overTask = localTasks.find((t) => t.id === over.id);
+            if (!overTask) return;
+            targetSectionId = overTask.section_id;
+        }
+
+        const activeTask = localTasks.find((t) => t.id === activeId);
+        if (!activeTask || activeTask.section_id === targetSectionId) return;
+
+        setLocalTasks((prev) =>
+            prev.map((t) => (t.id === activeId ? { ...t, section_id: targetSectionId } : t))
+        );
+    }, [localTasks, tasksBySection]);
+
     // --- List view drag handlers ---
     const handleListDragEnd = useCallback((event) => {
         const { active, over } = event;
@@ -657,32 +792,68 @@ export default function Show() {
 
         if (!over || active.id === over.id) return;
 
-        setLocalTasks((prev) => {
-            const filtered = prev.filter(matchesFilters);
-            const unfilteredIds = new Set(filtered.map((t) => t.id));
+        if (tasksBySection) {
+            // Section-aware drag end
+            const activeTask = localTasks.find((t) => t.id === active.id);
+            if (!activeTask) return;
 
-            const oldIndex = filtered.findIndex((t) => t.id === active.id);
-            const newIndex = filtered.findIndex((t) => t.id === over.id);
-            if (oldIndex === -1 || newIndex === -1) return prev;
+            const sectionId = activeTask.section_id;
+            const sectionTasks = localTasks.filter((t) => t.section_id === sectionId && matchesFilters(t));
 
-            const reordered = arrayMove(filtered, oldIndex, newIndex);
+            const overIdStr = String(over.id);
+            const isOverSection = overIdStr.startsWith('section-');
+            const overTask = !isOverSection ? localTasks.find((t) => t.id === over.id) : null;
 
-            // Rebuild full list: keep unfiltered items in place, splice reordered filtered items
-            const result = [];
-            let filteredIdx = 0;
-            for (const t of prev) {
-                if (unfilteredIds.has(t.id)) {
-                    result.push({ ...reordered[filteredIdx], position: filteredIdx });
-                    filteredIdx++;
-                } else {
-                    result.push(t);
+            if (!isOverSection && overTask && overTask.section_id === sectionId) {
+                // Reorder within the same section
+                const oldIndex = sectionTasks.findIndex((t) => t.id === active.id);
+                const newIndex = sectionTasks.findIndex((t) => t.id === over.id);
+
+                if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+                    const reordered = arrayMove(sectionTasks, oldIndex, newIndex);
+                    setLocalTasks((prev) => {
+                        const updated = prev.map((t) => ({ ...t }));
+                        reordered.forEach((t, i) => {
+                            const idx = updated.findIndex((u) => u.id === t.id);
+                            if (idx !== -1) updated[idx].position = i;
+                        });
+                        return updated;
+                    });
+                    persistReorder(reordered);
+                    return;
                 }
             }
 
-            persistReorder(reordered);
-            return result;
-        });
-    }, [matchesFilters, persistReorder]);
+            // Cross-section move — persist new section assignment with positions
+            persistReorder(sectionTasks);
+        } else {
+            // Flat list mode (no sections)
+            setLocalTasks((prev) => {
+                const filtered = prev.filter(matchesFilters);
+                const unfilteredIds = new Set(filtered.map((t) => t.id));
+
+                const oldIndex = filtered.findIndex((t) => t.id === active.id);
+                const newIndex = filtered.findIndex((t) => t.id === over.id);
+                if (oldIndex === -1 || newIndex === -1) return prev;
+
+                const reordered = arrayMove(filtered, oldIndex, newIndex);
+
+                const result = [];
+                let filteredIdx = 0;
+                for (const t of prev) {
+                    if (unfilteredIds.has(t.id)) {
+                        result.push({ ...reordered[filteredIdx], position: filteredIdx });
+                        filteredIdx++;
+                    } else {
+                        result.push(t);
+                    }
+                }
+
+                persistReorder(reordered);
+                return result;
+            });
+        }
+    }, [tasksBySection, localTasks, matchesFilters, persistReorder]);
 
     // --- Subtask drag handler (within a parent) ---
     const handleSubtaskDragEnd = useCallback((parentId, event) => {
@@ -809,15 +980,6 @@ export default function Show() {
         });
     };
 
-    const handleConfirmDelete = () => {
-        if (confirmDelete.type === 'project') {
-            router.delete(`/projects/${project.id}`);
-        } else {
-            router.delete(`/projects/${project.id}/tasks/${confirmDelete.taskId}`);
-        }
-        setConfirmDelete(null);
-    };
-
     const handleToggleComplete = useCallback((taskId) => {
         // Check parent tasks first, then subtasks
         let task = localTasks.find((t) => t.id === taskId);
@@ -840,6 +1002,106 @@ export default function Show() {
             return next;
         });
     }, []);
+
+    // --- Selection helpers ---
+    const toggleTaskSelection = useCallback((taskId) => {
+        setSelectedTasks((prev) => {
+            const next = new Set(prev);
+            if (next.has(taskId)) next.delete(taskId);
+            else next.add(taskId);
+            return next;
+        });
+    }, []);
+
+    const clearSelection = useCallback(() => {
+        setSelectedTasks(new Set());
+        setBulkDropdown(null);
+    }, []);
+
+    // Clear selection when filters change
+    useEffect(() => {
+        setSelectedTasks(new Set());
+    }, [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate]);
+
+    // Close bulk dropdown on outside click
+    useEffect(() => {
+        if (!bulkDropdown) return;
+        const handleClick = () => setBulkDropdown(null);
+        document.addEventListener('click', handleClick);
+        return () => document.removeEventListener('click', handleClick);
+    }, [bulkDropdown]);
+
+    // --- Bulk action handler ---
+    const handleBulkAction = useCallback(async (action, value) => {
+        if (selectedTasks.size === 0) return;
+        const taskIds = Array.from(selectedTasks);
+        setBulkDropdown(null);
+
+        if (action === 'delete') {
+            setConfirmDelete({
+                type: 'bulk',
+                taskIds,
+                title: 'Delete Tasks',
+                message: `Delete ${taskIds.length} selected task${taskIds.length !== 1 ? 's' : ''}? This cannot be undone.`,
+            });
+            return;
+        }
+
+        // Optimistic update
+        setLocalTasks((prev) => prev.map((t) => {
+            if (!taskIds.includes(t.id)) return t;
+            if (action === 'update_status') return { ...t, status: value };
+            if (action === 'update_priority') return { ...t, priority: value };
+            if (action === 'assign') {
+                const assignee = value ? users.find((u) => u.id === value) : null;
+                return { ...t, assigned_to: value, assignee: assignee ? { id: assignee.id, name: assignee.name } : null };
+            }
+            return t;
+        }));
+
+        clearSelection();
+
+        try {
+            const res = await apiFetch(`/projects/${project.id}/tasks/bulk`, {
+                method: 'POST',
+                body: JSON.stringify({ task_ids: taskIds, action, value }),
+            });
+            if (!res.ok) throw new Error('Bulk action failed');
+            const data = await res.json();
+            if (data.new_tasks?.length > 0) {
+                setLocalTasks((prev) => [...prev, ...data.new_tasks]);
+            }
+        } catch {
+            // Revert on failure — reload from server
+            router.reload({ only: ['tasks'] });
+        }
+    }, [selectedTasks, project.id, users, clearSelection]);
+
+    // Handle bulk delete confirmation
+    const handleConfirmDelete = () => {
+        if (confirmDelete?.type === 'bulk') {
+            const taskIds = confirmDelete.taskIds;
+            setLocalTasks((prev) => prev.filter((t) => !taskIds.includes(t.id)));
+            clearSelection();
+            setConfirmDelete(null);
+            apiFetch(`/projects/${project.id}/tasks/bulk`, {
+                method: 'POST',
+                body: JSON.stringify({ task_ids: taskIds, action: 'delete', value: null }),
+            }).catch(() => router.reload({ only: ['tasks'] }));
+            return;
+        }
+        if (confirmDelete?.type === 'section') {
+            handleConfirmDeleteSection(confirmDelete.sectionId);
+            setConfirmDelete(null);
+            return;
+        }
+        if (confirmDelete?.type === 'project') {
+            router.delete(`/projects/${project.id}`);
+        } else {
+            router.delete(`/projects/${project.id}/tasks/${confirmDelete.taskId}`);
+        }
+        setConfirmDelete(null);
+    };
 
     const hasActiveFilters = filterStatus || filterPriority || filterAssignee || filterSearch || filterDueDate;
     const activeFilterCount = [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate].filter(Boolean).length;
@@ -1039,6 +1301,7 @@ export default function Show() {
                             sensors={sensors}
                             collisionDetection={closestCorners}
                             onDragStart={handleDragStart}
+                            onDragOver={handleListDragOver}
                             onDragEnd={handleListDragEnd}
                         >
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -1054,59 +1317,253 @@ export default function Show() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    <SortableContext items={filteredTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                                        {filteredTasks.map((task) => (
-                                            <React.Fragment key={task.id}>
-                                                <SortableRow
-                                                    task={task}
-                                                    project={project}
-                                                    canEditTask={canEditTask(task)}
-                                                    canManageTasks={canManageTasks}
-                                                    handleDeleteTask={handleDeleteTask}
-                                                    users={users}
-                                                    onTaskUpdate={handleInlineUpdate}
-                                                    onToggleComplete={handleToggleComplete}
-                                                    isExpanded={expandedTasks.has(task.id)}
-                                                    onToggleExpand={handleToggleExpand}
-                                                />
-                                                {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
-                                                    <DndContext
-                                                        sensors={sensors}
-                                                        collisionDetection={closestCorners}
-                                                        onDragEnd={(event) => handleSubtaskDragEnd(task.id, event)}
-                                                    >
-                                                        <SortableContext items={task.subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                                                            {task.subtasks.map((sub) => (
-                                                                <SortableSubtaskRow
-                                                                    key={sub.id}
-                                                                    task={sub}
-                                                                    project={project}
-                                                                    canEditTask={canEditTask(sub)}
-                                                                    canManageTasks={canManageTasks}
-                                                                    handleDeleteTask={handleDeleteTask}
-                                                                    onToggleComplete={handleToggleComplete}
-                                                                    users={users}
-                                                                    onTaskUpdate={handleSubtaskInlineUpdate}
-                                                                />
+                                    {tasksBySection ? (
+                                        <>
+                                            {tasksBySection.map((group) => (
+                                                <React.Fragment key={group.id ?? '__unsectioned'}>
+                                                    {/* Section header — skip for unsectioned if it's the only group or empty */}
+                                                    {group.id !== null && (
+                                                        <tr className="bg-gray-100 dark:bg-gray-800/80">
+                                                            <td colSpan={7} className="px-4 py-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <button
+                                                                        onClick={() => toggleSectionCollapse(group.id)}
+                                                                        className="p-0.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                                                                    >
+                                                                        <svg className={`h-3.5 w-3.5 transition-transform ${collapsedSections.has(group.id) ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                                                        </svg>
+                                                                    </button>
+                                                                    {editingSectionId === group.id ? (
+                                                                        <input
+                                                                            autoFocus
+                                                                            className="text-sm font-semibold bg-white dark:bg-gray-700 border border-primary-300 dark:border-primary-600 rounded px-2 py-0.5 text-gray-900 dark:text-gray-100 outline-none"
+                                                                            value={editingSectionName}
+                                                                            onChange={(e) => setEditingSectionName(e.target.value)}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter') handleRenameSection(group.id, editingSectionName);
+                                                                                if (e.key === 'Escape') setEditingSectionId(null);
+                                                                            }}
+                                                                            onBlur={() => handleRenameSection(group.id, editingSectionName)}
+                                                                        />
+                                                                    ) : (
+                                                                        <span
+                                                                            className="text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400"
+                                                                            onClick={() => { setEditingSectionId(group.id); setEditingSectionName(group.name); }}
+                                                                        >
+                                                                            {group.name}
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">{group.tasks.length}</span>
+                                                                    {canManageTasks && (
+                                                                        <>
+                                                                            <Link
+                                                                                href={`/projects/${project.id}/tasks/create?section_id=${group.id}`}
+                                                                                className="ml-auto text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                                                title="Add task to section"
+                                                                            >
+                                                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                                                                </svg>
+                                                                            </Link>
+                                                                            <button
+                                                                                onClick={() => handleDeleteSection(group.id, group.name)}
+                                                                                className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                                                                title="Delete section"
+                                                                            >
+                                                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                                </svg>
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                    {/* Collapsed section drop zone */}
+                                                    {group.id !== null && collapsedSections.has(group.id) && (
+                                                        <SectionDropZone sectionId={group.id} />
+                                                    )}
+                                                    {/* Tasks in this section */}
+                                                    {!(group.id !== null && collapsedSections.has(group.id)) && (
+                                                        <>
+                                                        <SortableContext items={group.tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                                                            {group.tasks.map((task) => (
+                                                                <React.Fragment key={task.id}>
+                                                                    <SortableRow
+                                                                        task={task}
+                                                                        project={project}
+                                                                        canEditTask={canEditTask(task)}
+                                                                        canManageTasks={canManageTasks}
+                                                                        handleDeleteTask={handleDeleteTask}
+                                                                        users={users}
+                                                                        onTaskUpdate={handleInlineUpdate}
+                                                                        onToggleComplete={handleToggleComplete}
+                                                                        isExpanded={expandedTasks.has(task.id)}
+                                                                        onToggleExpand={handleToggleExpand}
+                                                                        isSelected={selectedTasks.has(task.id)}
+                                                                        onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                                                    />
+                                                                    {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
+                                                                        <DndContext
+                                                                            sensors={sensors}
+                                                                            collisionDetection={closestCorners}
+                                                                            onDragEnd={(event) => handleSubtaskDragEnd(task.id, event)}
+                                                                        >
+                                                                            <SortableContext items={task.subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                                                                                {task.subtasks.map((sub) => (
+                                                                                    <SortableSubtaskRow
+                                                                                        key={sub.id}
+                                                                                        task={sub}
+                                                                                        project={project}
+                                                                                        canEditTask={canEditTask(sub)}
+                                                                                        canManageTasks={canManageTasks}
+                                                                                        handleDeleteTask={handleDeleteTask}
+                                                                                        onToggleComplete={handleToggleComplete}
+                                                                                        users={users}
+                                                                                        onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                                    />
+                                                                                ))}
+                                                                            </SortableContext>
+                                                                        </DndContext>
+                                                                    )}
+                                                                    {expandedTasks.has(task.id) && canManageTasks && (
+                                                                        <tr className="bg-gray-50/50 dark:bg-gray-800/30">
+                                                                            <td colSpan={7} className="pl-14 py-2">
+                                                                                <Link
+                                                                                    href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
+                                                                                    className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                                                >
+                                                                                    + Add subtask
+                                                                                </Link>
+                                                                            </td>
+                                                                        </tr>
+                                                                    )}
+                                                                </React.Fragment>
                                                             ))}
                                                         </SortableContext>
-                                                    </DndContext>
-                                                )}
-                                                {expandedTasks.has(task.id) && canManageTasks && (
-                                                    <tr className="bg-gray-50/50 dark:bg-gray-800/30">
-                                                        <td colSpan={7} className="pl-14 py-2">
-                                                            <Link
-                                                                href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
-                                                                className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                        <SectionDropZone sectionId={group.id} />
+                                                        </>
+                                                    )}
+                                                </React.Fragment>
+                                            ))}
+                                            {/* Add section button */}
+                                            {canManageTasks && (
+                                                <tr>
+                                                    <td colSpan={7} className="px-6 py-2">
+                                                        {addingSectionName !== null ? (
+                                                            <input
+                                                                autoFocus
+                                                                className="text-sm bg-white dark:bg-gray-700 border border-primary-300 dark:border-primary-600 rounded px-2 py-1 text-gray-900 dark:text-gray-100 outline-none w-64"
+                                                                placeholder="Section name..."
+                                                                value={addingSectionName}
+                                                                onChange={(e) => setAddingSectionName(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') handleCreateSection(addingSectionName);
+                                                                    if (e.key === 'Escape') setAddingSectionName(null);
+                                                                }}
+                                                                onBlur={() => { if (addingSectionName?.trim()) handleCreateSection(addingSectionName); else setAddingSectionName(null); }}
+                                                            />
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setAddingSectionName('')}
+                                                                className="text-sm text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                                                             >
-                                                                + Add subtask
-                                                            </Link>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </React.Fragment>
-                                        ))}
-                                    </SortableContext>
+                                                                + Add section
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <SortableContext items={filteredTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                                                {filteredTasks.map((task) => (
+                                                    <React.Fragment key={task.id}>
+                                                        <SortableRow
+                                                            task={task}
+                                                            project={project}
+                                                            canEditTask={canEditTask(task)}
+                                                            canManageTasks={canManageTasks}
+                                                            handleDeleteTask={handleDeleteTask}
+                                                            users={users}
+                                                            onTaskUpdate={handleInlineUpdate}
+                                                            onToggleComplete={handleToggleComplete}
+                                                            isExpanded={expandedTasks.has(task.id)}
+                                                            onToggleExpand={handleToggleExpand}
+                                                            isSelected={selectedTasks.has(task.id)}
+                                                            onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                                        />
+                                                        {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
+                                                            <DndContext
+                                                                sensors={sensors}
+                                                                collisionDetection={closestCorners}
+                                                                onDragEnd={(event) => handleSubtaskDragEnd(task.id, event)}
+                                                            >
+                                                                <SortableContext items={task.subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                                                                    {task.subtasks.map((sub) => (
+                                                                        <SortableSubtaskRow
+                                                                            key={sub.id}
+                                                                            task={sub}
+                                                                            project={project}
+                                                                            canEditTask={canEditTask(sub)}
+                                                                            canManageTasks={canManageTasks}
+                                                                            handleDeleteTask={handleDeleteTask}
+                                                                            onToggleComplete={handleToggleComplete}
+                                                                            users={users}
+                                                                            onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                        />
+                                                                    ))}
+                                                                </SortableContext>
+                                                            </DndContext>
+                                                        )}
+                                                        {expandedTasks.has(task.id) && canManageTasks && (
+                                                            <tr className="bg-gray-50/50 dark:bg-gray-800/30">
+                                                                <td colSpan={7} className="pl-14 py-2">
+                                                                    <Link
+                                                                        href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
+                                                                        className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                                    >
+                                                                        + Add subtask
+                                                                    </Link>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </React.Fragment>
+                                                ))}
+                                            </SortableContext>
+                                            {/* Add section button when no sections exist yet */}
+                                            {canManageTasks && (
+                                                <tr>
+                                                    <td colSpan={7} className="px-6 py-2">
+                                                        {addingSectionName !== null ? (
+                                                            <input
+                                                                autoFocus
+                                                                className="text-sm bg-white dark:bg-gray-700 border border-primary-300 dark:border-primary-600 rounded px-2 py-1 text-gray-900 dark:text-gray-100 outline-none w-64"
+                                                                placeholder="Section name..."
+                                                                value={addingSectionName}
+                                                                onChange={(e) => setAddingSectionName(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') handleCreateSection(addingSectionName);
+                                                                    if (e.key === 'Escape') setAddingSectionName(null);
+                                                                }}
+                                                                onBlur={() => { if (addingSectionName?.trim()) handleCreateSection(addingSectionName); else setAddingSectionName(null); }}
+                                                            />
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setAddingSectionName('')}
+                                                                className="text-sm text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                            >
+                                                                + Add section
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                    )}
                                 </tbody>
                             </table>
                             <DragOverlay>
@@ -1173,6 +1630,8 @@ export default function Show() {
                                             auth={auth}
                                             onDeleteTask={handleDeleteTask}
                                             onToggleComplete={handleToggleComplete}
+                                            selectedTasks={selectedTasks}
+                                            onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                         />
                                     ))}
                                 </div>
@@ -1572,6 +2031,71 @@ export default function Show() {
                     </div>
                 );
             })()}
+
+            {/* Bulk Actions Toolbar */}
+            {selectedTasks.size > 0 && canManageTasks && (
+                <div onClick={(e) => e.stopPropagation()} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 dark:bg-gray-700 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-sm font-medium whitespace-nowrap">{selectedTasks.size} task{selectedTasks.size !== 1 ? 's' : ''} selected</span>
+                    <div className="w-px h-5 bg-gray-600" />
+
+                    {/* Status dropdown */}
+                    <div className="relative">
+                        <button onClick={() => setBulkDropdown(bulkDropdown === 'status' ? null : 'status')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Status</button>
+                        {bulkDropdown === 'status' && (
+                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 py-1 min-w-[140px]">
+                                {TASK_STATUSES.map((s) => (
+                                    <button key={s} onClick={() => handleBulkAction('update_status', s)} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                        {formatLabel(s)}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Priority dropdown */}
+                    <div className="relative">
+                        <button onClick={() => setBulkDropdown(bulkDropdown === 'priority' ? null : 'priority')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Priority</button>
+                        {bulkDropdown === 'priority' && (
+                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 py-1 min-w-[120px]">
+                                {['low', 'medium', 'high', 'urgent'].map((p) => (
+                                    <button key={p} onClick={() => handleBulkAction('update_priority', p)} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 capitalize">
+                                        {formatLabel(p)}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Assign dropdown */}
+                    <div className="relative">
+                        <button onClick={() => setBulkDropdown(bulkDropdown === 'assign' ? null : 'assign')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Assign</button>
+                        {bulkDropdown === 'assign' && (
+                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 py-1 min-w-[160px] max-h-48 overflow-y-auto">
+                                <button onClick={() => handleBulkAction('assign', null)} className="w-full text-left px-3 py-1.5 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 italic">
+                                    Unassign
+                                </button>
+                                {users.map((u) => (
+                                    <button key={u.id} onClick={() => handleBulkAction('assign', u.id)} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                        {u.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="w-px h-5 bg-gray-600" />
+
+                    {/* Delete */}
+                    <button onClick={() => handleBulkAction('delete')} className="text-sm px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors">Delete</button>
+
+                    {/* Close */}
+                    <button onClick={clearSelection} className="p-1 rounded hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors ml-1" title="Clear selection">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            )}
 
             {/* Confirm Delete Modal */}
             <ConfirmModal

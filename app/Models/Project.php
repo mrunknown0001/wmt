@@ -37,6 +37,11 @@ class Project extends Model
         return $this->hasMany(Task::class);
     }
 
+    public function sections(): HasMany
+    {
+        return $this->hasMany(TaskSection::class);
+    }
+
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_members')

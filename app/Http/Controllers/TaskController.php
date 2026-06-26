@@ -33,9 +33,13 @@ class TaskController extends Controller
                 ->first(['id', 'title']);
         }
 
+        $sections = $project->sections()->orderBy('position')->get(['id', 'name']);
+
         return Inertia::render('Tasks/Create', [
             'project' => $project,
             'parentTask' => $parentTask,
+            'sections' => $sections,
+            'defaultSectionId' => $request->query('section_id'),
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
@@ -275,6 +279,102 @@ class TaskController extends Controller
         return response()->json(['items' => $items->values()]);
     }
 
+    public function bulkAction(Request $request, Project $project): JsonResponse
+    {
+        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'task_ids' => 'required|array|min:1',
+            'task_ids.*' => 'required|integer',
+            'action' => 'required|string|in:update_status,update_priority,assign,delete',
+            'value' => 'nullable',
+        ]);
+
+        $tasks = Task::whereIn('id', $validated['task_ids'])
+            ->where('project_id', $project->id)
+            ->get();
+
+        if ($tasks->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No matching tasks found.'], 404);
+        }
+
+        $user = $request->user();
+        $newTasks = [];
+
+        switch ($validated['action']) {
+            case 'update_status':
+                $status = $validated['value'];
+                if (!in_array($status, ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'])) {
+                    return response()->json(['success' => false, 'message' => 'Invalid status.'], 422);
+                }
+                foreach ($tasks as $task) {
+                    $oldStatus = $task->status;
+                    if ($oldStatus === $status) continue;
+                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'due_date']);
+                    $oldValues['due_date'] = $task->due_date?->toDateString();
+                    $task->update(['status' => $status]);
+                    TaskActivityLogger::logChanges($task, $oldValues, $user);
+                    $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $user);
+                    if ($newTask) {
+                        $newTask->load('assignee', 'collaborators');
+                        $newTasks[] = $newTask;
+                    }
+                }
+                break;
+
+            case 'update_priority':
+                $priority = $validated['value'];
+                if (!in_array($priority, ['low', 'medium', 'high', 'urgent'])) {
+                    return response()->json(['success' => false, 'message' => 'Invalid priority.'], 422);
+                }
+                foreach ($tasks as $task) {
+                    if ($task->priority === $priority) continue;
+                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'due_date']);
+                    $oldValues['due_date'] = $task->due_date?->toDateString();
+                    $task->update(['priority' => $priority]);
+                    TaskActivityLogger::logChanges($task, $oldValues, $user);
+                }
+                break;
+
+            case 'assign':
+                $assigneeId = $validated['value'] ?: null;
+                if ($assigneeId) {
+                    $assignee = User::where('id', $assigneeId)->where('is_active', true)->first();
+                    if (!$assignee) {
+                        return response()->json(['success' => false, 'message' => 'Invalid assignee.'], 422);
+                    }
+                }
+                foreach ($tasks as $task) {
+                    $oldAssignee = $task->assigned_to;
+                    if ($oldAssignee == $assigneeId) continue;
+                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'due_date']);
+                    $oldValues['due_date'] = $task->due_date?->toDateString();
+                    $task->update(['assigned_to' => $assigneeId]);
+                    $task->load('assignee');
+                    TaskActivityLogger::logChanges($task, $oldValues, $user);
+                    if ($assigneeId && $assigneeId !== $user->id) {
+                        $task->load('project');
+                        $task->assignee->notify(new TaskAssignedNotification($task, $user));
+                    }
+                }
+                break;
+
+            case 'delete':
+                foreach ($tasks as $task) {
+                    $task->delete();
+                }
+                break;
+        }
+
+        return response()->json([
+            'success' => true,
+            'new_tasks' => $newTasks,
+            'affected_count' => $tasks->count(),
+        ]);
+    }
+
     public function reorder(Request $request, Project $project): JsonResponse
     {
         // Authorize: must be able to manage tasks or be the project owner
@@ -287,6 +387,7 @@ class TaskController extends Controller
             'tasks.*.id' => 'required|integer|exists:tasks,id',
             'tasks.*.status' => 'required|string|in:backlog,to_do,in_progress,in_review,done,cancelled',
             'tasks.*.position' => 'required|integer|min:0',
+            'tasks.*.section_id' => 'sometimes|nullable|integer',
         ]);
 
         // Pre-fetch recurring tasks that are transitioning to 'done'
@@ -302,12 +403,16 @@ class TaskController extends Controller
         }
 
         foreach ($validated['tasks'] as $item) {
+            $updateData = [
+                'status' => $item['status'],
+                'position' => $item['position'],
+            ];
+            if (array_key_exists('section_id', $item)) {
+                $updateData['section_id'] = $item['section_id'];
+            }
             Task::where('id', $item['id'])
                 ->where('project_id', $project->id)
-                ->update([
-                    'status' => $item['status'],
-                    'position' => $item['position'],
-                ]);
+                ->update($updateData);
         }
 
         // Generate next occurrences for recurring tasks that just moved to done

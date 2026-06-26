@@ -30,6 +30,7 @@ class Task extends Model
         'recurrence_frequency',
         'recurrence_interval',
         'recurring_source_id',
+        'section_id',
     ];
 
     protected function casts(): array
@@ -60,6 +61,11 @@ class Task extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(TaskSection::class, 'section_id');
     }
 
     public function parent(): BelongsTo

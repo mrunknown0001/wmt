@@ -29,6 +29,7 @@ class StoreTaskRequest extends FormRequest
             'is_recurring' => ['sometimes', 'boolean'],
             'recurrence_frequency' => ['required_if:is_recurring,true', 'nullable', 'string', 'in:daily,weekly,monthly,yearly'],
             'recurrence_interval' => ['required_if:is_recurring,true', 'nullable', 'integer', 'min:1', 'max:365'],
+            'section_id' => ['nullable', 'exists:task_sections,id'],
         ];
     }
 }

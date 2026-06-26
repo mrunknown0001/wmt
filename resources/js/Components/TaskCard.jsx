@@ -5,7 +5,7 @@ import PriorityBadge from './PriorityBadge';
 import Avatar from './Avatar';
 import { formatDate } from '../utils';
 
-export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete, onToggleComplete }) {
+export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete, onToggleComplete, isSelected, onToggleSelect }) {
     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
@@ -30,7 +30,8 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
             style={style}
             {...attributes}
             {...listeners}
-            className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-lg' : ''}`}
+            onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
+            className={`bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-lg' : ''} ${isSelected ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-gray-700'}`}
         >
             <div className="flex items-start gap-2 mb-2">
                 <button
