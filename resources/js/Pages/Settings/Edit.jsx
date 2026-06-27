@@ -25,7 +25,28 @@ export default function Edit() {
         max_upload_size: settings.max_upload_size || 10,
         task_reminders_enabled: settings.task_reminders_enabled ?? true,
         task_reminder_days: settings.task_reminder_days || [7, 3, 1],
+        escalation_enabled: settings.escalation_enabled ?? true,
+        escalation_tiers: settings.escalation_tiers || [
+            { days: 1, enabled: true },
+            { days: 3, enabled: true },
+            { days: 7, enabled: true },
+            { days: 14, enabled: true },
+        ],
     });
+
+    const ESCALATION_LABELS = [
+        'Assignee Reminder',
+        'Supervisor, Manager & Project Owner',
+        'Division Head',
+        'Executives',
+    ];
+
+    const updateEscalationTier = (index, field, value) => {
+        const updated = data.escalation_tiers.map((tier, i) =>
+            i === index ? { ...tier, [field]: value } : tier
+        );
+        setData('escalation_tiers', updated);
+    };
 
     const PRESET_DAYS = [1, 2, 3, 5, 7, 14, 21, 30];
 
@@ -181,6 +202,89 @@ export default function Edit() {
                                     </p>
                                     {errors.task_reminder_days && (
                                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.task_reminder_days}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        Overdue Task Escalation
+                                    </label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Automatically escalate overdue tasks up the org hierarchy.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={data.escalation_enabled}
+                                    onClick={() => setData('escalation_enabled', !data.escalation_enabled)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                                        data.escalation_enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                                    }`}
+                                >
+                                    <span
+                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                            data.escalation_enabled ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {data.escalation_enabled && (
+                                <div className="space-y-3">
+                                    {data.escalation_tiers.map((tier, index) => (
+                                        <div
+                                            key={index}
+                                            className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${
+                                                tier.enabled
+                                                    ? 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800'
+                                                    : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+                                            }`}
+                                        >
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={tier.enabled}
+                                                onClick={() => updateEscalationTier(index, 'enabled', !tier.enabled)}
+                                                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                                    tier.enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                                                }`}
+                                            >
+                                                <span
+                                                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                        tier.enabled ? 'translate-x-4' : 'translate-x-0'
+                                                    }`}
+                                                />
+                                            </button>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                    Level {index + 1}: {ESCALATION_LABELS[index]}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">after</span>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={90}
+                                                    value={tier.days}
+                                                    onChange={(e) => updateEscalationTier(index, 'days', parseInt(e.target.value) || 1)}
+                                                    disabled={!tier.enabled}
+                                                    className="w-16 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm text-center disabled:opacity-50"
+                                                />
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{tier.days === 1 ? 'day' : 'days'}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Configure how many days after a task is overdue each escalation level triggers. Escalation runs daily at 8:00 AM.
+                                    </p>
+                                    {errors.escalation_tiers && (
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.escalation_tiers}</p>
                                     )}
                                 </div>
                             )}

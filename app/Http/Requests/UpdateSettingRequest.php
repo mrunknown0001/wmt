@@ -20,6 +20,10 @@ class UpdateSettingRequest extends FormRequest
             'task_reminders_enabled' => ['required', 'boolean'],
             'task_reminder_days' => ['required_if:task_reminders_enabled,true', 'array', 'min:1'],
             'task_reminder_days.*' => ['integer', 'min:1', 'max:30'],
+            'escalation_enabled' => ['required', 'boolean'],
+            'escalation_tiers' => ['required', 'array', 'size:4'],
+            'escalation_tiers.*.days' => ['required', 'integer', 'min:1', 'max:90'],
+            'escalation_tiers.*.enabled' => ['required', 'boolean'],
         ];
     }
 }

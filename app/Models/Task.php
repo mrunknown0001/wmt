@@ -17,8 +17,8 @@ class Task extends Model
 
     public const ESCALATION_TIERS = [
         1 => ['days' => 1,  'label' => 'Assignee Reminder'],
-        2 => ['days' => 3,  'label' => 'Supervisor & Project Owner'],
-        3 => ['days' => 7,  'label' => 'Department Head'],
+        2 => ['days' => 3,  'label' => 'Supervisor, Manager & Project Owner'],
+        3 => ['days' => 7,  'label' => 'Division Head'],
         4 => ['days' => 14, 'label' => 'Executives'],
     ];
 

@@ -61,29 +61,31 @@ class SendTaskReminders extends Command
             $overdueCount++;
         }
 
-        // Escalation tiers
+        // Escalation tiers (configurable via admin settings)
         $escalatedCount = 0;
-        $escalationTasks = Task::with(['assignee.department.division', 'assignee.team', 'project'])
-            ->whereNotNull('assigned_to')
-            ->whereNotNull('due_date')
-            ->whereDate('due_date', '<', $today)
-            ->whereNotIn('status', ['done', 'cancelled'])
-            ->get();
+        if ($settings->escalation_enabled && !empty($settings->escalation_tiers)) {
+            $escalationTasks = Task::with(['assignee.department.division', 'assignee.team', 'project'])
+                ->whereNotNull('assigned_to')
+                ->whereNotNull('due_date')
+                ->whereDate('due_date', '<', $today)
+                ->whereNotIn('status', ['done', 'cancelled'])
+                ->get();
 
-        foreach ($escalationTasks as $task) {
-            $daysOverdue = $today->diffInDays($task->due_date);
-            $newLevel = $this->calculateEscalationLevel($daysOverdue);
+            foreach ($escalationTasks as $task) {
+                $daysOverdue = $today->diffInDays($task->due_date);
+                $newLevel = $this->calculateEscalationLevel($daysOverdue, $settings->escalation_tiers);
 
-            if ($newLevel > 0 && $newLevel > $task->escalation_level) {
-                $tier = Task::ESCALATION_TIERS[$newLevel];
-                $recipients = $this->getEscalationRecipients($task, $newLevel);
+                if ($newLevel > 0 && $newLevel > $task->escalation_level) {
+                    $label = Setting::ESCALATION_LABELS[$newLevel] ?? "Level {$newLevel}";
+                    $recipients = $this->getEscalationRecipients($task, $newLevel);
 
-                foreach ($recipients as $recipient) {
-                    $recipient->notify(new TaskEscalatedNotification($task, $newLevel, $tier['label']));
+                    foreach ($recipients as $recipient) {
+                        $recipient->notify(new TaskEscalatedNotification($task, $newLevel, $label));
+                    }
+
+                    $task->update(['escalation_level' => $newLevel]);
+                    $escalatedCount++;
                 }
-
-                $task->update(['escalation_level' => $newLevel]);
-                $escalatedCount++;
             }
         }
 
@@ -107,11 +109,12 @@ class SendTaskReminders extends Command
         return $query->exists();
     }
 
-    private function calculateEscalationLevel(int $daysOverdue): int
+    private function calculateEscalationLevel(int $daysOverdue, array $tiers): int
     {
         $level = 0;
-        foreach (Task::ESCALATION_TIERS as $tierLevel => $tier) {
-            if ($daysOverdue >= $tier['days']) {
+        foreach ($tiers as $index => $tier) {
+            $tierLevel = $index + 1; // tiers are 0-indexed in settings, 1-indexed for levels
+            if (!empty($tier['enabled']) && $daysOverdue >= $tier['days']) {
                 $level = $tierLevel;
             }
         }
@@ -128,14 +131,18 @@ class SendTaskReminders extends Command
         }
 
         switch ($level) {
-            case 1: // 1 day — re-remind assignee
+            case 1: // re-remind assignee
                 $recipients[] = $assignee;
                 break;
 
-            case 2: // 3 days — team leader + project owner
+            case 2: // supervisor (team leader), manager (department head) & project owner
                 if ($assignee->team && $assignee->team->leader_id) {
                     $leader = User::find($assignee->team->leader_id);
                     if ($leader) $recipients[] = $leader;
+                }
+                if ($assignee->department && $assignee->department->head_id) {
+                    $head = User::find($assignee->department->head_id);
+                    if ($head) $recipients[] = $head;
                 }
                 if ($task->project && $task->project->owner_id && $task->project->owner_id !== $assignee->id) {
                     $owner = User::find($task->project->owner_id);
@@ -143,19 +150,15 @@ class SendTaskReminders extends Command
                 }
                 break;
 
-            case 3: // 7 days — department head
-                if ($assignee->department && $assignee->department->head_id) {
-                    $head = User::find($assignee->department->head_id);
-                    if ($head) $recipients[] = $head;
-                }
-                break;
-
-            case 4: // 14 days — division head + executives
+            case 3: // division head
                 $division = $assignee->department?->division;
                 if ($division && $division->head_id) {
                     $divHead = User::find($division->head_id);
                     if ($divHead) $recipients[] = $divHead;
                 }
+                break;
+
+            case 4: // executives
                 $executives = User::role('executive')->where('is_active', true)->get();
                 foreach ($executives as $exec) {
                     $recipients[] = $exec;
