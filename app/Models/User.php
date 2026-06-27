@@ -29,6 +29,7 @@ class User extends Authenticatable
     public const NOTIFICATION_DEFAULTS = [
         'email_task_assigned'    => true,
         'email_task_due_soon'    => true,
+        'email_task_due_reminder' => true,
         'email_task_overdue'     => true,
         'email_task_comment'     => true,
         'email_task_mention'     => true,

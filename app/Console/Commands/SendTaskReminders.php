@@ -2,9 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Setting;
 use App\Models\Task;
 use App\Models\User;
-use App\Notifications\TaskDueSoonNotification;
+use App\Notifications\TaskDueReminderNotification;
 use App\Notifications\TaskEscalatedNotification;
 use App\Notifications\TaskOverdueNotification;
 use Illuminate\Console\Command;
@@ -18,23 +19,29 @@ class SendTaskReminders extends Command
     public function handle(): int
     {
         $today = now()->startOfDay();
-        $tomorrow = $today->copy()->addDay();
+        $settings = Setting::current();
 
-        // Tasks due tomorrow
-        $dueSoonTasks = Task::with(['assignee', 'project'])
-            ->whereNotNull('assigned_to')
-            ->whereNotNull('due_date')
-            ->whereDate('due_date', $tomorrow)
-            ->whereNotIn('status', ['done', 'cancelled'])
-            ->get();
+        // Configurable due-date reminders
+        $reminderCount = 0;
+        if ($settings->task_reminders_enabled && !empty($settings->task_reminder_days)) {
+            foreach ($settings->task_reminder_days as $daysBefore) {
+                $targetDate = $today->copy()->addDays($daysBefore);
 
-        $dueSoonCount = 0;
-        foreach ($dueSoonTasks as $task) {
-            if ($this->alreadyNotifiedToday($task, 'task_due_soon')) {
-                continue;
+                $tasks = Task::with(['assignee', 'project'])
+                    ->whereNotNull('assigned_to')
+                    ->whereNotNull('due_date')
+                    ->whereDate('due_date', $targetDate)
+                    ->whereNotIn('status', ['done', 'cancelled'])
+                    ->get();
+
+                foreach ($tasks as $task) {
+                    if ($this->alreadyNotifiedToday($task, 'task_due_reminder', $daysBefore)) {
+                        continue;
+                    }
+                    $task->assignee->notify(new TaskDueReminderNotification($task, $daysBefore));
+                    $reminderCount++;
+                }
             }
-            $task->assignee->notify(new TaskDueSoonNotification($task));
-            $dueSoonCount++;
         }
 
         // Overdue tasks
@@ -80,19 +87,24 @@ class SendTaskReminders extends Command
             }
         }
 
-        $this->info("Sent {$dueSoonCount} due-soon, {$overdueCount} overdue, and {$escalatedCount} escalation notifications.");
+        $this->info("Sent {$reminderCount} reminder(s), {$overdueCount} overdue, and {$escalatedCount} escalation notifications.");
 
         return self::SUCCESS;
     }
 
-    private function alreadyNotifiedToday(Task $task, string $type): bool
+    private function alreadyNotifiedToday(Task $task, string $type, ?int $daysBefore = null): bool
     {
-        return DatabaseNotification::where('notifiable_id', $task->assigned_to)
+        $query = DatabaseNotification::where('notifiable_id', $task->assigned_to)
             ->where('notifiable_type', User::class)
             ->whereDate('created_at', now()->toDateString())
             ->where('data->type', $type)
-            ->where('data->task_id', $task->id)
-            ->exists();
+            ->where('data->task_id', $task->id);
+
+        if ($daysBefore !== null) {
+            $query->where('data->days_before', $daysBefore);
+        }
+
+        return $query->exists();
     }
 
     private function calculateEscalationLevel(int $daysOverdue): int

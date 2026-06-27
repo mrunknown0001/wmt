@@ -7,7 +7,15 @@ use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
-    protected $fillable = ['app_name', 'primary_color'];
+    protected $fillable = ['app_name', 'primary_color', 'max_upload_size', 'task_reminder_days', 'task_reminders_enabled'];
+
+    protected function casts(): array
+    {
+        return [
+            'task_reminder_days' => 'array',
+            'task_reminders_enabled' => 'boolean',
+        ];
+    }
 
     public static function current(): self
     {
@@ -15,6 +23,9 @@ class Setting extends Model
             return static::firstOrCreate([], [
                 'app_name' => 'WMT',
                 'primary_color' => 'blue',
+                'max_upload_size' => 10,
+                'task_reminder_days' => [7, 3, 1],
+                'task_reminders_enabled' => true,
             ])->attributesToArray();
         });
 

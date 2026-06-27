@@ -104,11 +104,19 @@ class TaskController extends Controller
         $task->load('assignee', 'creator', 'collaborators', 'parent:id,title');
         $task->loadCount('subtasks');
 
-        $comments = $task->comments()->with('user')->latest()->take(10)->get()->map(fn ($c) => [
+        $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [
             'id' => $c->id,
             'type' => 'comment',
             'body' => $c->body,
             'user' => $c->user ? ['id' => $c->user->id, 'name' => $c->user->name] : null,
+            'attachments' => $c->attachments->map(fn ($a) => [
+                'id' => $a->id,
+                'file_name' => $a->file_name,
+                'file_type' => $a->file_type,
+                'file_size' => $a->file_size,
+                'url' => asset('storage/' . $a->file_path),
+                'is_image' => str_starts_with($a->file_type, 'image/'),
+            ]),
             'created_at' => $c->created_at->toIso8601String(),
         ]);
 
@@ -311,11 +319,19 @@ class TaskController extends Controller
         $limit = 10;
 
         if ($type === 'comment') {
-            $items = $task->comments()->with('user')->latest()->skip($offset)->take($limit)->get()->map(fn ($c) => [
+            $items = $task->comments()->with('user', 'attachments')->latest()->skip($offset)->take($limit)->get()->map(fn ($c) => [
                 'id' => $c->id,
                 'type' => 'comment',
                 'body' => $c->body,
                 'user' => $c->user ? ['id' => $c->user->id, 'name' => $c->user->name] : null,
+                'attachments' => $c->attachments->map(fn ($a) => [
+                    'id' => $a->id,
+                    'file_name' => $a->file_name,
+                    'file_type' => $a->file_type,
+                    'file_size' => $a->file_size,
+                    'url' => asset('storage/' . $a->file_path),
+                    'is_image' => str_starts_with($a->file_type, 'image/'),
+                ]),
                 'created_at' => $c->created_at->toIso8601String(),
             ]);
         } else {

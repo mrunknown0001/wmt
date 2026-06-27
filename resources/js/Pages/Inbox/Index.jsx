@@ -27,6 +27,8 @@ function notificationMessage(data) {
             return <><strong>{data.assigned_by}</strong> assigned you to <strong>{data.task_title}</strong> in {data.project_name}</>;
         case 'task_due_soon':
             return <>Task <strong>{data.task_title}</strong> in {data.project_name} is due tomorrow</>;
+        case 'task_due_reminder':
+            return <>Task <strong>{data.task_title}</strong> in {data.project_name} is due {data.days_before === 1 ? 'tomorrow' : `in ${data.days_before} days`}</>;
         case 'task_overdue':
             return <>Task <strong>{data.task_title}</strong> in {data.project_name} is overdue</>;
         case 'task_comment_mention':
@@ -55,6 +57,7 @@ function notificationIcon(type) {
                 </div>
             );
         case 'task_due_soon':
+        case 'task_due_reminder':
             return (
                 <div className="h-8 w-8 rounded-full bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
                     <svg className="h-4 w-4 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

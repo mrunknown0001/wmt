@@ -6,6 +6,8 @@ function toastMessage(data) {
             return `${data.assigned_by} assigned you to "${data.task_title}"`;
         case 'task_due_soon':
             return `Task "${data.task_title}" is due tomorrow`;
+        case 'task_due_reminder':
+            return `Task "${data.task_title}" is due ${data.days_before === 1 ? 'tomorrow' : `in ${data.days_before} days`}`;
         case 'task_overdue':
             return `Task "${data.task_title}" is overdue`;
         case 'task_comment':

@@ -14,7 +14,8 @@ const NOTIFICATION_GROUPS = [
     {
         label: 'Due Dates',
         items: [
-            { key: 'email_task_due_soon', label: 'Task due soon', description: 'Reminder when a task is due tomorrow' },
+            { key: 'email_task_due_soon', label: 'Task due soon (legacy)', description: 'Reminder when a task is due tomorrow' },
+            { key: 'email_task_due_reminder', label: 'Task due date reminders', description: 'Reminders before a task reaches its due date (configurable by admin)' },
             { key: 'email_task_overdue', label: 'Task overdue', description: 'Alert when a task passes its due date' },
             { key: 'email_task_escalated', label: 'Escalated overdue tasks', description: 'Notifications when overdue tasks are escalated up the org hierarchy' },
         ],

@@ -12,6 +12,9 @@ class SettingSeeder extends Seeder
         Setting::firstOrCreate([], [
             'app_name' => 'WMT',
             'primary_color' => 'blue',
+            'max_upload_size' => 10,
+            'task_reminder_days' => [7, 3, 1],
+            'task_reminders_enabled' => true,
         ]);
     }
 }

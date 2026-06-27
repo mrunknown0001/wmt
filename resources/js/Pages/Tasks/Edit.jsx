@@ -96,6 +96,12 @@ function isHtml(str) {
     return /<[a-z][\s\S]*>/i.test(str);
 }
 
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 function CommentItem({ item, currentUserId, projectId, taskId }) {
     const [deleting, setDeleting] = useState(false);
 
@@ -129,10 +135,41 @@ function CommentItem({ item, currentUserId, projectId, taskId }) {
                         </button>
                     )}
                 </div>
-                {isHtml(item.body) ? (
+                {item.body && (isHtml(item.body) ? (
                     <div className="text-sm text-gray-700 dark:text-gray-300 mt-1 rich-text" dangerouslySetInnerHTML={{ __html: item.body }} />
                 ) : (
                     <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{item.body}</p>
+                ))}
+                {item.attachments && item.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {item.attachments.map((att) => (
+                            <a
+                                key={att.id}
+                                href={att.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block"
+                            >
+                                {att.is_image ? (
+                                    <img
+                                        src={att.url}
+                                        alt={att.file_name}
+                                        className="h-20 w-20 rounded-lg object-cover border border-gray-200 dark:border-gray-600 hover:opacity-80 transition-opacity"
+                                    />
+                                ) : (
+                                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                        <svg className="h-5 w-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                        </svg>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{att.file_name}</p>
+                                            <p className="text-xs text-gray-400">{formatFileSize(att.file_size)}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </a>
+                        ))}
+                    </div>
                 )}
             </div>
         </div>
@@ -141,7 +178,7 @@ function CommentItem({ item, currentUserId, projectId, taskId }) {
 
 
 export default function Edit() {
-    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails } = usePage().props;
+    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, settings } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -161,6 +198,44 @@ export default function Edit() {
     const [activeTab, setActiveTab] = useState('comments');
     const [commentBody, setCommentBody] = useState('');
     const [posting, setPosting] = useState(false);
+    const [attachments, setAttachments] = useState([]);
+    const [attachmentError, setAttachmentError] = useState('');
+
+    const maxUploadSize = settings?.max_upload_size || 10;
+
+    const handleFileSelect = (e) => {
+        const files = Array.from(e.target.files);
+        const maxBytes = maxUploadSize * 1024 * 1024;
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+
+        setAttachmentError('');
+
+        for (const file of files) {
+            if (!allowedTypes.includes(file.type)) {
+                setAttachmentError(`"${file.name}" is not supported. Allowed: JPG, PNG, WebP, PDF.`);
+                e.target.value = '';
+                return;
+            }
+            if (file.size > maxBytes) {
+                setAttachmentError(`"${file.name}" exceeds the ${maxUploadSize}MB limit.`);
+                e.target.value = '';
+                return;
+            }
+        }
+
+        if (attachments.length + files.length > 5) {
+            setAttachmentError('Maximum 5 files per comment.');
+            e.target.value = '';
+            return;
+        }
+
+        setAttachments((prev) => [...prev, ...files]);
+        e.target.value = '';
+    };
+
+    const removeAttachment = (index) => {
+        setAttachments((prev) => prev.filter((_, i) => i !== index));
+    };
 
     // Separate loaded items by type for offset tracking
     const initialComments = (initialTimeline || []).filter(i => i.type === 'comment');
@@ -211,11 +286,23 @@ export default function Edit() {
 
     const handleComment = (e) => {
         e.preventDefault();
-        if (!commentBody || commentBody === '<p></p>') return;
+        const hasBody = commentBody && commentBody !== '<p></p>';
+        if (!hasBody && attachments.length === 0) return;
+
         setPosting(true);
-        router.post(`/projects/${project.id}/tasks/${task.id}/comments`, { body: commentBody }, {
+
+        const formData = new FormData();
+        if (hasBody) formData.append('body', commentBody);
+        attachments.forEach((file) => formData.append('attachments[]', file));
+
+        router.post(`/projects/${project.id}/tasks/${task.id}/comments`, formData, {
             preserveScroll: true,
-            onSuccess: () => setCommentBody(''),
+            forceFormData: true,
+            onSuccess: () => {
+                setCommentBody('');
+                setAttachments([]);
+                setAttachmentError('');
+            },
             onFinish: () => setPosting(false),
         });
     };
@@ -411,8 +498,55 @@ export default function Edit() {
                                         minimal
                                         users={users}
                                     />
-                                    <div className="flex justify-end mt-2">
-                                        <Button type="submit" size="sm" processing={posting} processingText="Posting..." disabled={!commentBody || commentBody === '<p></p>'}>
+
+                                    {attachments.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {attachments.map((file, index) => (
+                                                <div key={index} className="relative group flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-1.5 text-xs">
+                                                    {file.type.startsWith('image/') ? (
+                                                        <img
+                                                            src={URL.createObjectURL(file)}
+                                                            alt={file.name}
+                                                            className="h-8 w-8 rounded object-cover"
+                                                        />
+                                                    ) : (
+                                                        <svg className="h-5 w-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                                        </svg>
+                                                    )}
+                                                    <span className="max-w-24 truncate text-gray-600 dark:text-gray-300">{file.name}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeAttachment(index)}
+                                                        className="text-gray-400 hover:text-red-500"
+                                                    >
+                                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {attachmentError && (
+                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{attachmentError}</p>
+                                    )}
+
+                                    <div className="flex items-center justify-between mt-2">
+                                        <label className="cursor-pointer text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="Attach files">
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept=".jpg,.jpeg,.png,.webp,.pdf"
+                                                onChange={handleFileSelect}
+                                                className="hidden"
+                                            />
+                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                                            </svg>
+                                        </label>
+                                        <Button type="submit" size="sm" processing={posting} processingText="Posting..." disabled={(!commentBody || commentBody === '<p></p>') && attachments.length === 0}>
                                             Comment
                                         </Button>
                                     </div>

@@ -10,6 +10,8 @@ function notificationMessage(data) {
             return <><strong>{data.assigned_by}</strong> assigned you to <strong>{data.task_title}</strong></>;
         case 'task_due_soon':
             return <>Task <strong>{data.task_title}</strong> is due tomorrow</>;
+        case 'task_due_reminder':
+            return <>Task <strong>{data.task_title}</strong> is due {data.days_before === 1 ? 'tomorrow' : `in ${data.days_before} days`}</>;
         case 'task_overdue':
             return <>Task <strong>{data.task_title}</strong> is overdue</>;
         case 'task_comment_mention':

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreTaskCommentRequest;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskComment;
@@ -11,20 +12,30 @@ use App\Notifications\TaskCommentMentionNotification;
 use App\Notifications\TaskCommentNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class TaskCommentController extends Controller
 {
-    public function store(Request $request, Project $project, Task $task): RedirectResponse
+    public function store(StoreTaskCommentRequest $request, Project $project, Task $task): RedirectResponse
     {
-        $request->validate([
-            'body' => 'required|string|max:2000',
-        ]);
-
         $comment = $task->comments()->create([
             'user_id' => $request->user()->id,
-            'body' => $request->body,
+            'body' => $request->body ?? '',
         ]);
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->store("comment-attachments/{$comment->id}", 'public');
+
+                $comment->attachments()->create([
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_path' => $path,
+                    'file_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
+            }
+        }
 
         $this->notifyMentionedUsers($comment, $task, $request->user());
         $this->notifyAssignees($comment, $task, $request->user());
@@ -96,6 +107,12 @@ class TaskCommentController extends Controller
         }
 
         $this->notifyMentionedUsersOfDeletion($comment, $task, $request->user());
+
+        // Delete attached files from disk
+        foreach ($comment->attachments as $attachment) {
+            Storage::disk('public')->delete($attachment->file_path);
+        }
+        Storage::disk('public')->deleteDirectory("comment-attachments/{$comment->id}");
 
         $comment->delete();
 
