@@ -1,5 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { registerPushToken } from '../firebase';
 import NavLink from '../Components/NavLink';
 import NavSection from '../Components/NavSection';
 import Avatar from '../Components/Avatar';
@@ -106,6 +107,21 @@ export default function AuthenticatedLayout({ children, title }) {
             return next;
         });
     };
+
+    // Request push notification permission and register FCM token
+    useEffect(() => {
+        console.log('[FCM] useEffect fired, user:', !!auth.user);
+        if (!auth.user) return;
+        const key = 'wmt_push_registered';
+        if (sessionStorage.getItem(key)) {
+            console.log('[FCM] Already registered this session, skipping');
+            return;
+        }
+        sessionStorage.setItem(key, '1');
+        registerPushToken()
+            .then((token) => console.log('[FCM] Registration complete, token:', !!token))
+            .catch((err) => console.error('[FCM] Registration error:', err));
+    }, [auth.user]);
 
     const handleToast = useCallback((notification) => {
         setToasts((prev) => {

@@ -13,7 +13,7 @@ class DeviceTokenController extends Controller
     {
         $request->validate([
             'token' => 'required|string',
-            'platform' => 'required|string|in:android,ios',
+            'platform' => 'required|string|in:android,ios,web',
         ]);
 
         DeviceToken::updateOrCreate(

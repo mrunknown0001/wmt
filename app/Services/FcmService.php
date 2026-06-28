@@ -65,6 +65,14 @@ class FcmService
                             ],
                         ],
                     ],
+                    'webpush' => [
+                        'notification' => [
+                            'icon' => '/favicon.ico',
+                        ],
+                        'fcm_options' => [
+                            'link' => '/',
+                        ],
+                    ],
                 ],
             ];
 
