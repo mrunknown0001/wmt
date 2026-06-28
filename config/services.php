@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'fcm' => [
+        'credentials' => env('FCM_CREDENTIALS', storage_path('app/firebase-credentials.json')),
+        'project_id' => env('FCM_PROJECT_ID'),
+    ],
+
 ];
