@@ -2,37 +2,29 @@
 // No Firebase SDK needed here — the main thread handles token management.
 // This SW only displays notifications and handles clicks.
 
-// Handle background push messages (when the app tab is not focused or closed)
+// Handle push messages
 self.addEventListener('push', (event) => {
+    console.log('[SW] Push event received', event.data ? 'with data' : 'no data');
     if (!event.data) return;
 
-    // Skip if any WMT tab is focused — Echo handles foreground notifications
+    let payload;
+    try {
+        payload = event.data.json();
+    } catch (e) {
+        console.log('[SW] Failed to parse push data', e);
+        return;
+    }
+
+    console.log('[SW] Push payload:', JSON.stringify(payload));
+
+    const notification = payload.notification || {};
+
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            const hasFocusedTab = clientList.some((c) => c.visibilityState === 'visible');
-            if (hasFocusedTab) return;
-
-            let payload;
-            try {
-                payload = event.data.json();
-            } catch {
-                return;
-            }
-
-            const notification = payload.notification || {};
-            const data = payload.data || {};
-
-            const title = notification.title || 'WMT';
-            const options = {
-                body: notification.body || '',
-                icon: '/favicon.ico',
-                badge: '/favicon.ico',
-                data: data,
-                tag: data.notification_id || undefined,
-            };
-
-            return self.registration.showNotification(title, options);
+        self.registration.showNotification(notification.title || 'WMT', {
+            body: notification.body || 'New notification',
         })
+            .then(() => console.log('[SW] Notification shown successfully'))
+            .catch((err) => console.error('[SW] showNotification FAILED:', err))
     );
 });
 

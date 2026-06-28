@@ -93,6 +93,11 @@ class FcmService
                         'status' => $response->status(),
                         'error' => $response->json('error.message', ''),
                     ]);
+                } else {
+                    Log::info('FCM v1 send success', [
+                        'user_id' => $user->id,
+                        'token_prefix' => substr($token, 0, 20),
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::error('FCM send exception', ['error' => $e->getMessage()]);

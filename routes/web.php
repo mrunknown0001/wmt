@@ -45,6 +45,10 @@ Route::middleware('auth')->group(function () {
     // Global search
     Route::get('/api/search', SearchController::class)->name('search');
 
+    // Device tokens (FCM web push)
+    Route::post('/api/device-tokens', [\App\Http\Controllers\Api\DeviceTokenController::class, 'store'])->name('device-tokens.store');
+    Route::delete('/api/device-tokens', [\App\Http\Controllers\Api\DeviceTokenController::class, 'destroy'])->name('device-tokens.destroy');
+
     // Inbox (Notifications)
     Route::get('/inbox', [NotificationController::class, 'index'])->name('inbox');
     Route::get('/api/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
