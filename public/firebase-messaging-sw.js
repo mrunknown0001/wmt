@@ -4,27 +4,23 @@
 
 // Handle push messages
 self.addEventListener('push', (event) => {
-    console.log('[SW] Push event received', event.data ? 'with data' : 'no data');
     if (!event.data) return;
 
     let payload;
     try {
         payload = event.data.json();
-    } catch (e) {
-        console.log('[SW] Failed to parse push data', e);
+    } catch {
         return;
     }
-
-    console.log('[SW] Push payload:', JSON.stringify(payload));
 
     const notification = payload.notification || {};
 
     event.waitUntil(
         self.registration.showNotification(notification.title || 'WMT', {
             body: notification.body || 'New notification',
+            icon: '/favicon.ico',
+            data: payload.data || {},
         })
-            .then(() => console.log('[SW] Notification shown successfully'))
-            .catch((err) => console.error('[SW] showNotification FAILED:', err))
     );
 });
 

@@ -29,46 +29,36 @@ function getFirebaseMessaging() {
  */
 export async function registerPushToken() {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-        console.log('[FCM] Browser does not support notifications or service workers');
         return null;
     }
 
     if (!firebaseConfig.apiKey || !vapidKey) {
-        console.warn('[FCM] Missing env vars — apiKey:', !!firebaseConfig.apiKey, 'vapidKey:', !!vapidKey);
         return null;
     }
 
-    console.log('[FCM] Requesting notification permission...');
     const permission = await Notification.requestPermission();
-    console.log('[FCM] Permission result:', permission);
     if (permission !== 'granted') {
         return null;
     }
 
     try {
-        console.log('[FCM] Waiting for service worker...');
         const registration = await navigator.serviceWorker.ready;
-        console.log('[FCM] Service worker ready, scope:', registration.scope);
-
         const msg = getFirebaseMessaging();
-        console.log('[FCM] Getting FCM token...');
         const token = await getToken(msg, {
             vapidKey,
             serviceWorkerRegistration: registration,
         });
-        console.log('[FCM] Token received:', token ? token.substring(0, 20) + '...' : 'null');
 
         if (token) {
-            const res = await apiFetch('/api/device-tokens', {
+            await apiFetch('/api/device-tokens', {
                 method: 'POST',
                 body: JSON.stringify({ token, platform: 'web' }),
             });
-            console.log('[FCM] Token registered with backend, status:', res.status);
         }
 
         return token;
     } catch (err) {
-        console.error('[FCM] Failed to get FCM token', err);
+        console.error('[FCM] Failed to get token', err);
         return null;
     }
 }

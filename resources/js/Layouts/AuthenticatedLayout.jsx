@@ -110,17 +110,11 @@ export default function AuthenticatedLayout({ children, title }) {
 
     // Request push notification permission and register FCM token
     useEffect(() => {
-        console.log('[FCM] useEffect fired, user:', !!auth.user);
         if (!auth.user) return;
         const key = 'wmt_push_registered';
-        if (sessionStorage.getItem(key)) {
-            console.log('[FCM] Already registered this session, skipping');
-            return;
-        }
+        if (sessionStorage.getItem(key)) return;
         sessionStorage.setItem(key, '1');
-        registerPushToken()
-            .then((token) => console.log('[FCM] Registration complete, token:', !!token))
-            .catch((err) => console.error('[FCM] Registration error:', err));
+        registerPushToken().catch(() => {});
     }, [auth.user]);
 
     const handleToast = useCallback((notification) => {
