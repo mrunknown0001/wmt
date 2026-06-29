@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskUpdated;
 use App\Http\Requests\PatchTaskRequest;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
@@ -92,6 +93,9 @@ class TaskController extends Controller
         }
 
         AutomationRuleEngine::evaluate($task, 'task_created');
+
+        $task->load('assignee', 'collaborators');
+        broadcast(new TaskUpdated($project->id, $task->toArray(), 'created', $request->user()->id))->toOthers();
 
         return redirect("/projects/{$project->id}")
             ->with('success', 'Task created successfully.');
@@ -237,6 +241,9 @@ class TaskController extends Controller
 
         $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
 
+        $task->load('assignee', 'collaborators');
+        broadcast(new TaskUpdated($project->id, $task->toArray(), 'updated', $request->user()->id))->toOthers();
+
         return redirect("/projects/{$project->id}")
             ->with('success', $newTask ? 'Task completed. Next recurring occurrence created.' : 'Task updated successfully.');
     }
@@ -247,7 +254,10 @@ class TaskController extends Controller
 
         ActivityLogger::logDeleted($task, auth()->user());
 
+        $taskId = $task->id;
         $task->delete();
+
+        broadcast(new TaskUpdated($project->id, ['id' => $taskId], 'deleted', auth()->id()))->toOthers();
 
         return redirect("/projects/{$project->id}")
             ->with('success', 'Task deleted successfully.');
@@ -308,6 +318,8 @@ class TaskController extends Controller
                 $response['new_task'] = $newTask;
             }
         }
+
+        broadcast(new TaskUpdated($project->id, $task->toArray(), 'updated', $request->user()->id))->toOthers();
 
         return response()->json($response);
     }
@@ -453,6 +465,8 @@ class TaskController extends Controller
                 break;
         }
 
+        broadcast(new TaskUpdated($project->id, ['bulk' => true, 'action' => $validated['action']], 'bulk', $request->user()->id))->toOthers();
+
         return response()->json([
             'success' => true,
             'new_tasks' => $newTasks,
@@ -511,6 +525,8 @@ class TaskController extends Controller
                 $newTasks[] = $newTask;
             }
         }
+
+        broadcast(new TaskUpdated($project->id, ['reordered' => true], 'reordered', $request->user()->id))->toOthers();
 
         return response()->json([
             'success' => true,

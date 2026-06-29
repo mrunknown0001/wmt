@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link } from '@inertiajs/react';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -96,6 +96,18 @@ export default function Index({ allTasks, taskGroups: defaultGroups, stats: defa
     const [filterSearch, setFilterSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+
+    // Reload task list when task-related notifications arrive
+    useEffect(() => {
+        const handler = (e) => {
+            const type = e.detail?.type;
+            if (['task_assigned', 'task_due_soon', 'task_overdue'].includes(type)) {
+                router.reload({ preserveScroll: true });
+            }
+        };
+        window.addEventListener('wmt:notification', handler);
+        return () => window.removeEventListener('wmt:notification', handler);
+    }, []);
 
     const hasActiveFilters = filterSearch || filterStatus || filterPriority;
 

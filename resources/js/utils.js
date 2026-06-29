@@ -25,15 +25,19 @@ export const priorityColors = {
 };
 
 export function apiFetch(url, options = {}) {
-    return fetch(url, {
-        ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-            'Accept': 'application/json',
-            ...options.headers,
-        },
-    });
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+        'Accept': 'application/json',
+        ...options.headers,
+    };
+
+    // Include socket ID so Laravel's toOthers() can exclude the sender
+    if (window.Echo?.socketId?.()) {
+        headers['X-Socket-ID'] = window.Echo.socketId();
+    }
+
+    return fetch(url, { ...options, headers });
 }
 
 export const formatDate = (value) => {

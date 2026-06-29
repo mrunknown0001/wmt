@@ -35,6 +35,7 @@ import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
 import InlineDatePicker from '../../Components/InlineDatePicker';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
+import echo from '../../echo';
 
 const TASK_STATUSES = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
 
@@ -724,6 +725,36 @@ export default function Show() {
         setLocalTasks(serverTasks);
         setLocalSections(serverSections);
     }, [serverTasks, serverSections]);
+
+    // Real-time task updates via Echo
+    useEffect(() => {
+        const channel = echo.private(`project.${project.id}`);
+
+        channel.listen('.task.updated', (e) => {
+            switch (e.change_type) {
+                case 'created':
+                    setLocalTasks((prev) => {
+                        if (prev.some((t) => t.id === e.task.id)) return prev;
+                        return [...prev, e.task];
+                    });
+                    break;
+                case 'updated':
+                    setLocalTasks((prev) =>
+                        prev.map((t) => (t.id === e.task.id ? { ...t, ...e.task } : t))
+                    );
+                    break;
+                case 'deleted':
+                    setLocalTasks((prev) => prev.filter((t) => t.id !== e.task.id));
+                    break;
+                case 'reordered':
+                case 'bulk':
+                    router.reload({ only: ['tasks'], preserveScroll: true });
+                    break;
+            }
+        });
+
+        return () => echo.leave(`project.${project.id}`);
+    }, [project.id]);
 
     const canEditTask = (task) =>
         canManageTasks || task.assigned_to === auth.user?.id;

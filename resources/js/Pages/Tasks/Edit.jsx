@@ -12,6 +12,7 @@ import LinkButton from '../../Components/LinkButton';
 import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import { formatLabel, apiFetch } from '../../utils';
+import echo from '../../echo';
 
 function timeAgo(dateString) {
     const date = new Date(dateString);
@@ -253,6 +254,24 @@ export default function Edit() {
     useEffect(() => {
         setActivities(initialActivities);
     }, [initialTimeline]);
+
+    // Real-time comment updates via Echo
+    useEffect(() => {
+        const channel = echo.private(`task.${task.id}`);
+
+        channel.listen('.comment.created', (e) => {
+            setComments((prev) => {
+                if (prev.some((c) => c.id === e.comment.id)) return prev;
+                return [e.comment, ...prev];
+            });
+        });
+
+        channel.listen('.comment.deleted', (e) => {
+            setComments((prev) => prev.filter((c) => c.id !== e.comment_id));
+        });
+
+        return () => echo.leave(`task.${task.id}`);
+    }, [task.id]);
 
     const hasMoreComments = comments.length < (totalComments || 0);
     const hasMoreActivities = activities.length < (totalActivities || 0);

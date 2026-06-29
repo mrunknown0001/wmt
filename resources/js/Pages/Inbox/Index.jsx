@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
@@ -136,7 +137,27 @@ function handleMarkAllAsRead() {
 }
 
 export default function Index({ notifications }) {
-    const hasUnread = notifications.data?.some(n => !n.read_at);
+    const [localNotifications, setLocalNotifications] = useState(notifications.data || []);
+
+    // Sync when server props change (pagination navigation)
+    useEffect(() => {
+        setLocalNotifications(notifications.data || []);
+    }, [notifications.data]);
+
+    // Listen for real-time notifications (dispatched by NotificationBell via wmt:notification)
+    useEffect(() => {
+        const handler = (e) => {
+            const notification = e.detail;
+            setLocalNotifications((prev) => [
+                { id: notification.id, data: notification, read_at: null, created_at: new Date().toISOString() },
+                ...prev,
+            ]);
+        };
+        window.addEventListener('wmt:notification', handler);
+        return () => window.removeEventListener('wmt:notification', handler);
+    }, []);
+
+    const hasUnread = localNotifications.some(n => !n.read_at);
 
     return (
         <AuthenticatedLayout title="Inbox">
@@ -152,10 +173,10 @@ export default function Index({ notifications }) {
             />
 
             <Card padding={false}>
-                {notifications.data?.length > 0 ? (
+                {localNotifications.length > 0 ? (
                     <>
                         <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                            {notifications.data.map((notification) => (
+                            {localNotifications.map((notification) => (
                                 <button
                                     key={notification.id}
                                     onClick={() => handleNotificationClick(notification)}

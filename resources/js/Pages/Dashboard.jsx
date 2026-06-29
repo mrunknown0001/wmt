@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import Card from '../Components/Card';
@@ -58,6 +58,18 @@ export default function Dashboard() {
     } = usePage().props;
 
     const [preferences, setPreferences] = useState(dashboardPreferences || {});
+
+    // Reload dashboard stats when task-related notifications arrive
+    useEffect(() => {
+        const handler = (e) => {
+            const type = e.detail?.type;
+            if (['task_assigned', 'task_due_soon', 'task_overdue', 'task_escalated'].includes(type)) {
+                router.reload({ preserveScroll: true });
+            }
+        };
+        window.addEventListener('wmt:notification', handler);
+        return () => window.removeEventListener('wmt:notification', handler);
+    }, []);
 
     const isAdmin = auth.user?.roles?.some((r) => ['admin', 'supervisor'].includes(r));
 

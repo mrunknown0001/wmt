@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskCommentCreated;
+use App\Events\TaskCommentDeleted;
 use App\Http\Requests\StoreTaskCommentRequest;
 use App\Models\Project;
 use App\Models\Task;
@@ -39,6 +41,23 @@ class TaskCommentController extends Controller
 
         $this->notifyMentionedUsers($comment, $task, $request->user());
         $this->notifyAssignees($comment, $task, $request->user());
+
+        $comment->load('user', 'attachments');
+        broadcast(new TaskCommentCreated($task->id, [
+            'id' => $comment->id,
+            'type' => 'comment',
+            'body' => $comment->body,
+            'user' => $comment->user ? ['id' => $comment->user->id, 'name' => $comment->user->name] : null,
+            'attachments' => $comment->attachments->map(fn ($a) => [
+                'id' => $a->id,
+                'file_name' => $a->file_name,
+                'file_type' => $a->file_type,
+                'file_size' => $a->file_size,
+                'url' => asset('storage/'.$a->file_path),
+                'is_image' => str_starts_with($a->file_type, 'image/'),
+            ])->toArray(),
+            'created_at' => $comment->created_at->toIso8601String(),
+        ]))->toOthers();
 
         return back()->with('success', 'Comment added.');
     }
@@ -114,7 +133,10 @@ class TaskCommentController extends Controller
         }
         Storage::disk('public')->deleteDirectory("comment-attachments/{$comment->id}");
 
+        $commentId = $comment->id;
         $comment->delete();
+
+        broadcast(new TaskCommentDeleted($task->id, $commentId, $request->user()->id))->toOthers();
 
         return back()->with('success', 'Comment deleted.');
     }
