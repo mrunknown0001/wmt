@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\CommentAttachment;
 use App\Models\TaskComment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TaskCommentController extends Controller
 {
@@ -26,5 +28,14 @@ class TaskCommentController extends Controller
         $comment->delete();
 
         return response()->json(null, 204);
+    }
+
+    public function download(Request $request, Project $project, Task $task, TaskComment $comment, CommentAttachment $attachment): StreamedResponse
+    {
+        if ($attachment->task_comment_id !== $comment->id) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 }

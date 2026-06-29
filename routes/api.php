@@ -41,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/projects/{project}/tasks/{task}/patch', [TaskController::class, 'patchField']);
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskController::class, 'storeComment']);
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy']);
+    Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download']);
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -51,4 +52,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Device tokens (FCM)
     Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
     Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
+
+    // Mobile app device-token registration (Bearer auth, distinct path to avoid the web /api/device-tokens CSRF route).
+    Route::post('/mobile/device-tokens', [DeviceTokenController::class, 'store']);
+    Route::delete('/mobile/device-tokens', [DeviceTokenController::class, 'destroy']);
 });

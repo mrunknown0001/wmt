@@ -20,11 +20,22 @@ class TaskController extends Controller
     public function show(Project $project, Task $task): JsonResponse
     {
         $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name', 'parent:id,title', 'project:id,name');
+        $task->loadMissing('project.owner:id,name', 'project.members:id,name');
         $task->loadCount('subtasks');
         $task->loadCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
 
+        $members = collect();
+        if ($task->project) {
+            $members = collect([$task->project->owner])
+                ->merge($task->project->members)
+                ->filter()
+                ->unique('id')
+                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+                ->values();
+        }
+
         $comments = $task->comments()
-            ->with('user:id,name')
+            ->with('user:id,name', 'attachments')
             ->latest()
             ->take(20)
             ->get()
@@ -33,6 +44,15 @@ class TaskController extends Controller
                 'body' => $c->body,
                 'user' => $c->user ? ['id' => $c->user->id, 'name' => $c->user->name] : null,
                 'created_at' => $c->created_at->toIso8601String(),
+                'attachments' => $c->attachments->map(fn ($a) => [
+                    'id' => $a->id,
+                    'file_name' => $a->file_name,
+                    'file_type' => $a->file_type,
+                    'file_size' => $a->file_size,
+                    'url' => $a->url,
+                    'download_url' => url("/api/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
+                    'is_image' => $a->isImage(),
+                ]),
             ]);
 
         $activities = $task->activities()
@@ -54,6 +74,7 @@ class TaskController extends Controller
             'task' => $task,
             'comments' => $comments,
             'activities' => $activities,
+            'members' => $members,
         ]);
     }
 
@@ -116,25 +137,50 @@ class TaskController extends Controller
 
     public function storeComment(Request $request, Project $project, Task $task): JsonResponse
     {
+        $maxKb = \App\Models\Setting::current()->max_upload_size * 1024;
+
         $request->validate([
-            'body' => 'required|string|max:5000',
+            'body' => ['required_without:attachments', 'nullable', 'string', 'max:2000'],
+            'attachments' => ['nullable', 'array', 'max:5'],
+            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf', "max:{$maxKb}"],
         ]);
 
         $comment = $task->comments()->create([
             'user_id' => $request->user()->id,
-            'body' => $request->input('body'),
+            'body' => $request->input('body') ?? '',
         ]);
 
-        $comment->load('user:id,name');
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->store("comment-attachments/{$comment->id}", 'public');
+                $comment->attachments()->create([
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_path' => $path,
+                    'file_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
+            }
+        }
 
-        return response()->json([
-            'comment' => [
-                'id' => $comment->id,
-                'body' => $comment->body,
-                'user' => ['id' => $comment->user->id, 'name' => $comment->user->name],
-                'created_at' => $comment->created_at->toIso8601String(),
-            ],
-        ], 201);
+        $comment->load('user:id,name', 'attachments');
+
+        $this->notifyCommentMentions($comment, $task, $request->user());
+
+        return response()->json(['comment' => [
+            'id' => $comment->id,
+            'body' => $comment->body,
+            'user' => ['id' => $comment->user->id, 'name' => $comment->user->name],
+            'created_at' => $comment->created_at->toIso8601String(),
+            'attachments' => $comment->attachments->map(fn ($a) => [
+                'id' => $a->id,
+                'file_name' => $a->file_name,
+                'file_type' => $a->file_type,
+                'file_size' => $a->file_size,
+                'url' => $a->url,
+                'download_url' => url("/api/projects/{$project->id}/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
+                'is_image' => $a->isImage(),
+            ]),
+        ]], 201);
     }
 
     public function store(StoreTaskRequest $request, Project $project): JsonResponse
@@ -248,5 +294,22 @@ class TaskController extends Controller
         $task->delete();
 
         return response()->json(null, 204);
+    }
+
+    private function notifyCommentMentions(\App\Models\TaskComment $comment, Task $task, \App\Models\User $author): void
+    {
+        $task->loadMissing('project');
+        $body = $comment->body;
+
+        $mentionedIds = [];
+        if (preg_match_all('/data-id="(\d+)"/', $body, $m)) {
+            $mentionedIds = array_map('intval', $m[1]);
+        }
+
+        \App\Models\User::where('is_active', true)
+            ->where('id', '!=', $author->id)
+            ->get()
+            ->filter(fn ($u) => in_array($u->id, $mentionedIds) || str_contains($body, '@' . $u->name))
+            ->each(fn ($u) => $u->notify(new \App\Notifications\TaskCommentMentionNotification($task, $author, $comment)));
     }
 }
