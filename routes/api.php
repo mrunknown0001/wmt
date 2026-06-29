@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\MyTaskController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\TaskCommentController;
 use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,12 +28,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Projects
     Route::get('/projects', [ProjectController::class, 'index']);
+    Route::post('/projects', [ProjectController::class, 'store']);
     Route::get('/projects/{project}', [ProjectController::class, 'show']);
+    Route::put('/projects/{project}', [ProjectController::class, 'update']);
+    Route::delete('/projects/{project}', [ProjectController::class, 'destroy']);
 
     // Tasks
+    Route::post('/projects/{project}/tasks', [TaskController::class, 'store']);
     Route::get('/projects/{project}/tasks/{task}', [TaskController::class, 'show']);
+    Route::put('/projects/{project}/tasks/{task}', [TaskController::class, 'update']);
+    Route::delete('/projects/{project}/tasks/{task}', [TaskController::class, 'destroy']);
     Route::patch('/projects/{project}/tasks/{task}/patch', [TaskController::class, 'patchField']);
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskController::class, 'storeComment']);
+    Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy']);
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index']);

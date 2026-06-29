@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreTaskRequest;
+use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Project;
 use App\Models\Task;
 use App\Notifications\TaskAssignedNotification;
@@ -133,5 +135,118 @@ class TaskController extends Controller
                 'created_at' => $comment->created_at->toIso8601String(),
             ],
         ], 201);
+    }
+
+    public function store(StoreTaskRequest $request, Project $project): JsonResponse
+    {
+        $validated = $request->validated();
+
+        if (!empty($validated['parent_id'])) {
+            $parent = Task::where('id', $validated['parent_id'])
+                ->where('project_id', $project->id)
+                ->whereNull('parent_id')
+                ->firstOrFail();
+
+            $maxPosition = Task::where('parent_id', $parent->id)
+                ->where('status', $request->status)
+                ->max('position') ?? -1;
+        } else {
+            $maxPosition = $project->tasks()
+                ->whereNull('parent_id')
+                ->where('status', $request->status)
+                ->max('position') ?? -1;
+        }
+
+        $collaboratorIds = $validated['collaborator_ids'] ?? [];
+        unset($validated['collaborator_ids']);
+
+        $task = $project->tasks()->create([
+            ...$validated,
+            'created_by' => $request->user()->id,
+            'position' => $maxPosition + 1,
+        ]);
+
+        if (!empty($collaboratorIds)) {
+            $task->collaborators()->sync($collaboratorIds);
+        }
+
+        TaskActivityLogger::logCreated($task, $request->user());
+        ActivityLogger::logCreated($task, $request->user());
+
+        if ($task->assigned_to && $task->assigned_to !== $request->user()->id) {
+            $task->load('project');
+            $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
+        }
+
+        AutomationRuleEngine::evaluate($task, 'task_created');
+
+        $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name');
+
+        return response()->json(['task' => $task], 201);
+    }
+
+    public function update(UpdateTaskRequest $request, Project $project, Task $task): JsonResponse
+    {
+        $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+        $oldValues['start_date'] = $task->start_date?->toDateString();
+        $oldValues['due_date'] = $task->due_date?->toDateString();
+        $oldAssignee = $task->assigned_to;
+
+        $validated = $request->validated();
+        $collaboratorIds = $validated['collaborator_ids'] ?? null;
+        unset($validated['collaborator_ids']);
+
+        $task->update($validated);
+
+        if ($collaboratorIds !== null) {
+            $task->collaborators()->sync($collaboratorIds);
+        }
+
+        TaskActivityLogger::logChanges($task, $oldValues, $request->user());
+        ActivityLogger::logChanges($task, $oldValues, $request->user());
+
+        if ($task->assigned_to && $task->assigned_to !== $oldAssignee && $task->assigned_to !== $request->user()->id) {
+            $task->load('project');
+            $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
+        }
+
+        if (in_array($task->status, ['done', 'cancelled']) && $task->escalation_level > 0) {
+            $task->update(['escalation_level' => 0]);
+        }
+
+        if (($oldValues['status'] ?? null) !== $task->status) {
+            AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
+            if ($task->status === 'done') {
+                AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
+            }
+        }
+        if (($oldValues['priority'] ?? null) !== $task->priority) {
+            AutomationRuleEngine::evaluate($task, 'task_priority_changed', $oldValues);
+        }
+        if (($oldValues['assigned_to'] ?? null) != $task->assigned_to) {
+            AutomationRuleEngine::evaluate($task, 'task_assigned', $oldValues);
+        }
+
+        $response = ['task' => $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name')];
+
+        $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
+        if ($newTask) {
+            $newTask->load('assignee:id,name', 'collaborators:id,name');
+            $response['recurring_task_created'] = true;
+            $response['new_task'] = $newTask;
+        }
+
+        return response()->json($response);
+    }
+
+    public function destroy(Request $request, Project $project, Task $task): JsonResponse
+    {
+        $this->authorize('delete', $task);
+
+        ActivityLogger::logDeleted($task, $request->user());
+
+        $task->delete();
+
+        return response()->json(null, 204);
     }
 }
