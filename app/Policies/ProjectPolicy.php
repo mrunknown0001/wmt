@@ -14,7 +14,18 @@ class ProjectPolicy
 
     public function view(User $user, Project $project): bool
     {
-        return $user->hasPermissionTo('view-projects');
+        if ($user->hasPermissionTo('manage-projects')) {
+            return true;
+        }
+
+        // Owner or member can view
+        if ($project->owner_id === $user->id
+            || $project->members()->where('users.id', $user->id)->exists()) {
+            return true;
+        }
+
+        // Users with assigned tasks in this project can view
+        return $project->tasks()->where('assigned_to', $user->id)->exists();
     }
 
     public function create(User $user): bool

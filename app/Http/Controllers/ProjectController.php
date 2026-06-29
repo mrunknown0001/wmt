@@ -19,9 +19,21 @@ class ProjectController extends Controller
     {
         $this->authorize('viewAny', Project::class);
 
+        $user = $request->user();
+        $userId = $user->id;
+
         $query = Project::with('owner')
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        // Non-admin users only see projects they own, are members of, or have assigned tasks in
+        if (!$user->can('manage-projects')) {
+            $query->where(function ($q) use ($userId) {
+                $q->where('owner_id', $userId)
+                    ->orWhereHas('members', fn ($m) => $m->where('users.id', $userId))
+                    ->orWhereHas('tasks', fn ($t) => $t->where('assigned_to', $userId));
+            });
+        }
 
         if ($search = $request->input('search')) {
             $query->where('name', 'like', '%' . $search . '%');
@@ -61,10 +73,22 @@ class ProjectController extends Controller
     {
         $this->authorize('viewAny', Project::class);
 
+        $user = $request->user();
+        $userId = $user->id;
+
         $query = Project::with('owner')
             ->where('status', 'archived')
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        // Non-admin users only see projects they own, are members of, or have assigned tasks in
+        if (!$user->can('manage-projects')) {
+            $query->where(function ($q) use ($userId) {
+                $q->where('owner_id', $userId)
+                    ->orWhereHas('members', fn ($m) => $m->where('users.id', $userId))
+                    ->orWhereHas('tasks', fn ($t) => $t->where('assigned_to', $userId));
+            });
+        }
 
         if ($search = $request->input('search')) {
             $query->where('name', 'like', '%' . $search . '%');
@@ -133,18 +157,44 @@ class ProjectController extends Controller
 
         $project->load('owner', 'members');
 
+        $userId = auth()->id();
+        $user = auth()->user();
+        $isOwner = $project->owner_id === $userId;
+        $isMember = $project->members->contains('id', $userId);
+        $isProjectAdmin = $project->isProjectAdmin($user);
+        $hasFullAccess = $user->can('manage-projects') || $isOwner || $isMember;
+
         $sections = $project->sections()->orderBy('position')->get();
 
-        $tasks = $project->tasks()
-            ->whereNull('parent_id')
-            ->with(['assignee', 'creator', 'collaborators', 'subtasks.assignee', 'subtasks.collaborators'])
-            ->withCount('subtasks')
-            ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')])
-            ->orderBy('position')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $taskQuery = $project->tasks()->whereNull('parent_id');
 
-        $isProjectAdmin = $project->isProjectAdmin(auth()->user());
+        if ($hasFullAccess) {
+            $tasks = $taskQuery
+                ->with(['assignee', 'creator', 'collaborators', 'subtasks.assignee', 'subtasks.collaborators'])
+                ->withCount('subtasks')
+                ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')])
+                ->orderBy('position')
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            // User only has assigned tasks — show parent tasks assigned to them,
+            // or parent tasks that have subtasks assigned to them
+            $tasks = $taskQuery
+                ->where(function ($q) use ($userId) {
+                    $q->where('assigned_to', $userId)
+                        ->orWhereHas('subtasks', fn ($s) => $s->where('assigned_to', $userId));
+                })
+                ->with([
+                    'assignee', 'creator', 'collaborators',
+                    'subtasks' => fn ($q) => $q->where('assigned_to', $userId),
+                    'subtasks.assignee', 'subtasks.collaborators',
+                ])
+                ->withCount(['subtasks' => fn ($q) => $q->where('assigned_to', $userId)])
+                ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('assigned_to', $userId)->where('status', 'done')])
+                ->orderBy('position')
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
 
         $canManageProject = auth()->user()->can('manage-projects')
             || $project->owner_id === auth()->id()
