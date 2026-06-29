@@ -8,7 +8,10 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskCommentController;
 use App\Http\Controllers\Api\TaskController;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
+
+Broadcast::routes(['prefix' => 'api', 'middleware' => ['auth:sanctum']]);
 
 // Public
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'app' => config('app.name')]));
