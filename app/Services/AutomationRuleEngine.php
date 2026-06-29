@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ProjectAutomationRule;
 use App\Models\Task;
+use App\Models\TaskComment;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 
@@ -87,6 +88,7 @@ class AutomationRuleEngine
                 'assign_user' => self::actionAssignUser($task, $params),
                 'move_to_section' => self::actionMoveToSection($task, $params),
                 'send_notification' => self::actionSendNotification($task, $params),
+                'add_comment' => self::actionAddComment($task, $params),
                 default => null,
             };
         }
@@ -140,6 +142,34 @@ class AutomationRuleEngine
         if ($task->section_id == $sectionId) return;
 
         $task->update(['section_id' => $sectionId]);
+    }
+
+    private static function actionAddComment(Task $task, array $params): void
+    {
+        $message = $params['message'] ?? null;
+        if (!$message) return;
+
+        // Replace placeholder variables in the message
+        $task->loadMissing('assignee', 'project');
+        $message = str_replace(
+            ['{task}', '{status}', '{assignee}', '{project}'],
+            [
+                $task->title,
+                ucfirst(str_replace('_', ' ', $task->status)),
+                $task->assignee?->name ?? 'Unassigned',
+                $task->project?->name ?? '',
+            ],
+            $message
+        );
+
+        // Use the project owner as the comment author, fall back to task creator
+        $userId = $task->project?->owner_id ?? $task->created_by ?? auth()->id();
+
+        TaskComment::create([
+            'task_id' => $task->id,
+            'user_id' => $userId,
+            'body' => $message,
+        ]);
     }
 
     private static function actionSendNotification(Task $task, array $params): void

@@ -41,7 +41,7 @@ class ProjectAutomationRuleController extends Controller
             'conditions.*.operator' => 'required|string|in:equals,not_equals,in,not_in',
             'conditions.*.value' => 'present',
             'actions' => 'required|array|min:1',
-            'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification',
+            'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification,add_comment',
             'actions.*.params' => 'required|array',
         ]);
 
@@ -68,7 +68,7 @@ class ProjectAutomationRuleController extends Controller
             'conditions.*.operator' => 'required|string|in:equals,not_equals,in,not_in',
             'conditions.*.value' => 'present',
             'actions' => 'required|array|min:1',
-            'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification',
+            'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification,add_comment',
             'actions.*.params' => 'required|array',
         ]);
 
