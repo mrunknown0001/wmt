@@ -14,7 +14,7 @@ export default function Pagination({ links }) {
                                     href={link.url}
                                     className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                                         link.active
-                                            ? 'bg-blue-600 text-white font-medium'
+                                            ? 'bg-primary-600 text-white font-medium'
                                             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                     }`}
                                     dangerouslySetInnerHTML={{ __html: link.label }}

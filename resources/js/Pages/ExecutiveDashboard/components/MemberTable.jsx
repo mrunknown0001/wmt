@@ -30,7 +30,7 @@ export default function MemberTable({ members }) {
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {members.map((member) => (
-                            <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                            <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
                                 <td className="px-6 py-3">
                                     <div className="flex items-center gap-3">
                                         <Avatar name={member.name} size="sm" />
