@@ -19,7 +19,7 @@ class TaskController extends Controller
 {
     public function show(Project $project, Task $task): JsonResponse
     {
-        $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name', 'parent:id,title', 'project:id,name');
+        $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name', 'parent:id,title', 'project:id,name', 'subtasks.assignee:id,name');
         $task->loadMissing('project.owner:id,name', 'project.members:id,name');
         $task->loadCount('subtasks');
         $task->loadCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
@@ -75,6 +75,15 @@ class TaskController extends Controller
             'comments' => $comments,
             'activities' => $activities,
             'members' => $members,
+            'subtasks' => $task->subtasks->map(fn ($s) => [
+                'id' => $s->id,
+                'project_id' => $s->project_id,
+                'title' => $s->title,
+                'status' => $s->status,
+                'priority' => $s->priority,
+                'due_date' => $s->due_date,
+                'assignee' => $s->assignee ? ['id' => $s->assignee->id, 'name' => $s->assignee->name] : null,
+            ]),
         ]);
     }
 
