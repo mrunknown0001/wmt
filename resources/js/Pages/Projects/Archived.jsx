@@ -88,13 +88,14 @@ export default function Archived() {
                 <Card padding={false}>
                     {projects.data.length > 0 ? (
                         <>
+                            <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Owner</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tasks</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Due Date</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Owner</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Tasks</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Due Date</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                                     </tr>
                                 </thead>
@@ -106,17 +107,17 @@ export default function Archived() {
                                             onClick={() => router.visit(`/projects/${project.id}`)}
                                         >
                                             <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{project.name}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
                                                 <div className="flex items-center gap-2">
                                                     {project.owner && <Avatar name={project.owner.name} size="sm" />}
                                                     <span>{project.owner?.name || 'Unassigned'}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
                                                 <span className="font-medium text-gray-900 dark:text-gray-100">{project.completed_tasks_count}</span>
                                                 <span className="text-gray-400">/{project.tasks_count}</span>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(project.due_date) || '—'}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">{formatDate(project.due_date) || '—'}</td>
                                             <td className="px-6 py-4 text-sm text-right" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center justify-end gap-1">
                                                     {canManage(project) && (
@@ -143,6 +144,7 @@ export default function Archived() {
                                     ))}
                                 </tbody>
                             </table>
+                            </div>
                             <Pagination links={projects.links} />
                         </>
                     ) : (

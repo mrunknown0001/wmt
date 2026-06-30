@@ -48,12 +48,13 @@ export default function Index() {
                 <Card padding={false}>
                     {divisions.data.length > 0 ? (
                         <>
+                            <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Description</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Head</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Description</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Head</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Departments</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                                     </tr>
@@ -62,8 +63,8 @@ export default function Index() {
                                     {divisions.data.map((division) => (
                                         <tr key={division.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                             <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{division.name}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">{division.description || '—'}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate hidden sm:table-cell">{division.description || '—'}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
                                                 {division.head ? (
                                                     <div className="flex items-center gap-2">
                                                         <Avatar name={division.head.name} size="sm" />
@@ -96,6 +97,7 @@ export default function Index() {
                                     ))}
                                 </tbody>
                             </table>
+                            </div>
                             <Pagination links={divisions.links} />
                         </>
                     ) : (

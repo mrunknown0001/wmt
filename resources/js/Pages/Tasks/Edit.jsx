@@ -368,7 +368,7 @@ export default function Edit() {
                             <Input label="Title" id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} error={errors.title} />
                             <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <Select label="Status" id="status" value={data.status} onChange={(e) => setData('status', e.target.value)} options={statuses.map((s) => ({ value: s, label: formatLabel(s) }))} error={errors.status} />
                                 <Select label="Priority" id="priority" value={data.priority} onChange={(e) => setData('priority', e.target.value)} options={priorities.map((p) => ({ value: p, label: formatLabel(p) }))} error={errors.priority} />
                             </div>
@@ -376,7 +376,7 @@ export default function Edit() {
                             <SearchableSelect label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(val) => setData('assigned_to', val)} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} disabled={!canManageTaskDetails} showAvatar />
 
                             <div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {showStartDate && (
                                         <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} error={errors.start_date} disabled={!canManageTaskDetails} />
                                     )}
@@ -422,7 +422,7 @@ export default function Edit() {
 
                                     {data.is_recurring && (
                                         <>
-                                            <div className="mt-3 grid grid-cols-2 gap-4">
+                                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <Input
                                                     label="Every"
                                                     id="recurrence_interval"

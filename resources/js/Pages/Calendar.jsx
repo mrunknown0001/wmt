@@ -261,7 +261,8 @@ export default function Calendar({ tasks, month, year }) {
             </div>
 
             {/* Calendar grid */}
-            <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                <div className="min-w-[640px]">
                 {/* Day headers */}
                 <div className="grid grid-cols-7 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                     {DAYS.map((day) => (
@@ -287,6 +288,7 @@ export default function Calendar({ tasks, month, year }) {
                         ))}
                     </div>
                 ))}
+            </div>
             </div>
 
             {/* Legend */}

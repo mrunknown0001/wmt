@@ -89,7 +89,7 @@ export default function Dashboard() {
         <AuthenticatedLayout title="Dashboard">
             <div>
                 {/* Header */}
-                <div className="flex items-start justify-between mb-6">
+                <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
                     <div>
                         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                             {greeting()}, {auth.user?.name}

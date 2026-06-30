@@ -56,12 +56,12 @@ export default function Edit() {
                         <Input label="Name" id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} error={errors.name} />
                         <Input label="Email" id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} error={errors.email} />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <Input label="Password (leave blank to keep)" id="password" type="password" value={data.password} onChange={(e) => setData('password', e.target.value)} error={errors.password} />
                             <Input label="Confirm Password" id="password_confirmation" type="password" value={data.password_confirmation} onChange={(e) => setData('password_confirmation', e.target.value)} />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="department_id" className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Department</label>
                                 <select

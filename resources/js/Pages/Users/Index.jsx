@@ -49,14 +49,15 @@ export default function Index() {
                 <Card padding={false}>
                     {users.data.length > 0 ? (
                         <>
+                            <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Email</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Email</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Role</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Department</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Department</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Status</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                                     </tr>
                                 </thead>
@@ -69,12 +70,12 @@ export default function Index() {
                                                     {user.name}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">{user.email}</td>
                                             <td className="px-6 py-4 text-sm">
                                                 <Badge color="blue">{formatLabel(user.roles?.[0]?.name || 'No role')}</Badge>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{user.department?.name || '—'}</td>
-                                            <td className="px-6 py-4 text-sm">
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">{user.department?.name || '—'}</td>
+                                            <td className="px-6 py-4 text-sm hidden sm:table-cell">
                                                 <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${user.is_active ? 'text-green-700 dark:text-green-400' : 'text-gray-500'}`}>
                                                     <span className={`h-1.5 w-1.5 rounded-full ${user.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
                                                     {user.is_active ? 'Active' : 'Inactive'}
@@ -102,6 +103,7 @@ export default function Index() {
                                     ))}
                                 </tbody>
                             </table>
+                            </div>
                             <Pagination links={users.links} />
                         </>
                     ) : (

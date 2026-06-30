@@ -46,7 +46,7 @@ export default function Edit() {
                         <Input label="Name" id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} error={errors.name} />
                         <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <Select
                                 label="Status" id="status" value={data.status}
                                 onChange={(e) => setData('status', e.target.value)}

@@ -1458,48 +1458,48 @@ export default function Show() {
 
             {/* View Toggle + Filters + Add Task */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                     {/* View Toggle */}
                     <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-0.5">
                         <button
                             onClick={() => setView('list')}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'list'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
                                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
                             }`}
                         >
-                            <ListIcon /> List
+                            <ListIcon /> <span className="hidden sm:inline">List</span>
                         </button>
                         <button
                             onClick={() => setView('board')}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'board'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
                                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
                             }`}
                         >
-                            <BoardIcon /> Board
+                            <BoardIcon /> <span className="hidden sm:inline">Board</span>
                         </button>
                         <button
                             onClick={() => setView('calendar')}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'calendar'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
                                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
                             }`}
                         >
-                            <CalendarIcon /> Calendar
+                            <CalendarIcon /> <span className="hidden sm:inline">Calendar</span>
                         </button>
                         <button
                             onClick={() => setView('gantt')}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'gantt'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
                                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
                             }`}
                         >
-                            <GanttIcon /> Gantt
+                            <GanttIcon /> <span className="hidden sm:inline">Gantt</span>
                         </button>
                     </div>
 
@@ -1513,7 +1513,7 @@ export default function Show() {
                             value={filterSearch}
                             onChange={(e) => setFilterSearch(e.target.value)}
                             placeholder="Search tasks..."
-                            className="pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-44"
+                            className="pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-36 sm:w-44"
                         />
                     </div>
                     <select
@@ -1529,7 +1529,7 @@ export default function Show() {
                     <select
                         value={filterPriority}
                         onChange={(e) => setFilterPriority(e.target.value)}
-                        className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        className="hidden sm:block rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
                         <option value="">All Priorities</option>
                         {['low', 'medium', 'high', 'urgent'].map((p) => (
@@ -1539,7 +1539,7 @@ export default function Show() {
                     <select
                         value={filterAssignee}
                         onChange={(e) => setFilterAssignee(e.target.value)}
-                        className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        className="hidden md:block rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
                         <option value="">All Assignees</option>
                         {assignees.map((a) => (
@@ -1549,7 +1549,7 @@ export default function Show() {
                     <select
                         value={filterDueDate}
                         onChange={(e) => setFilterDueDate(e.target.value)}
-                        className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        className="hidden md:block rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
                         <option value="">All Dates</option>
                         <option value="overdue">Overdue</option>
@@ -1588,6 +1588,7 @@ export default function Show() {
                             onDragOver={handleListDragOver}
                             onDragEnd={handleListDragEnd}
                         >
+                            <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
@@ -1813,6 +1814,7 @@ export default function Show() {
                                     )}
                                 </tbody>
                             </table>
+                            </div>
                             <DragOverlay>
                                 {activeTask ? (
                                     <table className="min-w-full">
@@ -1994,7 +1996,8 @@ export default function Show() {
                         </div>
 
                         {/* Calendar grid */}
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                            <div className="min-w-[640px]">
                             <div className="grid grid-cols-7 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                                 {DAYS.map((day) => (
                                     <div key={day} className="px-2 py-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">{day}</div>
@@ -2046,6 +2049,7 @@ export default function Show() {
                                     })}
                                 </div>
                             ))}
+                        </div>
                         </div>
 
                         {/* Legend */}
@@ -2292,7 +2296,7 @@ export default function Show() {
 
             {/* Bulk Actions Toolbar */}
             {selectedTasks.size > 0 && canManageTasks && (
-                <div onClick={(e) => e.stopPropagation()} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 dark:bg-gray-700 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
+                <div onClick={(e) => e.stopPropagation()} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 dark:bg-gray-700 text-white rounded-xl shadow-2xl px-4 py-3 flex flex-wrap items-center gap-3 max-w-[calc(100vw-2rem)]">
                     <span className="text-sm font-medium whitespace-nowrap">{selectedTasks.size} task{selectedTasks.size !== 1 ? 's' : ''} selected</span>
                     <div className="w-px h-5 bg-gray-600" />
 

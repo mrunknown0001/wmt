@@ -48,14 +48,15 @@ export default function Index() {
                 <Card padding={false}>
                     {teams.data.length > 0 ? (
                         <>
+                            <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Department</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Division</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Leader</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Members</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Division</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Leader</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Members</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                                     </tr>
                                 </thead>
@@ -64,8 +65,8 @@ export default function Index() {
                                         <tr key={team.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                             <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{team.name}</td>
                                             <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{team.department?.name || '—'}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{team.department?.division?.name || '—'}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">{team.department?.division?.name || '—'}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">
                                                 {team.leader ? (
                                                     <div className="flex items-center gap-2">
                                                         <Avatar name={team.leader.name} size="sm" />
@@ -73,7 +74,7 @@ export default function Index() {
                                                     </div>
                                                 ) : '—'}
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{team.members_count}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">{team.members_count}</td>
                                             <td className="px-6 py-4 text-sm text-right">
                                                 {canManage && (
                                                     <div className="flex items-center justify-end gap-1">
@@ -98,6 +99,7 @@ export default function Index() {
                                     ))}
                                 </tbody>
                             </table>
+                            </div>
                             <Pagination links={teams.links} />
                         </>
                     ) : (
