@@ -1,6 +1,7 @@
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from './ThemeContext';
+import './echo';
 
 // Register Firebase service worker for push notifications
 if ('serviceWorker' in navigator) {
