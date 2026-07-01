@@ -84,6 +84,12 @@ const BellIcon = () => (
     </svg>
 );
 
+const LockIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+    </svg>
+);
+
 const SettingsIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z" />
@@ -212,6 +218,9 @@ export default function AuthenticatedLayout({ children, title }) {
                 <NavSection title="Preferences" collapsed={collapsed}>
                     <NavLink href="/settings/notifications" icon={<BellIcon />} active={isActive('/settings/notifications')} collapsed={collapsed}>
                         Notifications
+                    </NavLink>
+                    <NavLink href="/settings/password" icon={<LockIcon />} active={isActive('/settings/password')} collapsed={collapsed}>
+                        Change Password
                     </NavLink>
                 </NavSection>
 
