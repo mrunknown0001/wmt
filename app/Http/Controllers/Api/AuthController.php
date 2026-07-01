@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -38,43 +38,21 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $user->createToken($request->device_name)->plainTextToken,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'position' => $user->position,
-                'department' => $user->department ? ['id' => $user->department->id, 'name' => $user->department->name] : null,
-                'team' => $user->team ? ['id' => $user->team->id, 'name' => $user->team->name] : null,
-                'roles' => $user->getRoleNames(),
-                'notification_preferences' => $user->getNotificationPreferences(),
-            ],
+            'user' => new UserResource($user),
         ]);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        // Revoke the current access token
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out successfully.']);
     }
 
-    public function user(Request $request): JsonResponse
+    public function user(Request $request): UserResource
     {
-        $user = $request->user();
-        $user->load('department', 'team');
-
-        return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'position' => $user->position,
-                'department' => $user->department ? ['id' => $user->department->id, 'name' => $user->department->name] : null,
-                'team' => $user->team ? ['id' => $user->team->id, 'name' => $user->team->name] : null,
-                'roles' => $user->getRoleNames(),
-                'notification_preferences' => $user->getNotificationPreferences(),
-            ],
-        ]);
+        return new UserResource(
+            $request->user()->load('department', 'team')
+        );
     }
 }
