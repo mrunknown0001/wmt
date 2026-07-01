@@ -72,4 +72,18 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Password changed successfully.']);
     }
+
+    public function logoutOtherDevices(Request $request): JsonResponse
+    {
+        $request->validate([
+            'password' => ['required', 'current_password'],
+        ]);
+
+        // Delete all Sanctum tokens except the current one
+        $request->user()->tokens()
+            ->where('id', '!=', $request->user()->currentAccessToken()->id)
+            ->delete();
+
+        return response()->json(['message' => 'All other devices have been logged out.']);
+    }
 }

@@ -101,6 +101,7 @@ Route::middleware('auth')->group(function () {
     // Change Password
     Route::get('/settings/password', [PasswordController::class, 'edit'])->name('settings.password');
     Route::put('/settings/password', [PasswordController::class, 'update'])->name('settings.password.update');
+    Route::post('/settings/logout-other-devices', [PasswordController::class, 'logoutOtherDevices'])->name('settings.logout-other-devices');
 
     // Settings (admin)
     Route::get('/settings', [SettingController::class, 'edit'])->name('settings.edit');
