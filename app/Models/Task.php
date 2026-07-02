@@ -124,4 +124,18 @@ class Task extends Model
     {
         return $this->hasOne(self::class, 'recurring_source_id');
     }
+
+    public function isStandalone(): bool
+    {
+        return is_null($this->project_id);
+    }
+
+    public function getEditUrl(): string
+    {
+        if ($this->project_id) {
+            return "/projects/{$this->project_id}/tasks/{$this->id}/edit";
+        }
+
+        return "/tasks/{$this->id}/edit";
+    }
 }

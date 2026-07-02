@@ -52,10 +52,13 @@ class RecurringTaskService
             }
         }
 
-        $maxPosition = Task::where('project_id', $task->project_id)
-            ->whereNull('parent_id')
-            ->where('status', 'to_do')
-            ->max('position') ?? -1;
+        $positionQuery = Task::whereNull('parent_id')->where('status', 'to_do');
+        if ($task->project_id) {
+            $positionQuery->where('project_id', $task->project_id);
+        } else {
+            $positionQuery->whereNull('project_id');
+        }
+        $maxPosition = $positionQuery->max('position') ?? -1;
 
         $newTask = Task::create([
             'project_id' => $task->project_id,

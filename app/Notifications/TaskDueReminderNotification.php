@@ -43,7 +43,7 @@ class TaskDueReminderNotification extends Notification implements ShouldQueue
             ->line($line)
             ->line("**{$this->task->title}** in project {$this->task->project?->name}")
             ->line("Due date: {$this->task->due_date->toFormattedDateString()}")
-            ->action('View Task', url("/projects/{$this->task->project_id}/tasks/{$this->task->id}/edit"))
+            ->action('View Task', url($this->task->getEditUrl()))
             ->line('Thank you for using ' . config('app.name') . '!');
     }
 

@@ -25,6 +25,7 @@ class DashboardController extends Controller
             ->get();
 
         $involvedProjectIds = Task::where('assigned_to', $user->id)
+            ->whereNotNull('project_id')
             ->distinct()
             ->pluck('project_id')
             ->merge($user->memberProjects()->pluck('projects.id'))

@@ -34,7 +34,7 @@ class TaskAssignedNotification extends Notification implements ShouldQueue
             ->greeting("Hello {$notifiable->name},")
             ->line("{$this->assignedBy->name} assigned you a task.")
             ->line("**{$this->task->title}** in project {$this->task->project?->name}")
-            ->action('View Task', url("/projects/{$this->task->project_id}/tasks/{$this->task->id}/edit"))
+            ->action('View Task', url($this->task->getEditUrl()))
             ->line('Thank you for using ' . config('app.name') . '!');
     }
 

@@ -21,7 +21,7 @@ class StoreTaskCommentRequest extends FormRequest
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => [
                 'file',
-                'mimes:jpg,jpeg,png,webp,pdf',
+                'mimes:jpg,jpeg,png,webp,pdf,mp4,mov,avi,wmv,webm,xls,xlsx,csv',
                 "max:{$maxSizeKb}",
             ],
         ];
@@ -33,7 +33,7 @@ class StoreTaskCommentRequest extends FormRequest
 
         return [
             'attachments.*.max' => "Each file must not exceed {$maxMb}MB.",
-            'attachments.*.mimes' => 'Only JPG, PNG, WebP, and PDF files are allowed.',
+            'attachments.*.mimes' => 'Only images (JPG, PNG, WebP), PDF, video (MP4, MOV, AVI, WMV, WebM), and spreadsheets (XLS, XLSX, CSV) are allowed.',
             'attachments.max' => 'You can attach up to 5 files per comment.',
             'body.required_without' => 'A comment must have text or at least one attachment.',
         ];

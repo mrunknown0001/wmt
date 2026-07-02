@@ -47,7 +47,7 @@ class SearchController extends Controller
                 'status' => $t->status,
                 'priority' => $t->priority,
                 'project_name' => $t->project?->name,
-                'url' => "/projects/{$t->project_id}",
+                'url' => $t->project_id ? "/projects/{$t->project_id}" : "/tasks/{$t->id}/edit",
             ]);
 
         $users = collect();

@@ -1,12 +1,12 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Link, router } from '@inertiajs/react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { Link, router, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import PriorityBadge from '../../Components/PriorityBadge';
 import StatusBadge from '../../Components/StatusBadge';
 import EmptyState from '../../Components/EmptyState';
-import { formatDate, formatLabel } from '../../utils';
+import { formatDate, formatLabel, taskEditUrl } from '../../utils';
 
 const TASK_STATUSES = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
@@ -60,7 +60,7 @@ function TaskSection({ section, tasks }) {
                     {tasks.map((task) => (
                         <Link
                             key={task.id}
-                            href={`/projects/${task.project_id}/tasks/${task.id}/edit`}
+                            href={taskEditUrl(task)}
                             className={`flex items-center gap-4 px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors border-l-3 ${style.row}`}
                         >
                             <div className="flex-1 min-w-0">
@@ -69,7 +69,7 @@ function TaskSection({ section, tasks }) {
                                 </p>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                        {task.project?.name}
+                                        {task.project?.name || 'Personal'}
                                     </span>
                                 </div>
                             </div>
@@ -92,7 +92,129 @@ function TaskSection({ section, tasks }) {
     );
 }
 
-export default function Index({ allTasks, taskGroups: defaultGroups, stats: defaultStats }) {
+function QuickAddTask({ canAssignOthers, users, projects, priorities }) {
+    const [expanded, setExpanded] = useState(false);
+    const inputRef = useRef(null);
+    const { data, setData, post, processing, reset, errors } = useForm({
+        title: '',
+        status: 'to_do',
+        priority: 'medium',
+        assigned_to: '',
+        project_id: '',
+        due_date: '',
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!data.title.trim()) return;
+
+        post('/tasks', {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                setExpanded(false);
+            },
+        });
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !expanded) {
+            handleSubmit(e);
+        }
+        if (e.key === 'Escape') {
+            reset();
+            setExpanded(false);
+        }
+    };
+
+    return (
+        <Card padding={false}>
+            <form onSubmit={handleSubmit}>
+                <div className="flex items-center gap-3 px-5 py-3">
+                    <svg className="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={data.title}
+                        onChange={(e) => setData('title', e.target.value)}
+                        onFocus={() => setExpanded(true)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Add a task..."
+                        className="flex-1 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-0 p-0"
+                    />
+                    {data.title.trim() && (
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="text-xs font-medium px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        >
+                            Add
+                        </button>
+                    )}
+                    {expanded && (
+                        <button
+                            type="button"
+                            onClick={() => { reset(); setExpanded(false); }}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
+                {expanded && (
+                    <div className="px-5 pb-3 flex flex-wrap items-center gap-3 border-t border-gray-100 dark:border-gray-700 pt-3">
+                        <select
+                            value={data.priority}
+                            onChange={(e) => setData('priority', e.target.value)}
+                            className="text-xs rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-gray-700 dark:text-gray-200 dark:bg-gray-700"
+                        >
+                            {priorities.map((p) => (
+                                <option key={p} value={p}>{formatLabel(p)}</option>
+                            ))}
+                        </select>
+                        <input
+                            type="date"
+                            value={data.due_date}
+                            onChange={(e) => setData('due_date', e.target.value)}
+                            className="text-xs rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-gray-700 dark:text-gray-200 dark:bg-gray-700"
+                        />
+                        {canAssignOthers && (
+                            <select
+                                value={data.assigned_to}
+                                onChange={(e) => setData('assigned_to', e.target.value)}
+                                className="text-xs rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-gray-700 dark:text-gray-200 dark:bg-gray-700"
+                            >
+                                <option value="">Assign to me</option>
+                                {users.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </select>
+                        )}
+                        <select
+                            value={data.project_id}
+                            onChange={(e) => setData('project_id', e.target.value)}
+                            className="text-xs rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-gray-700 dark:text-gray-200 dark:bg-gray-700"
+                        >
+                            <option value="">No project</option>
+                            {projects.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                {errors.title && (
+                    <p className="px-5 pb-2 text-xs text-red-500">{errors.title}</p>
+                )}
+            </form>
+        </Card>
+    );
+}
+
+export default function Index({ allTasks, taskGroups: defaultGroups, stats: defaultStats, canAssignOthers = false, users = [], projects = [], statuses = TASK_STATUSES, priorities = PRIORITIES }) {
     const [filterSearch, setFilterSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
@@ -171,6 +293,16 @@ export default function Index({ allTasks, taskGroups: defaultGroups, stats: defa
                         <p className="text-sm text-gray-500 dark:text-gray-400">Due Today</p>
                     </div>
                 </Card>
+            </div>
+
+            {/* Quick Add */}
+            <div className="mb-6">
+                <QuickAddTask
+                    canAssignOthers={canAssignOthers}
+                    users={users}
+                    projects={projects}
+                    priorities={priorities}
+                />
             </div>
 
             {/* Filter Bar */}

@@ -124,4 +124,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(DeviceToken::class);
     }
+
+    public function personalTodos(): HasMany
+    {
+        return $this->hasMany(PersonalTodo::class);
+    }
 }

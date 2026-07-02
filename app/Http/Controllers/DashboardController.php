@@ -37,6 +37,7 @@ class DashboardController extends Controller
 
         // Projects where the user is assigned tasks or is a member, but not the owner
         $involvedProjectIds = Task::where('assigned_to', $user->id)
+            ->whereNotNull('project_id')
             ->distinct()
             ->pluck('project_id')
             ->merge(

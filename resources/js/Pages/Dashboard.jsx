@@ -14,7 +14,7 @@ import ActivityFeed from '../Components/Dashboard/ActivityFeed';
 import DonutChart from '../Components/Dashboard/DonutChart';
 import BarChart from '../Components/Dashboard/BarChart';
 import TeamWorkload from '../Components/Dashboard/TeamWorkload';
-import { formatDate } from '../utils';
+import { formatDate, taskEditUrl } from '../utils';
 
 function StatCard({ label, value, icon, color = 'blue', href }) {
     const colors = {
@@ -135,7 +135,7 @@ export default function Dashboard() {
                                     return (
                                         <Link
                                             key={task.id}
-                                            href={`/projects/${task.project_id}/tasks/${task.id}/edit`}
+                                            href={taskEditUrl(task)}
                                             className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                         >
                                             <div className={`w-1 h-8 rounded-full ${isOverdue ? 'bg-red-500' : 'bg-yellow-500'}`} />
@@ -288,7 +288,7 @@ export default function Dashboard() {
                                     return (
                                         <Link
                                             key={task.id}
-                                            href={`/projects/${task.project_id}/tasks/${task.id}/edit`}
+                                            href={taskEditUrl(task)}
                                             className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                         >
                                             <div className="flex-1 min-w-0">

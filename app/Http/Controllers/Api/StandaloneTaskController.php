@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
-use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\ActivityLogger;
 use App\Services\AutomationRuleEngine;
@@ -15,24 +15,53 @@ use App\Services\TaskActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class TaskController extends Controller
+class StandaloneTaskController extends Controller
 {
-    public function show(Project $project, Task $task): JsonResponse
+    public function store(StoreTaskRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $user = $request->user();
+
+        if (empty($validated['assigned_to'])) {
+            $validated['assigned_to'] = $user->id;
+        }
+
+        $collaboratorIds = $validated['collaborator_ids'] ?? [];
+        unset($validated['collaborator_ids']);
+
+        $maxPosition = Task::whereNull('project_id')
+            ->whereNull('parent_id')
+            ->where('status', $validated['status'] ?? 'to_do')
+            ->max('position') ?? -1;
+
+        $task = Task::create([
+            ...$validated,
+            'created_by' => $user->id,
+            'position' => $maxPosition + 1,
+        ]);
+
+        if (! empty($collaboratorIds)) {
+            $task->collaborators()->sync($collaboratorIds);
+        }
+
+        TaskActivityLogger::logCreated($task, $user);
+        ActivityLogger::logCreated($task, $user);
+
+        if ($task->assigned_to && $task->assigned_to !== $user->id) {
+            $task->load('project');
+            $task->assignee->notify(new TaskAssignedNotification($task, $user));
+        }
+
+        $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name');
+
+        return response()->json(['task' => $task], 201);
+    }
+
+    public function show(Task $task): JsonResponse
     {
         $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name', 'parent:id,title', 'project:id,name', 'subtasks.assignee:id,name');
-        $task->loadMissing('project.owner:id,name', 'project.members:id,name');
         $task->loadCount('subtasks');
         $task->loadCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
-
-        $members = collect();
-        if ($task->project) {
-            $members = collect([$task->project->owner])
-                ->merge($task->project->members)
-                ->filter()
-                ->unique('id')
-                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
-                ->values();
-        }
 
         $comments = $task->comments()
             ->with('user:id,name', 'attachments')
@@ -50,7 +79,7 @@ class TaskController extends Controller
                     'file_type' => $a->file_type,
                     'file_size' => $a->file_size,
                     'url' => $a->url,
-                    'download_url' => url("/api/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
+                    'download_url' => url("/api/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
                     'is_image' => $a->isImage(),
                     'is_video' => $a->isVideo(),
                 ]),
@@ -75,7 +104,6 @@ class TaskController extends Controller
             'task' => $task,
             'comments' => $comments,
             'activities' => $activities,
-            'members' => $members,
             'subtasks' => $task->subtasks->map(fn ($s) => [
                 'id' => $s->id,
                 'project_id' => $s->project_id,
@@ -88,7 +116,61 @@ class TaskController extends Controller
         ]);
     }
 
-    public function patchField(Request $request, Project $project, Task $task): JsonResponse
+    public function update(UpdateTaskRequest $request, Task $task): JsonResponse
+    {
+        $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+        $oldValues['start_date'] = $task->start_date?->toDateString();
+        $oldValues['due_date'] = $task->due_date?->toDateString();
+        $oldAssignee = $task->assigned_to;
+
+        $validated = $request->validated();
+        $collaboratorIds = $validated['collaborator_ids'] ?? null;
+        unset($validated['collaborator_ids']);
+
+        $task->update($validated);
+
+        if ($collaboratorIds !== null) {
+            $task->collaborators()->sync($collaboratorIds);
+        }
+
+        TaskActivityLogger::logChanges($task, $oldValues, $request->user());
+        ActivityLogger::logChanges($task, $oldValues, $request->user());
+
+        if ($task->assigned_to && $task->assigned_to !== $oldAssignee && $task->assigned_to !== $request->user()->id) {
+            $task->load('project');
+            $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
+        }
+
+        if (in_array($task->status, ['done', 'cancelled']) && $task->escalation_level > 0) {
+            $task->update(['escalation_level' => 0]);
+        }
+
+        AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
+        AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
+
+        $response = ['task' => $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name')];
+
+        $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
+        if ($newTask) {
+            $newTask->load('assignee:id,name', 'collaborators:id,name');
+            $response['recurring_task_created'] = true;
+            $response['new_task'] = $newTask;
+        }
+
+        return response()->json($response);
+    }
+
+    public function destroy(Request $request, Task $task): JsonResponse
+    {
+        $this->authorize('delete', $task);
+
+        ActivityLogger::logDeleted($task, $request->user());
+        $task->delete();
+
+        return response()->json(null, 204);
+    }
+
+    public function patchField(Request $request, Task $task): JsonResponse
     {
         $this->authorize('update', $task);
 
@@ -128,11 +210,9 @@ class TaskController extends Controller
         $response = ['success' => true, 'task' => $task];
 
         if ($field === 'status') {
-            if (($oldValues['status'] ?? null) !== $task->status) {
-                AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
-                if ($task->status === 'done') {
-                    AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
-                }
+            AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
+            if ($task->status === 'done') {
+                AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
             }
             $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
             if ($newTask) {
@@ -145,7 +225,7 @@ class TaskController extends Controller
         return response()->json($response);
     }
 
-    public function storeComment(Request $request, Project $project, Task $task): JsonResponse
+    public function storeComment(Request $request, Task $task): JsonResponse
     {
         $maxKb = \App\Models\Setting::current()->max_upload_size * 1024;
 
@@ -204,124 +284,11 @@ class TaskController extends Controller
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
                 'url' => $a->url,
-                'download_url' => url("/api/projects/{$project->id}/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
+                'download_url' => url("/api/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
                 'is_image' => $a->isImage(),
                 'is_video' => $a->isVideo(),
             ]),
         ]], 201);
-    }
-
-    public function store(StoreTaskRequest $request, Project $project): JsonResponse
-    {
-        $validated = $request->validated();
-
-        if (!empty($validated['parent_id'])) {
-            $parent = Task::where('id', $validated['parent_id'])
-                ->where('project_id', $project->id)
-                ->whereNull('parent_id')
-                ->firstOrFail();
-
-            $maxPosition = Task::where('parent_id', $parent->id)
-                ->where('status', $request->status)
-                ->max('position') ?? -1;
-        } else {
-            $maxPosition = $project->tasks()
-                ->whereNull('parent_id')
-                ->where('status', $request->status)
-                ->max('position') ?? -1;
-        }
-
-        $collaboratorIds = $validated['collaborator_ids'] ?? [];
-        unset($validated['collaborator_ids']);
-
-        $task = $project->tasks()->create([
-            ...$validated,
-            'created_by' => $request->user()->id,
-            'position' => $maxPosition + 1,
-        ]);
-
-        if (!empty($collaboratorIds)) {
-            $task->collaborators()->sync($collaboratorIds);
-        }
-
-        TaskActivityLogger::logCreated($task, $request->user());
-        ActivityLogger::logCreated($task, $request->user());
-
-        if ($task->assigned_to && $task->assigned_to !== $request->user()->id) {
-            $task->load('project');
-            $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
-        }
-
-        AutomationRuleEngine::evaluate($task, 'task_created');
-
-        $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name');
-
-        return response()->json(['task' => $task], 201);
-    }
-
-    public function update(UpdateTaskRequest $request, Project $project, Task $task): JsonResponse
-    {
-        $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
-        $oldValues['start_date'] = $task->start_date?->toDateString();
-        $oldValues['due_date'] = $task->due_date?->toDateString();
-        $oldAssignee = $task->assigned_to;
-
-        $validated = $request->validated();
-        $collaboratorIds = $validated['collaborator_ids'] ?? null;
-        unset($validated['collaborator_ids']);
-
-        $task->update($validated);
-
-        if ($collaboratorIds !== null) {
-            $task->collaborators()->sync($collaboratorIds);
-        }
-
-        TaskActivityLogger::logChanges($task, $oldValues, $request->user());
-        ActivityLogger::logChanges($task, $oldValues, $request->user());
-
-        if ($task->assigned_to && $task->assigned_to !== $oldAssignee && $task->assigned_to !== $request->user()->id) {
-            $task->load('project');
-            $task->assignee->notify(new TaskAssignedNotification($task, $request->user()));
-        }
-
-        if (in_array($task->status, ['done', 'cancelled']) && $task->escalation_level > 0) {
-            $task->update(['escalation_level' => 0]);
-        }
-
-        if (($oldValues['status'] ?? null) !== $task->status) {
-            AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
-            if ($task->status === 'done') {
-                AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
-            }
-        }
-        if (($oldValues['priority'] ?? null) !== $task->priority) {
-            AutomationRuleEngine::evaluate($task, 'task_priority_changed', $oldValues);
-        }
-        if (($oldValues['assigned_to'] ?? null) != $task->assigned_to) {
-            AutomationRuleEngine::evaluate($task, 'task_assigned', $oldValues);
-        }
-
-        $response = ['task' => $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name')];
-
-        $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
-        if ($newTask) {
-            $newTask->load('assignee:id,name', 'collaborators:id,name');
-            $response['recurring_task_created'] = true;
-            $response['new_task'] = $newTask;
-        }
-
-        return response()->json($response);
-    }
-
-    public function destroy(Request $request, Project $project, Task $task): JsonResponse
-    {
-        $this->authorize('delete', $task);
-
-        ActivityLogger::logDeleted($task, $request->user());
-
-        $task->delete();
-
-        return response()->json(null, 204);
     }
 
     private function notifyCommentMentions(\App\Models\TaskComment $comment, Task $task, \App\Models\User $author): void
@@ -334,10 +301,10 @@ class TaskController extends Controller
             $mentionedIds = array_map('intval', $m[1]);
         }
 
-        \App\Models\User::where('is_active', true)
+        User::where('is_active', true)
             ->where('id', '!=', $author->id)
             ->get()
-            ->filter(fn ($u) => in_array($u->id, $mentionedIds) || str_contains($body, '@' . $u->name))
+            ->filter(fn ($u) => in_array($u->id, $mentionedIds) || str_contains($body, '@'.$u->name))
             ->each(fn ($u) => $u->notify(new \App\Notifications\TaskCommentMentionNotification($task, $author, $comment)));
     }
 }

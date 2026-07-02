@@ -39,7 +39,7 @@ class TaskEscalatedNotification extends Notification implements ShouldQueue
             ->line("Assigned to: {$this->task->assignee?->name}")
             ->line("Due date: {$this->task->due_date->toFormattedDateString()}")
             ->line("Escalation level: {$this->escalationLabel}")
-            ->action('View Task', url("/projects/{$this->task->project_id}/tasks/{$this->task->id}/edit"))
+            ->action('View Task', url($this->task->getEditUrl()))
             ->salutation('Please take action on this overdue task.');
     }
 

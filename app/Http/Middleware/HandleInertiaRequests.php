@@ -51,6 +51,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'settings' => fn () => \App\Models\Setting::current(),
             'unreadNotificationsCount' => fn () => $request->user()?->unreadNotifications()->count() ?? 0,
+            'personalTodosCount' => fn () => $request->user()?->personalTodos()->incomplete()->count() ?? 0,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

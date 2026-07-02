@@ -120,7 +120,9 @@ function notificationIcon(type) {
 
 function handleNotificationClick(notification) {
     const data = notification.data;
-    const taskUrl = `/projects/${data.project_id}/tasks/${data.task_id}/edit`;
+    const taskUrl = data.project_id
+        ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
+        : `/tasks/${data.task_id}/edit`;
 
     if (!notification.read_at) {
         router.patch(`/inbox/${notification.id}/read`, {}, {

@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardPreferenceController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\StandaloneTaskController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\MyTaskController;
@@ -59,6 +60,17 @@ Route::middleware('auth')->group(function () {
     // My Tasks
     Route::get('/my-tasks', [MyTaskController::class, 'index'])->name('my-tasks');
 
+    // Standalone Tasks (not project-scoped)
+    Route::post('/tasks', [StandaloneTaskController::class, 'store'])->name('tasks.store');
+    Route::get('/tasks/{task}/edit', [StandaloneTaskController::class, 'edit'])->name('tasks.edit');
+    Route::put('/tasks/{task}', [StandaloneTaskController::class, 'update'])->name('tasks.update');
+    Route::delete('/tasks/{task}', [StandaloneTaskController::class, 'destroy'])->name('tasks.destroy');
+    Route::patch('/tasks/{task}/patch', [StandaloneTaskController::class, 'patchField'])->name('tasks.patch');
+    Route::get('/tasks/{task}/timeline', [StandaloneTaskController::class, 'timeline'])->name('tasks.timeline');
+    Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'storeStandalone'])->name('standalone-tasks.comments.store');
+    Route::delete('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroyStandalone'])->name('standalone-tasks.comments.destroy');
+    Route::get('/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'downloadStandalone'])->name('standalone-tasks.comments.attachments.download');
+
     // Calendar
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
 
@@ -78,6 +90,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/projects/{project}/tasks/{task}/timeline', [TaskController::class, 'timeline'])->name('projects.tasks.timeline');
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
+    Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download'])->name('tasks.comments.attachments.download');
 
     // Task Sections
     Route::post('/projects/{project}/sections', [TaskSectionController::class, 'store'])->name('projects.sections.store');

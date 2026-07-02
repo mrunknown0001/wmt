@@ -11,7 +11,7 @@ import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
-import { formatLabel, apiFetch } from '../../utils';
+import { formatLabel, apiFetch, taskEditUrl } from '../../utils';
 import echo from '../../echo';
 
 function timeAgo(dateString) {
@@ -103,13 +103,16 @@ function formatFileSize(bytes) {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function CommentItem({ item, currentUserId, projectId, taskId }) {
+function CommentItem({ item, currentUserId, projectId, taskId, isStandalone }) {
     const [deleting, setDeleting] = useState(false);
 
     const handleDelete = () => {
         if (!confirm('Delete this comment?')) return;
         setDeleting(true);
-        router.delete(`/projects/${projectId}/tasks/${taskId}/comments/${item.id}`, {
+        const deleteUrl = isStandalone
+            ? `/tasks/${taskId}/comments/${item.id}`
+            : `/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
+        router.delete(deleteUrl, {
             preserveScroll: true,
             onFinish: () => setDeleting(false),
         });
@@ -144,31 +147,60 @@ function CommentItem({ item, currentUserId, projectId, taskId }) {
                 {item.attachments && item.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                         {item.attachments.map((att) => (
-                            <a
-                                key={att.id}
-                                href={att.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block"
-                            >
-                                {att.is_image ? (
-                                    <img
-                                        src={att.url}
-                                        alt={att.file_name}
-                                        className="h-20 w-20 rounded-lg object-cover border border-gray-200 dark:border-gray-600 hover:opacity-80 transition-opacity"
-                                    />
-                                ) : (
-                                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                                        <svg className="h-5 w-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                                        </svg>
-                                        <div className="min-w-0">
-                                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{att.file_name}</p>
-                                            <p className="text-xs text-gray-400">{formatFileSize(att.file_size)}</p>
+                            <div key={att.id} className="relative group">
+                                <a
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                >
+                                    {att.is_image ? (
+                                        <img
+                                            src={att.url}
+                                            alt={att.file_name}
+                                            className="h-20 w-20 rounded-lg object-cover border border-gray-200 dark:border-gray-600 hover:opacity-80 transition-opacity"
+                                        />
+                                    ) : att.is_video ? (
+                                        <div className="relative h-20 w-32 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden bg-black hover:opacity-80 transition-opacity">
+                                            <video src={att.url} className="h-full w-full object-cover" preload="metadata" />
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <svg className="h-8 w-8 text-white/80" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M8 5v14l11-7z" />
+                                                </svg>
+                                            </div>
+                                            <p className="absolute bottom-0 left-0 right-0 text-[10px] text-white/80 bg-black/50 px-1 py-0.5 truncate">{att.file_name}</p>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                            {att.file_type?.includes('spreadsheet') || att.file_type?.includes('excel') || att.file_type?.includes('csv') ? (
+                                                <svg className="h-5 w-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M12 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M3.375 12H12m0 0v1.5c0 .621.504 1.125 1.125 1.125M12 12c0 .621-.504 1.125-1.125 1.125m1.125 2.625h7.5m-7.5 0c-.621 0-1.125-.504-1.125-1.125M12 15.75c0-.621-.504-1.125-1.125-1.125m-2.25 0c.621 0 1.125-.504 1.125-1.125m0 0v1.5c0 .621-.504 1.125-1.125 1.125" />
+                                                </svg>
+                                            ) : (
+                                                <svg className="h-5 w-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                                </svg>
+                                            )}
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{att.file_name}</p>
+                                                <p className="text-xs text-gray-400">{formatFileSize(att.file_size)}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </a>
+                                {att.download_url && (
+                                    <a
+                                        href={att.download_url}
+                                        className="absolute top-1 right-1 p-1 rounded-md bg-white/80 dark:bg-gray-800/80 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                        title="Download"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                        </svg>
+                                    </a>
                                 )}
-                            </a>
+                            </div>
                         ))}
                     </div>
                 )}
@@ -179,7 +211,7 @@ function CommentItem({ item, currentUserId, projectId, taskId }) {
 
 
 export default function Edit() {
-    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, settings } = usePage().props;
+    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, settings, isStandalone, projects } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -193,6 +225,7 @@ export default function Edit() {
         is_recurring: task.is_recurring || false,
         recurrence_frequency: task.recurrence_frequency || 'weekly',
         recurrence_interval: task.recurrence_interval || 1,
+        ...(isStandalone ? { project_id: task.project_id || '' } : {}),
     });
 
     const [showStartDate, setShowStartDate] = useState(!!task.start_date);
@@ -207,13 +240,17 @@ export default function Edit() {
     const handleFileSelect = (e) => {
         const files = Array.from(e.target.files);
         const maxBytes = maxUploadSize * 1024 * 1024;
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+        const allowedTypes = [
+            'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+            'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv', 'video/webm',
+            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv',
+        ];
 
         setAttachmentError('');
 
         for (const file of files) {
             if (!allowedTypes.includes(file.type)) {
-                setAttachmentError(`"${file.name}" is not supported. Allowed: JPG, PNG, WebP, PDF.`);
+                setAttachmentError(`"${file.name}" is not supported. Allowed: images, PDF, videos, Excel, CSV.`);
                 e.target.value = '';
                 return;
             }
@@ -279,7 +316,8 @@ export default function Edit() {
     const loadMoreComments = async () => {
         setLoadingComments(true);
         try {
-            const res = await apiFetch(`/projects/${project.id}/tasks/${task.id}/timeline?type=comment&offset=${comments.length}`);
+            const timelineBase = isStandalone ? `/tasks/${task.id}/timeline` : `/projects/${project.id}/tasks/${task.id}/timeline`;
+            const res = await apiFetch(`${timelineBase}?type=comment&offset=${comments.length}`);
             const json = await res.json();
             setComments(prev => [...prev, ...json.items]);
         } finally {
@@ -290,7 +328,8 @@ export default function Edit() {
     const loadMoreActivities = async () => {
         setLoadingActivities(true);
         try {
-            const res = await apiFetch(`/projects/${project.id}/tasks/${task.id}/timeline?type=activity&offset=${activities.length}`);
+            const timelineBase = isStandalone ? `/tasks/${task.id}/timeline` : `/projects/${project.id}/tasks/${task.id}/timeline`;
+            const res = await apiFetch(`${timelineBase}?type=activity&offset=${activities.length}`);
             const json = await res.json();
             setActivities(prev => [...prev, ...json.items]);
         } finally {
@@ -300,7 +339,7 @@ export default function Edit() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        put(`/projects/${project.id}/tasks/${task.id}`);
+        put(isStandalone ? `/tasks/${task.id}` : `/projects/${project.id}/tasks/${task.id}`);
     };
 
     const handleComment = (e) => {
@@ -314,7 +353,10 @@ export default function Edit() {
         if (hasBody) formData.append('body', commentBody);
         attachments.forEach((file) => formData.append('attachments[]', file));
 
-        router.post(`/projects/${project.id}/tasks/${task.id}/comments`, formData, {
+        const commentUrl = isStandalone
+            ? `/tasks/${task.id}/comments`
+            : `/projects/${project.id}/tasks/${task.id}/comments`;
+        router.post(commentUrl, formData, {
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {
@@ -330,7 +372,11 @@ export default function Edit() {
         <AuthenticatedLayout title="Edit Task">
             <PageHeader
                 title="Edit Task"
-                breadcrumbs={[
+                breadcrumbs={isStandalone ? [
+                    { label: 'Dashboard', href: '/dashboard' },
+                    { label: 'My Tasks', href: '/my-tasks' },
+                    { label: 'Edit Task' },
+                ] : [
                     { label: 'Dashboard', href: '/dashboard' },
                     { label: 'Projects', href: '/projects' },
                     { label: project.name, href: `/projects/${project.id}` },
@@ -349,7 +395,7 @@ export default function Edit() {
                                 </svg>
                                 Subtask of:{' '}
                                 <Link
-                                    href={`/projects/${project.id}/tasks/${task.parent.id}/edit`}
+                                    href={taskEditUrl(task.parent)}
                                     className="font-medium hover:underline"
                                 >
                                     {task.parent.title}
@@ -374,6 +420,18 @@ export default function Edit() {
                             </div>
 
                             <SearchableSelect label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(val) => setData('assigned_to', val)} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} disabled={!canManageTaskDetails} showAvatar />
+
+                            {isStandalone && projects && projects.length > 0 && (
+                                <SearchableSelect
+                                    label="Project"
+                                    id="project_id"
+                                    value={data.project_id}
+                                    onChange={(val) => setData('project_id', val)}
+                                    placeholder="— No project (standalone) —"
+                                    options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                                    error={errors.project_id}
+                                />
+                            )}
 
                             <div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -460,7 +518,7 @@ export default function Edit() {
                             />
 
                             <div className="flex justify-end gap-3 pt-4">
-                                <LinkButton href={`/projects/${project.id}`} variant="secondary">Cancel</LinkButton>
+                                <LinkButton href={isStandalone ? '/my-tasks' : `/projects/${project.id}`} variant="secondary">Cancel</LinkButton>
                                 <Button type="submit" processing={processing} processingText="Saving...">Save Changes</Button>
                             </div>
                         </form>
@@ -528,6 +586,14 @@ export default function Edit() {
                                                             alt={file.name}
                                                             className="h-8 w-8 rounded object-cover"
                                                         />
+                                                    ) : file.type.startsWith('video/') ? (
+                                                        <svg className="h-5 w-5 text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                                        </svg>
+                                                    ) : file.type.includes('spreadsheet') || file.type.includes('excel') || file.type.includes('csv') ? (
+                                                        <svg className="h-5 w-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M12 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M3.375 12H12m0 0v1.5c0 .621.504 1.125 1.125 1.125M12 12c0 .621-.504 1.125-1.125 1.125m1.125 2.625h7.5m-7.5 0c-.621 0-1.125-.504-1.125-1.125M12 15.75c0-.621-.504-1.125-1.125-1.125m-2.25 0c.621 0 1.125-.504 1.125-1.125m0 0v1.5c0 .621-.504 1.125-1.125 1.125" />
+                                                        </svg>
                                                     ) : (
                                                         <svg className="h-5 w-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -557,7 +623,7 @@ export default function Edit() {
                                             <input
                                                 type="file"
                                                 multiple
-                                                accept=".jpg,.jpeg,.png,.webp,.pdf"
+                                                accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4,.mov,.avi,.wmv,.webm,.xls,.xlsx,.csv"
                                                 onChange={handleFileSelect}
                                                 className="hidden"
                                             />
@@ -578,8 +644,9 @@ export default function Edit() {
                                                 key={`comment-${item.id}`}
                                                 item={item}
                                                 currentUserId={auth.user?.id}
-                                                projectId={project.id}
+                                                projectId={project?.id}
                                                 taskId={task.id}
+                                                isStandalone={isStandalone}
                                             />
                                         ))
                                     ) : (
@@ -660,7 +727,7 @@ export default function Edit() {
                                                 </span>
                                             ) : (
                                                 <Link
-                                                    href={`/projects/${item.project_id}/tasks/${item.id}/edit`}
+                                                    href={taskEditUrl(item)}
                                                     className="text-primary-600 dark:text-primary-400 hover:underline truncate block"
                                                 >
                                                     {item.title}

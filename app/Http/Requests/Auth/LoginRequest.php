@@ -20,7 +20,7 @@ class LoginRequest extends FormRequest
             'remember' => ['boolean'],
         ];
 
-        if (config('services.turnstile.secret_key')) {
+        if (config('services.turnstile.enabled') && config('services.turnstile.secret_key')) {
             $rules['cf-turnstile-response'] = ['required', new Turnstile];
         }
 

@@ -10,8 +10,16 @@ class PatchTaskRequest extends FormRequest
     {
         $task = $this->route('task');
 
-        return $this->user()->can('manage-tasks')
-            || $task->project->owner_id === $this->user()->id
+        if ($this->user()->can('manage-tasks')) {
+            return true;
+        }
+
+        if ($task->isStandalone()) {
+            return $task->created_by === $this->user()->id
+                || $task->assigned_to === $this->user()->id;
+        }
+
+        return $task->project->owner_id === $this->user()->id
             || $task->assigned_to === $this->user()->id;
     }
 
@@ -32,9 +40,15 @@ class PatchTaskRequest extends FormRequest
         $validator->after(function ($validator) {
             $task = $this->route('task');
 
-            // Only admins and project owners can change assignee and dates
-            $canManage = $this->user()->can('manage-tasks')
-                || $task->project->owner_id === $this->user()->id;
+            $canManage = $this->user()->can('manage-tasks');
+
+            if (! $canManage && ! $task->isStandalone()) {
+                $canManage = $task->project->owner_id === $this->user()->id;
+            }
+
+            if (! $canManage && $task->isStandalone()) {
+                $canManage = $task->created_by === $this->user()->id;
+            }
 
             if (!$canManage) {
                 $restricted = array_intersect(['assigned_to', 'start_date', 'due_date'], array_keys($this->all()));

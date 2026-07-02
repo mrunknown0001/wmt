@@ -5,8 +5,10 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\MyTaskController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PersonalTodoController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskCommentController;
+use App\Http\Controllers\Api\StandaloneTaskController;
 use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
@@ -38,7 +40,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/projects/{project}', [ProjectController::class, 'update']);
     Route::delete('/projects/{project}', [ProjectController::class, 'destroy']);
 
-    // Tasks
+    // Standalone Tasks (no project)
+    Route::post('/tasks', [StandaloneTaskController::class, 'store']);
+    Route::get('/tasks/{task}', [StandaloneTaskController::class, 'show']);
+    Route::put('/tasks/{task}', [StandaloneTaskController::class, 'update']);
+    Route::delete('/tasks/{task}', [StandaloneTaskController::class, 'destroy']);
+    Route::patch('/tasks/{task}/patch', [StandaloneTaskController::class, 'patchField']);
+    Route::post('/tasks/{task}/comments', [StandaloneTaskController::class, 'storeComment']);
+
+    // Tasks (project-scoped)
     Route::post('/projects/{project}/tasks', [TaskController::class, 'store']);
     Route::get('/projects/{project}/tasks/{task}', [TaskController::class, 'show']);
     Route::put('/projects/{project}/tasks/{task}', [TaskController::class, 'update']);
@@ -53,6 +63,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+    // Personal to-dos
+    Route::get('/personal-todos', [PersonalTodoController::class, 'index']);
+    Route::post('/personal-todos', [PersonalTodoController::class, 'store']);
+    Route::patch('/personal-todos/{personalTodo}', [PersonalTodoController::class, 'update']);
+    Route::delete('/personal-todos/{personalTodo}', [PersonalTodoController::class, 'destroy']);
+    Route::post('/personal-todos/reorder', [PersonalTodoController::class, 'reorder']);
 
     // Device tokens (FCM)
     Route::post('/device-tokens', [DeviceTokenController::class, 'store']);

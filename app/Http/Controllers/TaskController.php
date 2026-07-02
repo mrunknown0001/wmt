@@ -119,7 +119,9 @@ class TaskController extends Controller
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
                 'url' => asset('storage/' . $a->file_path),
+                'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
                 'is_image' => str_starts_with($a->file_type, 'image/'),
+                'is_video' => str_starts_with($a->file_type, 'video/'),
             ]),
             'created_at' => $c->created_at->toIso8601String(),
         ]);
@@ -342,7 +344,9 @@ class TaskController extends Controller
                     'file_type' => $a->file_type,
                     'file_size' => $a->file_size,
                     'url' => asset('storage/' . $a->file_path),
+                    'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
                     'is_image' => str_starts_with($a->file_type, 'image/'),
+                    'is_video' => str_starts_with($a->file_type, 'video/'),
                 ]),
                 'created_at' => $c->created_at->toIso8601String(),
             ]);

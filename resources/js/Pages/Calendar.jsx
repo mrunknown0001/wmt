@@ -3,6 +3,7 @@ import { router, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import PageHeader from '../Components/PageHeader';
 import StatusBadge from '../Components/StatusBadge';
+import { taskEditUrl } from '../utils';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -26,7 +27,7 @@ const MAX_VISIBLE_TASKS = 3;
 function TaskPill({ task }) {
     return (
         <Link
-            href={`/projects/${task.project_id}/tasks/${task.id}/edit`}
+            href={taskEditUrl(task)}
             onClick={(e) => e.stopPropagation()}
             className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
             title={`${task.title} (${task.project?.name || 'No project'})`}

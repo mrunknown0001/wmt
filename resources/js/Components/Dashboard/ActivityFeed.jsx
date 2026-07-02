@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
 import Card from '../Card';
 import Avatar from '../Avatar';
-import { timeAgo, formatLabel } from '../../utils';
+import { timeAgo, formatLabel, taskEditUrl } from '../../utils';
 
 export default function ActivityFeed({ activities }) {
     if (!activities?.length) return null;
@@ -34,7 +34,7 @@ export default function ActivityFeed({ activities }) {
                             <div className="flex items-center gap-2 mt-0.5">
                                 {activity.task && (
                                     <Link
-                                        href={`/projects/${activity.task.project_id}/tasks/${activity.task.id}/edit`}
+                                        href={taskEditUrl(activity.task)}
                                         className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate"
                                     >
                                         {activity.task.title}

@@ -11,6 +11,7 @@ import NotificationBell from '../Components/NotificationBell';
 import NotificationToast from '../Components/NotificationToast';
 import AiChatWidget from '../Components/AiChat/AiChatWidget';
 import GlobalSearch from '../Components/GlobalSearch';
+import SidebarTodoWidget from '../Components/SidebarTodoWidget';
 
 const HomeIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -244,6 +245,11 @@ export default function AuthenticatedLayout({ children, title }) {
                     </NavSection>
                 )}
             </nav>
+
+            {/* To-Do Widget */}
+            <div className="border-t border-gray-700/50">
+                <SidebarTodoWidget collapsed={collapsed} />
+            </div>
 
             {/* User area */}
             <div className="border-t border-gray-700/50 px-4 py-3">

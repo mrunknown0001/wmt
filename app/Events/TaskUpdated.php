@@ -13,7 +13,7 @@ class TaskUpdated implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
-        public int $projectId,
+        public ?int $projectId,
         public array $task,
         public string $changeType,
         public int $changedBy,
@@ -21,6 +21,10 @@ class TaskUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
+        if (! $this->projectId) {
+            return [];
+        }
+
         return [new PrivateChannel("project.{$this->projectId}")];
     }
 
