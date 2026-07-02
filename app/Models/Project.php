@@ -58,4 +58,14 @@ class Project extends Model
     {
         return $this->members()->where('user_id', $user->id)->where('role', 'admin')->exists();
     }
+
+    public function customFields(): HasMany
+    {
+        return $this->hasMany(CustomField::class)->orderBy('position');
+    }
+
+    public function forms(): HasMany
+    {
+        return $this->hasMany(Form::class);
+    }
 }

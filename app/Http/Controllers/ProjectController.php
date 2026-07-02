@@ -170,7 +170,7 @@ class ProjectController extends Controller
 
         if ($hasFullAccess) {
             $tasks = $taskQuery
-                ->with(['assignee', 'creator', 'collaborators', 'subtasks.assignee', 'subtasks.collaborators'])
+                ->with(['assignee', 'creator', 'collaborators', 'subtasks.assignee', 'subtasks.collaborators', 'customFieldValues.selectedOption', 'subtasks.customFieldValues.selectedOption'])
                 ->withCount('subtasks')
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')])
                 ->orderBy('position')
@@ -188,6 +188,8 @@ class ProjectController extends Controller
                     'assignee', 'creator', 'collaborators',
                     'subtasks' => fn ($q) => $q->where('assigned_to', $userId),
                     'subtasks.assignee', 'subtasks.collaborators',
+                    'customFieldValues.selectedOption',
+                    'subtasks.customFieldValues.selectedOption',
                 ])
                 ->withCount(['subtasks' => fn ($q) => $q->where('assigned_to', $userId)])
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('assigned_to', $userId)->where('status', 'done')])
@@ -208,6 +210,8 @@ class ProjectController extends Controller
             ? $project->automationRules()->with('creator:id,name')->orderBy('created_at', 'desc')->get()
             : [];
 
+        $customFields = $project->customFields()->with('options')->get();
+
         return Inertia::render('Projects/Show', [
             'project' => $project,
             'tasks' => $tasks,
@@ -216,6 +220,7 @@ class ProjectController extends Controller
             'canManageProject' => $canManageProject,
             'canManageTasks' => $canManageTasks,
             'automationRules' => $automationRules,
+            'customFields' => $customFields,
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
         ]);

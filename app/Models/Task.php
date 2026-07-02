@@ -125,6 +125,11 @@ class Task extends Model
         return $this->hasOne(self::class, 'recurring_source_id');
     }
 
+    public function customFieldValues(): HasMany
+    {
+        return $this->hasMany(TaskCustomFieldValue::class);
+    }
+
     public function isStandalone(): bool
     {
         return is_null($this->project_id);

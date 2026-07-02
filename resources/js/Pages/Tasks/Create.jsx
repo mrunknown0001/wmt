@@ -10,10 +10,11 @@ import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import { formatLabel } from '../../utils';
 
 export default function Create() {
-    const { project, parentTask, sections = [], defaultSectionId, users, statuses, priorities, recurrenceFrequencies } = usePage().props;
+    const { project, parentTask, sections = [], defaultSectionId, users, statuses, priorities, recurrenceFrequencies, customFields = [] } = usePage().props;
 
     const { data, setData, post, processing, errors } = useForm({
         title: '',
@@ -29,6 +30,7 @@ export default function Create() {
         is_recurring: false,
         recurrence_frequency: 'weekly',
         recurrence_interval: 1,
+        custom_field_values: {},
     });
 
     const [showStartDate, setShowStartDate] = useState(false);
@@ -161,6 +163,20 @@ export default function Create() {
                             onChange={(ids) => setData('collaborator_ids', ids)}
                             excludeIds={data.assigned_to ? [Number(data.assigned_to)] : []}
                         />
+
+                        {customFields.length > 0 && (
+                            <div className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Custom Fields</h4>
+                                {customFields.map(field => (
+                                    <CustomFieldValueEditor
+                                        key={field.id}
+                                        field={field}
+                                        value={data.custom_field_values[field.id]}
+                                        onChange={(id, val) => setData('custom_field_values', { ...data.custom_field_values, [id]: val })}
+                                    />
+                                ))}
+                            </div>
+                        )}
 
                         <div className="flex justify-end gap-3 pt-4">
                             <LinkButton href={`/projects/${project.id}`} variant="secondary">Cancel</LinkButton>

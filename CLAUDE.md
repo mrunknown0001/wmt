@@ -115,6 +115,25 @@ Division → Department → Team → Users (fixed hierarchy)
 - Task priorities: low, medium, high, urgent
 - Project statuses: active, on_hold, completed, archived
 
+### Phase 4: Custom Fields & Form Builder — COMPLETE
+- Custom fields on projects (text, number, date, single_select, multi_select)
+- 5 new models: CustomField, CustomFieldOption, TaskCustomFieldValue, Form, FormField
+- 5 migrations (custom_fields, custom_field_options, task_custom_field_values, forms, form_fields)
+- CustomFieldController (JSON API) for CRUD + reorder, nested under projects
+- TaskCustomFieldValueController for updating custom field values on tasks
+- FormController (Inertia) for form builder CRUD, nested under projects
+- PublicFormController for public form display + submission (no auth)
+- Form builder with field palette, mapping to custom fields or task title/description
+- Task defaults on forms (status, priority, assignee, section)
+- Public form submissions create tasks with custom field values populated
+- Turnstile protection on public forms (reuses existing Turnstile rule + config)
+- Rate limiting on public form submissions (throttle:10,1)
+- Frontend: CustomFieldManager, CustomFieldValueEditor, FormBuilder, TurnstileWidget components
+- Frontend: Forms Index/Create/Edit pages, PublicForm + PublicFormSuccess pages
+- Custom field values integrated into Task Create/Edit pages
+- Custom Fields panel on Project Show page
+- No new permissions (inherits project-level authorization)
+
 ## Running
 ```bash
 # Docker
@@ -141,6 +160,10 @@ app/
 │   │   ├── DashboardController.php
 │   │   ├── DepartmentController.php
 │   │   ├── DivisionController.php
+│   │   ├── CustomFieldController.php
+│   │   ├── FormController.php
+│   │   ├── PublicFormController.php
+│   │   ├── TaskCustomFieldValueController.php
 │   │   ├── ProjectController.php
 │   │   ├── TaskController.php
 │   │   ├── TeamController.php
@@ -151,13 +174,18 @@ app/
 │       ├── Auth/
 │       │   ├── LoginRequest.php
 │       │   └── RegisterRequest.php
-│       ├── Store{Division,Department,Team,User,Project,Task}Request.php
-│       └── Update{Division,Department,Team,User,Project,Task}Request.php
+│       ├── Store{Division,Department,Team,User,Project,Task,CustomField,Form}Request.php
+│       └── Update{Division,Department,Team,User,Project,Task,CustomField,Form}Request.php
 ├── Models/
+│   ├── CustomField.php
+│   ├── CustomFieldOption.php
 │   ├── Department.php
 │   ├── Division.php
+│   ├── Form.php
+│   ├── FormField.php
 │   ├── Project.php
 │   ├── Task.php
+│   ├── TaskCustomFieldValue.php
 │   ├── Team.php
 │   └── User.php
 ├── Policies/
@@ -185,6 +213,8 @@ resources/js/
 │   │   ├── Index.jsx, Create.jsx, Edit.jsx, Show.jsx
 │   ├── Tasks/
 │   │   ├── Create.jsx, Edit.jsx
+│   ├── Forms/
+│   │   ├── Index.jsx, Create.jsx, Edit.jsx, PublicForm.jsx, PublicFormSuccess.jsx
 │   ├── Teams/
 │   │   ├── Index.jsx, Create.jsx, Edit.jsx
 │   └── Users/
@@ -198,7 +228,12 @@ database/
 │   ├── ...create_teams_table.php
 │   ├── ...update_users_table_org_structure.php
 │   ├── ...create_projects_table.php
-│   └── ...create_tasks_table.php
+│   ├── ...create_tasks_table.php
+│   ├── ...create_custom_fields_table.php
+│   ├── ...create_custom_field_options_table.php
+│   ├── ...create_task_custom_field_values_table.php
+│   ├── ...create_forms_table.php
+│   └── ...create_form_fields_table.php
 ├── seeders/
 │   ├── DatabaseSeeder.php
 │   ├── OrganizationSeeder.php

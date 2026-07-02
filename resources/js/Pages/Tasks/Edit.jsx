@@ -11,6 +11,7 @@ import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import { formatLabel, apiFetch, taskEditUrl } from '../../utils';
 import echo from '../../echo';
 
@@ -211,7 +212,7 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone }) {
 
 
 export default function Edit() {
-    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, settings, isStandalone, projects } = usePage().props;
+    const { project, task, timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {} } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -226,6 +227,19 @@ export default function Edit() {
         recurrence_frequency: task.recurrence_frequency || 'weekly',
         recurrence_interval: task.recurrence_interval || 1,
         ...(isStandalone ? { project_id: task.project_id || '' } : {}),
+        custom_field_values: (() => {
+            const vals = {};
+            Object.entries(initialCfValues).forEach(([fieldId, cfv]) => {
+                const cf = customFields.find(f => f.id === Number(fieldId));
+                if (!cf) return;
+                if (cf.type === 'text') vals[fieldId] = cfv.value_text || '';
+                else if (cf.type === 'number') vals[fieldId] = cfv.value_number ?? '';
+                else if (cf.type === 'date') vals[fieldId] = cfv.value_date ? cfv.value_date.split('T')[0] : '';
+                else if (cf.type === 'single_select') vals[fieldId] = cfv.value_option_id ? String(cfv.value_option_id) : '';
+                else if (cf.type === 'multi_select') vals[fieldId] = cfv.value_json || [];
+            });
+            return vals;
+        })(),
     });
 
     const [showStartDate, setShowStartDate] = useState(!!task.start_date);
@@ -516,6 +530,20 @@ export default function Edit() {
                                 onChange={(ids) => setData('collaborator_ids', ids)}
                                 excludeIds={data.assigned_to ? [Number(data.assigned_to)] : []}
                             />
+
+                            {customFields.length > 0 && (
+                                <div className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Custom Fields</h4>
+                                    {customFields.map(field => (
+                                        <CustomFieldValueEditor
+                                            key={field.id}
+                                            field={field}
+                                            value={data.custom_field_values[field.id]}
+                                            onChange={(id, val) => setData('custom_field_values', { ...data.custom_field_values, [id]: val })}
+                                        />
+                                    ))}
+                                </div>
+                            )}
 
                             <div className="flex justify-end gap-3 pt-4">
                                 <LinkButton href={isStandalone ? '/my-tasks' : `/projects/${project.id}`} variant="secondary">Cancel</LinkButton>

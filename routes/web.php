@@ -23,6 +23,10 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\FormController;
+use App\Http\Controllers\PublicFormController;
+use App\Http\Controllers\TaskCustomFieldValueController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +40,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [LoginController::class, 'store']);
 
 });
+
+// Public forms (no auth required)
+Route::get('/forms/{uuid}', [PublicFormController::class, 'show'])->name('forms.show');
+Route::post('/forms/{uuid}', [PublicFormController::class, 'submit'])->middleware('throttle:10,1')->name('forms.submit');
 
 // Authenticated routes
 Route::middleware('auth')->group(function () {
@@ -119,6 +127,25 @@ Route::middleware('auth')->group(function () {
     // Settings (admin)
     Route::get('/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
+
+    // Custom Fields
+    Route::get('/projects/{project}/custom-fields', [CustomFieldController::class, 'index'])->name('projects.custom-fields.index');
+    Route::post('/projects/{project}/custom-fields', [CustomFieldController::class, 'store'])->name('projects.custom-fields.store');
+    Route::put('/projects/{project}/custom-fields/{customField}', [CustomFieldController::class, 'update'])->name('projects.custom-fields.update');
+    Route::delete('/projects/{project}/custom-fields/{customField}', [CustomFieldController::class, 'destroy'])->name('projects.custom-fields.destroy');
+    Route::post('/projects/{project}/custom-fields/reorder', [CustomFieldController::class, 'reorder'])->name('projects.custom-fields.reorder');
+
+    // Task Custom Field Values
+    Route::patch('/projects/{project}/tasks/{task}/custom-field-values', [TaskCustomFieldValueController::class, 'update'])->name('projects.tasks.custom-field-values.update');
+
+    // Project Forms
+    Route::get('/projects/{project}/forms', [FormController::class, 'index'])->name('projects.forms.index');
+    Route::get('/projects/{project}/forms/create', [FormController::class, 'create'])->name('projects.forms.create');
+    Route::post('/projects/{project}/forms', [FormController::class, 'store'])->name('projects.forms.store');
+    Route::get('/projects/{project}/forms/{form}/edit', [FormController::class, 'edit'])->name('projects.forms.edit');
+    Route::put('/projects/{project}/forms/{form}', [FormController::class, 'update'])->name('projects.forms.update');
+    Route::delete('/projects/{project}/forms/{form}', [FormController::class, 'destroy'])->name('projects.forms.destroy');
+    Route::patch('/projects/{project}/forms/{form}/toggle', [FormController::class, 'toggle'])->name('projects.forms.toggle');
 
     // Project Automation Rules
     Route::get('/projects/{project}/automation-rules', [ProjectAutomationRuleController::class, 'index'])->name('projects.automation-rules.index');

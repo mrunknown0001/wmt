@@ -30,6 +30,7 @@ import EmptyState from '../../Components/EmptyState';
 import KanbanColumn from '../../Components/KanbanColumn';
 import { ConfirmModal } from '../../Components/Modal';
 import AutomationRuleBuilder from '../../Components/AutomationRuleBuilder';
+import CustomFieldManager from '../../Components/CustomFieldManager';
 import StatusPicker from '../../Components/StatusPicker';
 import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
@@ -87,8 +88,58 @@ const TrashIcon = () => (
     </svg>
 );
 
+// Render a custom field value for a task row
+function renderCustomFieldValue(task, customField) {
+    const cfValues = task.custom_field_values || [];
+    const cfv = cfValues.find(v => v.custom_field_id === customField.id);
+    if (!cfv) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+
+    switch (customField.type) {
+        case 'text':
+            return cfv.value_text || '—';
+        case 'number':
+            return cfv.value_number != null ? cfv.value_number : '—';
+        case 'date':
+            return cfv.value_date ? formatDate(cfv.value_date) : '—';
+        case 'single_select': {
+            const opt = cfv.selected_option;
+            if (!opt) return '—';
+            return (
+                <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={opt.color ? { backgroundColor: opt.color + '20', color: opt.color } : undefined}
+                >
+                    {opt.color && <span className="w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: opt.color }} />}
+                    {opt.label}
+                </span>
+            );
+        }
+        case 'multi_select': {
+            const selectedIds = cfv.value_json || [];
+            if (!selectedIds.length) return '—';
+            const options = (customField.options || []).filter(o => selectedIds.map(String).includes(String(o.id)));
+            return (
+                <div className="flex flex-wrap gap-1">
+                    {options.map(opt => (
+                        <span
+                            key={opt.id}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                            style={opt.color ? { backgroundColor: opt.color + '20', color: opt.color } : undefined}
+                        >
+                            {opt.color && <span className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: opt.color }} />}
+                            {opt.label}
+                        </span>
+                    ))}
+                </div>
+            );
+        }
+        default:
+            return '—';
+    }
+}
+
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, customFields = [] }) {
     const {
         attributes,
         listeners,
@@ -243,6 +294,11 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     )}
                 </div>
             </td>
+            {customFields.map(cf => (
+                <td key={cf.id} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    {renderCustomFieldValue(task, cf)}
+                </td>
+            ))}
             <td className="px-6 py-3 text-sm text-right">
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
@@ -272,7 +328,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [] }) {
     const {
         attributes,
         listeners,
@@ -463,6 +519,11 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     )}
                 </div>
             </td>
+            {customFields.map(cf => (
+                <td key={cf.id} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    {renderCustomFieldValue(task, cf)}
+                </td>
+            ))}
             <td className="px-6 py-4 text-sm text-right">
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
@@ -592,7 +653,7 @@ function SectionDropZone({ sectionId }) {
     const { setNodeRef, isOver } = useDroppable({ id: `section-${sectionId ?? 'null'}` });
     return (
         <tr ref={setNodeRef}>
-            <td colSpan={7} className={`transition-colors ${isOver ? 'py-2' : 'py-0'}`}>
+            <td colSpan={99} className={`transition-colors ${isOver ? 'py-2' : 'py-0'}`}>
                 {isOver && (
                     <div className="mx-4 border-2 border-dashed border-primary-300 dark:border-primary-600 rounded py-2 text-center text-xs text-primary-500 font-medium">
                         Drop here
@@ -622,7 +683,7 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
 
     return (
         <tr ref={setNodeRef} style={style} className="bg-gray-100 dark:bg-gray-800/80">
-            <td colSpan={7} className="px-4 py-2">
+            <td colSpan={99} className="px-4 py-2">
                 <div className="flex items-center gap-2">
                     {canManage && (
                         <button
@@ -694,7 +755,7 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
 }
 
 export default function Show() {
-    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, auth, users } = usePage().props;
+    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], auth, users } = usePage().props;
 
     const [showDetails, setShowDetails] = useState(false);
     const [view, setView] = useState('list');
@@ -719,6 +780,7 @@ export default function Show() {
     const [editingSectionName, setEditingSectionName] = useState('');
     const [addingSectionName, setAddingSectionName] = useState(null); // null = not adding, string = input value
     const [showAutomation, setShowAutomation] = useState(false);
+    const [showCustomFields, setShowCustomFields] = useState(false);
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -1365,6 +1427,12 @@ export default function Show() {
                 actions={
                     canManageProject && (
                         <div className="flex items-center gap-2">
+                            <LinkButton href={`/projects/${project.id}/forms`} variant="secondary" size="sm">
+                                Forms
+                            </LinkButton>
+                            <Button variant="secondary" size="sm" onClick={() => setShowCustomFields(v => !v)}>
+                                Custom Fields
+                            </Button>
                             {canManageTasks && (
                                 <Button variant="secondary" size="sm" onClick={() => setShowAutomation(v => !v)}>
                                     <AutomationIcon /> Automation
@@ -1387,6 +1455,16 @@ export default function Show() {
                     )
                 }
             />
+
+            {/* Custom Fields Panel */}
+            {showCustomFields && (
+                <Card className="mb-6">
+                    <CustomFieldManager
+                        projectId={project.id}
+                        initialFields={initialCustomFields}
+                    />
+                </Card>
+            )}
 
             {/* Automation Rules Panel */}
             {showAutomation && canManageTasks && (
@@ -1598,6 +1676,9 @@ export default function Show() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Priority</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assignee</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dates</th>
+                                        {initialCustomFields.map(cf => (
+                                            <th key={cf.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">{cf.name}</th>
+                                        ))}
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
@@ -1649,6 +1730,7 @@ export default function Show() {
                                                                         onToggleExpand={handleToggleExpand}
                                                                         isSelected={selectedTasks.has(task.id)}
                                                                         onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                                                        customFields={initialCustomFields}
                                                                     />
                                                                     {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                                         <DndContext
@@ -1669,6 +1751,7 @@ export default function Show() {
                                                                                         onToggleComplete={handleToggleComplete}
                                                                                         users={users}
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                                        customFields={initialCustomFields}
                                                                                     />
                                                                                 ))}
                                                                             </SortableContext>
@@ -1676,7 +1759,7 @@ export default function Show() {
                                                                     )}
                                                                     {expandedTasks.has(task.id) && canManageTasks && (
                                                                         <tr className="bg-gray-50/50 dark:bg-gray-800/30">
-                                                                            <td colSpan={7} className="pl-14 py-2">
+                                                                            <td colSpan={99} className="pl-14 py-2">
                                                                                 <Link
                                                                                     href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
                                                                                     className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
@@ -1697,7 +1780,7 @@ export default function Show() {
                                             {/* Add section button */}
                                             {canManageTasks && (
                                                 <tr>
-                                                    <td colSpan={7} className="px-6 py-2">
+                                                    <td colSpan={99} className="px-6 py-2">
                                                         {addingSectionName !== null ? (
                                                             <input
                                                                 autoFocus
@@ -1742,6 +1825,7 @@ export default function Show() {
                                                             onToggleExpand={handleToggleExpand}
                                                             isSelected={selectedTasks.has(task.id)}
                                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                                            customFields={initialCustomFields}
                                                         />
                                                         {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                             <DndContext
@@ -1762,6 +1846,7 @@ export default function Show() {
                                                                             onToggleComplete={handleToggleComplete}
                                                                             users={users}
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                            customFields={initialCustomFields}
                                                                         />
                                                                     ))}
                                                                 </SortableContext>
@@ -1769,7 +1854,7 @@ export default function Show() {
                                                         )}
                                                         {expandedTasks.has(task.id) && canManageTasks && (
                                                             <tr className="bg-gray-50/50 dark:bg-gray-800/30">
-                                                                <td colSpan={7} className="pl-14 py-2">
+                                                                <td colSpan={99} className="pl-14 py-2">
                                                                     <Link
                                                                         href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
                                                                         className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
@@ -1785,7 +1870,7 @@ export default function Show() {
                                             {/* Add section button when no sections exist yet */}
                                             {canManageTasks && (
                                                 <tr>
-                                                    <td colSpan={7} className="px-6 py-2">
+                                                    <td colSpan={99} className="px-6 py-2">
                                                         {addingSectionName !== null ? (
                                                             <input
                                                                 autoFocus
