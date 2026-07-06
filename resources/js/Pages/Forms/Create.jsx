@@ -4,13 +4,11 @@ import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Textarea from '../../Components/Textarea';
-import Select from '../../Components/Select';
-import SearchableSelect from '../../Components/SearchableSelect';
 import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
 
 export default function FormsCreate() {
-    const { project, customFields, sections, users } = usePage().props;
+    const { project, customFields } = usePage().props;
 
     const { data, setData, post, processing, errors } = useForm({
         name: '',
@@ -18,12 +16,6 @@ export default function FormsCreate() {
         is_active: true,
         submit_button_text: 'Submit',
         success_message: 'Thank you! Your response has been recorded.',
-        task_defaults: {
-            status: 'to_do',
-            priority: 'medium',
-            assigned_to: null,
-            section_id: null,
-        },
         fields: [],
     });
 
@@ -31,20 +23,6 @@ export default function FormsCreate() {
         e.preventDefault();
         post(`/projects/${project.id}/forms`);
     };
-
-    const statusOptions = [
-        { value: 'backlog', label: 'Backlog' },
-        { value: 'to_do', label: 'To Do' },
-        { value: 'in_progress', label: 'In Progress' },
-        { value: 'in_review', label: 'In Review' },
-    ];
-
-    const priorityOptions = [
-        { value: 'low', label: 'Low' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'high', label: 'High' },
-        { value: 'urgent', label: 'Urgent' },
-    ];
 
     return (
         <AuthenticatedLayout title={`Create Form - ${project.name}`}>
@@ -98,48 +76,6 @@ export default function FormsCreate() {
                             error={errors.success_message}
                             placeholder="Shown after successful submission"
                         />
-                    </div>
-                </Card>
-
-                {/* Task Defaults */}
-                <Card>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Task Defaults</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                        When a form is submitted, a task is created with these default values.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Select
-                            label="Status"
-                            id="task_status"
-                            value={data.task_defaults.status}
-                            onChange={(e) => setData('task_defaults', { ...data.task_defaults, status: e.target.value })}
-                            options={statusOptions}
-                        />
-                        <Select
-                            label="Priority"
-                            id="task_priority"
-                            value={data.task_defaults.priority}
-                            onChange={(e) => setData('task_defaults', { ...data.task_defaults, priority: e.target.value })}
-                            options={priorityOptions}
-                        />
-                        <SearchableSelect
-                            label="Assign To"
-                            id="task_assigned_to"
-                            value={data.task_defaults.assigned_to || ''}
-                            onChange={(val) => setData('task_defaults', { ...data.task_defaults, assigned_to: val || null })}
-                            options={users.map(u => ({ value: u.id, label: u.name }))}
-                            placeholder="— Unassigned —"
-                        />
-                        {sections.length > 0 && (
-                            <Select
-                                label="Section"
-                                id="task_section"
-                                value={data.task_defaults.section_id || ''}
-                                onChange={(e) => setData('task_defaults', { ...data.task_defaults, section_id: e.target.value || null })}
-                                options={sections.map(s => ({ value: s.id, label: s.name }))}
-                                placeholder="— No section —"
-                            />
-                        )}
                     </div>
                 </Card>
 
