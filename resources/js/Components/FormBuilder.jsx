@@ -130,7 +130,25 @@ function FieldConfigPanel({ field, index, customFields, onChange, onRemove, onMo
                     </>
                 )}
 
-                {/* Options for select/multi_select without custom field mapping */}
+                {/* Options for select/multi_select */}
+                {['select', 'multi_select'].includes(field.type) && field.maps_to === 'custom_field' && field.custom_field_id && (() => {
+                    const cf = customFields?.find(c => c.id === field.custom_field_id);
+                    const opts = cf?.options || [];
+                    if (!opts.length) return null;
+                    return (
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options <span className="text-xs font-normal text-gray-400">(from custom field)</span></label>
+                            <div className="space-y-1">
+                                {opts.map(opt => (
+                                    <div key={opt.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-700 dark:text-gray-300">
+                                        {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />}
+                                        {opt.label}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
                 {['select', 'multi_select'].includes(field.type) && field.maps_to !== 'custom_field' && (
                     <FieldOptionsEditor
                         options={field.config?.options || []}
