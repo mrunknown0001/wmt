@@ -280,7 +280,7 @@ export default function AuthenticatedLayout({ children, title }) {
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 bg-pattern flex">
                 {/* Mobile backdrop */}
                 {sidebarOpen && (
                     <div
@@ -291,7 +291,7 @@ export default function AuthenticatedLayout({ children, title }) {
 
                 {/* Sidebar — mobile (always full width) */}
                 <aside
-                    className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 dark:bg-gray-950 transform transition-transform lg:hidden ${
+                    className={`fixed inset-y-0 left-0 z-50 w-64 bg-linear-to-b from-gray-900 to-gray-950 dark:from-gray-950 dark:to-black transform transition-transform lg:hidden ${
                         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                     }`}
                 >
@@ -300,7 +300,7 @@ export default function AuthenticatedLayout({ children, title }) {
 
                 {/* Sidebar — desktop (collapsible) */}
                 <aside
-                    className={`hidden lg:block bg-gray-900 dark:bg-gray-950 transition-all duration-200 shrink-0 sticky top-0 h-screen ${
+                    className={`hidden lg:block bg-linear-to-b from-gray-900 to-gray-950 dark:from-gray-950 dark:to-black transition-all duration-200 shrink-0 sticky top-0 h-screen ${
                         sidebarCollapsed ? 'w-16' : 'w-64'
                     }`}
                 >
@@ -310,7 +310,7 @@ export default function AuthenticatedLayout({ children, title }) {
                 {/* Main area */}
                 <div className="flex-1 flex flex-col min-w-0">
                     {/* Top header bar */}
-                    <div className="sticky top-0 z-30 flex items-center gap-3 px-4 lg:px-8 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <div className="sticky top-0 z-30 flex items-center gap-3 px-4 lg:px-8 py-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
                         {/* Mobile hamburger — opens sidebar overlay */}
                         <button
                             onClick={() => setSidebarOpen(true)}

@@ -2012,6 +2012,7 @@ export default function Show() {
                         </DndContext>
                     ) : (
                         <EmptyState
+                            illustration={hasActiveFilters ? 'search' : 'tasks'}
                             title={hasActiveFilters ? 'No matching tasks' : 'No tasks yet'}
                             description={hasActiveFilters ? 'Try adjusting your filters.' : 'Get started by adding the first task to this project.'}
                             action={

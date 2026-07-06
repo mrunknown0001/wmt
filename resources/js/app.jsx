@@ -1,4 +1,4 @@
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from './ThemeContext';
 import './echo';
@@ -9,6 +9,14 @@ if ('serviceWorker' in navigator) {
         console.warn('Firebase SW registration failed', err);
     });
 }
+
+// Smooth page transition
+router.on('start', () => {
+    document.getElementById('app')?.style.setProperty('opacity', '0.92');
+});
+router.on('finish', () => {
+    document.getElementById('app')?.style.setProperty('opacity', '1');
+});
 
 createInertiaApp({
     title: (title) => title ? `${title} - WMT` : 'WMT',

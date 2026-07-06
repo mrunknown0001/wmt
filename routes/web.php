@@ -64,6 +64,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
     Route::patch('/inbox/{id}/read', [NotificationController::class, 'markAsRead'])->name('inbox.read');
     Route::post('/inbox/read-all', [NotificationController::class, 'markAllAsRead'])->name('inbox.readAll');
+    Route::patch('/inbox/{id}/bookmark', [NotificationController::class, 'toggleBookmark'])->name('inbox.bookmark');
+    Route::patch('/inbox/{id}/archive', [NotificationController::class, 'archive'])->name('inbox.archive');
+    Route::patch('/inbox/{id}/unarchive', [NotificationController::class, 'unarchive'])->name('inbox.unarchive');
 
     // My Tasks
     Route::get('/my-tasks', [MyTaskController::class, 'index'])->name('my-tasks');

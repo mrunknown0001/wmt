@@ -255,6 +255,21 @@
 - Applied via CSS custom properties (`--color-primary-*`)
 - Settings cached in Redis
 
+## UI/UX Polish
+- **Animation system** — CSS custom properties for timing tokens (`--duration-fast/normal/slow`, easing curves) and 9 reusable keyframe animations
+- **Button press feedback** — `active:scale-[0.97]` shrink on click, `focus-visible` rings (keyboard-only)
+- **Modal animations** — scale-in entrance, scale-out exit with backdrop fade
+- **Popover/dropdown animations** — slide-down entrance on status pickers, priority pickers, assignee pickers, search results, and form builder dropdowns
+- **Card hover lift** — task cards translate up 1px with enhanced shadow on hover
+- **List row accent bars** — primary-colored left bar appears on hover for project list rows and dashboard items
+- **Sidebar active indicator** — 3px primary-colored vertical bar on the active nav item
+- **Collapsed sidebar tooltips** — styled hover tooltips on collapsed nav icons (replaces browser-default `title`)
+- **Icon hover scale** — sidebar action buttons (logout, hamburger, theme toggle) scale up with spring easing on hover
+- **Flash message animations** — slide-in from right on appear, slide-out on dismiss/auto-expire
+- **Styled horizontal scrollbar** — slim 6px scrollbar for list view, calendar, and Gantt containers; hidden until hover
+- **Global cursor:pointer** — all interactive elements (buttons, links, selects, labels) show pointer cursor
+- **Reusable components** — `Tooltip` (4-position hover tooltip), `Skeleton`/`SkeletonCard`/`SkeletonRow` (shimmer loading placeholders)
+
 ## Technical Infrastructure
 - Docker Compose dev environment (Laravel, MySQL, Redis, Soketi, phpMyAdmin)
 - Inertia.js SSR with React (JSX)
@@ -269,4 +284,4 @@
 - HandleInertiaRequests middleware shares auth data, settings, unread count, flash messages
 - SearchableSelect reusable component for user pickers
 - Portal-based floating dropdowns for consistent z-index behavior
-- Custom styled scrollbars for modals and dropdowns
+- Custom styled scrollbars for modals, dropdowns, and horizontal overflow containers

@@ -63,6 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::patch('/notifications/{id}/bookmark', [NotificationController::class, 'toggleBookmark']);
+    Route::patch('/notifications/{id}/archive', [NotificationController::class, 'archive']);
+    Route::patch('/notifications/{id}/unarchive', [NotificationController::class, 'unarchive']);
 
     // Personal to-dos
     Route::get('/personal-todos', [PersonalTodoController::class, 'index']);

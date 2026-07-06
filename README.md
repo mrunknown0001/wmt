@@ -60,6 +60,7 @@ Default admin login: `admin@wmt.com` / `password`
 - **My Tasks** — Personal task view grouped by due date urgency
 - **Personal To-Do List** — Sidebar widget with drag-and-drop reordering and completion animations
 - **Celebration Effect** — Canvas particle animation on task completion
+- **UI/UX Polish** — ClickUp-inspired micro-interactions, animations, and hover feedback
 - **Dark Mode** — Full dark/light theme support with customizable primary color
 
 See [FEATURES.md](FEATURES.md) for the complete feature list.
