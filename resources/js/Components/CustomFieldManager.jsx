@@ -97,12 +97,11 @@ export default function CustomFieldManager({ projectId, initialFields = [] }) {
     const [form, setForm] = useState({
         name: '',
         type: 'text',
-        is_required: false,
         options: [],
     });
 
     const resetForm = () => {
-        setForm({ name: '', type: 'text', is_required: false, options: [] });
+        setForm({ name: '', type: 'text', options: [] });
         setEditingField(null);
     };
 
@@ -116,7 +115,6 @@ export default function CustomFieldManager({ projectId, initialFields = [] }) {
         setForm({
             name: field.name,
             type: field.type,
-            is_required: field.is_required,
             options: field.options || [],
         });
         setShowModal(true);
@@ -128,7 +126,6 @@ export default function CustomFieldManager({ projectId, initialFields = [] }) {
             const payload = {
                 name: form.name,
                 type: form.type,
-                is_required: form.is_required,
                 options: ['single_select', 'multi_select'].includes(form.type) ? form.options : undefined,
             };
 
@@ -198,9 +195,6 @@ export default function CustomFieldManager({ projectId, initialFields = [] }) {
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
                                     {typeLabel(field.type)}
                                 </span>
-                                {field.is_required && (
-                                    <span className="text-xs text-red-500">Required</span>
-                                )}
                             </div>
                             <div className="flex items-center gap-1">
                                 <button
@@ -254,16 +248,6 @@ export default function CustomFieldManager({ projectId, initialFields = [] }) {
                         options={FIELD_TYPES}
                         disabled={!!editingField}
                     />
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="cf-required"
-                            checked={form.is_required}
-                            onChange={(e) => setForm(prev => ({ ...prev, is_required: e.target.checked }))}
-                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
-                        />
-                        <label htmlFor="cf-required" className="text-sm text-gray-700 dark:text-gray-300">Required field</label>
-                    </div>
                     {['single_select', 'multi_select'].includes(form.type) && (
                         <OptionEditor
                             options={form.options}
