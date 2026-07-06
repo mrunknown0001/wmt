@@ -35,6 +35,7 @@ import StatusPicker from '../../Components/StatusPicker';
 import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
 import InlineDatePicker from '../../Components/InlineDatePicker';
+import CelebrationEffect from '../../Components/CelebrationEffect';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import echo from '../../echo';
 
@@ -174,12 +175,12 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
         <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
             <td className="pl-10 pr-2 py-3 w-10">
                 <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id); }}
+                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className={`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    className={`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
                         isDone
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400'
+                            ? 'bg-green-500 border-green-500 text-white scale-110'
+                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
                     }`}
                     title={isDone ? 'Mark incomplete' : 'Mark complete'}
                 >
@@ -370,12 +371,12 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
         >
             <td className="pl-6 pr-2 py-4 w-10">
                 <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id); }}
+                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
                         isDone
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400'
+                            ? 'bg-green-500 border-green-500 text-white scale-110'
+                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
                     }`}
                     title={isDone ? 'Mark incomplete' : 'Mark complete'}
                 >
@@ -781,6 +782,7 @@ export default function Show() {
     const [addingSectionName, setAddingSectionName] = useState(null); // null = not adding, string = input value
     const [showAutomation, setShowAutomation] = useState(false);
     const [showCustomFields, setShowCustomFields] = useState(false);
+    const [celebration, setCelebration] = useState(null); // { x, y } or null
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -1287,7 +1289,7 @@ export default function Show() {
         });
     };
 
-    const handleToggleComplete = useCallback((taskId) => {
+    const handleToggleComplete = useCallback((taskId, clickEvent) => {
         // Check parent tasks first, then subtasks
         let task = localTasks.find((t) => t.id === taskId);
         if (!task) {
@@ -1298,6 +1300,13 @@ export default function Show() {
         }
         if (!task) return;
         const newStatus = task.status === 'done' ? 'to_do' : 'done';
+
+        // Trigger celebration when completing (not uncompleting)
+        if (newStatus === 'done' && clickEvent) {
+            const rect = clickEvent.currentTarget.getBoundingClientRect();
+            setCelebration({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+        }
+
         handleSubtaskInlineUpdate(taskId, 'status', newStatus);
     }, [localTasks, handleSubtaskInlineUpdate]);
 
@@ -2452,6 +2461,14 @@ export default function Show() {
                 title={confirmDelete?.title}
                 message={confirmDelete?.message}
             />
+
+            {celebration && (
+                <CelebrationEffect
+                    x={celebration.x}
+                    y={celebration.y}
+                    onComplete={() => setCelebration(null)}
+                />
+            )}
         </AuthenticatedLayout>
     );
 }

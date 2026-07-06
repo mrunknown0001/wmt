@@ -35,12 +35,12 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
         >
             <div className="flex items-start gap-2 mb-2">
                 <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id); }}
+                    onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id, e); }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className={`mt-0.5 shrink-0 h-4.5 w-4.5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    className={`mt-0.5 shrink-0 h-4.5 w-4.5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
                         isDone
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400'
+                            ? 'bg-green-500 border-green-500 text-white scale-110'
+                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
                     }`}
                     title={isDone ? 'Mark incomplete' : 'Mark complete'}
                 >
