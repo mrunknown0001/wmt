@@ -37,7 +37,7 @@ function OptionEditor({ options, onChange }) {
     return (
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options</label>
-            <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+            <div className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                 {options.map((opt, i) => (
                     <div key={i} className="flex items-center gap-2">
                         <input
