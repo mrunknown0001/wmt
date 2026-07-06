@@ -133,7 +133,7 @@ function FieldConfigPanel({ field, index, customFields, onChange, onRemove, onMo
                 {/* Options for select/multi_select */}
                 {['select', 'multi_select'].includes(field.type) && field.maps_to === 'custom_field' && field.custom_field_id && (() => {
                     const cf = customFields?.find(c => c.id === field.custom_field_id);
-                    const opts = cf?.options || [];
+                    const opts = [...(cf?.options || [])].sort((a, b) => a.label.localeCompare(b.label));
                     if (!opts.length) return null;
                     return (
                         <div className="space-y-2">

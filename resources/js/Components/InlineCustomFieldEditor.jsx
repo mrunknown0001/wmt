@@ -224,14 +224,14 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
                 )}
                 {customField.type === 'single_select' && (
                     <SelectOptions
-                        options={customField.options || []}
+                        options={[...(customField.options || [])].sort((a, b) => a.label.localeCompare(b.label))}
                         selectedId={currentValue}
                         onSelect={handleSave}
                     />
                 )}
                 {customField.type === 'multi_select' && (
                     <MultiSelectEditor
-                        options={customField.options || []}
+                        options={[...(customField.options || [])].sort((a, b) => a.label.localeCompare(b.label))}
                         selectedIds={currentValue || []}
                         onSave={handleSave}
                         onClose={() => onToggle(false)}
