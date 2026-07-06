@@ -36,6 +36,7 @@ import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
 import InlineDatePicker from '../../Components/InlineDatePicker';
 import CelebrationEffect from '../../Components/CelebrationEffect';
+import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import echo from '../../echo';
 
@@ -140,7 +141,7 @@ function renderCustomFieldValue(task, customField) {
 }
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, customFields = [] }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [] }) {
     const {
         attributes,
         listeners,
@@ -297,7 +298,18 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
             </td>
             {customFields.map(cf => (
                 <td key={cf.id} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {renderCustomFieldValue(task, cf)}
+                    {canEditTask ? (
+                        <InlineCustomFieldEditor
+                            task={task}
+                            customField={cf}
+                            isOpen={openPopover === `cf-${cf.id}`}
+                            onToggle={togglePopover(`cf-${cf.id}`)}
+                            onUpdate={onCustomFieldUpdate}
+                            formatDate={formatDate}
+                        />
+                    ) : (
+                        renderCustomFieldValue(task, cf)
+                    )}
                 </td>
             ))}
             <td className="px-6 py-3 text-sm text-right">
@@ -329,7 +341,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [] }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [] }) {
     const {
         attributes,
         listeners,
@@ -522,7 +534,18 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             </td>
             {customFields.map(cf => (
                 <td key={cf.id} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {renderCustomFieldValue(task, cf)}
+                    {canEditTask ? (
+                        <InlineCustomFieldEditor
+                            task={task}
+                            customField={cf}
+                            isOpen={openPopover === `cf-${cf.id}`}
+                            onToggle={togglePopover(`cf-${cf.id}`)}
+                            onUpdate={onCustomFieldUpdate}
+                            formatDate={formatDate}
+                        />
+                    ) : (
+                        renderCustomFieldValue(task, cf)
+                    )}
                 </td>
             ))}
             <td className="px-6 py-4 text-sm text-right">
@@ -1045,6 +1068,51 @@ export default function Show() {
             setLocalTasks(serverTasks);
         });
     }, [localTasks, project.id, serverTasks, handleInlineUpdate]);
+
+    // Inline custom field value update (optimistic)
+    const handleCustomFieldUpdate = useCallback((taskId, fieldId, fieldType, value) => {
+        // Build optimistic custom_field_values entry
+        const buildOptimisticCfv = (existingValues) => {
+            const values = [...(existingValues || [])];
+            const idx = values.findIndex(v => v.custom_field_id === fieldId);
+            const entry = {
+                custom_field_id: fieldId,
+                value_text: fieldType === 'text' ? value : null,
+                value_number: fieldType === 'number' ? value : null,
+                value_date: fieldType === 'date' ? value : null,
+                value_option_id: fieldType === 'single_select' ? value : null,
+                value_json: fieldType === 'multi_select' ? value : null,
+                selected_option: fieldType === 'single_select' && value
+                    ? (initialCustomFields.find(cf => cf.id === fieldId)?.options || []).find(o => o.id === Number(value)) || null
+                    : null,
+            };
+            if (idx >= 0) { values[idx] = { ...values[idx], ...entry }; }
+            else { values.push(entry); }
+            return values;
+        };
+
+        // Update in localTasks (could be parent or subtask)
+        setLocalTasks((prev) => prev.map((t) => {
+            if (t.id === taskId) {
+                return { ...t, custom_field_values: buildOptimisticCfv(t.custom_field_values) };
+            }
+            const subIdx = t.subtasks?.findIndex((s) => s.id === taskId);
+            if (subIdx !== undefined && subIdx >= 0) {
+                const updatedSubs = [...t.subtasks];
+                updatedSubs[subIdx] = { ...updatedSubs[subIdx], custom_field_values: buildOptimisticCfv(updatedSubs[subIdx].custom_field_values) };
+                return { ...t, subtasks: updatedSubs };
+            }
+            return t;
+        }));
+
+        // Persist
+        apiFetch(`/projects/${project.id}/tasks/${taskId}/custom-field-values`, {
+            method: 'PATCH',
+            body: JSON.stringify({ values: { [fieldId]: value } }),
+        }).catch(() => {
+            setLocalTasks(serverTasks);
+        });
+    }, [project.id, initialCustomFields, serverTasks]);
 
     // --- List view drag over (cross-section movement) ---
     const handleListDragOver = useCallback((event) => {
@@ -1734,6 +1802,7 @@ export default function Show() {
                                                                         handleDeleteTask={handleDeleteTask}
                                                                         users={users}
                                                                         onTaskUpdate={handleInlineUpdate}
+                                                                        onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                         onToggleComplete={handleToggleComplete}
                                                                         isExpanded={expandedTasks.has(task.id)}
                                                                         onToggleExpand={handleToggleExpand}
@@ -1760,6 +1829,7 @@ export default function Show() {
                                                                                         onToggleComplete={handleToggleComplete}
                                                                                         users={users}
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                                        onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                                         customFields={initialCustomFields}
                                                                                     />
                                                                                 ))}
@@ -1829,6 +1899,7 @@ export default function Show() {
                                                             handleDeleteTask={handleDeleteTask}
                                                             users={users}
                                                             onTaskUpdate={handleInlineUpdate}
+                                                            onCustomFieldUpdate={handleCustomFieldUpdate}
                                                             onToggleComplete={handleToggleComplete}
                                                             isExpanded={expandedTasks.has(task.id)}
                                                             onToggleExpand={handleToggleExpand}
@@ -1855,6 +1926,7 @@ export default function Show() {
                                                                             onToggleComplete={handleToggleComplete}
                                                                             users={users}
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                            onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                             customFields={initialCustomFields}
                                                                         />
                                                                     ))}
