@@ -525,7 +525,14 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
     const updateTitlePos = useCallback(() => {
         if (titleBtnRef.current) {
             const rect = titleBtnRef.current.getBoundingClientRect();
-            setTitlePos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+            const dropdownMaxH = 240; // max-h-60 = 15rem = 240px
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const openUp = spaceBelow < dropdownMaxH && rect.top > dropdownMaxH;
+            setTitlePos({
+                top: openUp ? rect.top - dropdownMaxH - 4 : rect.bottom + 4,
+                left: rect.left,
+                width: rect.width,
+            });
         }
     }, []);
 
@@ -627,7 +634,14 @@ function AddFieldDropdown({ onAdd }) {
     const updatePos = useCallback(() => {
         if (btnRef.current) {
             const rect = btnRef.current.getBoundingClientRect();
-            setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+            const dropdownHeight = FIELD_TYPES.length * 36 + 8; // approx height
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const openUp = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+            setPos({
+                top: openUp ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
+                left: rect.left,
+                width: rect.width,
+            });
         }
     }, []);
 
