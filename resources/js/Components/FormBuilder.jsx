@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
     DndContext,
     closestCenter,
@@ -500,6 +501,9 @@ function CustomFieldsModal({ isOpen, onClose, customFields, currentFields, onUpd
 // --- Settings Tab ---
 function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
     const [titleDropdownOpen, setTitleDropdownOpen] = useState(false);
+    const titleBtnRef = useRef(null);
+    const titleDropdownRef = useRef(null);
+    const [titlePos, setTitlePos] = useState({ top: 0, left: 0, width: 0 });
 
     const nonStaticFields = fields.filter(f => !STATIC_TYPES.includes(f.type) && f.type !== 'attachment');
     const titleFieldIds = taskDefaults?.title_field_ids || [];
@@ -517,6 +521,31 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
             .map(f => f.label || 'Untitled')
             .join(', ')
         : 'Form name (default)';
+
+    const updateTitlePos = useCallback(() => {
+        if (titleBtnRef.current) {
+            const rect = titleBtnRef.current.getBoundingClientRect();
+            setTitlePos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!titleDropdownOpen) return;
+        updateTitlePos();
+        window.addEventListener('scroll', updateTitlePos, true);
+        window.addEventListener('resize', updateTitlePos);
+        const handleClickOutside = (e) => {
+            if (titleDropdownRef.current && !titleDropdownRef.current.contains(e.target) && !titleBtnRef.current.contains(e.target)) {
+                setTitleDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            window.removeEventListener('scroll', updateTitlePos, true);
+            window.removeEventListener('resize', updateTitlePos);
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [titleDropdownOpen, updateTitlePos]);
 
     return (
         <div className="space-y-6">
@@ -536,11 +565,12 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
                 </div>
 
                 {/* Task title field selector */}
-                <div className="relative">
+                <div>
                     <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                         Select fields for task titles
                     </label>
                     <button
+                        ref={titleBtnRef}
                         type="button"
                         onClick={() => setTitleDropdownOpen(!titleDropdownOpen)}
                         className="w-full flex items-center justify-between px-3 py-2 text-sm text-left rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
@@ -551,8 +581,12 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
                         </svg>
                     </button>
 
-                    {titleDropdownOpen && (
-                        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto styled-scrollbar">
+                    {titleDropdownOpen && createPortal(
+                        <div
+                            ref={titleDropdownRef}
+                            className="fixed z-9999 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto styled-scrollbar"
+                            style={{ top: titlePos.top, left: titlePos.left, width: titlePos.width }}
+                        >
                             {nonStaticFields.length === 0 ? (
                                 <p className="text-sm text-gray-500 dark:text-gray-400 p-3 text-center">No fields available</p>
                             ) : (
@@ -574,7 +608,8 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
                                     </label>
                                 ))
                             )}
-                        </div>
+                        </div>,
+                        document.body
                     )}
                 </div>
             </div>
@@ -585,10 +620,39 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
 // --- Add Field Dropdown ---
 function AddFieldDropdown({ onAdd }) {
     const [open, setOpen] = useState(false);
+    const btnRef = useRef(null);
+    const dropdownRef = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+    const updatePos = useCallback(() => {
+        if (btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect();
+            setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!open) return;
+        updatePos();
+        window.addEventListener('scroll', updatePos, true);
+        window.addEventListener('resize', updatePos);
+        const handleClickOutside = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target) && !btnRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            window.removeEventListener('scroll', updatePos, true);
+            window.removeEventListener('resize', updatePos);
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [open, updatePos]);
 
     return (
-        <div className="relative">
+        <div>
             <button
+                ref={btnRef}
                 type="button"
                 onClick={() => setOpen(!open)}
                 className="w-full flex items-center justify-center gap-1 px-3 py-2.5 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
@@ -598,8 +662,12 @@ function AddFieldDropdown({ onAdd }) {
                 </svg>
                 Add question
             </button>
-            {open && (
-                <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
+            {open && createPortal(
+                <div
+                    ref={dropdownRef}
+                    className="fixed z-9999 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden"
+                    style={{ top: pos.top, left: pos.left, width: pos.width }}
+                >
                     {FIELD_TYPES.map(type => (
                         <button
                             key={type.value}
@@ -613,7 +681,8 @@ function AddFieldDropdown({ onAdd }) {
                             {type.label}
                         </button>
                     ))}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
