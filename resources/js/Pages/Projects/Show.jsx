@@ -1746,7 +1746,7 @@ export default function Show() {
                             onDragOver={handleListDragOver}
                             onDragEnd={handleListDragEnd}
                         >
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto styled-scrollbar-x">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
@@ -2165,7 +2165,7 @@ export default function Show() {
                         </div>
 
                         {/* Calendar grid */}
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto styled-scrollbar-x">
                             <div className="min-w-[640px]">
                             <div className="grid grid-cols-7 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                                 {DAYS.map((day) => (
@@ -2319,7 +2319,7 @@ export default function Show() {
                             />
                         ) : (
                             <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto styled-scrollbar-x">
                                     <div style={{ minWidth: `${240 + totalWidth}px` }}>
                                         {/* Header: month row */}
                                         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">

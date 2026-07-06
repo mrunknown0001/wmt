@@ -104,6 +104,42 @@
     background-color: rgba(107, 114, 128, 0.6);
 }
 
+/* Styled horizontal scrollbar for tables and overflow containers */
+.styled-scrollbar-x {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+.styled-scrollbar-x:hover {
+    scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+.styled-scrollbar-x::-webkit-scrollbar {
+    height: 6px;
+}
+.styled-scrollbar-x::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 0 4px;
+}
+.styled-scrollbar-x::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 9999px;
+    transition: background-color 0.2s;
+}
+.styled-scrollbar-x:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.4);
+}
+.styled-scrollbar-x::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.6);
+}
+.dark .styled-scrollbar-x:hover {
+    scrollbar-color: rgba(107, 114, 128, 0.4) transparent;
+}
+.dark .styled-scrollbar-x:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.4);
+}
+.dark .styled-scrollbar-x::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.6);
+}
+
 /* AI Chat panel slide-up animation */
 @keyframes slide-up {
     from { transform: translateY(100%); opacity: 0; }
