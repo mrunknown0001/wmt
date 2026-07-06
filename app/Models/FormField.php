@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FormField extends Model
 {
-    public const TYPES = ['text', 'textarea', 'select', 'multi_select', 'date', 'number', 'heading', 'description'];
+    public const TYPES = ['text', 'textarea', 'select', 'multi_select', 'date', 'number', 'heading', 'description', 'attachment'];
     public const STATIC_TYPES = ['heading', 'description'];
 
     protected $fillable = [
@@ -18,6 +18,8 @@ class FormField extends Model
         'is_required',
         'position',
         'config',
+        'default_value',
+        'is_visible',
         'maps_to',
         'custom_field_id',
     ];
@@ -26,6 +28,7 @@ class FormField extends Model
     {
         return [
             'is_required' => 'boolean',
+            'is_visible' => 'boolean',
             'position' => 'integer',
             'config' => 'array',
         ];

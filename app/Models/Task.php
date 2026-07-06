@@ -130,6 +130,11 @@ class Task extends Model
         return $this->hasMany(TaskCustomFieldValue::class);
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TaskAttachment::class);
+    }
+
     public function isStandalone(): bool
     {
         return is_null($this->project_id);

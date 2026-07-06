@@ -9,7 +9,7 @@ import FormBuilder from '../../Components/FormBuilder';
 import { useState } from 'react';
 
 export default function FormsEdit() {
-    const { project, form: initialForm, customFields } = usePage().props;
+    const { project, form: initialForm, customFields, sections } = usePage().props;
     const [copied, setCopied] = useState(false);
 
     const { data, setData, put, processing, errors } = useForm({
@@ -18,6 +18,10 @@ export default function FormsEdit() {
         is_active: initialForm.is_active,
         submit_button_text: initialForm.submit_button_text || 'Submit',
         success_message: initialForm.success_message || '',
+        task_defaults: initialForm.task_defaults || {
+            section_id: null,
+            title_field_ids: [],
+        },
         fields: (initialForm.fields || []).map(f => ({
             id: f.id,
             type: f.type,
@@ -26,6 +30,8 @@ export default function FormsEdit() {
             is_required: f.is_required,
             position: f.position,
             config: f.config,
+            default_value: f.default_value || null,
+            is_visible: f.is_visible !== false,
             maps_to: f.maps_to,
             custom_field_id: f.custom_field_id,
         })),
@@ -114,11 +120,13 @@ export default function FormsEdit() {
 
                 {/* Form Builder */}
                 <Card>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Form Fields</h3>
                     <FormBuilder
                         fields={data.fields}
                         onChange={(fields) => setData('fields', fields)}
                         customFields={customFields}
+                        sections={sections || []}
+                        taskDefaults={data.task_defaults}
+                        onTaskDefaultsChange={(td) => setData('task_defaults', td)}
                         errors={errors}
                     />
                 </Card>

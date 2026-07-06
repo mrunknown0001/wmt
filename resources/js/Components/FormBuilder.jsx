@@ -1,181 +1,325 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    verticalListSortingStrategy,
+    arrayMove,
+    sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import Input from './Input';
 import Select from './Select';
-import Textarea from './Textarea';
 import Button from './Button';
-import { ConfirmModal } from './Modal';
+import Modal, { ConfirmModal } from './Modal';
 
 const FIELD_TYPES = [
-    { value: 'text', label: 'Text Input', icon: 'T' },
+    { value: 'text', label: 'Text Input', icon: 'A' },
     { value: 'textarea', label: 'Text Area', icon: 'P' },
     { value: 'number', label: 'Number', icon: '#' },
     { value: 'date', label: 'Date', icon: 'D' },
     { value: 'select', label: 'Dropdown', icon: 'v' },
     { value: 'multi_select', label: 'Multi Select', icon: 'M' },
+    { value: 'attachment', label: 'Attachment', icon: '📎' },
     { value: 'heading', label: 'Heading', icon: 'H' },
     { value: 'description', label: 'Description', icon: 'i' },
 ];
 
 const STATIC_TYPES = ['heading', 'description'];
 
-function FieldConfigPanel({ field, index, customFields, allFields, onChange, onRemove, onMove, isFirst, isLast }) {
-    const update = (key, value) => {
-        onChange(index, { ...field, [key]: value });
+const CUSTOM_FIELD_TYPE_MAP = {
+    'text': 'text',
+    'textarea': 'textarea',
+    'number': 'number',
+    'date': 'date',
+    'single_select': 'select',
+    'multi_select': 'multi_select',
+};
+
+function getFieldIcon(type) {
+    return FIELD_TYPES.find(t => t.value === type)?.icon || '?';
+}
+
+function getFieldTypeLabel(type) {
+    return FIELD_TYPES.find(t => t.value === type)?.label || type;
+}
+
+// --- Sortable Field Row ---
+function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRemove, customFields, allFields, onChange }) {
+    const sortableId = `field-${fieldIndex}`;
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: sortableId });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : undefined,
+        zIndex: isDragging ? 50 : undefined,
     };
 
     const isStatic = STATIC_TYPES.includes(field.type);
 
-    // Collect mappings used by OTHER fields
+    const update = (key, value) => {
+        onChange(fieldIndex, { ...field, [key]: value });
+    };
+
+    // Build mapping options for non-custom-field items
     const usedMappings = new Set();
     allFields.forEach((f, i) => {
-        if (i === index) return;
-        if (f.maps_to === 'title') usedMappings.add('title');
+        if (i === fieldIndex) return;
         if (f.maps_to === 'description') usedMappings.add('description');
         if (f.maps_to === 'custom_field' && f.custom_field_id) usedMappings.add(`custom_field:${f.custom_field_id}`);
     });
 
-    // Build mapping options, excluding already-used ones
-    const mapOptions = [
-        { value: '', label: 'No mapping (static)' },
-    ];
-    if (!usedMappings.has('title')) {
-        mapOptions.push({ value: 'title', label: 'Task Title' });
-    }
+    const mapOptions = [{ value: '', label: 'No mapping' }];
     if (!usedMappings.has('description')) {
         mapOptions.push({ value: 'description', label: 'Task Description' });
     }
-    if (customFields?.length > 0) {
-        customFields.forEach(cf => {
-            const key = `custom_field:${cf.id}`;
-            if (!usedMappings.has(key)) {
-                mapOptions.push({ value: key, label: `Custom: ${cf.name}` });
-            }
-        });
-    }
 
-    const currentMapValue = field.maps_to === 'custom_field' && field.custom_field_id
-        ? `custom_field:${field.custom_field_id}`
-        : (field.maps_to || '');
-
-    const handleMapChange = (val) => {
-        if (val.startsWith('custom_field:')) {
-            const cfId = parseInt(val.split(':')[1]);
-            update('maps_to', 'custom_field');
-            onChange(index, { ...field, maps_to: 'custom_field', custom_field_id: cfId });
-        } else {
-            onChange(index, { ...field, maps_to: val || null, custom_field_id: null });
-        }
-    };
+    const isCustomFieldMapped = field.maps_to === 'custom_field' && field.custom_field_id;
+    const mappedCf = isCustomFieldMapped ? customFields?.find(cf => cf.id === field.custom_field_id) : null;
 
     return (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-600 dark:text-gray-400">
-                        {FIELD_TYPES.find(t => t.value === field.type)?.icon || '?'}
-                    </span>
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {FIELD_TYPES.find(t => t.value === field.type)?.label || field.type}
-                    </span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <button
-                        type="button"
-                        onClick={() => onMove(index, -1)}
-                        disabled={isFirst}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 transition-colors"
-                        title="Move up"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onMove(index, 1)}
-                        disabled={isLast}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 transition-colors"
-                        title="Move down"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onRemove(index)}
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                        title="Remove"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                </div>
+        <div ref={setNodeRef} style={style} className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+            {/* Collapsed Row */}
+            <div className="flex items-center gap-2 px-3 py-2.5">
+                <button
+                    {...attributes}
+                    {...listeners}
+                    className="shrink-0 cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 touch-none"
+                    title="Drag to reorder"
+                    type="button"
+                >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                    </svg>
+                </button>
+                <span className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
+                    {getFieldIcon(field.type)}
+                </span>
+                <button
+                    type="button"
+                    onClick={() => onToggleExpand(fieldIndex)}
+                    className="flex-1 text-left text-sm font-medium text-gray-700 dark:text-gray-300 truncate"
+                >
+                    {field.label || <span className="text-gray-400 italic">Untitled field</span>}
+                </button>
+                {field.is_required && !isStatic && (
+                    <span className="text-xs text-red-500 font-medium shrink-0">Required</span>
+                )}
+                {isCustomFieldMapped && (
+                    <span className="text-xs text-primary-600 dark:text-primary-400 shrink-0">Custom Field</span>
+                )}
+                {!field.is_visible && (
+                    <span className="text-xs text-yellow-600 dark:text-yellow-400 shrink-0">Hidden</span>
+                )}
+                <button
+                    type="button"
+                    onClick={() => onToggleExpand(fieldIndex)}
+                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors shrink-0"
+                    title={isExpanded ? 'Collapse' : 'Expand'}
+                >
+                    <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => onRemove(fieldIndex)}
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                    title="Remove"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
             </div>
 
-            <div className="space-y-3">
-                <Input
-                    label="Label"
-                    id={`field-${index}-label`}
-                    value={field.label}
-                    onChange={(e) => update('label', e.target.value)}
-                    placeholder={isStatic ? 'Heading text...' : 'Field label'}
-                />
+            {/* Expanded Config */}
+            {isExpanded && (
+                <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-700 space-y-3">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        <span className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono">
+                            {getFieldIcon(field.type)}
+                        </span>
+                        {getFieldTypeLabel(field.type)}
+                        {isCustomFieldMapped && mappedCf && (
+                            <span className="ml-auto text-primary-600 dark:text-primary-400">
+                                Mapped to: {mappedCf.name}
+                            </span>
+                        )}
+                    </div>
 
-                {!isStatic && (
-                    <>
+                    <Input
+                        label="Label"
+                        id={`field-${fieldIndex}-label`}
+                        value={field.label}
+                        onChange={(e) => update('label', e.target.value)}
+                        placeholder={isStatic ? 'Heading text...' : 'Field label'}
+                    />
+
+                    {!isStatic && field.type !== 'attachment' && (
                         <Input
                             label="Help Text"
-                            id={`field-${index}-help`}
+                            id={`field-${fieldIndex}-help`}
                             value={field.help_text || ''}
                             onChange={(e) => update('help_text', e.target.value)}
-                            placeholder="Optional help text for this field"
+                            placeholder="Optional help text"
                         />
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id={`field-${index}-required`}
-                                checked={field.is_required || false}
-                                onChange={(e) => update('is_required', e.target.checked)}
-                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
-                            />
-                            <label htmlFor={`field-${index}-required`} className="text-sm text-gray-700 dark:text-gray-300">Required</label>
-                        </div>
-                        <Select
-                            label="Maps To"
-                            id={`field-${index}-maps`}
-                            value={currentMapValue}
-                            onChange={(e) => handleMapChange(e.target.value)}
-                            options={mapOptions}
-                        />
-                    </>
-                )}
+                    )}
 
-                {/* Options for select/multi_select */}
-                {['select', 'multi_select'].includes(field.type) && field.maps_to === 'custom_field' && field.custom_field_id && (() => {
-                    const cf = customFields?.find(c => c.id === field.custom_field_id);
-                    const opts = [...(cf?.options || [])].sort((a, b) => a.label.localeCompare(b.label));
-                    if (!opts.length) return null;
-                    return (
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options <span className="text-xs font-normal text-gray-400">(from custom field)</span></label>
-                            <div className="space-y-1">
-                                {opts.map(opt => (
-                                    <div key={opt.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-700 dark:text-gray-300">
-                                        {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />}
-                                        {opt.label}
-                                    </div>
-                                ))}
+                    {field.type === 'attachment' && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Accepts images, videos, and Excel files. Max 5 files, 50MB each.
+                        </p>
+                    )}
+
+                    {!isStatic && field.type !== 'attachment' && (
+                        <DefaultValueInput field={field} fieldIndex={fieldIndex} onChange={update} customFields={customFields} />
+                    )}
+
+                    {!isStatic && (
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id={`field-${fieldIndex}-required`}
+                                    checked={field.is_required || false}
+                                    onChange={(e) => update('is_required', e.target.checked)}
+                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
+                                />
+                                <label htmlFor={`field-${fieldIndex}-required`} className="text-sm text-gray-700 dark:text-gray-300">Required</label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id={`field-${fieldIndex}-visible`}
+                                    checked={field.is_visible !== false}
+                                    onChange={(e) => update('is_visible', e.target.checked)}
+                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
+                                />
+                                <label htmlFor={`field-${fieldIndex}-visible`} className="text-sm text-gray-700 dark:text-gray-300">Visible on form</label>
                             </div>
                         </div>
-                    );
-                })()}
-                {['select', 'multi_select'].includes(field.type) && field.maps_to !== 'custom_field' && (
-                    <FieldOptionsEditor
-                        options={field.config?.options || []}
-                        onChange={(opts) => update('config', { ...field.config, options: opts })}
-                    />
-                )}
-            </div>
+                    )}
+
+                    {/* Maps To for non-custom-field items */}
+                    {!isStatic && !isCustomFieldMapped && field.type !== 'attachment' && (
+                        <Select
+                            label="Maps To"
+                            id={`field-${fieldIndex}-maps`}
+                            value={field.maps_to || ''}
+                            onChange={(e) => onChange(fieldIndex, { ...field, maps_to: e.target.value || null, custom_field_id: null })}
+                            options={mapOptions}
+                        />
+                    )}
+
+                    {/* Options for select/multi_select mapped to custom field */}
+                    {['select', 'multi_select'].includes(field.type) && isCustomFieldMapped && mappedCf && (() => {
+                        const opts = [...(mappedCf.options || [])].sort((a, b) => a.label.localeCompare(b.label));
+                        if (!opts.length) return null;
+                        return (
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    Options <span className="text-xs font-normal text-gray-400">(from custom field)</span>
+                                </label>
+                                <div className="space-y-1">
+                                    {opts.map(opt => (
+                                        <div key={opt.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-700 dark:text-gray-300">
+                                            {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />}
+                                            {opt.label}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* Options editor for unmapped select/multi_select */}
+                    {['select', 'multi_select'].includes(field.type) && !isCustomFieldMapped && (
+                        <FieldOptionsEditor
+                            options={field.config?.options || []}
+                            onChange={(opts) => update('config', { ...field.config, options: opts })}
+                        />
+                    )}
+                </div>
+            )}
         </div>
     );
 }
 
+// --- Default Value Input ---
+function DefaultValueInput({ field, fieldIndex, onChange, customFields }) {
+    const isCustomFieldMapped = field.maps_to === 'custom_field' && field.custom_field_id;
+    const mappedCf = isCustomFieldMapped ? customFields?.find(cf => cf.id === field.custom_field_id) : null;
+
+    switch (field.type) {
+        case 'text':
+        case 'textarea':
+            return (
+                <Input
+                    label="Default Value"
+                    id={`field-${fieldIndex}-default`}
+                    value={field.default_value || ''}
+                    onChange={(e) => onChange('default_value', e.target.value)}
+                    placeholder="Pre-filled value (optional)"
+                />
+            );
+        case 'number':
+            return (
+                <Input
+                    label="Default Value"
+                    id={`field-${fieldIndex}-default`}
+                    type="number"
+                    value={field.default_value || ''}
+                    onChange={(e) => onChange('default_value', e.target.value)}
+                    placeholder="Default number (optional)"
+                />
+            );
+        case 'date':
+            return (
+                <Input
+                    label="Default Value"
+                    id={`field-${fieldIndex}-default`}
+                    type="date"
+                    value={field.default_value || ''}
+                    onChange={(e) => onChange('default_value', e.target.value)}
+                />
+            );
+        case 'select': {
+            const opts = isCustomFieldMapped && mappedCf
+                ? [...(mappedCf.options || [])].sort((a, b) => a.label.localeCompare(b.label)).map(o => ({ value: String(o.id), label: o.label }))
+                : (field.config?.options || []).map(o => ({ value: o.value, label: o.label }));
+            return (
+                <Select
+                    label="Default Value"
+                    id={`field-${fieldIndex}-default`}
+                    value={field.default_value || ''}
+                    onChange={(e) => onChange('default_value', e.target.value)}
+                    options={opts}
+                    placeholder="— None —"
+                />
+            );
+        }
+        default:
+            return null;
+    }
+}
+
+// --- Field Options Editor ---
 function FieldOptionsEditor({ options, onChange }) {
     const addOption = () => {
         onChange([...options, { label: '', value: String(options.length + 1) }]);
@@ -215,8 +359,277 @@ function FieldOptionsEditor({ options, onChange }) {
     );
 }
 
-export default function FormBuilder({ fields, onChange, customFields = [], errors = {} }) {
+// --- Add from Custom Fields Modal ---
+function CustomFieldsModal({ isOpen, onClose, customFields, currentFields, onUpdate }) {
+    const getCheckedIds = () => {
+        return new Set(currentFields.filter(f => f.maps_to === 'custom_field' && f.custom_field_id).map(f => f.custom_field_id));
+    };
+
+    const [checkedIds, setCheckedIds] = useState(getCheckedIds);
+
+    // Sync when modal opens
+    const prevOpen = useRef(false);
+    if (isOpen && !prevOpen.current) {
+        const newIds = getCheckedIds();
+        if ([...newIds].join(',') !== [...checkedIds].join(',')) {
+            setCheckedIds(newIds);
+        }
+    }
+    prevOpen.current = isOpen;
+
+    const toggleField = (cfId) => {
+        setCheckedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(cfId)) {
+                next.delete(cfId);
+            } else {
+                next.add(cfId);
+            }
+            return next;
+        });
+    };
+
+    const deselectAll = () => setCheckedIds(new Set());
+
+    const handleUpdate = () => {
+        // Remove unchecked custom field mappings
+        let newFields = currentFields.filter(f => {
+            if (f.maps_to === 'custom_field' && f.custom_field_id) {
+                return checkedIds.has(f.custom_field_id);
+            }
+            return true;
+        });
+
+        // Add newly checked custom fields
+        const existingCfIds = new Set(newFields.filter(f => f.maps_to === 'custom_field').map(f => f.custom_field_id));
+        checkedIds.forEach(cfId => {
+            if (!existingCfIds.has(cfId)) {
+                const cf = customFields.find(c => c.id === cfId);
+                if (!cf) return;
+                const formType = CUSTOM_FIELD_TYPE_MAP[cf.type] || 'text';
+                newFields.push({
+                    type: formType,
+                    label: cf.name,
+                    help_text: '',
+                    is_required: cf.is_required || false,
+                    position: newFields.length,
+                    config: null,
+                    default_value: null,
+                    is_visible: true,
+                    maps_to: 'custom_field',
+                    custom_field_id: cf.id,
+                });
+            }
+        });
+
+        // Re-index positions
+        newFields = newFields.map((f, i) => ({ ...f, position: i }));
+        onUpdate(newFields);
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Added to form" size="lg">
+            <div className="mb-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 pb-2">
+                <span className="font-medium">Field</span>
+                <button type="button" onClick={deselectAll} className="text-primary-600 dark:text-primary-400 hover:text-primary-700 text-xs">
+                    Deselect all
+                </button>
+            </div>
+            <div className="space-y-1 max-h-96 overflow-y-auto styled-scrollbar">
+                {customFields.map(cf => {
+                    const icon = getFieldIcon(CUSTOM_FIELD_TYPE_MAP[cf.type] || 'text');
+                    const opts = (cf.options || []).sort((a, b) => a.label.localeCompare(b.label));
+                    const showOpts = opts.slice(0, 3);
+                    const moreCount = opts.length - showOpts.length;
+
+                    return (
+                        <label
+                            key={cf.id}
+                            className="flex items-start gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 last:border-0"
+                        >
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
+                                        {icon}
+                                    </span>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
+                                        {cf.name}
+                                    </span>
+                                </div>
+                                {opts.length > 0 ? (
+                                    <div className="flex items-center gap-2 mt-1 ml-7 flex-wrap">
+                                        {showOpts.map(opt => (
+                                            <span key={opt.id} className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                                {opt.color && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />}
+                                                {opt.label}
+                                            </span>
+                                        ))}
+                                        {moreCount > 0 && (
+                                            <span className="text-xs text-gray-400 dark:text-gray-500">+{moreCount}</span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 ml-7">No description provided</p>
+                                )}
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={checkedIds.has(cf.id)}
+                                onChange={() => toggleField(cf.id)}
+                                className="mt-1 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700 shrink-0"
+                            />
+                        </label>
+                    );
+                })}
+                {customFields.length === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-8">
+                        No custom fields defined for this project.
+                    </p>
+                )}
+            </div>
+            <div className="flex justify-end mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <Button onClick={handleUpdate}>Update</Button>
+            </div>
+        </Modal>
+    );
+}
+
+// --- Settings Tab ---
+function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
+    const [titleDropdownOpen, setTitleDropdownOpen] = useState(false);
+
+    const nonStaticFields = fields.filter(f => !STATIC_TYPES.includes(f.type) && f.type !== 'attachment');
+    const titleFieldIds = taskDefaults?.title_field_ids || [];
+
+    const toggleTitleField = (position) => {
+        const next = titleFieldIds.includes(position)
+            ? titleFieldIds.filter(p => p !== position)
+            : [...titleFieldIds, position];
+        onTaskDefaultsChange({ ...taskDefaults, title_field_ids: next });
+    };
+
+    const titleLabel = titleFieldIds.length > 0
+        ? nonStaticFields
+            .filter(f => titleFieldIds.includes(f.position))
+            .map(f => f.label || 'Untitled')
+            .join(', ')
+        : 'Form name (default)';
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Task settings</h4>
+
+                {/* Section selector */}
+                <div className="mb-4">
+                    <Select
+                        label="Select a section for tasks"
+                        id="task-section"
+                        value={taskDefaults?.section_id || ''}
+                        onChange={(e) => onTaskDefaultsChange({ ...taskDefaults, section_id: e.target.value || null })}
+                        options={(sections || []).map(s => ({ value: s.id, label: s.name }))}
+                        placeholder="— No section —"
+                    />
+                </div>
+
+                {/* Task title field selector */}
+                <div className="relative">
+                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                        Select fields for task titles
+                    </label>
+                    <button
+                        type="button"
+                        onClick={() => setTitleDropdownOpen(!titleDropdownOpen)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-sm text-left rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    >
+                        <span className="truncate">{titleLabel}</span>
+                        <svg className={`w-4 h-4 shrink-0 ml-2 transition-transform ${titleDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    {titleDropdownOpen && (
+                        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto styled-scrollbar">
+                            {nonStaticFields.length === 0 ? (
+                                <p className="text-sm text-gray-500 dark:text-gray-400 p-3 text-center">No fields available</p>
+                            ) : (
+                                nonStaticFields.map(f => (
+                                    <label
+                                        key={f.position}
+                                        className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer text-sm text-gray-700 dark:text-gray-300"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={titleFieldIds.includes(f.position)}
+                                            onChange={() => toggleTitleField(f.position)}
+                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
+                                        />
+                                        <span className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
+                                            {getFieldIcon(f.type)}
+                                        </span>
+                                        {f.label || 'Untitled'}
+                                    </label>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- Add Field Dropdown ---
+function AddFieldDropdown({ onAdd }) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className="w-full flex items-center justify-center gap-1 px-3 py-2.5 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
+            >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add question
+            </button>
+            {open && (
+                <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
+                    {FIELD_TYPES.map(type => (
+                        <button
+                            key={type.value}
+                            type="button"
+                            onClick={() => { onAdd(type.value); setOpen(false); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        >
+                            <span className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400">
+                                {type.icon}
+                            </span>
+                            {type.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// --- Main FormBuilder ---
+export default function FormBuilder({ fields, onChange, customFields = [], sections = [], taskDefaults = {}, onTaskDefaultsChange, errors = {} }) {
+    const [activeTab, setActiveTab] = useState('questions');
+    const [expandedIndex, setExpandedIndex] = useState(null);
     const [deleteIndex, setDeleteIndex] = useState(null);
+    const [cfModalOpen, setCfModalOpen] = useState(false);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
 
     const addField = (type) => {
         const newField = {
@@ -226,10 +639,14 @@ export default function FormBuilder({ fields, onChange, customFields = [], error
             is_required: false,
             position: fields.length,
             config: null,
+            default_value: null,
+            is_visible: true,
             maps_to: null,
             custom_field_id: null,
         };
-        onChange([...fields, newField]);
+        const newFields = [...fields, newField];
+        onChange(newFields);
+        setExpandedIndex(newFields.length - 1);
     };
 
     const updateField = (index, updatedField) => {
@@ -241,69 +658,124 @@ export default function FormBuilder({ fields, onChange, customFields = [], error
     const removeField = (index) => {
         onChange(fields.filter((_, i) => i !== index).map((f, i) => ({ ...f, position: i })));
         setDeleteIndex(null);
+        if (expandedIndex === index) setExpandedIndex(null);
+        else if (expandedIndex > index) setExpandedIndex(expandedIndex - 1);
     };
 
-    const moveField = (index, direction) => {
-        const newIndex = index + direction;
-        if (newIndex < 0 || newIndex >= fields.length) return;
-        const newFields = [...fields];
-        [newFields[index], newFields[newIndex]] = [newFields[newIndex], newFields[index]];
-        onChange(newFields.map((f, i) => ({ ...f, position: i })));
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = parseInt(active.id.replace('field-', ''));
+        const newIndex = parseInt(over.id.replace('field-', ''));
+
+        const newFields = arrayMove(fields, oldIndex, newIndex).map((f, i) => ({ ...f, position: i }));
+        onChange(newFields);
+
+        // Update expanded index if needed
+        if (expandedIndex === oldIndex) setExpandedIndex(newIndex);
+        else if (expandedIndex !== null) {
+            if (oldIndex < expandedIndex && newIndex >= expandedIndex) setExpandedIndex(expandedIndex - 1);
+            else if (oldIndex > expandedIndex && newIndex <= expandedIndex) setExpandedIndex(expandedIndex + 1);
+        }
     };
+
+    const sortableIds = fields.map((_, i) => `field-${i}`);
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Field Palette */}
-            <div className="lg:col-span-1">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Add Field</h4>
-                <div className="space-y-1">
-                    {FIELD_TYPES.map(type => (
+        <div>
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('questions')}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'questions'
+                            ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                >
+                    Questions
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('settings')}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'settings'
+                            ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                >
+                    Settings
+                </button>
+            </div>
+
+            {/* Questions Tab */}
+            {activeTab === 'questions' && (
+                <div className="space-y-3">
+                    {fields.length === 0 ? (
+                        <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Add questions to your form using the buttons below.
+                            </p>
+                        </div>
+                    ) : (
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                                {fields.map((field, i) => (
+                                    <SortableFieldRow
+                                        key={`field-${i}`}
+                                        field={field}
+                                        fieldIndex={i}
+                                        isExpanded={expandedIndex === i}
+                                        onToggleExpand={(idx) => setExpandedIndex(expandedIndex === idx ? null : idx)}
+                                        onRemove={(idx) => setDeleteIndex(idx)}
+                                        customFields={customFields}
+                                        allFields={fields}
+                                        onChange={updateField}
+                                    />
+                                ))}
+                            </SortableContext>
+                        </DndContext>
+                    )}
+
+                    <AddFieldDropdown onAdd={addField} />
+
+                    {customFields.length > 0 && (
                         <button
-                            key={type.value}
                             type="button"
-                            onClick={() => addField(type.value)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 transition-colors"
+                            onClick={() => setCfModalOpen(true)}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
                         >
-                            <span className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400">
-                                {type.icon}
-                            </span>
-                            {type.label}
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                            </svg>
+                            Add from custom fields
                         </button>
-                    ))}
+                    )}
                 </div>
-            </div>
+            )}
 
-            {/* Form Canvas */}
-            <div className="lg:col-span-3">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                    Form Fields ({fields.length})
-                </h4>
-                {fields.length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Click a field type from the palette to add it to your form.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {fields.map((field, i) => (
-                            <FieldConfigPanel
-                                key={i}
-                                field={field}
-                                index={i}
-                                customFields={customFields}
-                                allFields={fields}
-                                onChange={updateField}
-                                onRemove={(idx) => setDeleteIndex(idx)}
-                                onMove={moveField}
-                                isFirst={i === 0}
-                                isLast={i === fields.length - 1}
-                            />
-                        ))}
-                    </div>
-                )}
-            </div>
+            {/* Settings Tab */}
+            {activeTab === 'settings' && (
+                <SettingsTab
+                    fields={fields}
+                    sections={sections}
+                    taskDefaults={taskDefaults}
+                    onTaskDefaultsChange={onTaskDefaultsChange}
+                />
+            )}
 
+            {/* Custom Fields Modal */}
+            <CustomFieldsModal
+                isOpen={cfModalOpen}
+                onClose={() => setCfModalOpen(false)}
+                customFields={customFields}
+                currentFields={fields}
+                onUpdate={onChange}
+            />
+
+            {/* Delete Confirmation */}
             <ConfirmModal
                 isOpen={deleteIndex !== null}
                 onClose={() => setDeleteIndex(null)}

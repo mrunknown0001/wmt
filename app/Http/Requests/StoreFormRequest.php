@@ -21,10 +21,9 @@ class StoreFormRequest extends FormRequest
             'submit_button_text' => ['sometimes', 'string', 'max:255'],
             'success_message' => ['nullable', 'string', 'max:5000'],
             'task_defaults' => ['nullable', 'array'],
-            'task_defaults.status' => ['sometimes', 'string', 'in:backlog,to_do,in_progress,in_review'],
-            'task_defaults.priority' => ['sometimes', 'string', 'in:low,medium,high,urgent'],
-            'task_defaults.assigned_to' => ['sometimes', 'nullable', 'exists:users,id'],
             'task_defaults.section_id' => ['sometimes', 'nullable'],
+            'task_defaults.title_field_ids' => ['sometimes', 'array'],
+            'task_defaults.title_field_ids.*' => ['integer'],
             'fields' => ['required', 'array', 'min:1'],
             'fields.*.type' => ['required', 'string', 'in:' . implode(',', FormField::TYPES)],
             'fields.*.label' => ['required', 'string', 'max:255'],
@@ -32,7 +31,9 @@ class StoreFormRequest extends FormRequest
             'fields.*.is_required' => ['sometimes', 'boolean'],
             'fields.*.position' => ['required', 'integer', 'min:0'],
             'fields.*.config' => ['nullable', 'array'],
-            'fields.*.maps_to' => ['nullable', 'string', 'in:title,description,custom_field'],
+            'fields.*.default_value' => ['nullable', 'string'],
+            'fields.*.is_visible' => ['sometimes', 'boolean'],
+            'fields.*.maps_to' => ['nullable', 'string', 'in:description,custom_field'],
             'fields.*.custom_field_id' => ['nullable', 'exists:custom_fields,id'],
         ];
     }

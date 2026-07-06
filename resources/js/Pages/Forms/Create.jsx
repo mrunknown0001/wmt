@@ -8,7 +8,7 @@ import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
 
 export default function FormsCreate() {
-    const { project, customFields } = usePage().props;
+    const { project, customFields, sections } = usePage().props;
 
     const { data, setData, post, processing, errors } = useForm({
         name: '',
@@ -16,6 +16,10 @@ export default function FormsCreate() {
         is_active: true,
         submit_button_text: 'Submit',
         success_message: 'Thank you! Your response has been recorded.',
+        task_defaults: {
+            section_id: null,
+            title_field_ids: [],
+        },
         fields: [],
     });
 
@@ -81,11 +85,13 @@ export default function FormsCreate() {
 
                 {/* Form Builder */}
                 <Card>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Form Fields</h3>
                     <FormBuilder
                         fields={data.fields}
                         onChange={(fields) => setData('fields', fields)}
                         customFields={customFields}
+                        sections={sections || []}
+                        taskDefaults={data.task_defaults}
+                        onTaskDefaultsChange={(td) => setData('task_defaults', td)}
                         errors={errors}
                     />
                 </Card>

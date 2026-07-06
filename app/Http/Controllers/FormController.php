@@ -47,15 +47,11 @@ class FormController extends Controller
 
         $customFields = $project->customFields()->with('options')->get();
         $sections = $project->sections()->orderBy('position')->get(['id', 'name']);
-        $users = \App\Models\User::where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name']);
 
         return Inertia::render('Forms/Create', [
             'project' => $project->only('id', 'name'),
             'customFields' => $customFields,
             'sections' => $sections,
-            'users' => $users,
         ]);
     }
 
@@ -89,9 +85,6 @@ class FormController extends Controller
 
         $customFields = $project->customFields()->with('options')->get();
         $sections = $project->sections()->orderBy('position')->get(['id', 'name']);
-        $users = \App\Models\User::where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name']);
 
         return Inertia::render('Forms/Edit', [
             'project' => $project->only('id', 'name'),
@@ -101,7 +94,6 @@ class FormController extends Controller
             ],
             'customFields' => $customFields,
             'sections' => $sections,
-            'users' => $users,
         ]);
     }
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CustomField;
 use App\Models\Form;
 use App\Models\Task;
+use App\Models\TaskAttachment;
 use App\Models\TaskCustomFieldValue;
 use App\Rules\Turnstile;
 use Illuminate\Http\Request;
@@ -38,6 +39,8 @@ class PublicFormController extends Controller
                         'is_required' => $field->is_required,
                         'config' => $field->config,
                         'maps_to' => $field->maps_to,
+                        'default_value' => $field->default_value,
+                        'is_visible' => $field->is_visible,
                     ];
 
                     // Include options for mapped select fields
@@ -81,8 +84,25 @@ class PublicFormController extends Controller
                 continue;
             }
 
-            $fieldRules = [];
+            // Skip validation for hidden fields (they use default values)
+            if (!$field->is_visible) {
+                continue;
+            }
+
             $key = "fields.{$field->id}";
+
+            if ($field->type === 'attachment') {
+                if ($field->is_required) {
+                    $rules[$key] = ['required', 'array', 'max:5'];
+                    $rules["{$key}.*"] = ['file', 'mimes:jpg,jpeg,png,gif,bmp,webp,mp4,mov,avi,webm,xlsx,xls,csv', 'max:51200'];
+                } else {
+                    $rules[$key] = ['nullable', 'array', 'max:5'];
+                    $rules["{$key}.*"] = ['file', 'mimes:jpg,jpeg,png,gif,bmp,webp,mp4,mov,avi,webm,xlsx,xls,csv', 'max:51200'];
+                }
+                continue;
+            }
+
+            $fieldRules = [];
 
             if ($field->is_required) {
                 $fieldRules[] = 'required';
@@ -105,7 +125,17 @@ class PublicFormController extends Controller
         $validated = $request->validate($rules);
         $fieldValues = $validated['fields'] ?? [];
 
-        // Build task data from defaults
+        // Merge default values for hidden fields
+        foreach ($form->fields as $field) {
+            if (in_array($field->type, ['heading', 'description', 'attachment'])) {
+                continue;
+            }
+            if (!$field->is_visible && $field->default_value !== null) {
+                $fieldValues[$field->id] = $field->default_value;
+            }
+        }
+
+        // Build task data
         $defaults = $form->task_defaults ?? [];
         $taskData = [
             'project_id' => $form->project_id,
@@ -117,11 +147,28 @@ class PublicFormController extends Controller
             'created_by' => null,
         ];
 
+        // Build task title from selected fields
+        $titleFieldIds = $defaults['title_field_ids'] ?? [];
+        if (!empty($titleFieldIds)) {
+            $titleParts = [];
+            foreach ($form->fields as $field) {
+                if (in_array($field->position, $titleFieldIds)) {
+                    $val = $fieldValues[$field->id] ?? null;
+                    if ($val !== null && $val !== '') {
+                        $titleParts[] = is_array($val) ? implode(', ', $val) : $val;
+                    }
+                }
+            }
+            if (!empty($titleParts)) {
+                $taskData['title'] = implode(', ', $titleParts);
+            }
+        }
+
         // Map form field values to task properties and custom fields
         $customFieldMappings = [];
 
         foreach ($form->fields as $field) {
-            if (in_array($field->type, ['heading', 'description'])) {
+            if (in_array($field->type, ['heading', 'description', 'attachment'])) {
                 continue;
             }
 
@@ -130,9 +177,7 @@ class PublicFormController extends Controller
                 continue;
             }
 
-            if ($field->maps_to === 'title') {
-                $taskData['title'] = $value;
-            } elseif ($field->maps_to === 'description') {
+            if ($field->maps_to === 'description') {
                 $taskData['description'] = $value;
             } elseif ($field->maps_to === 'custom_field' && $field->custom_field_id) {
                 $customFieldMappings[$field->custom_field_id] = $value;
@@ -164,6 +209,34 @@ class PublicFormController extends Controller
             ]);
             $cfv->setTypedValue($customField->type, $value);
             $cfv->save();
+        }
+
+        // Handle file attachments
+        foreach ($form->fields as $field) {
+            if ($field->type !== 'attachment') {
+                continue;
+            }
+
+            $files = $request->file("fields.{$field->id}", []);
+            if (!is_array($files)) {
+                $files = [$files];
+            }
+
+            foreach ($files as $file) {
+                if (!$file || !$file->isValid()) {
+                    continue;
+                }
+
+                $path = $file->store('form-attachments', 'public');
+
+                TaskAttachment::create([
+                    'task_id' => $task->id,
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_path' => $path,
+                    'file_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
+            }
         }
 
         return Inertia::render('Forms/PublicFormSuccess', [
