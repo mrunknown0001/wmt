@@ -37,30 +37,32 @@ function OptionEditor({ options, onChange }) {
     return (
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options</label>
-            {options.map((opt, i) => (
-                <div key={i} className="flex items-center gap-2">
-                    <input
-                        type="color"
-                        value={opt.color || '#3b82f6'}
-                        onChange={(e) => updateOption(i, 'color', e.target.value)}
-                        className="h-8 w-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
-                    />
-                    <input
-                        type="text"
-                        value={opt.label}
-                        onChange={(e) => updateOption(i, 'label', e.target.value)}
-                        placeholder={`Option ${i + 1}`}
-                        className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => removeOption(i)}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-            ))}
+            <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                {options.map((opt, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                        <input
+                            type="color"
+                            value={opt.color || '#3b82f6'}
+                            onChange={(e) => updateOption(i, 'color', e.target.value)}
+                            className="h-8 w-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer shrink-0"
+                        />
+                        <input
+                            type="text"
+                            value={opt.label}
+                            onChange={(e) => updateOption(i, 'label', e.target.value)}
+                            placeholder={`Option ${i + 1}`}
+                            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => removeOption(i)}
+                            className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                ))}
+            </div>
             <button
                 type="button"
                 onClick={addOption}

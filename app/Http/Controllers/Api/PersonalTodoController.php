@@ -69,6 +69,20 @@ class PersonalTodoController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function clearCompleted(Request $request): JsonResponse
+    {
+        $request->user()->personalTodos()->where('is_completed', true)->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function clearAll(Request $request): JsonResponse
+    {
+        $request->user()->personalTodos()->delete();
+
+        return response()->json(['success' => true]);
+    }
+
     public function reorder(Request $request): JsonResponse
     {
         $validated = $request->validate([

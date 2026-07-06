@@ -70,6 +70,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/personal-todos/{personalTodo}', [PersonalTodoController::class, 'update']);
     Route::delete('/personal-todos/{personalTodo}', [PersonalTodoController::class, 'destroy']);
     Route::post('/personal-todos/reorder', [PersonalTodoController::class, 'reorder']);
+    Route::delete('/personal-todos/clear-completed', [PersonalTodoController::class, 'clearCompleted']);
+    Route::delete('/personal-todos/clear-all', [PersonalTodoController::class, 'clearAll']);
 
     // Device tokens (FCM)
     Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
