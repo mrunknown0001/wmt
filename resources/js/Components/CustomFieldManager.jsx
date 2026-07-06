@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Button from './Button';
 import Input from './Input';
 import Select from './Select';
@@ -28,22 +29,30 @@ const COLOR_PALETTE = [
     '#f43f5e', '#78716c', '#64748b', '#1e293b',
 ];
 
-function ColorPickerPopover({ color, onChange, onClose }) {
+function ColorPickerPopover({ color, onChange, onClose, anchorRef }) {
     const popoverRef = useRef(null);
-    const customInputRef = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0 });
+
+    useEffect(() => {
+        if (anchorRef?.current) {
+            const rect = anchorRef.current.getBoundingClientRect();
+            setPos({ top: rect.bottom + 4, left: rect.left });
+        }
+    }, [anchorRef]);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+            if (popoverRef.current && !popoverRef.current.contains(e.target) &&
+                anchorRef?.current && !anchorRef.current.contains(e.target)) {
                 onClose();
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [onClose]);
+    }, [onClose, anchorRef]);
 
-    return (
-        <div ref={popoverRef} className="absolute z-50 mt-1 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+    return createPortal(
+        <div ref={popoverRef} className="fixed z-9999 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700" style={{ top: pos.top, left: pos.left }}>
             <div className="grid grid-cols-5 gap-1.5 mb-2">
                 {COLOR_PALETTE.map((c) => (
                     <button
@@ -59,7 +68,6 @@ function ColorPickerPopover({ color, onChange, onClose }) {
             </div>
             <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <input
-                    ref={customInputRef}
                     type="color"
                     value={color || '#3b82f6'}
                     onChange={(e) => { onChange(e.target.value); onClose(); }}
@@ -67,7 +75,8 @@ function ColorPickerPopover({ color, onChange, onClose }) {
                 />
                 <span className="text-xs text-gray-500 dark:text-gray-400">Custom</span>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 
@@ -76,6 +85,7 @@ function OptionEditor({ options, onChange }) {
     const lastInputRef = useRef(null);
     const prevCountRef = useRef(options.length);
     const [colorPickerIndex, setColorPickerIndex] = useState(null);
+    const colorBtnRefs = useRef({});
 
     useEffect(() => {
         if (options.length > prevCountRef.current && lastInputRef.current) {
@@ -104,9 +114,10 @@ function OptionEditor({ options, onChange }) {
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options</label>
             <div ref={listRef} className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                 {options.map((opt, i) => (
-                    <div key={i} className="flex items-center gap-2 relative">
+                    <div key={i} className="flex items-center gap-2">
                         <button
                             type="button"
+                            ref={(el) => { colorBtnRefs.current[i] = el; }}
                             onClick={() => setColorPickerIndex(colorPickerIndex === i ? null : i)}
                             className="h-7 w-7 rounded-full border-2 border-gray-300 dark:border-gray-600 cursor-pointer shrink-0 transition-transform hover:scale-110"
                             style={{ backgroundColor: opt.color || '#3b82f6' }}
@@ -116,6 +127,7 @@ function OptionEditor({ options, onChange }) {
                                 color={opt.color || '#3b82f6'}
                                 onChange={(c) => updateOption(i, 'color', c)}
                                 onClose={() => setColorPickerIndex(null)}
+                                anchorRef={{ current: colorBtnRefs.current[i] }}
                             />
                         )}
                         <input
