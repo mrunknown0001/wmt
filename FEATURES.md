@@ -60,6 +60,12 @@
 - **PriorityPicker** — popover dropdown for quick priority changes
 - **AssigneePicker** — searchable user popover with avatar display
 - **InlineDatePicker** — custom calendar grid popover with clear date support
+- **InlineCustomFieldEditor** — inline editing for all 5 custom field types in list view
+
+### Celebration Effect
+- Canvas particle animation triggered on task completion (checkbox click)
+- Confetti burst from the checkbox location
+- Auto-cleanup after animation completes
 
 ### Task Activity Tracking
 - Automatic change logging for 6 fields (title, description, status, priority, assigned_to, due_date)
@@ -85,6 +91,44 @@
 - Recurring icon displayed on task cards
 - Collaborators synced to new occurrence
 - Guards against duplicate generation
+
+## Custom Fields
+- 5 field types: text, number, date, single select, multi select
+- Per-project field definitions with position-based ordering
+- Single/multi select fields support colored options with scrollable list
+- Custom field values stored per task with typed columns (text, number, date, option ID, JSON)
+- Inline editing of all field types directly in the task list view
+- Custom field columns displayed in list view with sortable headers
+- Auto-focus and scroll-to-new-option when adding select options
+- Styled scrollbars on option lists
+
+## Form Builder & Public Forms
+- Drag-and-drop form builder with field palette (text, textarea, number, date, select, multi select, heading, description)
+- Form fields mappable to task title, description, or custom fields
+- Select/multi select fields inherit options from mapped custom fields (displayed read-only)
+- Static options editor for unmapped select fields
+- Task defaults on forms (status, priority, assignee, section)
+- Public form URLs via UUID — no authentication required
+- Turnstile (CAPTCHA) protection on public form submissions
+- Rate limiting on submissions (throttle:10,1)
+- Form active/inactive toggle — inactive forms return 404
+- Public form submissions create tasks with custom field values populated
+- Configurable submit button text and success message
+
+## Personal To-Do List
+- Sidebar widget accessible in both expanded and collapsed sidebar modes
+- Add, complete, and delete personal to-dos
+- Drag-and-drop reordering via @dnd-kit (modal view)
+- Completion animation with fade-out effect
+- Expandable modal view with full list management
+- Show/hide completed items toggle
+- Clear completed and clear all actions with confirmation modals
+- Clear all closes modal automatically
+- Close (X) button on modal
+- Styled scrollbars matching app theme
+- Badge count for incomplete items on sidebar icon
+- Popover view when sidebar is collapsed
+- Optimistic UI updates with API rollback on failure
 
 ## Workflow Automation Rules
 - Project-level rule builder accessible from project show page

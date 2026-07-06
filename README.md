@@ -51,6 +51,10 @@ Default admin login: `admin@wmt.com` / `password`
 - **Executive Dashboard** — Org-wide stats with hierarchical drill-down
 - **Activity Log** — Centralized audit trail across all projects
 - **Dark Mode** — Full dark/light theme support
+- **Custom Fields** — 5 types (text, number, date, single select, multi select) per project with inline editing
+- **Form Builder** — Drag-and-drop form designer with public links, Turnstile protection, and custom field mapping
+- **Personal To-Do List** — Sidebar widget with drag-and-drop reordering, completion animations, and modal view
+- **Celebration Effect** — Canvas particle animation on task completion
 - **Customizable Dashboard** — 7 togglable widgets, persisted per user
 
 See [FEATURES.md](FEATURES.md) for the complete feature list.
