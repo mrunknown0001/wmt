@@ -293,9 +293,16 @@
     background-image: radial-gradient(circle, rgb(255 255 255 / 0.03) 1px, transparent 1px);
 }
 
-/* Smooth page transition */
-#app {
-    transition: opacity 150ms ease-in-out;
+/* Navigation progress bar glow */
+#nav-progress::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 80px;
+    height: 100%;
+    box-shadow: 0 0 8px var(--color-primary-500, #6366f1), 0 0 3px var(--color-primary-400, #818cf8);
+    border-radius: 0 1px 1px 0;
 }
 
 /* Ensure clickable elements show pointer cursor */
