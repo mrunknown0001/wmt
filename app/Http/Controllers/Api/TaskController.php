@@ -147,12 +147,10 @@ class TaskController extends Controller
 
     public function storeComment(Request $request, Project $project, Task $task): JsonResponse
     {
-        $maxKb = \App\Models\Setting::current()->max_upload_size * 1024;
-
         $request->validate([
             'body' => ['required_without:attachments', 'nullable', 'string', 'max:2000'],
             'attachments' => ['nullable', 'array', 'max:5'],
-            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf,mp4,mov,avi,wmv,webm,xls,xlsx,csv', "max:{$maxKb}"],
+            'attachments.*' => ['file', new \App\Rules\CommentAttachmentFile],
         ]);
 
         $comment = $task->comments()->create([

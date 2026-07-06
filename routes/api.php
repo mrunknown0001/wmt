@@ -1,15 +1,24 @@
 <?php
 
+use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AutomationRuleController;
+use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeviceTokenController;
+use App\Http\Controllers\Api\ExecutiveDashboardController;
 use App\Http\Controllers\Api\MyTaskController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\NotificationPreferenceController;
 use App\Http\Controllers\Api\PersonalTodoController;
 use App\Http\Controllers\Api\ProjectController;
-use App\Http\Controllers\Api\TaskCommentController;
+use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\StandaloneTaskController;
+use App\Http\Controllers\Api\TaskCommentController;
+use App\Http\Controllers\Api\TaskCommentPaginationController;
 use App\Http\Controllers\Api\TaskController;
+use App\Http\Controllers\Api\TaskSectionController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
@@ -83,4 +92,36 @@ Route::middleware('auth:sanctum')->group(function () {
     // Mobile app device-token registration (Bearer auth, distinct path to avoid the web /api/device-tokens CSRF route).
     Route::post('/mobile/device-tokens', [DeviceTokenController::class, 'store']);
     Route::delete('/mobile/device-tokens', [DeviceTokenController::class, 'destroy']);
+
+    // Notification preferences
+    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'index']);
+    Route::post('/notification-preferences', [NotificationPreferenceController::class, 'update']);
+
+    // Global search (mobile path to avoid web.php /api/search shadow)
+    Route::get('/mobile/search', SearchController::class);
+
+    // App settings for clients
+    Route::get('/settings', SettingController::class);
+
+    // Comment & activity pagination
+    Route::get('/projects/{project}/tasks/{task}/comments', [TaskCommentPaginationController::class, 'comments']);
+    Route::get('/projects/{project}/tasks/{task}/activities', [TaskCommentPaginationController::class, 'activities']);
+
+    // Task sections CRUD
+    Route::post('/projects/{project}/sections', [TaskSectionController::class, 'store']);
+    Route::put('/projects/{project}/sections/{section}', [TaskSectionController::class, 'update']);
+    Route::delete('/projects/{project}/sections/{section}', [TaskSectionController::class, 'destroy']);
+    Route::post('/projects/{project}/sections/reorder', [TaskSectionController::class, 'reorder']);
+
+    // Activity log (admin)
+    Route::get('/activity-log', ActivityLogController::class);
+
+    // Executive dashboard (role-gated)
+    Route::get('/executive-dashboard', ExecutiveDashboardController::class);
+
+    // Automation rules (read-only)
+    Route::get('/projects/{project}/automation-rules', AutomationRuleController::class);
+
+    // Calendar feed
+    Route::get('/calendar', CalendarController::class);
 });
