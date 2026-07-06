@@ -18,22 +18,38 @@ const FIELD_TYPES = [
 
 const STATIC_TYPES = ['heading', 'description'];
 
-function FieldConfigPanel({ field, index, customFields, onChange, onRemove, onMove, isFirst, isLast }) {
+function FieldConfigPanel({ field, index, customFields, allFields, onChange, onRemove, onMove, isFirst, isLast }) {
     const update = (key, value) => {
         onChange(index, { ...field, [key]: value });
     };
 
     const isStatic = STATIC_TYPES.includes(field.type);
 
-    // Build mapping options
+    // Collect mappings used by OTHER fields
+    const usedMappings = new Set();
+    allFields.forEach((f, i) => {
+        if (i === index) return;
+        if (f.maps_to === 'title') usedMappings.add('title');
+        if (f.maps_to === 'description') usedMappings.add('description');
+        if (f.maps_to === 'custom_field' && f.custom_field_id) usedMappings.add(`custom_field:${f.custom_field_id}`);
+    });
+
+    // Build mapping options, excluding already-used ones
     const mapOptions = [
         { value: '', label: 'No mapping (static)' },
-        { value: 'title', label: 'Task Title' },
-        { value: 'description', label: 'Task Description' },
     ];
+    if (!usedMappings.has('title')) {
+        mapOptions.push({ value: 'title', label: 'Task Title' });
+    }
+    if (!usedMappings.has('description')) {
+        mapOptions.push({ value: 'description', label: 'Task Description' });
+    }
     if (customFields?.length > 0) {
         customFields.forEach(cf => {
-            mapOptions.push({ value: `custom_field:${cf.id}`, label: `Custom: ${cf.name}` });
+            const key = `custom_field:${cf.id}`;
+            if (!usedMappings.has(key)) {
+                mapOptions.push({ value: key, label: `Custom: ${cf.name}` });
+            }
         });
     }
 
@@ -276,6 +292,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], error
                                 field={field}
                                 index={i}
                                 customFields={customFields}
+                                allFields={fields}
                                 onChange={updateField}
                                 onRemove={(idx) => setDeleteIndex(idx)}
                                 onMove={moveField}

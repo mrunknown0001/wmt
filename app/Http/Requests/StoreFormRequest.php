@@ -36,4 +36,28 @@ class StoreFormRequest extends FormRequest
             'fields.*.custom_field_id' => ['nullable', 'exists:custom_fields,id'],
         ];
     }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $fields = $this->input('fields', []);
+            $mappings = [];
+
+            foreach ($fields as $i => $field) {
+                $mapsTo = $field['maps_to'] ?? null;
+                if (!$mapsTo) continue;
+
+                $key = $mapsTo === 'custom_field'
+                    ? "custom_field:{$field['custom_field_id']}"
+                    : $mapsTo;
+
+                if (in_array($key, $mappings)) {
+                    $label = $mapsTo === 'custom_field' ? 'custom field' : $mapsTo;
+                    $validator->errors()->add("fields.{$i}.maps_to", "This {$label} mapping is already used by another field.");
+                } else {
+                    $mappings[] = $key;
+                }
+            }
+        });
+    }
 }
