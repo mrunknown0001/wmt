@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Button from './Button';
 import Input from './Input';
 import Select from './Select';
@@ -20,6 +20,18 @@ const OPTION_COLORS = [
 ];
 
 function OptionEditor({ options, onChange }) {
+    const listRef = useRef(null);
+    const lastInputRef = useRef(null);
+    const prevCountRef = useRef(options.length);
+
+    useEffect(() => {
+        if (options.length > prevCountRef.current && lastInputRef.current) {
+            lastInputRef.current.focus();
+            listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+        }
+        prevCountRef.current = options.length;
+    }, [options.length]);
+
     const addOption = () => {
         onChange([...options, { label: '', color: OPTION_COLORS[options.length % OPTION_COLORS.length] }]);
     };
@@ -37,7 +49,7 @@ function OptionEditor({ options, onChange }) {
     return (
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options</label>
-            <div className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+            <div ref={listRef} className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                 {options.map((opt, i) => (
                     <div key={i} className="flex items-center gap-2">
                         <input
@@ -47,6 +59,7 @@ function OptionEditor({ options, onChange }) {
                             className="h-8 w-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer shrink-0"
                         />
                         <input
+                            ref={i === options.length - 1 ? lastInputRef : undefined}
                             type="text"
                             value={opt.label}
                             onChange={(e) => updateOption(i, 'label', e.target.value)}
