@@ -263,7 +263,7 @@ export default function AuthenticatedLayout({ children, title }) {
                             </div>
                             <button
                                 onClick={handleLogout}
-                                className="text-gray-400 hover:text-white transition-colors p-1"
+                                className="text-gray-400 hover:text-white transition-colors p-1 icon-hover"
                                 title="Logout"
                             >
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -314,7 +314,7 @@ export default function AuthenticatedLayout({ children, title }) {
                         {/* Mobile hamburger — opens sidebar overlay */}
                         <button
                             onClick={() => setSidebarOpen(true)}
-                            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 lg:hidden"
+                            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 lg:hidden icon-hover"
                         >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -323,7 +323,7 @@ export default function AuthenticatedLayout({ children, title }) {
                         {/* Desktop hamburger — collapses/expands sidebar */}
                         <button
                             onClick={toggleSidebarCollapsed}
-                            className="hidden lg:flex p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                            className="hidden lg:flex p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 icon-hover"
                             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                         >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

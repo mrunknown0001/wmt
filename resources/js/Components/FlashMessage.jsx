@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 const types = {
     success: {
@@ -23,21 +23,31 @@ const types = {
 
 export default function FlashMessage({ type = 'success', message }) {
     const [visible, setVisible] = useState(true);
+    const [leaving, setLeaving] = useState(false);
     const config = types[type] || types.success;
+
+    const dismiss = useCallback(() => {
+        setLeaving(true);
+        setTimeout(() => {
+            setLeaving(false);
+            setVisible(false);
+        }, 300);
+    }, []);
 
     useEffect(() => {
         setVisible(true);
-        const timer = setTimeout(() => setVisible(false), 5000);
+        setLeaving(false);
+        const timer = setTimeout(dismiss, 4700);
         return () => clearTimeout(timer);
-    }, [message]);
+    }, [message, dismiss]);
 
-    if (!visible || !message) return null;
+    if ((!visible && !leaving) || !message) return null;
 
     return (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg transition-all ${config.bg}`}>
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${leaving ? 'animate-[slide-out-right_300ms_ease_forwards]' : 'animate-slide-in-right'} ${config.bg}`}>
             {config.icon}
             <span className={`text-sm font-medium ${config.text}`}>{message}</span>
-            <button onClick={() => setVisible(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ml-2">
+            <button onClick={dismiss} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ml-2">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>

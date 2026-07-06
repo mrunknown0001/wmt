@@ -32,10 +32,11 @@
 - Priorities: low, medium, high, urgent
 - Assignee and creator tracking
 - Start date and due date with overdue detection
-- Subtasks (self-referential parent_id)
+- Subtasks (self-referential parent_id) with progress tracking
 - Collaborators (many-to-many with users)
 - Position-based ordering within status columns
 - Rich text descriptions via TipTap WYSIWYG editor
+- File attachments on tasks (via form submissions)
 
 ### Task Sections
 - Asana-style sections for grouping tasks within a project
@@ -64,8 +65,10 @@
 
 ### Celebration Effect
 - Canvas particle animation triggered on task completion (checkbox click)
-- Confetti burst from the checkbox location
-- Auto-cleanup after animation completes
+- 45 particles with 3 shape types: stars (with rotation and glow), sparkles (with trails), confetti (rectangular, fluttering)
+- Physics simulation with gravity, drag, velocity, and rotation
+- Expanding ring animation
+- Auto-cleanup after ~1.5s animation completes
 
 ### Task Activity Tracking
 - Automatic change logging for 6 fields (title, description, status, priority, assigned_to, due_date)
@@ -74,8 +77,9 @@
 
 ### Task Comments
 - Add/delete comments on tasks
-- Rich text comments with TipTap editor
-- **@mentions** — mention users in comments with searchable dropdown (triggers notification)
+- Rich text comments with TipTap editor (bold, italic, underline, lists, links)
+- **@mentions** — mention users in comments with searchable autocomplete dropdown (triggers notification)
+- **File attachments** on comments with upload and download support
 - Combined timeline view with activities (sorted by date)
 - Paginated loading (offset-based, 10 per page)
 - Filter tabs: All, Comments, Activity
@@ -103,17 +107,42 @@
 - Styled scrollbars on option lists
 
 ## Form Builder & Public Forms
-- Drag-and-drop form builder with field palette (text, textarea, number, date, select, multi select, heading, description)
-- Form fields mappable to task title, description, or custom fields
+- **Asana-style two-tab layout** — Questions tab and Settings tab
+- **9 field types**: text, textarea, number, date, select, multi select, attachment, heading, description
+- **Drag-and-drop field reordering** via @dnd-kit with visual feedback
+- **Expandable field configuration**: label, help text, default value, required, visible on form, maps-to
+- **Default values** per field — type-appropriate inputs (text, number, date picker, select dropdown)
+- **Visibility toggle** — hidden fields use default values silently when form is submitted
+- **"Add from Custom Fields" modal** — browse project custom fields with type icons, option previews, and checkbox selection
+- **Settings tab**:
+  - Section selector — assign submitted tasks to a project section
+  - Task title field selector — multi-select dropdown to compose task titles from multiple form fields
+- Form fields mappable to task description or custom fields
 - Select/multi select fields inherit options from mapped custom fields (displayed read-only)
 - Static options editor for unmapped select fields
-- Task defaults on forms (status, priority, assignee, section)
+- **Attachment field type** — images, videos, Excel files; up to 5 files per submission, 50MB per file
+- Portal-based floating dropdowns with dynamic up/down positioning based on viewport space
 - Public form URLs via UUID — no authentication required
 - Turnstile (CAPTCHA) protection on public form submissions
 - Rate limiting on submissions (throttle:10,1)
 - Form active/inactive toggle — inactive forms return 404
-- Public form submissions create tasks with custom field values populated
+- Public form submissions create tasks with:
+  - Custom title composed from selected fields
+  - Custom field values populated
+  - File attachments linked to task
+  - Section assignment from form defaults
 - Configurable submit button text and success message
+- Styled scrollbars on modals and dropdown lists
+
+## AI Chat Assistant
+- Floating chat widget accessible from any page
+- Multi-turn streaming conversations via Server-Sent Events (SSE)
+- Context-aware — understands organizational structure, tasks, and workload
+- Auto-generated conversation titles from first message
+- Conversation history with list view, switch, and delete
+- Follow-up prompt suggestions (auto-parsed from AI responses)
+- Message limit enforcement (10 messages per conversation)
+- Configurable AI platform via `AI_PLATFORM` env var (OpenAI / OpenRouter)
 
 ## Personal To-Do List
 - Sidebar widget accessible in both expanded and collapsed sidebar modes
@@ -190,7 +219,7 @@
   - **Task Mention** — when @mentioned in a comment
   - **Comment Deleted** — when a comment mentioning you is deleted
   - **Task Escalated** — tiered overdue escalation (see below)
-  - **Subtask Comment** — comments on subtasks
+  - **Task Due Reminder** — recurring due date reminders
 - Notification bell with unread count badge
 - Dropdown preview (last 5 notifications)
 - Full inbox page (paginated, 15/page)
@@ -230,11 +259,14 @@
 - Docker Compose dev environment (Laravel, MySQL, Redis, Soketi, phpMyAdmin)
 - Inertia.js SSR with React (JSX)
 - Tailwind CSS v4 for styling
-- TipTap WYSIWYG rich text editor
-- @dnd-kit for drag-and-drop interactions
+- TipTap WYSIWYG rich text editor with @mention support
+- @dnd-kit for drag-and-drop interactions (Kanban, form builder, to-do list, sections)
 - CSRF-protected API fetches
 - Policy-based authorization on all resources
 - Form request validation on all create/update operations
 - Queued notifications via Redis
+- Server-Sent Events for AI chat streaming
 - HandleInertiaRequests middleware shares auth data, settings, unread count, flash messages
 - SearchableSelect reusable component for user pickers
+- Portal-based floating dropdowns for consistent z-index behavior
+- Custom styled scrollbars for modals and dropdowns

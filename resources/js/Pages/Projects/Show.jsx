@@ -174,8 +174,9 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     };
 
     return (
-        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
-            <td className="pl-10 pr-2 py-3 w-10">
+        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
+            <td className="relative pl-10 pr-2 py-3 w-10">
+                <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
                     onPointerDown={(e) => e.stopPropagation()}
@@ -380,9 +381,10 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             {...attributes}
             {...listeners}
             onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
-            className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
+            className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
         >
-            <td className="pl-6 pr-2 py-4 w-10">
+            <td className="relative pl-6 pr-2 py-4 w-10">
+                <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
                     onPointerDown={(e) => e.stopPropagation()}

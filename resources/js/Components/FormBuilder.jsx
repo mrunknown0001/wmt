@@ -591,7 +591,7 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
                     {titleDropdownOpen && createPortal(
                         <div
                             ref={titleDropdownRef}
-                            className="fixed z-9999 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto styled-scrollbar"
+                            className="fixed z-9999 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto styled-scrollbar animate-slide-down"
                             style={{ top: titlePos.top, left: titlePos.left, width: titlePos.width }}
                         >
                             {nonStaticFields.length === 0 ? (
@@ -679,7 +679,7 @@ function AddFieldDropdown({ onAdd }) {
             {open && createPortal(
                 <div
                     ref={dropdownRef}
-                    className="fixed z-9999 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden"
+                    className="fixed z-9999 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden animate-slide-down"
                     style={{ top: pos.top, left: pos.left, width: pos.width }}
                 >
                     {FIELD_TYPES.map(type => (

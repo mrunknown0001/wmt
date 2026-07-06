@@ -23,7 +23,7 @@ export default function LinkButton({
     return (
         <Link
             href={href}
-            className={`inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${variants[variant]} ${sizes[size]} ${className}`}
+            className={`inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800 active:scale-[0.97] ${variants[variant]} ${sizes[size]} ${className}`}
             {...props}
         >
             {children}

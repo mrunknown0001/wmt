@@ -136,7 +136,7 @@ export default function Dashboard() {
                                         <Link
                                             key={task.id}
                                             href={taskEditUrl(task)}
-                                            className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                            className="group relative flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                         >
                                             <div className={`w-1 h-8 rounded-full ${isOverdue ? 'bg-red-500' : 'bg-yellow-500'}`} />
                                             <div className="flex-1 min-w-0">
@@ -206,8 +206,9 @@ export default function Dashboard() {
                                     <Link
                                         key={project.id}
                                         href={`/projects/${project.id}`}
-                                        className="block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                        className="group relative block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                     >
+                                        <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         <div className="flex items-center gap-4">
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
@@ -248,8 +249,9 @@ export default function Dashboard() {
                                     <Link
                                         key={project.id}
                                         href={`/projects/${project.id}`}
-                                        className="block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                        className="group relative block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                     >
+                                        <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         <div className="flex items-center gap-4">
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
@@ -289,8 +291,9 @@ export default function Dashboard() {
                                         <Link
                                             key={task.id}
                                             href={taskEditUrl(task)}
-                                            className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                            className="group relative flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                         >
+                                            <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{task.title}</p>
                                                 <div className="flex items-center gap-2 mt-0.5">
