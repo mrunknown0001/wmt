@@ -155,7 +155,7 @@ function TodoList({ todos, onToggle, onDelete, onAdd, onReorder, onClearComplete
                 />
             </form>
 
-            <div className={`overflow-y-auto ${modal ? 'max-h-[60vh] px-0' : 'max-h-48 px-1'}`}>
+            <div className={`overflow-y-auto scrollbar-thin ${modal ? 'max-h-[60vh] px-0' : 'max-h-48 px-1'}`}>
                 {incomplete.length === 0 && completedCount === 0 && (
                     <p className={`text-xs text-gray-500 text-center py-3 ${modal ? '' : 'px-3'}`}>No to-dos yet</p>
                 )}
@@ -343,6 +343,7 @@ export default function SidebarTodoWidget({ collapsed }) {
             const backup = [...todos];
             setTodos([]);
             setIncompleteCount(0);
+            setShowModal(false);
 
             try {
                 await apiFetch('/api/personal-todos/clear-all', { method: 'DELETE' });
