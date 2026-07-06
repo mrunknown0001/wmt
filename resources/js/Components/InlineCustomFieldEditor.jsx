@@ -86,25 +86,40 @@ function TextNumberEditor({ value, type, onSave, onClose }) {
     const inputRef = useRef(null);
 
     const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            onSave(draft === '' ? null : draft);
-        } else if (e.key === 'Escape') {
+        if (e.key === 'Escape') {
             onClose();
+        } else if (e.key === 'Enter' && type !== 'textarea') {
+            onSave(draft === '' ? null : draft);
         }
     };
 
+    const inputClass = "w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500";
+
     return (
-        <div className="p-2 min-w-[180px]">
-            <input
-                ref={inputRef}
-                autoFocus
-                type={type === 'number' ? 'number' : 'text'}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                placeholder={type === 'number' ? 'Enter number...' : 'Enter text...'}
-            />
+        <div className={`p-2 ${type === 'textarea' ? 'min-w-70' : 'min-w-45'}`}>
+            {type === 'textarea' ? (
+                <textarea
+                    ref={inputRef}
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className={`${inputClass} resize-y min-h-20`}
+                    placeholder="Enter text..."
+                    rows={3}
+                />
+            ) : (
+                <input
+                    ref={inputRef}
+                    autoFocus
+                    type={type === 'number' ? 'number' : 'text'}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className={inputClass}
+                    placeholder={type === 'number' ? 'Enter number...' : 'Enter text...'}
+                />
+            )}
             <div className="flex justify-end gap-2 mt-2">
                 <button
                     onClick={onClose}
@@ -128,7 +143,8 @@ function DisplayValue({ customField, cfv, formatDate }) {
 
     switch (customField.type) {
         case 'text':
-            return <span>{cfv.value_text || '—'}</span>;
+        case 'textarea':
+            return <span className={customField.type === 'textarea' ? 'line-clamp-2' : ''}>{cfv.value_text || '—'}</span>;
         case 'number':
             return <span>{cfv.value_number != null ? cfv.value_number : '—'}</span>;
         case 'date':
@@ -195,7 +211,7 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
     const currentValue = (() => {
         if (!cfv) return null;
         switch (customField.type) {
-            case 'text': return cfv.value_text;
+            case 'text': case 'textarea': return cfv.value_text;
             case 'number': return cfv.value_number;
             case 'single_select': return cfv.value_option_id;
             case 'multi_select': return cfv.value_json || [];
@@ -214,7 +230,7 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
                 <DisplayValue customField={customField} cfv={cfv} formatDate={formatDateFn} />
             </button>
             <InlinePopover isOpen={isOpen} onClose={() => onToggle(false)} anchorRef={anchorRef}>
-                {(customField.type === 'text' || customField.type === 'number') && (
+                {(customField.type === 'text' || customField.type === 'textarea' || customField.type === 'number') && (
                     <TextNumberEditor
                         value={currentValue}
                         type={customField.type}

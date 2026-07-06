@@ -47,7 +47,7 @@ class TaskCustomFieldValue extends Model
     public function getValueAttribute(): mixed
     {
         return match ($this->customField?->type) {
-            'text' => $this->value_text,
+            'text', 'textarea' => $this->value_text,
             'number' => $this->value_number,
             'date' => $this->value_date,
             'single_select' => $this->value_option_id,
@@ -73,7 +73,7 @@ class TaskCustomFieldValue extends Model
         }
 
         match ($type) {
-            'text' => $this->value_text = (string) $rawValue,
+            'text', 'textarea' => $this->value_text = (string) $rawValue,
             'number' => $this->value_number = (float) $rawValue,
             'date' => $this->value_date = $rawValue,
             'single_select' => $this->value_option_id = (int) $rawValue,

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CustomField extends Model
 {
-    public const TYPES = ['text', 'number', 'date', 'single_select', 'multi_select'];
+    public const TYPES = ['text', 'textarea', 'number', 'date', 'single_select', 'multi_select'];
 
     protected $fillable = [
         'project_id',

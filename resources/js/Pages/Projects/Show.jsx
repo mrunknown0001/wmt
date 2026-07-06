@@ -98,6 +98,7 @@ function renderCustomFieldValue(task, customField) {
 
     switch (customField.type) {
         case 'text':
+        case 'textarea':
             return cfv.value_text || '—';
         case 'number':
             return cfv.value_number != null ? cfv.value_number : '—';
@@ -1077,7 +1078,7 @@ export default function Show() {
             const idx = values.findIndex(v => v.custom_field_id === fieldId);
             const entry = {
                 custom_field_id: fieldId,
-                value_text: fieldType === 'text' ? value : null,
+                value_text: (fieldType === 'text' || fieldType === 'textarea') ? value : null,
                 value_number: fieldType === 'number' ? value : null,
                 value_date: fieldType === 'date' ? value : null,
                 value_option_id: fieldType === 'single_select' ? value : null,

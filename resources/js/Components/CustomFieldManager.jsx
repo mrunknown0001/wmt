@@ -8,6 +8,7 @@ import { apiFetch } from '../utils';
 
 const FIELD_TYPES = [
     { value: 'text', label: 'Text' },
+    { value: 'textarea', label: 'Multi-line Text' },
     { value: 'number', label: 'Number' },
     { value: 'date', label: 'Date' },
     { value: 'single_select', label: 'Single Select' },
@@ -19,10 +20,62 @@ const OPTION_COLORS = [
     '#ec4899', '#06b6d4', '#f97316',
 ];
 
+const COLOR_PALETTE = [
+    '#ef4444', '#f97316', '#f59e0b', '#eab308',
+    '#84cc16', '#22c55e', '#10b981', '#14b8a6',
+    '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
+    '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
+    '#f43f5e', '#78716c', '#64748b', '#1e293b',
+];
+
+function ColorPickerPopover({ color, onChange, onClose }) {
+    const popoverRef = useRef(null);
+    const customInputRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+                onClose();
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [onClose]);
+
+    return (
+        <div ref={popoverRef} className="absolute z-50 mt-1 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-5 gap-1.5 mb-2">
+                {COLOR_PALETTE.map((c) => (
+                    <button
+                        key={c}
+                        type="button"
+                        onClick={() => { onChange(c); onClose(); }}
+                        className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                            color === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'
+                        }`}
+                        style={{ backgroundColor: c }}
+                    />
+                ))}
+            </div>
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <input
+                    ref={customInputRef}
+                    type="color"
+                    value={color || '#3b82f6'}
+                    onChange={(e) => { onChange(e.target.value); onClose(); }}
+                    className="h-6 w-6 rounded border border-gray-300 dark:border-gray-600 cursor-pointer shrink-0"
+                />
+                <span className="text-xs text-gray-500 dark:text-gray-400">Custom</span>
+            </div>
+        </div>
+    );
+}
+
 function OptionEditor({ options, onChange }) {
     const listRef = useRef(null);
     const lastInputRef = useRef(null);
     const prevCountRef = useRef(options.length);
+    const [colorPickerIndex, setColorPickerIndex] = useState(null);
 
     useEffect(() => {
         if (options.length > prevCountRef.current && lastInputRef.current) {
@@ -51,13 +104,20 @@ function OptionEditor({ options, onChange }) {
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options</label>
             <div ref={listRef} className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                 {options.map((opt, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                        <input
-                            type="color"
-                            value={opt.color || '#3b82f6'}
-                            onChange={(e) => updateOption(i, 'color', e.target.value)}
-                            className="h-8 w-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer shrink-0"
+                    <div key={i} className="flex items-center gap-2 relative">
+                        <button
+                            type="button"
+                            onClick={() => setColorPickerIndex(colorPickerIndex === i ? null : i)}
+                            className="h-7 w-7 rounded-full border-2 border-gray-300 dark:border-gray-600 cursor-pointer shrink-0 transition-transform hover:scale-110"
+                            style={{ backgroundColor: opt.color || '#3b82f6' }}
                         />
+                        {colorPickerIndex === i && (
+                            <ColorPickerPopover
+                                color={opt.color || '#3b82f6'}
+                                onChange={(c) => updateOption(i, 'color', c)}
+                                onClose={() => setColorPickerIndex(null)}
+                            />
+                        )}
                         <input
                             ref={i === options.length - 1 ? lastInputRef : undefined}
                             type="text"

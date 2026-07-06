@@ -1,5 +1,6 @@
 import Input from './Input';
 import Select from './Select';
+import Textarea from './Textarea';
 
 export default function CustomFieldValueEditor({ field, value, onChange, error }) {
     const handleChange = (newValue) => {
@@ -15,6 +16,18 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                     value={value || ''}
                     onChange={(e) => handleChange(e.target.value)}
                     error={error}
+                />
+            );
+
+        case 'textarea':
+            return (
+                <Textarea
+                    label={field.name}
+                    id={`cf-${field.id}`}
+                    value={value || ''}
+                    onChange={(e) => handleChange(e.target.value)}
+                    error={error}
+                    rows={3}
                 />
             );
 
