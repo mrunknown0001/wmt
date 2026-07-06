@@ -47,7 +47,7 @@ Default admin login: `admin@wmt.com` / `password`
 - **Subtasks** — Hierarchical parent-child tasks with progress tracking
 - **Recurring Tasks** — Daily/weekly/monthly/yearly with auto-generation
 - **Comments & @Mentions** — Rich text comments with user mentions and file attachments
-- **Real-time Notifications** — WebSocket push + email (8 types, per-user preferences)
+- **Real-time Notifications** — WebSocket push + email (8 types, per-user preferences, bookmark/archive/mention filters)
 - **Escalated Due Dates** — Tiered overdue escalation through org hierarchy
 - **Workflow Automation** — Project-level rule builder (trigger → conditions → actions)
 - **AI Chat Assistant** — Streaming multi-turn conversations with organizational context

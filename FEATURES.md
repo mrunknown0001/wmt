@@ -222,7 +222,10 @@
   - **Task Due Reminder** — recurring due date reminders
 - Notification bell with unread count badge
 - Dropdown preview (last 5 notifications)
-- Full inbox page (paginated, 15/page)
+- Full inbox page (paginated, 15/page) with 5 filter tabs: Inbox, Unread, Bookmarked, Mentions, Archived
+- **Bookmark** — toggle bookmark on any notification for quick access later (amber bookmark icon)
+- **Archive** — archive notifications to remove from main inbox; unarchive from Archived tab
+- **Mentioned filter** — view only notifications where you were @mentioned in comments
 - Mark individual or all as read
 - Audio chime on new notification (Web Audio API)
 - Toast notification popup (top-right, auto-dismiss 5s)
