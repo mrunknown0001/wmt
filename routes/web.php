@@ -15,7 +15,6 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ExecutiveDashboardController;
-use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\ProjectAutomationRuleController;
 use App\Http\Controllers\AiChatController;
@@ -117,10 +116,6 @@ Route::middleware('auth')->group(function () {
 
     // Activity Log (admin)
     Route::get('/activity-log', [ActivityLogController::class, 'index'])->name('activity-log');
-
-    // Notification Preferences
-    Route::get('/settings/notifications', [NotificationPreferenceController::class, 'edit'])->name('settings.notifications');
-    Route::put('/settings/notifications', [NotificationPreferenceController::class, 'update'])->name('settings.notifications.update');
 
     // Change Password
     Route::get('/settings/password', [PasswordController::class, 'edit'])->name('settings.password');

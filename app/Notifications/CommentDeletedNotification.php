@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Setting;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -22,7 +23,7 @@ class CommentDeletedNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = ['database', 'broadcast'];
-        if ($notifiable->wantsEmail('comment_deleted')) {
+        if (Setting::current()->wantsEmail('comment_deleted')) {
             $channels[] = 'mail';
         }
         return $channels;

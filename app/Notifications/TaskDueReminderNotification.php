@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Setting;
 use App\Models\Task;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,7 +22,7 @@ class TaskDueReminderNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = ['database', 'broadcast'];
-        if ($notifiable->wantsEmail('task_due_reminder')) {
+        if (Setting::current()->wantsEmail('task_due_reminder')) {
             $channels[] = 'mail';
         }
         return $channels;
