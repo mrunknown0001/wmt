@@ -58,7 +58,7 @@ export default function InlinePopover({ isOpen, onClose, anchorRef, children, cl
         <div
             ref={popoverRef}
             style={{ position: 'absolute', top: position.top, left: position.left, zIndex: 50, visibility: positioned ? 'visible' : 'hidden' }}
-            className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg ${className}`}
+            className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg ${positioned ? 'animate-slide-down' : ''} ${className}`}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
         >

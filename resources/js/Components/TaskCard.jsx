@@ -31,16 +31,16 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
             {...attributes}
             {...listeners}
             onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
-            className={`bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-lg' : ''} ${isSelected ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+            className={`bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm card-hover cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-lg transform-none!' : ''} ${isSelected ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
         >
             <div className="flex items-start gap-2 mb-2">
                 <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id); }}
+                    onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id, e); }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className={`mt-0.5 shrink-0 h-4.5 w-4.5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    className={`mt-0.5 shrink-0 h-4.5 w-4.5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
                         isDone
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400'
+                            ? 'bg-green-500 border-green-500 text-white scale-110'
+                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
                     }`}
                     title={isDone ? 'Mark incomplete' : 'Mark complete'}
                 >

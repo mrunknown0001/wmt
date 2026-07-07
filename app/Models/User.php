@@ -124,4 +124,15 @@ class User extends Authenticatable
     {
         return $this->hasMany(DeviceToken::class);
     }
+
+    public function personalTodos(): HasMany
+    {
+        return $this->hasMany(PersonalTodo::class);
+    }
+
+    public function notifications(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(DatabaseNotification::class, 'notifiable')
+            ->latest();
+    }
 }

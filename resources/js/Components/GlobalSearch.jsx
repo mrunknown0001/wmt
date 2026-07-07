@@ -152,7 +152,7 @@ export default function GlobalSearch() {
             </div>
 
             {isOpen && (hasResults || noResults) && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto animate-slide-down">
                     {noResults && (
                         <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                             No results found for "{query}"

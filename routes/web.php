@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardPreferenceController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\StandaloneTaskController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\MyTaskController;
@@ -22,6 +23,10 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\FormController;
+use App\Http\Controllers\PublicFormController;
+use App\Http\Controllers\TaskCustomFieldValueController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +40,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [LoginController::class, 'store']);
 
 });
+
+// Public forms (no auth required)
+Route::get('/forms/{uuid}', [PublicFormController::class, 'show'])->name('forms.show');
+Route::post('/forms/{uuid}', [PublicFormController::class, 'submit'])->middleware('throttle:10,1')->name('forms.submit');
 
 // Authenticated routes
 Route::middleware('auth')->group(function () {
@@ -55,9 +64,23 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
     Route::patch('/inbox/{id}/read', [NotificationController::class, 'markAsRead'])->name('inbox.read');
     Route::post('/inbox/read-all', [NotificationController::class, 'markAllAsRead'])->name('inbox.readAll');
+    Route::patch('/inbox/{id}/bookmark', [NotificationController::class, 'toggleBookmark'])->name('inbox.bookmark');
+    Route::patch('/inbox/{id}/archive', [NotificationController::class, 'archive'])->name('inbox.archive');
+    Route::patch('/inbox/{id}/unarchive', [NotificationController::class, 'unarchive'])->name('inbox.unarchive');
 
     // My Tasks
     Route::get('/my-tasks', [MyTaskController::class, 'index'])->name('my-tasks');
+
+    // Standalone Tasks (not project-scoped)
+    Route::post('/tasks', [StandaloneTaskController::class, 'store'])->name('tasks.store');
+    Route::get('/tasks/{task}/edit', [StandaloneTaskController::class, 'edit'])->name('tasks.edit');
+    Route::put('/tasks/{task}', [StandaloneTaskController::class, 'update'])->name('tasks.update');
+    Route::delete('/tasks/{task}', [StandaloneTaskController::class, 'destroy'])->name('tasks.destroy');
+    Route::patch('/tasks/{task}/patch', [StandaloneTaskController::class, 'patchField'])->name('tasks.patch');
+    Route::get('/tasks/{task}/timeline', [StandaloneTaskController::class, 'timeline'])->name('tasks.timeline');
+    Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'storeStandalone'])->name('standalone-tasks.comments.store');
+    Route::delete('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroyStandalone'])->name('standalone-tasks.comments.destroy');
+    Route::get('/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'downloadStandalone'])->name('standalone-tasks.comments.attachments.download');
 
     // Calendar
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
@@ -78,6 +101,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/projects/{project}/tasks/{task}/timeline', [TaskController::class, 'timeline'])->name('projects.tasks.timeline');
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
+    Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download'])->name('tasks.comments.attachments.download');
 
     // Task Sections
     Route::post('/projects/{project}/sections', [TaskSectionController::class, 'store'])->name('projects.sections.store');
@@ -106,6 +130,25 @@ Route::middleware('auth')->group(function () {
     // Settings (admin)
     Route::get('/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
+
+    // Custom Fields
+    Route::get('/projects/{project}/custom-fields', [CustomFieldController::class, 'index'])->name('projects.custom-fields.index');
+    Route::post('/projects/{project}/custom-fields', [CustomFieldController::class, 'store'])->name('projects.custom-fields.store');
+    Route::put('/projects/{project}/custom-fields/{customField}', [CustomFieldController::class, 'update'])->name('projects.custom-fields.update');
+    Route::delete('/projects/{project}/custom-fields/{customField}', [CustomFieldController::class, 'destroy'])->name('projects.custom-fields.destroy');
+    Route::post('/projects/{project}/custom-fields/reorder', [CustomFieldController::class, 'reorder'])->name('projects.custom-fields.reorder');
+
+    // Task Custom Field Values
+    Route::patch('/projects/{project}/tasks/{task}/custom-field-values', [TaskCustomFieldValueController::class, 'update'])->name('projects.tasks.custom-field-values.update');
+
+    // Project Forms
+    Route::get('/projects/{project}/forms', [FormController::class, 'index'])->name('projects.forms.index');
+    Route::get('/projects/{project}/forms/create', [FormController::class, 'create'])->name('projects.forms.create');
+    Route::post('/projects/{project}/forms', [FormController::class, 'store'])->name('projects.forms.store');
+    Route::get('/projects/{project}/forms/{form}/edit', [FormController::class, 'edit'])->name('projects.forms.edit');
+    Route::put('/projects/{project}/forms/{form}', [FormController::class, 'update'])->name('projects.forms.update');
+    Route::delete('/projects/{project}/forms/{form}', [FormController::class, 'destroy'])->name('projects.forms.destroy');
+    Route::patch('/projects/{project}/forms/{form}/toggle', [FormController::class, 'toggle'])->name('projects.forms.toggle');
 
     // Project Automation Rules
     Route::get('/projects/{project}/automation-rules', [ProjectAutomationRuleController::class, 'index'])->name('projects.automation-rules.index');

@@ -10,8 +10,16 @@ class UpdateTaskRequest extends FormRequest
     {
         $task = $this->route('task');
 
-        return $this->user()->can('manage-tasks')
-            || $task->project->owner_id === $this->user()->id
+        if ($this->user()->can('manage-tasks')) {
+            return true;
+        }
+
+        if ($task->isStandalone()) {
+            return $task->created_by === $this->user()->id
+                || $task->assigned_to === $this->user()->id;
+        }
+
+        return $task->project->owner_id === $this->user()->id
             || $task->assigned_to === $this->user()->id;
     }
 
@@ -23,6 +31,7 @@ class UpdateTaskRequest extends FormRequest
             'status' => ['required', 'string', 'in:backlog,to_do,in_progress,in_review,done,cancelled'],
             'priority' => ['required', 'string', 'in:low,medium,high,urgent'],
             'assigned_to' => ['nullable', 'exists:users,id'],
+            'project_id' => ['nullable', 'exists:projects,id'],
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
             'parent_id' => ['nullable', 'exists:tasks,id'],
@@ -32,6 +41,7 @@ class UpdateTaskRequest extends FormRequest
             'recurrence_frequency' => ['required_if:is_recurring,true', 'nullable', 'string', 'in:daily,weekly,monthly,yearly'],
             'recurrence_interval' => ['required_if:is_recurring,true', 'nullable', 'integer', 'min:1', 'max:365'],
             'section_id' => ['nullable', 'exists:task_sections,id'],
+            'custom_field_values' => ['nullable', 'array'],
         ];
     }
 
@@ -43,12 +53,18 @@ class UpdateTaskRequest extends FormRequest
             return $validated;
         }
 
-        // Only admins and project owners can change assignee and dates
         $task = $this->route('task');
-        $canManage = $this->user()->can('manage-tasks')
-            || $task->project->owner_id === $this->user()->id;
+        $canManage = $this->user()->can('manage-tasks');
 
-        if (!$canManage) {
+        if (! $canManage && ! $task->isStandalone()) {
+            $canManage = $task->project->owner_id === $this->user()->id;
+        }
+
+        if (! $canManage && $task->isStandalone()) {
+            $canManage = $task->created_by === $this->user()->id;
+        }
+
+        if (! $canManage) {
             unset($validated['assigned_to'], $validated['start_date'], $validated['due_date']);
         }
 

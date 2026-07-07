@@ -19,21 +19,36 @@ class TaskPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('manage-tasks');
+        return true;
     }
 
     public function update(User $user, Task $task): bool
     {
-        return $user->hasPermissionTo('manage-tasks')
-            || $task->project->owner_id === $user->id
+        if ($user->hasPermissionTo('manage-tasks')) {
+            return true;
+        }
+
+        if ($task->isStandalone()) {
+            return $task->created_by === $user->id
+                || $task->assigned_to === $user->id;
+        }
+
+        return $task->project->owner_id === $user->id
             || $task->project->isProjectAdmin($user)
             || $task->assigned_to === $user->id;
     }
 
     public function delete(User $user, Task $task): bool
     {
-        return $user->hasPermissionTo('manage-tasks')
-            || $task->project->owner_id === $user->id
+        if ($user->hasPermissionTo('manage-tasks')) {
+            return true;
+        }
+
+        if ($task->isStandalone()) {
+            return $task->created_by === $user->id;
+        }
+
+        return $task->project->owner_id === $user->id
             || $task->project->isProjectAdmin($user);
     }
 }

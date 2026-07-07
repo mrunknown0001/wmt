@@ -12,10 +12,12 @@ use App\Models\User;
 use App\Notifications\CommentDeletedNotification;
 use App\Notifications\TaskCommentMentionNotification;
 use App\Notifications\TaskCommentNotification;
+use App\Models\CommentAttachment;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TaskCommentController extends Controller
 {
@@ -54,7 +56,9 @@ class TaskCommentController extends Controller
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
                 'url' => asset('storage/'.$a->file_path),
+                'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
                 'is_image' => str_starts_with($a->file_type, 'image/'),
+                'is_video' => str_starts_with($a->file_type, 'video/'),
             ])->toArray(),
             'created_at' => $comment->created_at->toIso8601String(),
         ]))->toOthers();
@@ -119,6 +123,15 @@ class TaskCommentController extends Controller
         return $mentionedIds;
     }
 
+    public function download(Request $request, Project $project, Task $task, TaskComment $comment, CommentAttachment $attachment): StreamedResponse
+    {
+        if ($attachment->task_comment_id !== $comment->id) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
+    }
+
     public function destroy(Request $request, Project $project, Task $task, TaskComment $comment): RedirectResponse
     {
         if ($comment->user_id !== $request->user()->id && ! $request->user()->hasRole('admin')) {
@@ -128,6 +141,81 @@ class TaskCommentController extends Controller
         $this->notifyMentionedUsersOfDeletion($comment, $task, $request->user());
 
         // Delete attached files from disk
+        foreach ($comment->attachments as $attachment) {
+            Storage::disk('public')->delete($attachment->file_path);
+        }
+        Storage::disk('public')->deleteDirectory("comment-attachments/{$comment->id}");
+
+        $commentId = $comment->id;
+        $comment->delete();
+
+        broadcast(new TaskCommentDeleted($task->id, $commentId, $request->user()->id))->toOthers();
+
+        return back()->with('success', 'Comment deleted.');
+    }
+
+    public function storeStandalone(StoreTaskCommentRequest $request, Task $task): RedirectResponse
+    {
+        $comment = $task->comments()->create([
+            'user_id' => $request->user()->id,
+            'body' => $request->body ?? '',
+        ]);
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->store("comment-attachments/{$comment->id}", 'public');
+
+                $comment->attachments()->create([
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_path' => $path,
+                    'file_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
+            }
+        }
+
+        $this->notifyMentionedUsers($comment, $task, $request->user());
+        $this->notifyAssignees($comment, $task, $request->user());
+
+        $comment->load('user', 'attachments');
+        broadcast(new TaskCommentCreated($task->id, [
+            'id' => $comment->id,
+            'type' => 'comment',
+            'body' => $comment->body,
+            'user' => $comment->user ? ['id' => $comment->user->id, 'name' => $comment->user->name] : null,
+            'attachments' => $comment->attachments->map(fn ($a) => [
+                'id' => $a->id,
+                'file_name' => $a->file_name,
+                'file_type' => $a->file_type,
+                'file_size' => $a->file_size,
+                'url' => asset('storage/'.$a->file_path),
+                'download_url' => url("/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
+                'is_image' => str_starts_with($a->file_type, 'image/'),
+                'is_video' => str_starts_with($a->file_type, 'video/'),
+            ])->toArray(),
+            'created_at' => $comment->created_at->toIso8601String(),
+        ]))->toOthers();
+
+        return back()->with('success', 'Comment added.');
+    }
+
+    public function downloadStandalone(Request $request, Task $task, TaskComment $comment, CommentAttachment $attachment): StreamedResponse
+    {
+        if ($attachment->task_comment_id !== $comment->id) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
+    }
+
+    public function destroyStandalone(Request $request, Task $task, TaskComment $comment): RedirectResponse
+    {
+        if ($comment->user_id !== $request->user()->id && ! $request->user()->hasRole('admin')) {
+            abort(403);
+        }
+
+        $this->notifyMentionedUsersOfDeletion($comment, $task, $request->user());
+
         foreach ($comment->attachments as $attachment) {
             Storage::disk('public')->delete($attachment->file_path);
         }

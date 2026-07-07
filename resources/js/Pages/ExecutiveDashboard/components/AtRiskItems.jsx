@@ -3,6 +3,7 @@ import Card from '../../../Components/Card';
 import Avatar from '../../../Components/Avatar';
 import PriorityBadge from '../../../Components/PriorityBadge';
 import StatusBadge from '../../../Components/StatusBadge';
+import { taskEditUrl } from '../../../utils';
 
 export default function AtRiskItems({ items }) {
     if (!items?.length) {
@@ -26,7 +27,7 @@ export default function AtRiskItems({ items }) {
                         {item.assignee && <Avatar name={item.assignee.name} size="sm" />}
                         <div className="flex-1 min-w-0">
                             <Link
-                                href={`/projects/${item.project?.id}/tasks/${item.id}/edit`}
+                                href={taskEditUrl(item)}
                                 className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 truncate block"
                             >
                                 {item.title}

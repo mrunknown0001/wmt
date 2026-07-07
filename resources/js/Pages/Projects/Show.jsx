@@ -30,10 +30,13 @@ import EmptyState from '../../Components/EmptyState';
 import KanbanColumn from '../../Components/KanbanColumn';
 import { ConfirmModal } from '../../Components/Modal';
 import AutomationRuleBuilder from '../../Components/AutomationRuleBuilder';
+import CustomFieldManager from '../../Components/CustomFieldManager';
 import StatusPicker from '../../Components/StatusPicker';
 import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
 import InlineDatePicker from '../../Components/InlineDatePicker';
+import CelebrationEffect from '../../Components/CelebrationEffect';
+import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import echo from '../../echo';
 
@@ -87,8 +90,59 @@ const TrashIcon = () => (
     </svg>
 );
 
+// Render a custom field value for a task row
+function renderCustomFieldValue(task, customField) {
+    const cfValues = task.custom_field_values || [];
+    const cfv = cfValues.find(v => v.custom_field_id === customField.id);
+    if (!cfv) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+
+    switch (customField.type) {
+        case 'text':
+        case 'textarea':
+            return cfv.value_text || '—';
+        case 'number':
+            return cfv.value_number != null ? cfv.value_number : '—';
+        case 'date':
+            return cfv.value_date ? formatDate(cfv.value_date) : '—';
+        case 'single_select': {
+            const opt = cfv.selected_option;
+            if (!opt) return '—';
+            return (
+                <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={opt.color ? { backgroundColor: opt.color + '20', color: opt.color } : undefined}
+                >
+                    {opt.color && <span className="w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: opt.color }} />}
+                    {opt.label}
+                </span>
+            );
+        }
+        case 'multi_select': {
+            const selectedIds = cfv.value_json || [];
+            if (!selectedIds.length) return '—';
+            const options = (customField.options || []).filter(o => selectedIds.map(String).includes(String(o.id)));
+            return (
+                <div className="flex flex-wrap gap-1">
+                    {options.map(opt => (
+                        <span
+                            key={opt.id}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                            style={opt.color ? { backgroundColor: opt.color + '20', color: opt.color } : undefined}
+                        >
+                            {opt.color && <span className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: opt.color }} />}
+                            {opt.label}
+                        </span>
+                    ))}
+                </div>
+            );
+        }
+        default:
+            return '—';
+    }
+}
+
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [] }) {
     const {
         attributes,
         listeners,
@@ -120,15 +174,16 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     };
 
     return (
-        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
-            <td className="pl-10 pr-2 py-3 w-10">
+        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
+            <td className="relative pl-10 pr-2 py-3 w-10">
+                <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id); }}
+                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className={`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    className={`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
                         isDone
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400'
+                            ? 'bg-green-500 border-green-500 text-white scale-110'
+                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
                     }`}
                     title={isDone ? 'Mark incomplete' : 'Mark complete'}
                 >
@@ -243,6 +298,22 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     )}
                 </div>
             </td>
+            {customFields.map(cf => (
+                <td key={cf.id} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    {canEditTask ? (
+                        <InlineCustomFieldEditor
+                            task={task}
+                            customField={cf}
+                            isOpen={openPopover === `cf-${cf.id}`}
+                            onToggle={togglePopover(`cf-${cf.id}`)}
+                            onUpdate={onCustomFieldUpdate}
+                            formatDate={formatDate}
+                        />
+                    ) : (
+                        renderCustomFieldValue(task, cf)
+                    )}
+                </td>
+            ))}
             <td className="px-6 py-3 text-sm text-right">
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
@@ -272,7 +343,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [] }) {
     const {
         attributes,
         listeners,
@@ -310,16 +381,17 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             {...attributes}
             {...listeners}
             onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
-            className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
+            className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
         >
-            <td className="pl-6 pr-2 py-4 w-10">
+            <td className="relative pl-6 pr-2 py-4 w-10">
+                <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id); }}
+                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
                         isDone
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400'
+                            ? 'bg-green-500 border-green-500 text-white scale-110'
+                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
                     }`}
                     title={isDone ? 'Mark incomplete' : 'Mark complete'}
                 >
@@ -463,6 +535,22 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     )}
                 </div>
             </td>
+            {customFields.map(cf => (
+                <td key={cf.id} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    {canEditTask ? (
+                        <InlineCustomFieldEditor
+                            task={task}
+                            customField={cf}
+                            isOpen={openPopover === `cf-${cf.id}`}
+                            onToggle={togglePopover(`cf-${cf.id}`)}
+                            onUpdate={onCustomFieldUpdate}
+                            formatDate={formatDate}
+                        />
+                    ) : (
+                        renderCustomFieldValue(task, cf)
+                    )}
+                </td>
+            ))}
             <td className="px-6 py-4 text-sm text-right">
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
@@ -592,7 +680,7 @@ function SectionDropZone({ sectionId }) {
     const { setNodeRef, isOver } = useDroppable({ id: `section-${sectionId ?? 'null'}` });
     return (
         <tr ref={setNodeRef}>
-            <td colSpan={7} className={`transition-colors ${isOver ? 'py-2' : 'py-0'}`}>
+            <td colSpan={99} className={`transition-colors ${isOver ? 'py-2' : 'py-0'}`}>
                 {isOver && (
                     <div className="mx-4 border-2 border-dashed border-primary-300 dark:border-primary-600 rounded py-2 text-center text-xs text-primary-500 font-medium">
                         Drop here
@@ -622,7 +710,7 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
 
     return (
         <tr ref={setNodeRef} style={style} className="bg-gray-100 dark:bg-gray-800/80">
-            <td colSpan={7} className="px-4 py-2">
+            <td colSpan={99} className="px-4 py-2">
                 <div className="flex items-center gap-2">
                     {canManage && (
                         <button
@@ -694,7 +782,7 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
 }
 
 export default function Show() {
-    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, auth, users } = usePage().props;
+    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], auth, users } = usePage().props;
 
     const [showDetails, setShowDetails] = useState(false);
     const [view, setView] = useState('list');
@@ -719,6 +807,8 @@ export default function Show() {
     const [editingSectionName, setEditingSectionName] = useState('');
     const [addingSectionName, setAddingSectionName] = useState(null); // null = not adding, string = input value
     const [showAutomation, setShowAutomation] = useState(false);
+    const [showCustomFields, setShowCustomFields] = useState(false);
+    const [celebration, setCelebration] = useState(null); // { x, y } or null
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -982,6 +1072,51 @@ export default function Show() {
         });
     }, [localTasks, project.id, serverTasks, handleInlineUpdate]);
 
+    // Inline custom field value update (optimistic)
+    const handleCustomFieldUpdate = useCallback((taskId, fieldId, fieldType, value) => {
+        // Build optimistic custom_field_values entry
+        const buildOptimisticCfv = (existingValues) => {
+            const values = [...(existingValues || [])];
+            const idx = values.findIndex(v => v.custom_field_id === fieldId);
+            const entry = {
+                custom_field_id: fieldId,
+                value_text: (fieldType === 'text' || fieldType === 'textarea') ? value : null,
+                value_number: fieldType === 'number' ? value : null,
+                value_date: fieldType === 'date' ? value : null,
+                value_option_id: fieldType === 'single_select' ? value : null,
+                value_json: fieldType === 'multi_select' ? value : null,
+                selected_option: fieldType === 'single_select' && value
+                    ? (initialCustomFields.find(cf => cf.id === fieldId)?.options || []).find(o => o.id === Number(value)) || null
+                    : null,
+            };
+            if (idx >= 0) { values[idx] = { ...values[idx], ...entry }; }
+            else { values.push(entry); }
+            return values;
+        };
+
+        // Update in localTasks (could be parent or subtask)
+        setLocalTasks((prev) => prev.map((t) => {
+            if (t.id === taskId) {
+                return { ...t, custom_field_values: buildOptimisticCfv(t.custom_field_values) };
+            }
+            const subIdx = t.subtasks?.findIndex((s) => s.id === taskId);
+            if (subIdx !== undefined && subIdx >= 0) {
+                const updatedSubs = [...t.subtasks];
+                updatedSubs[subIdx] = { ...updatedSubs[subIdx], custom_field_values: buildOptimisticCfv(updatedSubs[subIdx].custom_field_values) };
+                return { ...t, subtasks: updatedSubs };
+            }
+            return t;
+        }));
+
+        // Persist
+        apiFetch(`/projects/${project.id}/tasks/${taskId}/custom-field-values`, {
+            method: 'PATCH',
+            body: JSON.stringify({ values: { [fieldId]: value } }),
+        }).catch(() => {
+            setLocalTasks(serverTasks);
+        });
+    }, [project.id, initialCustomFields, serverTasks]);
+
     // --- List view drag over (cross-section movement) ---
     const handleListDragOver = useCallback((event) => {
         const { active, over } = event;
@@ -1225,7 +1360,7 @@ export default function Show() {
         });
     };
 
-    const handleToggleComplete = useCallback((taskId) => {
+    const handleToggleComplete = useCallback((taskId, clickEvent) => {
         // Check parent tasks first, then subtasks
         let task = localTasks.find((t) => t.id === taskId);
         if (!task) {
@@ -1236,6 +1371,13 @@ export default function Show() {
         }
         if (!task) return;
         const newStatus = task.status === 'done' ? 'to_do' : 'done';
+
+        // Trigger celebration when completing (not uncompleting)
+        if (newStatus === 'done' && clickEvent) {
+            const rect = clickEvent.currentTarget.getBoundingClientRect();
+            setCelebration({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+        }
+
         handleSubtaskInlineUpdate(taskId, 'status', newStatus);
     }, [localTasks, handleSubtaskInlineUpdate]);
 
@@ -1365,6 +1507,12 @@ export default function Show() {
                 actions={
                     canManageProject && (
                         <div className="flex items-center gap-2">
+                            <LinkButton href={`/projects/${project.id}/forms`} variant="secondary" size="sm">
+                                Forms
+                            </LinkButton>
+                            <Button variant="secondary" size="sm" onClick={() => setShowCustomFields(v => !v)}>
+                                Custom Fields
+                            </Button>
                             {canManageTasks && (
                                 <Button variant="secondary" size="sm" onClick={() => setShowAutomation(v => !v)}>
                                     <AutomationIcon /> Automation
@@ -1387,6 +1535,16 @@ export default function Show() {
                     )
                 }
             />
+
+            {/* Custom Fields Panel */}
+            {showCustomFields && (
+                <Card className="mb-6">
+                    <CustomFieldManager
+                        projectId={project.id}
+                        initialFields={initialCustomFields}
+                    />
+                </Card>
+            )}
 
             {/* Automation Rules Panel */}
             {showAutomation && canManageTasks && (
@@ -1588,7 +1746,7 @@ export default function Show() {
                             onDragOver={handleListDragOver}
                             onDragEnd={handleListDragEnd}
                         >
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto styled-scrollbar-x">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
@@ -1598,6 +1756,9 @@ export default function Show() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Priority</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assignee</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dates</th>
+                                        {initialCustomFields.map(cf => (
+                                            <th key={cf.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">{cf.name}</th>
+                                        ))}
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
@@ -1644,11 +1805,13 @@ export default function Show() {
                                                                         handleDeleteTask={handleDeleteTask}
                                                                         users={users}
                                                                         onTaskUpdate={handleInlineUpdate}
+                                                                        onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                         onToggleComplete={handleToggleComplete}
                                                                         isExpanded={expandedTasks.has(task.id)}
                                                                         onToggleExpand={handleToggleExpand}
                                                                         isSelected={selectedTasks.has(task.id)}
                                                                         onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                                                        customFields={initialCustomFields}
                                                                     />
                                                                     {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                                         <DndContext
@@ -1669,6 +1832,8 @@ export default function Show() {
                                                                                         onToggleComplete={handleToggleComplete}
                                                                                         users={users}
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                                        onCustomFieldUpdate={handleCustomFieldUpdate}
+                                                                                        customFields={initialCustomFields}
                                                                                     />
                                                                                 ))}
                                                                             </SortableContext>
@@ -1676,7 +1841,7 @@ export default function Show() {
                                                                     )}
                                                                     {expandedTasks.has(task.id) && canManageTasks && (
                                                                         <tr className="bg-gray-50/50 dark:bg-gray-800/30">
-                                                                            <td colSpan={7} className="pl-14 py-2">
+                                                                            <td colSpan={99} className="pl-14 py-2">
                                                                                 <Link
                                                                                     href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
                                                                                     className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
@@ -1697,7 +1862,7 @@ export default function Show() {
                                             {/* Add section button */}
                                             {canManageTasks && (
                                                 <tr>
-                                                    <td colSpan={7} className="px-6 py-2">
+                                                    <td colSpan={99} className="px-6 py-2">
                                                         {addingSectionName !== null ? (
                                                             <input
                                                                 autoFocus
@@ -1737,11 +1902,13 @@ export default function Show() {
                                                             handleDeleteTask={handleDeleteTask}
                                                             users={users}
                                                             onTaskUpdate={handleInlineUpdate}
+                                                            onCustomFieldUpdate={handleCustomFieldUpdate}
                                                             onToggleComplete={handleToggleComplete}
                                                             isExpanded={expandedTasks.has(task.id)}
                                                             onToggleExpand={handleToggleExpand}
                                                             isSelected={selectedTasks.has(task.id)}
                                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                                            customFields={initialCustomFields}
                                                         />
                                                         {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                             <DndContext
@@ -1762,6 +1929,8 @@ export default function Show() {
                                                                             onToggleComplete={handleToggleComplete}
                                                                             users={users}
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
+                                                                            onCustomFieldUpdate={handleCustomFieldUpdate}
+                                                                            customFields={initialCustomFields}
                                                                         />
                                                                     ))}
                                                                 </SortableContext>
@@ -1769,7 +1938,7 @@ export default function Show() {
                                                         )}
                                                         {expandedTasks.has(task.id) && canManageTasks && (
                                                             <tr className="bg-gray-50/50 dark:bg-gray-800/30">
-                                                                <td colSpan={7} className="pl-14 py-2">
+                                                                <td colSpan={99} className="pl-14 py-2">
                                                                     <Link
                                                                         href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
                                                                         className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
@@ -1785,7 +1954,7 @@ export default function Show() {
                                             {/* Add section button when no sections exist yet */}
                                             {canManageTasks && (
                                                 <tr>
-                                                    <td colSpan={7} className="px-6 py-2">
+                                                    <td colSpan={99} className="px-6 py-2">
                                                         {addingSectionName !== null ? (
                                                             <input
                                                                 autoFocus
@@ -1843,6 +2012,7 @@ export default function Show() {
                         </DndContext>
                     ) : (
                         <EmptyState
+                            illustration={hasActiveFilters ? 'search' : 'tasks'}
                             title={hasActiveFilters ? 'No matching tasks' : 'No tasks yet'}
                             description={hasActiveFilters ? 'Try adjusting your filters.' : 'Get started by adding the first task to this project.'}
                             action={
@@ -1996,7 +2166,7 @@ export default function Show() {
                         </div>
 
                         {/* Calendar grid */}
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto styled-scrollbar-x">
                             <div className="min-w-[640px]">
                             <div className="grid grid-cols-7 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                                 {DAYS.map((day) => (
@@ -2150,7 +2320,7 @@ export default function Show() {
                             />
                         ) : (
                             <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto styled-scrollbar-x">
                                     <div style={{ minWidth: `${240 + totalWidth}px` }}>
                                         {/* Header: month row */}
                                         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -2367,6 +2537,14 @@ export default function Show() {
                 title={confirmDelete?.title}
                 message={confirmDelete?.message}
             />
+
+            {celebration && (
+                <CelebrationEffect
+                    x={celebration.x}
+                    y={celebration.y}
+                    onComplete={() => setCelebration(null)}
+                />
+            )}
         </AuthenticatedLayout>
     );
 }

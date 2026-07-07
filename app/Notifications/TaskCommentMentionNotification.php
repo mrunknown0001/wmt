@@ -40,7 +40,7 @@ class TaskCommentMentionNotification extends Notification implements ShouldQueue
             ->line("{$this->mentionedBy->name} mentioned you in a comment.")
             ->line("**{$this->task->title}** in project {$this->task->project?->name}")
             ->line("\"{$preview}\"")
-            ->action('View Task', url("/projects/{$this->task->project_id}/tasks/{$this->task->id}/edit"))
+            ->action('View Task', url($this->task->getEditUrl()))
             ->line('Thank you for using ' . config('app.name') . '!');
     }
 

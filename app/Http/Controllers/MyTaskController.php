@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,6 +32,9 @@ class MyTaskController extends Controller
             'noDueDate' => $activeTasks->filter(fn ($t) => !$t->due_date),
         ];
 
+        $canAssignOthers = $user->hasPermissionTo('manage-tasks')
+            || $user->hasAnyRole(['supervisor', 'division_head', 'executive', 'admin']);
+
         return Inertia::render('MyTasks/Index', [
             'allTasks' => $allTasks->values(),
             'taskGroups' => [
@@ -44,6 +49,15 @@ class MyTaskController extends Controller
                 'overdue' => $grouped['overdue']->count(),
                 'dueToday' => $grouped['dueToday']->count(),
             ],
+            'canAssignOthers' => $canAssignOthers,
+            'users' => $canAssignOthers
+                ? User::where('is_active', true)->orderBy('name')->get(['id', 'name'])
+                : [],
+            'projects' => Project::where('status', '!=', 'archived')
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
+            'priorities' => ['low', 'medium', 'high', 'urgent'],
         ]);
     }
 }

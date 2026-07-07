@@ -52,6 +52,7 @@ class TaskController extends Controller
                     'url' => $a->url,
                     'download_url' => url("/api/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
                     'is_image' => $a->isImage(),
+                    'is_video' => $a->isVideo(),
                 ]),
             ]);
 
@@ -146,12 +147,10 @@ class TaskController extends Controller
 
     public function storeComment(Request $request, Project $project, Task $task): JsonResponse
     {
-        $maxKb = \App\Models\Setting::current()->max_upload_size * 1024;
-
         $request->validate([
             'body' => ['required_without:attachments', 'nullable', 'string', 'max:2000'],
             'attachments' => ['nullable', 'array', 'max:5'],
-            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf', "max:{$maxKb}"],
+            'attachments.*' => ['file', new \App\Rules\CommentAttachmentFile],
         ]);
 
         $comment = $task->comments()->create([
@@ -187,6 +186,7 @@ class TaskController extends Controller
                 'file_size' => $a->file_size,
                 'url' => asset('storage/'.$a->file_path),
                 'is_image' => str_starts_with($a->file_type, 'image/'),
+                'is_video' => str_starts_with($a->file_type, 'video/'),
             ])->toArray(),
             'created_at' => $comment->created_at->toIso8601String(),
         ]))->toOthers();
@@ -204,6 +204,7 @@ class TaskController extends Controller
                 'url' => $a->url,
                 'download_url' => url("/api/projects/{$project->id}/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
                 'is_image' => $a->isImage(),
+                'is_video' => $a->isVideo(),
             ]),
         ]], 201);
     }

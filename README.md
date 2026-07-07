@@ -16,6 +16,7 @@ Operational workload management platform with Asana-like task management, organi
 | Styling | Tailwind CSS v4 |
 | Rich Text | TipTap (WYSIWYG editor) |
 | Drag & Drop | @dnd-kit |
+| AI | OpenAI / OpenRouter (configurable via `AI_PLATFORM` env var) |
 | Dev environment | Docker Compose |
 
 ## Getting Started
@@ -41,17 +42,26 @@ Default admin login: `admin@wmt.com` / `password`
 
 - **Organization Hierarchy** — Divisions → Departments → Teams → Users
 - **Project Management** — Full CRUD with owner/admin roles, member management
-- **Kanban Board** — Drag-and-drop task cards with inline editing
+- **Kanban Board** — Drag-and-drop task cards with inline editing and dual view (board/list)
 - **Task Sections** — Asana-style grouping within projects
+- **Subtasks** — Hierarchical parent-child tasks with progress tracking
 - **Recurring Tasks** — Daily/weekly/monthly/yearly with auto-generation
-- **Comments & @Mentions** — Rich text comments with user mentions
-- **Real-time Notifications** — WebSocket push + email (per-user preferences)
+- **Comments & @Mentions** — Rich text comments with user mentions and file attachments
+- **Real-time Notifications** — WebSocket push + email (8 types, per-user preferences, bookmark/archive/mention filters)
 - **Escalated Due Dates** — Tiered overdue escalation through org hierarchy
 - **Workflow Automation** — Project-level rule builder (trigger → conditions → actions)
+- **AI Chat Assistant** — Streaming multi-turn conversations with organizational context
 - **Executive Dashboard** — Org-wide stats with hierarchical drill-down
-- **Activity Log** — Centralized audit trail across all projects
-- **Dark Mode** — Full dark/light theme support
 - **Customizable Dashboard** — 7 togglable widgets, persisted per user
+- **Activity Log** — Centralized audit trail across all projects
+- **Custom Fields** — 5 types (text, number, date, single select, multi select) per project with inline editing
+- **Form Builder** — Asana-style form designer with tabs (Questions/Settings), drag-and-drop, custom field mapping, file attachments, and public form links
+- **Calendar** — Monthly grid view with priority-colored task pills
+- **My Tasks** — Personal task view grouped by due date urgency
+- **Personal To-Do List** — Sidebar widget with drag-and-drop reordering and completion animations
+- **Celebration Effect** — Canvas particle animation on task completion
+- **UI/UX Polish** — ClickUp-inspired micro-interactions, animations, and hover feedback
+- **Dark Mode** — Full dark/light theme support with customizable primary color
 
 See [FEATURES.md](FEATURES.md) for the complete feature list.
 

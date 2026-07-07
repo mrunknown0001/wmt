@@ -8,6 +8,8 @@ use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\CustomField;
+use App\Models\TaskCustomFieldValue;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\ActivityLogger;
@@ -47,6 +49,7 @@ class TaskController extends Controller
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
             'recurrenceFrequencies' => Task::RECURRENCE_FREQUENCIES,
+            'customFields' => $project->customFields()->with('options')->get(),
         ]);
     }
 
@@ -72,7 +75,8 @@ class TaskController extends Controller
         }
 
         $collaboratorIds = $validated['collaborator_ids'] ?? [];
-        unset($validated['collaborator_ids']);
+        $customFieldValues = $validated['custom_field_values'] ?? [];
+        unset($validated['collaborator_ids'], $validated['custom_field_values']);
 
         $task = $project->tasks()->create([
             ...$validated,
@@ -82,6 +86,15 @@ class TaskController extends Controller
 
         if (!empty($collaboratorIds)) {
             $task->collaborators()->sync($collaboratorIds);
+        }
+
+        // Save custom field values
+        foreach ($customFieldValues as $fieldId => $value) {
+            $customField = CustomField::where('id', $fieldId)->where('project_id', $project->id)->first();
+            if (!$customField || $value === null || $value === '') continue;
+            $cfv = new TaskCustomFieldValue(['task_id' => $task->id, 'custom_field_id' => $fieldId]);
+            $cfv->setTypedValue($customField->type, $value);
+            $cfv->save();
         }
 
         TaskActivityLogger::logCreated($task, $request->user());
@@ -119,7 +132,9 @@ class TaskController extends Controller
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
                 'url' => asset('storage/' . $a->file_path),
+                'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
                 'is_image' => str_starts_with($a->file_type, 'image/'),
+                'is_video' => str_starts_with($a->file_type, 'video/'),
             ]),
             'created_at' => $c->created_at->toIso8601String(),
         ]);
@@ -180,6 +195,9 @@ class TaskController extends Controller
             || $project->owner_id === auth()->id()
             || $project->isProjectAdmin(auth()->user());
 
+        $customFields = $project->customFields()->with('options')->get();
+        $customFieldValues = $task->customFieldValues()->get()->keyBy('custom_field_id');
+
         return Inertia::render('Tasks/Edit', [
             'project' => $project,
             'task' => $task,
@@ -192,6 +210,8 @@ class TaskController extends Controller
             'recurrenceFrequencies' => Task::RECURRENCE_FREQUENCIES,
             'recurrenceChain' => $recurrenceChain,
             'canManageTaskDetails' => $canManageTaskDetails,
+            'customFields' => $customFields,
+            'customFieldValues' => $customFieldValues,
         ]);
     }
 
@@ -204,12 +224,26 @@ class TaskController extends Controller
 
         $validated = $request->validated();
         $collaboratorIds = $validated['collaborator_ids'] ?? null;
-        unset($validated['collaborator_ids']);
+        $customFieldValues = $validated['custom_field_values'] ?? null;
+        unset($validated['collaborator_ids'], $validated['custom_field_values']);
 
         $task->update($validated);
 
         if ($collaboratorIds !== null) {
             $task->collaborators()->sync($collaboratorIds);
+        }
+
+        // Update custom field values
+        if ($customFieldValues !== null) {
+            foreach ($customFieldValues as $fieldId => $value) {
+                $customField = CustomField::where('id', $fieldId)->where('project_id', $project->id)->first();
+                if (!$customField) continue;
+                $cfv = TaskCustomFieldValue::updateOrCreate(
+                    ['task_id' => $task->id, 'custom_field_id' => $fieldId],
+                );
+                $cfv->setTypedValue($customField->type, $value);
+                $cfv->save();
+            }
         }
 
         TaskActivityLogger::logChanges($task, $oldValues, $request->user());
@@ -342,7 +376,9 @@ class TaskController extends Controller
                     'file_type' => $a->file_type,
                     'file_size' => $a->file_size,
                     'url' => asset('storage/' . $a->file_path),
+                    'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
                     'is_image' => str_starts_with($a->file_type, 'image/'),
+                    'is_video' => str_starts_with($a->file_type, 'video/'),
                 ]),
                 'created_at' => $c->created_at->toIso8601String(),
             ]);

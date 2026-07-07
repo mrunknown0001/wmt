@@ -69,6 +69,13 @@ export const svgPriorityColors = {
     low: '#9ca3af', medium: '#3b82f6', high: '#f97316', urgent: '#ef4444',
 };
 
+export const taskEditUrl = (task) => {
+    if (task.project_id) {
+        return `/projects/${task.project_id}/tasks/${task.id}/edit`;
+    }
+    return `/tasks/${task.id}/edit`;
+};
+
 export const getInitials = (name) => {
     if (!name) return '?';
     return name

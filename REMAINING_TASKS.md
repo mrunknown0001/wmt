@@ -3,7 +3,6 @@
 ## High Priority
 
 ### Task Enhancements
-- [ ] File/image attachments on tasks
 - [ ] Task dependencies (blocked-by / blocks relationships)
 - [ ] Task labels/tags for categorization
 - [ ] Task time tracking (log hours, estimates vs actuals)
@@ -20,11 +19,7 @@
 - [ ] Project archiving workflow with confirmation
 
 ### Notification Improvements
-- [ ] Email notification channel (currently database + broadcast only)
-- [ ] User notification preferences (per-type opt-in/opt-out)
 - [ ] Digest emails (daily/weekly summary)
-- [ ] @mention notifications in comments
-- [ ] Notification for task comments (notify assignee and collaborators)
 
 ## Medium Priority
 
@@ -45,7 +40,6 @@
 ### User Experience
 - [ ] Keyboard shortcuts (navigate board, quick-create task)
 - [ ] Drag-and-drop file upload on task edit
-- [ ] Rich text editor for task descriptions and comments (Markdown or WYSIWYG)
 - [ ] Mobile-responsive improvements for Kanban board
 - [ ] Customizable Kanban column visibility (hide/show specific statuses)
 - [ ] Task card customization (choose which fields to display)
@@ -68,7 +62,6 @@
 
 ### Governance & Compliance
 - [ ] Approval workflows (task status requires manager sign-off)
-- [ ] Audit log (who changed what, when — exportable)
 - [ ] SLA tracking (response time, resolution time)
 - [ ] Risk register tied to projects
 - [ ] Document management (policies, SOPs linked to projects)
@@ -93,7 +86,6 @@
 - [ ] Redis caching for frequently accessed data (project lists, user lists)
 - [ ] Lazy loading for large task boards (virtual scrolling)
 - [ ] Background job for recurring task generation (currently synchronous)
-- [ ] Rate limiting on API endpoints
 
 ### Testing
 - [ ] Unit tests for models and services
@@ -107,3 +99,15 @@
 - [ ] User guide / help pages
 - [ ] Admin setup guide
 - [ ] Developer onboarding docs
+
+---
+
+## Completed (Previously Listed)
+- [x] File/image attachments on tasks (via form builder + comment attachments)
+- [x] Rich text editor for task descriptions and comments (TipTap WYSIWYG)
+- [x] Email notification channel (all 8 types with queued delivery)
+- [x] User notification preferences (per-type toggle switches)
+- [x] @mention notifications in comments (with searchable autocomplete)
+- [x] Notification for task comments (notify assignee and collaborators)
+- [x] Rate limiting on API endpoints (form submissions throttle:10,1)
+- [x] Audit log (centralized activity log across projects)

@@ -1,14 +1,16 @@
 import { getInitials } from '../utils';
 
-const palette = [
-    'bg-blue-500',
-    'bg-green-500',
-    'bg-purple-500',
-    'bg-orange-500',
-    'bg-pink-500',
-    'bg-teal-500',
-    'bg-indigo-500',
-    'bg-rose-500',
+const gradients = [
+    'from-blue-500 to-indigo-600',
+    'from-emerald-500 to-teal-600',
+    'from-purple-500 to-violet-600',
+    'from-orange-500 to-amber-600',
+    'from-pink-500 to-rose-600',
+    'from-teal-500 to-cyan-600',
+    'from-indigo-500 to-blue-600',
+    'from-rose-500 to-pink-600',
+    'from-violet-500 to-purple-600',
+    'from-cyan-500 to-sky-600',
 ];
 
 const sizes = {
@@ -22,15 +24,15 @@ function hashName(name) {
     for (let i = 0; i < (name || '').length; i++) {
         hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
-    return Math.abs(hash) % palette.length;
+    return Math.abs(hash) % gradients.length;
 }
 
 export default function Avatar({ name, size = 'md', className = '' }) {
-    const colorClass = palette[hashName(name)];
+    const gradientClass = gradients[hashName(name)];
 
     return (
         <span
-            className={`inline-flex items-center justify-center rounded-full text-white font-medium shrink-0 ${colorClass} ${sizes[size]} ${className}`}
+            className={`inline-flex items-center justify-center rounded-full text-white font-medium shrink-0 bg-linear-to-br ${gradientClass} shadow-sm ${sizes[size]} ${className}`}
             title={name || 'Unknown'}
         >
             {getInitials(name)}

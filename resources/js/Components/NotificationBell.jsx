@@ -139,7 +139,9 @@ export default function NotificationBell({ onToast }) {
 
     const handleClick = (notification) => {
         const data = notification.data;
-        const taskUrl = `/projects/${data.project_id}/tasks/${data.task_id}/edit`;
+        const taskUrl = data.project_id
+            ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
+            : `/tasks/${data.task_id}/edit`;
 
         if (!notification.read_at) {
             // Mark as read optimistically

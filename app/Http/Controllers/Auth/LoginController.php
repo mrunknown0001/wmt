@@ -14,7 +14,7 @@ class LoginController extends Controller
     public function create(): Response
     {
         return Inertia::render('Auth/Login', [
-            'turnstileSiteKey' => config('services.turnstile.site_key'),
+            'turnstileSiteKey' => config('services.turnstile.enabled') ? config('services.turnstile.site_key') : null,
         ]);
     }
 

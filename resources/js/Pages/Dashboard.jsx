@@ -14,28 +14,30 @@ import ActivityFeed from '../Components/Dashboard/ActivityFeed';
 import DonutChart from '../Components/Dashboard/DonutChart';
 import BarChart from '../Components/Dashboard/BarChart';
 import TeamWorkload from '../Components/Dashboard/TeamWorkload';
-import { formatDate } from '../utils';
+import { formatDate, taskEditUrl } from '../utils';
 
 function StatCard({ label, value, icon, color = 'blue', href }) {
-    const colors = {
-        blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-        green: 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-        purple: 'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-        red: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+    const gradients = {
+        blue: 'from-blue-500 to-indigo-600',
+        green: 'from-emerald-500 to-teal-600',
+        purple: 'from-purple-500 to-violet-600',
+        red: 'from-red-500 to-rose-600',
     };
 
     const content = (
-        <Card className="hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-4">
-                <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${colors[color]}`}>
+        <div className={`relative overflow-hidden rounded-xl bg-linear-to-br ${gradients[color]} p-5 shadow-sm hover:shadow-lg transition-shadow`}>
+            <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10" />
+            <div className="absolute bottom-0 right-0 -mb-6 -mr-6 h-20 w-20 rounded-full bg-white/5" />
+            <div className="relative flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white">
                     {icon}
                 </div>
                 <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{value}</p>
+                    <p className="text-sm text-white/80 font-medium">{label}</p>
+                    <p className="text-2xl font-bold text-white">{value}</p>
                 </div>
             </div>
-        </Card>
+        </div>
     );
 
     return href ? <Link href={href} className="block">{content}</Link> : content;
@@ -135,8 +137,8 @@ export default function Dashboard() {
                                     return (
                                         <Link
                                             key={task.id}
-                                            href={`/projects/${task.project_id}/tasks/${task.id}/edit`}
-                                            className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                            href={taskEditUrl(task)}
+                                            className="group relative flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                         >
                                             <div className={`w-1 h-8 rounded-full ${isOverdue ? 'bg-red-500' : 'bg-yellow-500'}`} />
                                             <div className="flex-1 min-w-0">
@@ -206,8 +208,9 @@ export default function Dashboard() {
                                     <Link
                                         key={project.id}
                                         href={`/projects/${project.id}`}
-                                        className="block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                        className="group relative block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                     >
+                                        <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         <div className="flex items-center gap-4">
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
@@ -227,6 +230,7 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <EmptyState
+                                illustration="projects"
                                 title="No projects yet"
                                 description="Create your first project to get started"
                                 action={<LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
@@ -248,8 +252,9 @@ export default function Dashboard() {
                                     <Link
                                         key={project.id}
                                         href={`/projects/${project.id}`}
-                                        className="block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                        className="group relative block px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                     >
+                                        <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         <div className="flex items-center gap-4">
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
@@ -270,6 +275,7 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <EmptyState
+                                illustration="projects"
                                 title="No involvements"
                                 description="Projects where you have assigned tasks will appear here"
                             />
@@ -288,9 +294,10 @@ export default function Dashboard() {
                                     return (
                                         <Link
                                             key={task.id}
-                                            href={`/projects/${task.project_id}/tasks/${task.id}/edit`}
-                                            className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                            href={taskEditUrl(task)}
+                                            className="group relative flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                         >
+                                            <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{task.title}</p>
                                                 <div className="flex items-center gap-2 mt-0.5">
@@ -309,6 +316,7 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <EmptyState
+                                illustration="tasks"
                                 title="No pending tasks"
                                 description="Tasks assigned to you will appear here"
                             />

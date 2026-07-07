@@ -19,6 +19,11 @@ class AutomationRuleEngine
             return;
         }
 
+        // Skip automation for standalone tasks (rules are project-scoped)
+        if (! $task->project_id) {
+            return;
+        }
+
         $rules = ProjectAutomationRule::where('project_id', $task->project_id)
             ->where('is_active', true)
             ->where('trigger_type', $triggerType)

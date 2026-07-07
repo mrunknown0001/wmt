@@ -36,4 +36,18 @@ class CommentAttachment extends Model
     {
         return str_starts_with($this->file_type, 'image/');
     }
+
+    public function isVideo(): bool
+    {
+        return str_starts_with($this->file_type, 'video/');
+    }
+
+    public function isSpreadsheet(): bool
+    {
+        return in_array($this->file_type, [
+            'text/csv',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
 }
