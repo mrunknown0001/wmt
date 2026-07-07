@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
+use App\Models\CommentAttachment;
 use App\Models\Task;
+use App\Models\TaskComment;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\ActivityLogger;
@@ -14,6 +16,8 @@ use App\Services\RecurringTaskService;
 use App\Services\TaskActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StandaloneTaskController extends Controller
 {
@@ -289,7 +293,32 @@ class StandaloneTaskController extends Controller
         ]], 201);
     }
 
-    private function notifyCommentMentions(\App\Models\TaskComment $comment, Task $task, \App\Models\User $author): void
+    public function destroyComment(Request $request, Task $task, TaskComment $comment): JsonResponse
+    {
+        if ($comment->user_id !== $request->user()->id && !$request->user()->hasRole('admin')) {
+            abort(403);
+        }
+
+        foreach ($comment->attachments as $attachment) {
+            Storage::disk('public')->delete($attachment->file_path);
+        }
+        Storage::disk('public')->deleteDirectory("comment-attachments/{$comment->id}");
+
+        $comment->delete();
+
+        return response()->json(null, 204);
+    }
+
+    public function downloadAttachment(Request $request, Task $task, TaskComment $comment, CommentAttachment $attachment): StreamedResponse
+    {
+        if ($attachment->task_comment_id !== $comment->id) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
+    }
+
+    private function notifyCommentMentions(TaskComment $comment, Task $task, User $author): void
     {
         $task->loadMissing('project');
         $body = $comment->body;

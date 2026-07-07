@@ -56,6 +56,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/tasks/{task}', [StandaloneTaskController::class, 'destroy']);
     Route::patch('/tasks/{task}/patch', [StandaloneTaskController::class, 'patchField']);
     Route::post('/tasks/{task}/comments', [StandaloneTaskController::class, 'storeComment']);
+    Route::delete('/tasks/{task}/comments/{comment}', [StandaloneTaskController::class, 'destroyComment']);
+    Route::get('/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [StandaloneTaskController::class, 'downloadAttachment']);
+    Route::get('/tasks/{task}/comments', [TaskCommentPaginationController::class, 'standaloneComments']);
+    Route::get('/tasks/{task}/activities', [TaskCommentPaginationController::class, 'standaloneActivities']);
 
     // Tasks (project-scoped)
     Route::post('/projects/{project}/tasks', [TaskController::class, 'store']);

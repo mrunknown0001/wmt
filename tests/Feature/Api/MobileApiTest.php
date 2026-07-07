@@ -115,6 +115,102 @@ class MobileApiTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
+    // 2. Standalone Task Comment/Attachment Routes
+    // ──────────────────────────────────────────────
+
+    public function test_standalone_task_delete_comment_requires_auth(): void
+    {
+        $task = Task::factory()->create(['project_id' => null, 'created_by' => $this->regularUser->id, 'assigned_to' => $this->regularUser->id]);
+        $comment = $task->comments()->create(['user_id' => $this->regularUser->id, 'body' => 'test']);
+
+        $this->deleteJson("/api/tasks/{$task->id}/comments/{$comment->id}")
+            ->assertUnauthorized();
+    }
+
+    public function test_standalone_task_delete_own_comment(): void
+    {
+        $task = Task::factory()->create(['project_id' => null, 'created_by' => $this->regularUser->id, 'assigned_to' => $this->regularUser->id]);
+        $comment = $task->comments()->create(['user_id' => $this->regularUser->id, 'body' => 'my comment']);
+
+        $this->withToken($this->userToken)
+            ->deleteJson("/api/tasks/{$task->id}/comments/{$comment->id}")
+            ->assertNoContent();
+
+        $this->assertDatabaseMissing('task_comments', ['id' => $comment->id]);
+    }
+
+    public function test_standalone_task_delete_comment_forbidden_for_non_author(): void
+    {
+        $task = Task::factory()->create(['project_id' => null, 'created_by' => $this->admin->id, 'assigned_to' => $this->admin->id]);
+        $comment = $task->comments()->create(['user_id' => $this->admin->id, 'body' => 'admin comment']);
+
+        $this->withToken($this->userToken)
+            ->deleteJson("/api/tasks/{$task->id}/comments/{$comment->id}")
+            ->assertForbidden();
+    }
+
+    public function test_standalone_task_admin_can_delete_any_comment(): void
+    {
+        $task = Task::factory()->create(['project_id' => null, 'created_by' => $this->regularUser->id, 'assigned_to' => $this->regularUser->id]);
+        $comment = $task->comments()->create(['user_id' => $this->regularUser->id, 'body' => 'user comment']);
+
+        $this->withToken($this->adminToken)
+            ->deleteJson("/api/tasks/{$task->id}/comments/{$comment->id}")
+            ->assertNoContent();
+    }
+
+    public function test_standalone_task_comment_pagination(): void
+    {
+        $task = Task::factory()->create(['project_id' => null, 'created_by' => $this->regularUser->id, 'assigned_to' => $this->regularUser->id]);
+
+        for ($i = 0; $i < 25; $i++) {
+            $task->comments()->create(['user_id' => $this->regularUser->id, 'body' => "Comment {$i}"]);
+        }
+
+        $response = $this->withToken($this->userToken)
+            ->getJson("/api/tasks/{$task->id}/comments?limit=10");
+
+        $response->assertOk()
+            ->assertJsonStructure(['comments', 'has_more'])
+            ->assertJson(['has_more' => true]);
+
+        $this->assertCount(10, $response->json('comments'));
+
+        // Load next page
+        $lastId = collect($response->json('comments'))->last()['id'];
+        $page2 = $this->withToken($this->userToken)
+            ->getJson("/api/tasks/{$task->id}/comments?limit=10&before_id={$lastId}");
+
+        $page2->assertOk();
+        $this->assertCount(10, $page2->json('comments'));
+    }
+
+    public function test_standalone_task_activity_pagination(): void
+    {
+        $task = Task::factory()->create(['project_id' => null, 'created_by' => $this->regularUser->id, 'assigned_to' => $this->regularUser->id]);
+
+        for ($i = 0; $i < 25; $i++) {
+            TaskActivity::create([
+                'task_id' => $task->id,
+                'user_id' => $this->regularUser->id,
+                'field' => 'status',
+                'old_value' => 'to_do',
+                'new_value' => 'in_progress',
+                'description' => "Changed status {$i}",
+            ]);
+        }
+
+        $response = $this->withToken($this->userToken)
+            ->getJson("/api/tasks/{$task->id}/activities?limit=10");
+
+        $response->assertOk()
+            ->assertJsonStructure(['activities', 'has_more'])
+            ->assertJson(['has_more' => true]);
+
+        $this->assertCount(10, $response->json('activities'));
+    }
+
+    // ──────────────────────────────────────────────
     // 3. Global Search
     // ──────────────────────────────────────────────
 
