@@ -16,6 +16,7 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                     value={value || ''}
                     onChange={(e) => handleChange(e.target.value)}
                     error={error}
+                    maxLength={255}
                 />
             );
 
@@ -28,6 +29,7 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                     onChange={(e) => handleChange(e.target.value)}
                     error={error}
                     rows={3}
+                    maxLength={10000}
                 />
             );
 
@@ -40,6 +42,8 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                     value={value ?? ''}
                     onChange={(e) => handleChange(e.target.value)}
                     error={error}
+                    max={99999999999}
+                    min={-99999999999}
                 />
             );
 

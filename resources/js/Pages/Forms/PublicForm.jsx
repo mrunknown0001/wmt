@@ -180,6 +180,7 @@ export default function PublicForm() {
                             onChange={(e) => setFieldValue(field.id, e.target.value)}
                             error={fieldError}
                             placeholder={field.config?.placeholder || ''}
+                            maxLength={255}
                         />
                         {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
@@ -195,6 +196,7 @@ export default function PublicForm() {
                             onChange={(e) => setFieldValue(field.id, e.target.value)}
                             error={fieldError}
                             placeholder={field.config?.placeholder || ''}
+                            maxLength={10000}
                         />
                         {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
@@ -210,6 +212,8 @@ export default function PublicForm() {
                             value={value ?? ''}
                             onChange={(e) => setFieldValue(field.id, e.target.value)}
                             error={fieldError}
+                            max={99999999999}
+                            min={-99999999999}
                         />
                         {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>

@@ -125,6 +125,7 @@ function TextNumberEditor({ value, type, onSave, onClose }) {
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    maxLength={10000}
                     className={`${inputClass} resize-y min-h-20`}
                     placeholder="Enter text..."
                     rows={3}
@@ -138,6 +139,7 @@ function TextNumberEditor({ value, type, onSave, onClose }) {
                     onKeyDown={handleKeyDown}
                     className={inputClass}
                     placeholder={type === 'number' ? 'Enter number...' : 'Enter text...'}
+                    {...(type === 'number' ? { max: 99999999999, min: -99999999999 } : { maxLength: 255 })}
                 />
             )}
             <div className="flex justify-end gap-2 mt-2">

@@ -55,6 +55,7 @@ class ProjectAutomationRuleController extends Controller
 
         $rule = $project->automationRules()->create([
             ...$validated,
+            'is_active' => true,
             'created_by' => $request->user()->id,
         ]);
 
