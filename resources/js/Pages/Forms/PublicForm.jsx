@@ -17,6 +17,49 @@ function formatFileSize(bytes) {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function evaluateConditions(field, allFields, fieldValues, visited = new Set()) {
+    const conditions = field.conditions;
+    if (!conditions || !conditions.rules || conditions.rules.length === 0) {
+        return true;
+    }
+
+    // Circular reference protection
+    if (visited.has(field.id)) return true;
+    visited.add(field.id);
+
+    const logic = conditions.logic || 'all';
+    const results = conditions.rules.map(rule => {
+        const refField = allFields.find(f => f.id === rule.field_id);
+        if (!refField) return true;
+
+        // Recursively check if the referenced field is visible
+        if (!evaluateConditions(refField, allFields, fieldValues, new Set(visited))) {
+            return false;
+        }
+
+        const currentValue = fieldValues[refField.id];
+        const expectedValue = rule.value;
+        const operator = rule.operator || 'equals';
+
+        switch (operator) {
+            case 'equals':
+                return String(currentValue ?? '') === String(expectedValue ?? '');
+            case 'not_equals':
+                return String(currentValue ?? '') !== String(expectedValue ?? '');
+            case 'contains':
+                return String(currentValue ?? '').includes(String(expectedValue ?? ''));
+            case 'is_empty':
+                return !currentValue || currentValue === '' || (Array.isArray(currentValue) && currentValue.length === 0);
+            case 'is_not_empty':
+                return currentValue != null && currentValue !== '' && !(Array.isArray(currentValue) && currentValue.length === 0);
+            default:
+                return true;
+        }
+    });
+
+    return logic === 'all' ? results.every(Boolean) : results.some(Boolean);
+}
+
 export default function PublicForm() {
     const { form: formDef, turnstile } = usePage().props;
 
@@ -71,8 +114,12 @@ export default function PublicForm() {
 
         const formData = new FormData();
 
-        // Add field values
+        // Add field values (only for fields whose conditions are met)
         Object.entries(fieldValues).forEach(([fieldId, value]) => {
+            const field = formDef.fields.find(f => f.id === Number(fieldId));
+            if (field && !evaluateConditions(field, formDef.fields, fieldValues)) {
+                return; // Skip hidden conditional fields
+            }
             if (Array.isArray(value)) {
                 value.forEach(v => formData.append(`fields[${fieldId}][]`, v));
             } else {
@@ -316,7 +363,10 @@ export default function PublicForm() {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-5" encType="multipart/form-data">
-                            {visibleFields.map(renderField)}
+                            {visibleFields.map(field => {
+                                if (!evaluateConditions(field, formDef.fields, fieldValues)) return null;
+                                return renderField(field);
+                            })}
 
                             {turnstile.enabled && (
                                 <TurnstileWidget

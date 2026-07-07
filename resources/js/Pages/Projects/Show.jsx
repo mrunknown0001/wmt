@@ -1554,6 +1554,7 @@ export default function Show() {
                         rules={automationRules || []}
                         users={users}
                         sections={localSections}
+                        customFields={initialCustomFields}
                     />
                 </Card>
             )}

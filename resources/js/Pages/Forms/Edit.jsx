@@ -32,6 +32,7 @@ export default function FormsEdit() {
             config: f.config,
             default_value: f.default_value || null,
             is_visible: f.is_visible !== false,
+            conditions: f.conditions || null,
             maps_to: f.maps_to,
             custom_field_id: f.custom_field_id,
         })),

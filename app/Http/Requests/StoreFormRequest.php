@@ -33,6 +33,12 @@ class StoreFormRequest extends FormRequest
             'fields.*.config' => ['nullable', 'array'],
             'fields.*.default_value' => ['nullable', 'string'],
             'fields.*.is_visible' => ['sometimes', 'boolean'],
+            'fields.*.conditions' => ['nullable', 'array'],
+            'fields.*.conditions.logic' => ['sometimes', 'string', 'in:all,any'],
+            'fields.*.conditions.rules' => ['sometimes', 'array'],
+            'fields.*.conditions.rules.*.field_id' => ['required', 'integer'],
+            'fields.*.conditions.rules.*.operator' => ['required', 'string', 'in:equals,not_equals,contains,is_empty,is_not_empty'],
+            'fields.*.conditions.rules.*.value' => ['nullable'],
             'fields.*.maps_to' => ['nullable', 'string', 'in:description,custom_field'],
             'fields.*.custom_field_id' => ['nullable', 'exists:custom_fields,id'],
         ];

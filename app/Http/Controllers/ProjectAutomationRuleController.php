@@ -17,6 +17,22 @@ class ProjectAutomationRuleController extends Controller
         }
     }
 
+    private function ruleValidationRules(): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'trigger_type' => 'required|string|in:task_created,task_status_changed,task_priority_changed,task_assigned,task_completed,custom_field_changed',
+            'conditions' => 'nullable|array',
+            'conditions.*.field' => 'required|string|in:status,priority,assigned_to,section_id,custom_field',
+            'conditions.*.operator' => 'required|string|in:equals,not_equals,in,not_in,contains,not_contains,is_empty,is_not_empty,greater_than,less_than,before,after',
+            'conditions.*.value' => 'present',
+            'conditions.*.custom_field_id' => 'nullable|integer',
+            'actions' => 'required|array|min:1',
+            'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification,add_comment,set_custom_field',
+            'actions.*.params' => 'required|array',
+        ];
+    }
+
     public function index(Project $project): JsonResponse
     {
         $this->authorizeProject($project);
@@ -33,17 +49,7 @@ class ProjectAutomationRuleController extends Controller
     {
         $this->authorizeProject($project);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'trigger_type' => 'required|string|in:task_created,task_status_changed,task_priority_changed,task_assigned,task_completed',
-            'conditions' => 'nullable|array',
-            'conditions.*.field' => 'required|string|in:status,priority,assigned_to,section_id',
-            'conditions.*.operator' => 'required|string|in:equals,not_equals,in,not_in',
-            'conditions.*.value' => 'present',
-            'actions' => 'required|array|min:1',
-            'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification,add_comment',
-            'actions.*.params' => 'required|array',
-        ]);
+        $validated = $request->validate($this->ruleValidationRules());
 
         $rule = $project->automationRules()->create([
             ...$validated,
@@ -60,17 +66,7 @@ class ProjectAutomationRuleController extends Controller
         $this->authorizeProject($project);
         abort_if($rule->project_id !== $project->id, 404);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'trigger_type' => 'required|string|in:task_created,task_status_changed,task_priority_changed,task_assigned,task_completed',
-            'conditions' => 'nullable|array',
-            'conditions.*.field' => 'required|string|in:status,priority,assigned_to,section_id',
-            'conditions.*.operator' => 'required|string|in:equals,not_equals,in,not_in',
-            'conditions.*.value' => 'present',
-            'actions' => 'required|array|min:1',
-            'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification,add_comment',
-            'actions.*.params' => 'required|array',
-        ]);
+        $validated = $request->validate($this->ruleValidationRules());
 
         $rule->update($validated);
         $rule->load('creator:id,name');

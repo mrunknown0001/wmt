@@ -41,6 +41,7 @@ class PublicFormController extends Controller
                         'maps_to' => $field->maps_to,
                         'default_value' => $field->default_value,
                         'is_visible' => $field->is_visible,
+                        'conditions' => $field->conditions,
                     ];
 
                     // Include options for mapped select fields
@@ -78,6 +79,7 @@ class PublicFormController extends Controller
         }
 
         // Build dynamic validation rules
+        $submittedFields = $request->input('fields', []);
         $rules = [];
         foreach ($form->fields as $field) {
             if (in_array($field->type, ['heading', 'description'])) {
@@ -86,6 +88,11 @@ class PublicFormController extends Controller
 
             // Skip validation for hidden fields (they use default values)
             if (!$field->is_visible) {
+                continue;
+            }
+
+            // Skip validation for fields whose conditions are not met
+            if (!$this->fieldConditionsMet($field, $form->fields, $submittedFields)) {
                 continue;
             }
 
@@ -172,6 +179,11 @@ class PublicFormController extends Controller
                 continue;
             }
 
+            // Skip mapping for fields whose conditions are not met
+            if (!$this->fieldConditionsMet($field, $form->fields, $submittedFields)) {
+                continue;
+            }
+
             $value = $fieldValues[$field->id] ?? null;
             if ($value === null || $value === '') {
                 continue;
@@ -246,5 +258,63 @@ class PublicFormController extends Controller
                 'project_name' => $form->project->name,
             ],
         ]);
+    }
+
+    private function fieldConditionsMet($field, $allFields, array $submittedValues, array &$visited = []): bool
+    {
+        $conditions = $field->conditions;
+        if (empty($conditions) || empty($conditions['rules'])) {
+            return true;
+        }
+
+        // Circular reference protection
+        if (in_array($field->id, $visited)) {
+            return true;
+        }
+        $visited[] = $field->id;
+
+        $logic = $conditions['logic'] ?? 'all';
+        $results = [];
+
+        foreach ($conditions['rules'] as $rule) {
+            $refFieldId = $rule['field_id'] ?? null;
+            if (!$refFieldId) {
+                $results[] = true;
+                continue;
+            }
+
+            $refField = $allFields->firstWhere('id', $refFieldId);
+            if (!$refField) {
+                $results[] = true;
+                continue;
+            }
+
+            // Check if the referenced field itself is visible (recursive)
+            if (!$this->fieldConditionsMet($refField, $allFields, $submittedValues, $visited)) {
+                $results[] = false;
+                continue;
+            }
+
+            $submittedValue = $submittedValues[$refFieldId] ?? null;
+            $operator = $rule['operator'] ?? 'equals';
+            $expectedValue = $rule['value'] ?? null;
+
+            $met = match ($operator) {
+                'equals' => (string) ($submittedValue ?? '') === (string) ($expectedValue ?? ''),
+                'not_equals' => (string) ($submittedValue ?? '') !== (string) ($expectedValue ?? ''),
+                'contains' => is_string($submittedValue) && str_contains($submittedValue, (string) ($expectedValue ?? '')),
+                'is_empty' => $submittedValue === null || $submittedValue === '' || (is_array($submittedValue) && empty($submittedValue)),
+                'is_not_empty' => $submittedValue !== null && $submittedValue !== '' && !(is_array($submittedValue) && empty($submittedValue)),
+                default => true,
+            };
+
+            $results[] = $met;
+        }
+
+        if (empty($results)) {
+            return true;
+        }
+
+        return $logic === 'all' ? !in_array(false, $results, true) : in_array(true, $results, true);
     }
 }

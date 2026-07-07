@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 import Input from './Input';
@@ -12,6 +12,7 @@ const TRIGGER_TYPES = [
     { value: 'task_priority_changed', label: 'Task Priority Changed' },
     { value: 'task_assigned', label: 'Task Assigned' },
     { value: 'task_completed', label: 'Task Completed' },
+    { value: 'custom_field_changed', label: 'Custom Field Changed' },
 ];
 
 const CONDITION_FIELDS = [
@@ -19,11 +20,7 @@ const CONDITION_FIELDS = [
     { value: 'priority', label: 'Priority' },
     { value: 'assigned_to', label: 'Assignee' },
     { value: 'section_id', label: 'Section' },
-];
-
-const CONDITION_OPERATORS = [
-    { value: 'equals', label: 'equals' },
-    { value: 'not_equals', label: 'does not equal' },
+    { value: 'custom_field', label: 'Custom Field' },
 ];
 
 const ACTION_TYPES = [
@@ -33,10 +30,69 @@ const ACTION_TYPES = [
     { value: 'move_to_section', label: 'Move to Section' },
     { value: 'send_notification', label: 'Send Notification' },
     { value: 'add_comment', label: 'Add Comment' },
+    { value: 'set_custom_field', label: 'Set Custom Field' },
 ];
 
 const STATUSES = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+
+function getOperatorsForCustomFieldType(cfType) {
+    switch (cfType) {
+        case 'text':
+        case 'textarea':
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+                { value: 'contains', label: 'contains' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        case 'number':
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+                { value: 'greater_than', label: 'greater than' },
+                { value: 'less_than', label: 'less than' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        case 'date':
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+                { value: 'before', label: 'is before' },
+                { value: 'after', label: 'is after' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        case 'single_select':
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+                { value: 'in', label: 'is any of' },
+                { value: 'not_in', label: 'is none of' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        case 'multi_select':
+            return [
+                { value: 'contains', label: 'contains' },
+                { value: 'not_contains', label: 'does not contain' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        default:
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+            ];
+    }
+}
+
+const STANDARD_OPERATORS = [
+    { value: 'equals', label: 'equals' },
+    { value: 'not_equals', label: 'does not equal' },
+];
 
 function triggerColor(type) {
     switch (type) {
@@ -45,16 +101,28 @@ function triggerColor(type) {
         case 'task_priority_changed': return 'purple';
         case 'task_assigned': return 'yellow';
         case 'task_completed': return 'green';
+        case 'custom_field_changed': return 'cyan';
         default: return 'gray';
     }
 }
 
 const selectClass = 'block w-full rounded-lg border px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100';
+const inputClass = selectClass;
 
-function ConditionRow({ condition, index, onChange, onRemove, users, sections }) {
+function ConditionRow({ condition, index, onChange, onRemove, users, sections, customFields }) {
     const field = condition.field || 'status';
+    const isCustomField = field === 'custom_field';
+    const selectedCfId = condition.custom_field_id;
+    const selectedCf = isCustomField ? customFields.find(cf => cf.id === Number(selectedCfId)) : null;
+    const needsValue = !['is_empty', 'is_not_empty'].includes(condition.operator);
 
-    const getValueOptions = () => {
+    const operators = useMemo(() => {
+        if (!isCustomField) return STANDARD_OPERATORS;
+        if (!selectedCf) return STANDARD_OPERATORS;
+        return getOperatorsForCustomFieldType(selectedCf.type);
+    }, [isCustomField, selectedCf]);
+
+    const getStandardValueOptions = () => {
         switch (field) {
             case 'status': return STATUSES.map(s => ({ value: s, label: formatLabel(s) }));
             case 'priority': return PRIORITIES.map(p => ({ value: p, label: formatLabel(p) }));
@@ -64,31 +132,123 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections })
         }
     };
 
+    const handleFieldChange = (newField) => {
+        const updated = { ...condition, field: newField, value: '', operator: 'equals' };
+        if (newField !== 'custom_field') {
+            delete updated.custom_field_id;
+        } else {
+            updated.custom_field_id = '';
+        }
+        onChange(index, updated);
+    };
+
+    const handleCustomFieldSelect = (cfId) => {
+        onChange(index, { ...condition, custom_field_id: cfId ? Number(cfId) : '', value: '', operator: 'equals' });
+    };
+
+    const renderValueInput = () => {
+        if (!needsValue) return null;
+
+        if (isCustomField && selectedCf) {
+            const cfType = selectedCf.type;
+            if (cfType === 'single_select' || cfType === 'multi_select') {
+                const options = selectedCf.options || [];
+                return (
+                    <select
+                        value={condition.value || ''}
+                        onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                        className={selectClass}
+                    >
+                        <option value="">Select...</option>
+                        {options.map(opt => (
+                            <option key={opt.id} value={String(opt.id)}>{opt.label}</option>
+                        ))}
+                    </select>
+                );
+            }
+            if (cfType === 'number') {
+                return (
+                    <input
+                        type="number"
+                        value={condition.value || ''}
+                        onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                        placeholder="Value..."
+                        className={inputClass}
+                    />
+                );
+            }
+            if (cfType === 'date') {
+                return (
+                    <input
+                        type="date"
+                        value={condition.value || ''}
+                        onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                        className={inputClass}
+                    />
+                );
+            }
+            // text/textarea
+            return (
+                <input
+                    type="text"
+                    value={condition.value || ''}
+                    onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                    placeholder="Value..."
+                    className={inputClass}
+                />
+            );
+        }
+
+        // Standard field value select
+        return (
+            <select
+                value={condition.value || ''}
+                onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                className={selectClass}
+            >
+                <option value="">Select...</option>
+                {getStandardValueOptions().map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+            </select>
+        );
+    };
+
     return (
         <div className="flex items-start gap-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3">
-            <div className="grid grid-cols-3 gap-2 flex-1 min-w-0">
+            <div className={`grid gap-2 flex-1 min-w-0 ${isCustomField ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+                {/* Field selector */}
                 <select
                     value={field}
-                    onChange={(e) => onChange(index, { ...condition, field: e.target.value, value: '' })}
+                    onChange={(e) => handleFieldChange(e.target.value)}
                     className={selectClass}
                 >
                     {CONDITION_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
+
+                {/* Custom field selector (only when field=custom_field) */}
+                {isCustomField && (
+                    <select
+                        value={selectedCfId || ''}
+                        onChange={(e) => handleCustomFieldSelect(e.target.value)}
+                        className={selectClass}
+                    >
+                        <option value="">Select field...</option>
+                        {customFields.map(cf => (
+                            <option key={cf.id} value={cf.id}>{cf.name}</option>
+                        ))}
+                    </select>
+                )}
+
+                {/* Operator */}
                 <select
                     value={condition.operator || 'equals'}
-                    onChange={(e) => onChange(index, { ...condition, operator: e.target.value })}
+                    onChange={(e) => onChange(index, { ...condition, operator: e.target.value, ...((['is_empty', 'is_not_empty'].includes(e.target.value)) ? { value: '' } : {}) })}
                     className={selectClass}
                 >
-                    {CONDITION_OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {operators.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-                <select
-                    value={condition.value || ''}
-                    onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
-                    className={selectClass}
-                >
-                    <option value="">Select...</option>
-                    {getValueOptions().map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-                </select>
+
+                {/* Value input */}
+                {renderValueInput()}
             </div>
             <button onClick={() => onRemove(index)} className="mt-2 text-gray-400 hover:text-red-500 transition-colors shrink-0" title="Remove condition">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -99,9 +259,35 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections })
     );
 }
 
-function ActionRow({ action, index, onChange, onRemove, users, sections }) {
+function CustomFieldValueInput({ customField, value, onChange }) {
+    if (!customField) return null;
+    const cfType = customField.type;
+
+    if (cfType === 'single_select' || cfType === 'multi_select') {
+        const options = customField.options || [];
+        return (
+            <select value={value || ''} onChange={(e) => onChange(e.target.value)} className={selectClass}>
+                <option value="">Select...</option>
+                {options.map(opt => (
+                    <option key={opt.id} value={String(opt.id)}>{opt.label}</option>
+                ))}
+            </select>
+        );
+    }
+    if (cfType === 'number') {
+        return <input type="number" value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Value..." className={inputClass} />;
+    }
+    if (cfType === 'date') {
+        return <input type="date" value={value || ''} onChange={(e) => onChange(e.target.value)} className={inputClass} />;
+    }
+    return <input type="text" value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Value..." className={inputClass} />;
+}
+
+function ActionRow({ action, index, onChange, onRemove, users, sections, customFields }) {
     const type = action.type || 'change_status';
     const params = action.params || {};
+    const isSetCustomField = type === 'set_custom_field';
+    const selectedCf = isSetCustomField ? customFields.find(cf => cf.id === Number(params.custom_field_id)) : null;
 
     const renderParams = () => {
         switch (type) {
@@ -171,12 +357,34 @@ function ActionRow({ action, index, onChange, onRemove, users, sections }) {
                         className={selectClass + ' resize-none'}
                     />
                 );
+            case 'set_custom_field':
+                return (
+                    <div className="space-y-2">
+                        <select
+                            value={params.custom_field_id || ''}
+                            onChange={(e) => onChange(index, { ...action, params: { custom_field_id: e.target.value ? Number(e.target.value) : '', value: '' } })}
+                            className={selectClass}
+                        >
+                            <option value="">Select custom field...</option>
+                            {customFields.map(cf => (
+                                <option key={cf.id} value={cf.id}>{cf.name}</option>
+                            ))}
+                        </select>
+                        {selectedCf && (
+                            <CustomFieldValueInput
+                                customField={selectedCf}
+                                value={params.value}
+                                onChange={(val) => onChange(index, { ...action, params: { ...params, value: val } })}
+                            />
+                        )}
+                    </div>
+                );
             default:
                 return null;
         }
     };
 
-    const needsFullWidth = type === 'add_comment';
+    const needsFullWidth = type === 'add_comment' || type === 'set_custom_field';
 
     return (
         <div className="flex items-start gap-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3">
@@ -189,7 +397,7 @@ function ActionRow({ action, index, onChange, onRemove, users, sections }) {
                     {ACTION_TYPES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
                 </select>
                 {renderParams()}
-                {needsFullWidth && (
+                {type === 'add_comment' && (
                     <p className="text-xs text-gray-400">
                         Variables: {'{task}'}, {'{status}'}, {'{assignee}'}, {'{project}'}
                     </p>
@@ -211,7 +419,7 @@ const emptyRule = () => ({
     actions: [{ type: 'change_status', params: {} }],
 });
 
-export default function AutomationRuleBuilder({ projectId, rules: initialRules, users, sections }) {
+export default function AutomationRuleBuilder({ projectId, rules: initialRules, users, sections, customFields = [] }) {
     const [rules, setRules] = useState(initialRules || []);
     const [showForm, setShowForm] = useState(false);
     const [editingRule, setEditingRule] = useState(null);
@@ -446,6 +654,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     onRemove={handleConditionRemove}
                                     users={users}
                                     sections={sections}
+                                    customFields={customFields}
                                 />
                             ))}
                             {form.conditions.length === 0 && (
@@ -477,6 +686,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     onRemove={handleActionRemove}
                                     users={users}
                                     sections={sections}
+                                    customFields={customFields}
                                 />
                             ))}
                         </div>

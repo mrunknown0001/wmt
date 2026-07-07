@@ -6,6 +6,7 @@ use App\Models\CustomField;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskCustomFieldValue;
+use App\Services\AutomationRuleEngine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -34,6 +35,10 @@ class TaskCustomFieldValueController extends Controller
             $cfv->setTypedValue($customField->type, $rawValue);
             $cfv->save();
         }
+
+        // Trigger automation rules for custom field changes
+        $task->load('customFieldValues.customField');
+        AutomationRuleEngine::evaluate($task, 'custom_field_changed');
 
         return response()->json([
             'values' => $task->customFieldValues()->get()->keyBy('custom_field_id'),
