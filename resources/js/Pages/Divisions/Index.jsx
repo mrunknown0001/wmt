@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -22,9 +22,30 @@ const TrashIcon = () => (
 );
 
 export default function Index() {
-    const { divisions, auth } = usePage().props;
+    const { divisions, auth, filters } = usePage().props;
     const canManage = auth.user?.permissions?.includes('manage-divisions');
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [search, setSearch] = useState(filters?.search || '');
+    const debounceRef = useRef(null);
+
+    const applyFilters = useCallback((overrides = {}) => {
+        const params = { search: overrides.search ?? search };
+        Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; });
+        router.get('/divisions', params, { preserveState: true, preserveScroll: true });
+    }, [search]);
+
+    const handleSearchChange = (value) => {
+        setSearch(value);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => applyFilters({ search: value }), 300);
+    };
+
+    const clearFilters = () => {
+        setSearch('');
+        router.get('/divisions', {}, { preserveState: true, preserveScroll: true });
+    };
+
+    const hasActiveFilters = !!search;
 
     const handleDelete = () => {
         if (deleteTarget) {
@@ -44,6 +65,29 @@ export default function Index() {
                     ]}
                     actions={canManage && <LinkButton href="/divisions/create">Add Division</LinkButton>}
                 />
+
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <div className="relative flex-1 max-w-xs">
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                            placeholder="Search divisions..."
+                            className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        />
+                    </div>
+                    {hasActiveFilters && (
+                        <button
+                            onClick={clearFilters}
+                            className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
 
                 <Card padding={false}>
                     {divisions.data.length > 0 ? (
@@ -101,7 +145,10 @@ export default function Index() {
                             <Pagination links={divisions.links} />
                         </>
                     ) : (
-                        <EmptyState title="No divisions yet" description="Create your first division to build the organization structure" />
+                        <EmptyState
+                            title={hasActiveFilters ? "No matching divisions" : "No divisions yet"}
+                            description={hasActiveFilters ? "Try adjusting your search." : "Create your first division to build the organization structure"}
+                        />
                     )}
                 </Card>
             </div>

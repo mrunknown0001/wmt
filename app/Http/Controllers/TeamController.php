@@ -9,22 +9,38 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class TeamController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', Team::class);
 
-        $teams = Team::with('department.division', 'leader')
-            ->withCount('members')
-            ->orderBy('name')
-            ->paginate(20);
+        $query = Team::with('department.division', 'leader')
+            ->withCount('members');
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        if ($departmentId = $request->input('department_id')) {
+            $query->where('department_id', $departmentId);
+        }
+
+        $teams = $query->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
 
         return Inertia::render('Teams/Index', [
             'teams' => $teams,
+            'departments' => Department::orderBy('name')->get(['id', 'name']),
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'department_id' => $request->input('department_id', ''),
+            ],
         ]);
     }
 
