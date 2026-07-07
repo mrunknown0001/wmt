@@ -9,22 +9,46 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', User::class);
 
-        $users = User::with('roles', 'department', 'team')
-            ->orderBy('name')
-            ->paginate(20);
+        $query = User::with('roles', 'department', 'team');
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                    ->orWhere('email', 'like', '%' . $search . '%');
+            });
+        }
+
+        if ($role = $request->input('role')) {
+            $query->whereHas('roles', fn ($q) => $q->where('name', $role));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('is_active', $request->input('status') === 'active');
+        }
+
+        $users = $query->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
 
         return Inertia::render('Users/Index', [
             'users' => $users,
+            'roles' => Role::orderBy('name')->pluck('name'),
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'role' => $request->input('role', ''),
+                'status' => $request->input('status', ''),
+            ],
         ]);
     }
 

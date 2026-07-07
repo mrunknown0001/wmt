@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Setting;
 use App\Models\Task;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,7 +20,7 @@ class TaskOverdueNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = ['database', 'broadcast'];
-        if ($notifiable->wantsEmail('task_overdue')) {
+        if (Setting::current()->wantsEmail('task_overdue')) {
             $channels[] = 'mail';
         }
         return $channels;

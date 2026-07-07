@@ -8,22 +8,32 @@ use App\Models\Division;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DivisionController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', Division::class);
 
-        $divisions = Division::with('head', 'departments')
-            ->withCount('departments')
-            ->orderBy('name')
-            ->paginate(20);
+        $query = Division::with('head', 'departments')
+            ->withCount('departments');
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        $divisions = $query->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
 
         return Inertia::render('Divisions/Index', [
             'divisions' => $divisions,
+            'filters' => [
+                'search' => $request->input('search', ''),
+            ],
         ]);
     }
 

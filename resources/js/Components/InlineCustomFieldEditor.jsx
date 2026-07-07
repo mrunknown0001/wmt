@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import InlinePopover from './InlinePopover';
 import InlineDatePicker from './InlineDatePicker';
 
@@ -83,12 +83,34 @@ function MultiSelectOptions({ options, selectedIds = [], onToggle, onDone }) {
 
 function TextNumberEditor({ value, type, onSave, onClose }) {
     const [draft, setDraft] = useState(value ?? '');
-    const inputRef = useRef(null);
+    const draftRef = useRef(draft);
+    const resolvedRef = useRef(false);
+    const onSaveRef = useRef(onSave);
+    const valueRef = useRef(value);
+
+    draftRef.current = draft;
+    onSaveRef.current = onSave;
+    valueRef.current = value;
+
+    // Auto-save on unmount (triggered by outside click closing the popover)
+    useEffect(() => {
+        return () => {
+            if (!resolvedRef.current) {
+                const newVal = draftRef.current === '' ? null : draftRef.current;
+                const oldVal = valueRef.current ?? null;
+                if (String(newVal ?? '') !== String(oldVal ?? '')) {
+                    onSaveRef.current(newVal);
+                }
+            }
+        };
+    }, []);
 
     const handleKeyDown = (e) => {
         if (e.key === 'Escape') {
+            resolvedRef.current = true;
             onClose();
         } else if (e.key === 'Enter' && type !== 'textarea') {
+            resolvedRef.current = true;
             onSave(draft === '' ? null : draft);
         }
     };
@@ -99,18 +121,17 @@ function TextNumberEditor({ value, type, onSave, onClose }) {
         <div className={`p-2 ${type === 'textarea' ? 'min-w-70' : 'min-w-45'}`}>
             {type === 'textarea' ? (
                 <textarea
-                    ref={inputRef}
                     autoFocus
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    maxLength={10000}
                     className={`${inputClass} resize-y min-h-20`}
                     placeholder="Enter text..."
                     rows={3}
                 />
             ) : (
                 <input
-                    ref={inputRef}
                     autoFocus
                     type={type === 'number' ? 'number' : 'text'}
                     value={draft}
@@ -118,17 +139,18 @@ function TextNumberEditor({ value, type, onSave, onClose }) {
                     onKeyDown={handleKeyDown}
                     className={inputClass}
                     placeholder={type === 'number' ? 'Enter number...' : 'Enter text...'}
+                    {...(type === 'number' ? { max: 99999999999, min: -99999999999 } : { maxLength: 255 })}
                 />
             )}
             <div className="flex justify-end gap-2 mt-2">
                 <button
-                    onClick={onClose}
+                    onClick={() => { resolvedRef.current = true; onClose(); }}
                     className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 >
                     Cancel
                 </button>
                 <button
-                    onClick={() => onSave(draft === '' ? null : draft)}
+                    onClick={() => { resolvedRef.current = true; onSave(draft === '' ? null : draft); }}
                     className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
                 >
                     Save
@@ -144,7 +166,7 @@ function DisplayValue({ customField, cfv, formatDate }) {
     switch (customField.type) {
         case 'text':
         case 'textarea':
-            return <span className={customField.type === 'textarea' ? 'line-clamp-2' : ''}>{cfv.value_text || '—'}</span>;
+            return <span className={customField.type === 'textarea' ? 'line-clamp-2' : 'truncate block max-w-xs'} title={cfv.value_text || undefined}>{cfv.value_text || '—'}</span>;
         case 'number':
             return <span>{cfv.value_number != null ? cfv.value_number : '—'}</span>;
         case 'date':
@@ -225,7 +247,7 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
                 ref={anchorRef}
                 onClick={(e) => { e.stopPropagation(); onToggle(); }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="cursor-pointer text-left w-full"
+                className="cursor-pointer text-left w-full rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-700/60 transition-all"
             >
                 <DisplayValue customField={customField} cfv={cfv} formatDate={formatDateFn} />
             </button>

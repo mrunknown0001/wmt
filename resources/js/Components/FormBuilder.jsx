@@ -127,6 +127,9 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                 {!field.is_visible && (
                     <span className="text-xs text-yellow-600 dark:text-yellow-400 shrink-0">Hidden</span>
                 )}
+                {field.conditions?.rules?.length > 0 && (
+                    <span className="text-xs text-purple-600 dark:text-purple-400 shrink-0">Conditional</span>
+                )}
                 <button
                     type="button"
                     onClick={() => onToggleExpand(fieldIndex)}
@@ -215,6 +218,17 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                                 <label htmlFor={`field-${fieldIndex}-visible`} className="text-sm text-gray-700 dark:text-gray-300">Visible on form</label>
                             </div>
                         </div>
+                    )}
+
+                    {/* Conditional Branching */}
+                    {!isStatic && (
+                        <FieldConditionsEditor
+                            field={field}
+                            fieldIndex={fieldIndex}
+                            allFields={allFields}
+                            customFields={customFields}
+                            onChange={update}
+                        />
                     )}
 
                     {/* Maps To for non-custom-field items */}
@@ -360,6 +374,213 @@ function FieldOptionsEditor({ options, onChange }) {
     );
 }
 
+// --- Condition Rule Row ---
+function ConditionRuleRow({ rule, index, availableFields, onUpdate, onRemove }) {
+    const selectedField = availableFields.find(f => f._conditionKey === rule.field_key);
+
+    const getOperators = () => {
+        if (!selectedField) return [{ value: 'equals', label: 'equals' }];
+        switch (selectedField.type) {
+            case 'text':
+            case 'textarea':
+                return [
+                    { value: 'equals', label: 'equals' },
+                    { value: 'not_equals', label: 'does not equal' },
+                    { value: 'contains', label: 'contains' },
+                    { value: 'is_empty', label: 'is empty' },
+                    { value: 'is_not_empty', label: 'is not empty' },
+                ];
+            case 'number':
+                return [
+                    { value: 'equals', label: 'equals' },
+                    { value: 'not_equals', label: 'does not equal' },
+                    { value: 'is_empty', label: 'is empty' },
+                    { value: 'is_not_empty', label: 'is not empty' },
+                ];
+            case 'date':
+                return [
+                    { value: 'equals', label: 'equals' },
+                    { value: 'not_equals', label: 'does not equal' },
+                    { value: 'is_empty', label: 'is empty' },
+                    { value: 'is_not_empty', label: 'is not empty' },
+                ];
+            case 'select':
+            case 'multi_select':
+                return [
+                    { value: 'equals', label: 'equals' },
+                    { value: 'not_equals', label: 'does not equal' },
+                    { value: 'is_empty', label: 'is empty' },
+                    { value: 'is_not_empty', label: 'is not empty' },
+                ];
+            default:
+                return [
+                    { value: 'equals', label: 'equals' },
+                    { value: 'not_equals', label: 'does not equal' },
+                ];
+        }
+    };
+
+    const needsValue = !['is_empty', 'is_not_empty'].includes(rule.operator);
+
+    const renderValueInput = () => {
+        if (!needsValue) return null;
+
+        if (selectedField && (selectedField.type === 'select' || selectedField.type === 'multi_select')) {
+            // Get options from the field's config or mapped custom field
+            const options = selectedField.config?.options || selectedField.options || [];
+            return (
+                <select
+                    value={rule.value || ''}
+                    onChange={(e) => onUpdate(index, { ...rule, value: e.target.value })}
+                    className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                >
+                    <option value="">Select...</option>
+                    {options.map(opt => (
+                        <option key={opt.id ?? opt.value} value={String(opt.id ?? opt.value)}>{opt.label}</option>
+                    ))}
+                </select>
+            );
+        }
+
+        return (
+            <input
+                type={selectedField?.type === 'number' ? 'number' : selectedField?.type === 'date' ? 'date' : 'text'}
+                value={rule.value || ''}
+                onChange={(e) => onUpdate(index, { ...rule, value: e.target.value })}
+                placeholder="Value..."
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+            />
+        );
+    };
+
+    return (
+        <div className="flex items-center gap-2">
+            <select
+                value={rule.field_key || ''}
+                onChange={(e) => onUpdate(index, { ...rule, field_key: e.target.value || '', value: '', operator: 'equals' })}
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+            >
+                <option value="">Select field...</option>
+                {availableFields.map(f => (
+                    <option key={f._conditionKey} value={f._conditionKey}>{f.label || 'Untitled'}</option>
+                ))}
+            </select>
+            <select
+                value={rule.operator || 'equals'}
+                onChange={(e) => onUpdate(index, { ...rule, operator: e.target.value, ...(['is_empty', 'is_not_empty'].includes(e.target.value) ? { value: '' } : {}) })}
+                className="rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+            >
+                {getOperators().map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {renderValueInput()}
+            <button
+                type="button"
+                onClick={() => onRemove(index)}
+                className="text-gray-400 hover:text-red-500 shrink-0"
+                title="Remove condition"
+            >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    );
+}
+
+// --- Field Conditions Editor ---
+function FieldConditionsEditor({ field, fieldIndex, allFields, customFields = [], onChange }) {
+    const conditions = field.conditions || { logic: 'all', rules: [] };
+    const rules = conditions.rules || [];
+
+    // Show all non-static, non-attachment fields (except self)
+    // Assign a stable _conditionKey: use `id:{id}` for saved fields, `pos:{index}` for unsaved
+    const availableFields = allFields.map((f, i) => {
+        const enriched = { ...f, _conditionKey: f.id ? `id:${f.id}` : `pos:${i}` };
+        // For custom-field-mapped select fields, include options from the custom field
+        if (f.maps_to === 'custom_field' && f.custom_field_id && ['select', 'multi_select'].includes(f.type)) {
+            const cf = customFields.find(c => c.id === f.custom_field_id);
+            if (cf?.options?.length) {
+                enriched.options = cf.options;
+            }
+        }
+        return enriched;
+    }).filter((f, i) => {
+        if (i === fieldIndex) return false;
+        if (STATIC_TYPES.includes(f.type)) return false;
+        if (f.type === 'attachment') return false;
+        return true;
+    });
+
+    const updateConditions = (updated) => {
+        onChange('conditions', updated.rules?.length > 0 ? updated : null);
+    };
+
+    const addRule = () => {
+        updateConditions({
+            logic: conditions.logic || 'all',
+            rules: [...rules, { field_key: '', operator: 'equals', value: '' }],
+        });
+    };
+
+    const removeRule = (index) => {
+        const newRules = rules.filter((_, i) => i !== index);
+        updateConditions({ ...conditions, rules: newRules });
+    };
+
+    const updateRule = (index, updated) => {
+        const newRules = [...rules];
+        newRules[index] = updated;
+        updateConditions({ ...conditions, rules: newRules });
+    };
+
+    const updateLogic = (logic) => {
+        updateConditions({ ...conditions, logic });
+    };
+
+    return (
+        <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                Conditions
+                <span className="text-xs font-normal text-gray-400 ml-1">(show this field when...)</span>
+            </label>
+
+            {rules.length > 1 && (
+                <select
+                    value={conditions.logic || 'all'}
+                    onChange={(e) => updateLogic(e.target.value)}
+                    className="rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                >
+                    <option value="all">All conditions are met</option>
+                    <option value="any">Any condition is met</option>
+                </select>
+            )}
+
+            <div className="space-y-2">
+                {rules.map((rule, i) => (
+                    <ConditionRuleRow
+                        key={i}
+                        rule={rule}
+                        index={i}
+                        availableFields={availableFields}
+                        onUpdate={updateRule}
+                        onRemove={removeRule}
+                    />
+                ))}
+            </div>
+
+            {availableFields.length > 0 && (
+                <button
+                    type="button"
+                    onClick={addRule}
+                    className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700"
+                >
+                    + Add condition
+                </button>
+            )}
+        </div>
+    );
+}
+
 // --- Add from Custom Fields Modal ---
 function CustomFieldsModal({ isOpen, onClose, customFields, currentFields, onUpdate }) {
     const getCheckedIds = () => {
@@ -417,6 +638,7 @@ function CustomFieldsModal({ isOpen, onClose, customFields, currentFields, onUpd
                     config: null,
                     default_value: null,
                     is_visible: true,
+                    conditions: null,
                     maps_to: 'custom_field',
                     custom_field_id: cf.id,
                 });
@@ -724,6 +946,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
             config: null,
             default_value: null,
             is_visible: true,
+            conditions: null,
             maps_to: null,
             custom_field_id: null,
         };
@@ -739,7 +962,30 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
     };
 
     const removeField = (index) => {
-        onChange(fields.filter((_, i) => i !== index).map((f, i) => ({ ...f, position: i })));
+        const removedField = fields[index];
+        const removedKey = removedField?.id ? `id:${removedField.id}` : `pos:${index}`;
+        let newFields = fields.filter((_, i) => i !== index);
+
+        // Clean up conditions referencing the removed field and update pos: keys
+        newFields = newFields.map((f, newIdx) => {
+            if (!f.conditions?.rules?.length) return f;
+            const filteredRules = f.conditions.rules
+                .filter(r => r.field_key !== removedKey)
+                .map(r => {
+                    // Update pos: references since indices shifted
+                    if (r.field_key?.startsWith('pos:')) {
+                        const oldPos = parseInt(r.field_key.split(':')[1]);
+                        if (oldPos > index) return { ...r, field_key: `pos:${oldPos - 1}` };
+                    }
+                    return r;
+                });
+            return {
+                ...f,
+                conditions: filteredRules.length > 0 ? { ...f.conditions, rules: filteredRules } : null,
+            };
+        });
+
+        onChange(newFields.map((f, i) => ({ ...f, position: i })));
         setDeleteIndex(null);
         if (expandedIndex === index) setExpandedIndex(null);
         else if (expandedIndex > index) setExpandedIndex(expandedIndex - 1);
@@ -752,7 +998,35 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
         const oldIndex = parseInt(active.id.replace('field-', ''));
         const newIndex = parseInt(over.id.replace('field-', ''));
 
-        const newFields = arrayMove(fields, oldIndex, newIndex).map((f, i) => ({ ...f, position: i }));
+        // Build position mapping for pos: condition references
+        const posMapping = {};
+        fields.forEach((_, i) => {
+            let dest = i;
+            if (i === oldIndex) dest = newIndex;
+            else if (oldIndex < newIndex && i > oldIndex && i <= newIndex) dest = i - 1;
+            else if (oldIndex > newIndex && i >= newIndex && i < oldIndex) dest = i + 1;
+            posMapping[i] = dest;
+        });
+
+        const newFields = arrayMove(fields, oldIndex, newIndex).map((f, i) => {
+            const updated = { ...f, position: i };
+            // Update pos: references in conditions
+            if (updated.conditions?.rules?.length) {
+                updated.conditions = {
+                    ...updated.conditions,
+                    rules: updated.conditions.rules.map(r => {
+                        if (r.field_key?.startsWith('pos:')) {
+                            const oldPos = parseInt(r.field_key.split(':')[1]);
+                            if (posMapping[oldPos] !== undefined) {
+                                return { ...r, field_key: `pos:${posMapping[oldPos]}` };
+                            }
+                        }
+                        return r;
+                    }),
+                };
+            }
+            return updated;
+        });
         onChange(newFields);
 
         // Update expanded index if needed

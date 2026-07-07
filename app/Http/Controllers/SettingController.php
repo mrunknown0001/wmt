@@ -17,6 +17,7 @@ class SettingController extends Controller
         return Inertia::render('Settings/Edit', [
             'settings' => Setting::current(),
             'colorPalettes' => Setting::colorPalettes(),
+            'notificationChannelDefaults' => Setting::NOTIFICATION_CHANNEL_DEFAULTS,
         ]);
     }
 

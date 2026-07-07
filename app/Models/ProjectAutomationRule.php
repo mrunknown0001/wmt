@@ -12,6 +12,7 @@ class ProjectAutomationRule extends Model
         'name',
         'is_active',
         'trigger_type',
+        'trigger_config',
         'conditions',
         'actions',
         'created_by',
@@ -21,6 +22,7 @@ class ProjectAutomationRule extends Model
     {
         return [
             'is_active' => 'boolean',
+            'trigger_config' => 'array',
             'conditions' => 'array',
             'actions' => 'array',
         ];

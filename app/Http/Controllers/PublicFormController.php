@@ -41,6 +41,7 @@ class PublicFormController extends Controller
                         'maps_to' => $field->maps_to,
                         'default_value' => $field->default_value,
                         'is_visible' => $field->is_visible,
+                        'conditions' => $field->conditions,
                     ];
 
                     // Include options for mapped select fields
@@ -78,6 +79,7 @@ class PublicFormController extends Controller
         }
 
         // Build dynamic validation rules
+        $submittedFields = $request->input('fields', []);
         $rules = [];
         foreach ($form->fields as $field) {
             if (in_array($field->type, ['heading', 'description'])) {
@@ -86,6 +88,11 @@ class PublicFormController extends Controller
 
             // Skip validation for hidden fields (they use default values)
             if (!$field->is_visible) {
+                continue;
+            }
+
+            // Skip validation for fields whose conditions are not met
+            if (!$this->fieldConditionsMet($field, $form->fields, $submittedFields)) {
                 continue;
             }
 
@@ -154,9 +161,14 @@ class PublicFormController extends Controller
             foreach ($form->fields as $field) {
                 if (in_array($field->position, $titleFieldIds)) {
                     $val = $fieldValues[$field->id] ?? null;
-                    if ($val !== null && $val !== '') {
-                        $titleParts[] = is_array($val) ? implode(', ', $val) : $val;
+                    if ($val === null || $val === '') continue;
+
+                    // Resolve option IDs to labels for select/multi_select fields
+                    if (in_array($field->type, ['select', 'multi_select'])) {
+                        $val = $this->resolveOptionLabels($field, $val);
                     }
+
+                    $titleParts[] = is_array($val) ? implode(', ', $val) : $val;
                 }
             }
             if (!empty($titleParts)) {
@@ -169,6 +181,11 @@ class PublicFormController extends Controller
 
         foreach ($form->fields as $field) {
             if (in_array($field->type, ['heading', 'description', 'attachment'])) {
+                continue;
+            }
+
+            // Skip mapping for fields whose conditions are not met
+            if (!$this->fieldConditionsMet($field, $form->fields, $submittedFields)) {
                 continue;
             }
 
@@ -246,5 +263,85 @@ class PublicFormController extends Controller
                 'project_name' => $form->project->name,
             ],
         ]);
+    }
+
+    private function fieldConditionsMet($field, $allFields, array $submittedValues, array &$visited = []): bool
+    {
+        $conditions = $field->conditions;
+        if (empty($conditions) || empty($conditions['rules'])) {
+            return true;
+        }
+
+        // Circular reference protection
+        if (in_array($field->id, $visited)) {
+            return true;
+        }
+        $visited[] = $field->id;
+
+        $logic = $conditions['logic'] ?? 'all';
+        $results = [];
+
+        foreach ($conditions['rules'] as $rule) {
+            $refFieldId = $rule['field_id'] ?? null;
+            if (!$refFieldId) {
+                $results[] = true;
+                continue;
+            }
+
+            $refField = $allFields->firstWhere('id', $refFieldId);
+            if (!$refField) {
+                $results[] = true;
+                continue;
+            }
+
+            // Check if the referenced field itself is visible (recursive)
+            if (!$this->fieldConditionsMet($refField, $allFields, $submittedValues, $visited)) {
+                $results[] = false;
+                continue;
+            }
+
+            $submittedValue = $submittedValues[$refFieldId] ?? null;
+            $operator = $rule['operator'] ?? 'equals';
+            $expectedValue = $rule['value'] ?? null;
+
+            $met = match ($operator) {
+                'equals' => (string) ($submittedValue ?? '') === (string) ($expectedValue ?? ''),
+                'not_equals' => (string) ($submittedValue ?? '') !== (string) ($expectedValue ?? ''),
+                'contains' => is_string($submittedValue) && str_contains($submittedValue, (string) ($expectedValue ?? '')),
+                'is_empty' => $submittedValue === null || $submittedValue === '' || (is_array($submittedValue) && empty($submittedValue)),
+                'is_not_empty' => $submittedValue !== null && $submittedValue !== '' && !(is_array($submittedValue) && empty($submittedValue)),
+                default => true,
+            };
+
+            $results[] = $met;
+        }
+
+        if (empty($results)) {
+            return true;
+        }
+
+        return $logic === 'all' ? !in_array(false, $results, true) : in_array(true, $results, true);
+    }
+
+    private function resolveOptionLabels($field, $val): string|array
+    {
+        // Build option ID → label map
+        $optionMap = [];
+        if ($field->customField && $field->customField->options) {
+            foreach ($field->customField->options as $opt) {
+                $optionMap[(string) $opt->id] = $opt->label;
+            }
+        } elseif (!empty($field->config['options'])) {
+            foreach ($field->config['options'] as $opt) {
+                $key = (string) ($opt['id'] ?? $opt['value'] ?? '');
+                $optionMap[$key] = $opt['label'] ?? $key;
+            }
+        }
+
+        if (is_array($val)) {
+            return array_map(fn ($v) => $optionMap[(string) $v] ?? $v, $val);
+        }
+
+        return $optionMap[(string) $val] ?? $val;
     }
 }

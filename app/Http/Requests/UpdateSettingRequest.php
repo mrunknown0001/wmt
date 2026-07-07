@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Setting;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateSettingRequest extends FormRequest
@@ -13,7 +14,9 @@ class UpdateSettingRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $channelKeys = array_keys(Setting::NOTIFICATION_CHANNEL_DEFAULTS);
+
+        $rules = [
             'app_name' => ['required', 'string', 'max:255'],
             'primary_color' => ['required', 'string', 'in:blue,indigo,violet,teal,green,red,orange,rose'],
             'max_upload_size' => ['required', 'integer', 'min:1', 'max:100'],
@@ -24,6 +27,13 @@ class UpdateSettingRequest extends FormRequest
             'escalation_tiers' => ['required', 'array', 'size:4'],
             'escalation_tiers.*.days' => ['required', 'integer', 'min:1', 'max:90'],
             'escalation_tiers.*.enabled' => ['required', 'boolean'],
+            'notification_channels' => ['required', 'array'],
         ];
+
+        foreach ($channelKeys as $key) {
+            $rules["notification_channels.{$key}"] = ['required', 'boolean'];
+        }
+
+        return $rules;
     }
 }

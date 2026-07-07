@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Setting;
 use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\User;
@@ -24,7 +25,7 @@ class TaskCommentMentionNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = ['database', 'broadcast'];
-        if ($notifiable->wantsEmail('task_mention')) {
+        if (Setting::current()->wantsEmail('task_mention')) {
             $channels[] = 'mail';
         }
         return $channels;

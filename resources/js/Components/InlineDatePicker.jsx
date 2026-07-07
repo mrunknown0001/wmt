@@ -142,7 +142,7 @@ export default function InlineDatePicker({ currentDate, isOpen, onToggle, onSele
                 ref={anchorRef}
                 onClick={(e) => { e.stopPropagation(); onToggle(); }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className={`cursor-pointer text-sm ${hidden ? 'sr-only' : ''} ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}
+                className={`cursor-pointer text-sm rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-700/60 transition-all ${hidden ? 'sr-only' : ''} ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}
             >
                 {formatDate(currentDate) || '—'}
             </button>

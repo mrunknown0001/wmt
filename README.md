@@ -12,10 +12,12 @@ Operational workload management platform with Asana-like task management, organi
 | Cache/Sessions/Queues | Redis |
 | WebSockets | Soketi (Pusher-protocol) |
 | Real-time client | Laravel Echo |
-| Auth/Permissions | spatie/laravel-permission |
+| Auth/Permissions | spatie/laravel-permission + Laravel Sanctum |
 | Styling | Tailwind CSS v4 |
 | Rich Text | TipTap (WYSIWYG editor) |
 | Drag & Drop | @dnd-kit |
+| Push Notifications | Firebase Cloud Messaging (FCM) |
+| CAPTCHA | Cloudflare Turnstile |
 | AI | OpenAI / OpenRouter (configurable via `AI_PLATFORM` env var) |
 | Dev environment | Docker Compose |
 
@@ -41,27 +43,29 @@ Default admin login: `admin@wmt.com` / `password`
 ## Key Features
 
 - **Organization Hierarchy** — Divisions → Departments → Teams → Users
-- **Project Management** — Full CRUD with owner/admin roles, member management
+- **Project Management** — Full CRUD with owner/admin roles, member management, archived projects view
 - **Kanban Board** — Drag-and-drop task cards with inline editing and dual view (board/list)
 - **Task Sections** — Asana-style grouping within projects
 - **Subtasks** — Hierarchical parent-child tasks with progress tracking
 - **Recurring Tasks** — Daily/weekly/monthly/yearly with auto-generation
+- **Task Attachments** — Direct file uploads on tasks and comments
 - **Comments & @Mentions** — Rich text comments with user mentions and file attachments
-- **Real-time Notifications** — WebSocket push + email (8 types, per-user preferences, bookmark/archive/mention filters)
+- **Real-time Notifications** — WebSocket push + email + FCM push notifications (8 types, per-user preferences, bookmark/archive/mention filters)
 - **Escalated Due Dates** — Tiered overdue escalation through org hierarchy
 - **Workflow Automation** — Project-level rule builder (trigger → conditions → actions)
+- **Global Search** — Search across projects, tasks, and users from any page
 - **AI Chat Assistant** — Streaming multi-turn conversations with organizational context
 - **Executive Dashboard** — Org-wide stats with hierarchical drill-down
 - **Customizable Dashboard** — 7 togglable widgets, persisted per user
 - **Activity Log** — Centralized audit trail across all projects
 - **Custom Fields** — 5 types (text, number, date, single select, multi select) per project with inline editing
-- **Form Builder** — Asana-style form designer with tabs (Questions/Settings), drag-and-drop, custom field mapping, file attachments, and public form links
+- **Form Builder** — Asana-style form designer with drag-and-drop, custom field mapping, conditional visibility, file attachments, and public form links
 - **Calendar** — Monthly grid view with priority-colored task pills
 - **My Tasks** — Personal task view grouped by due date urgency
 - **Personal To-Do List** — Sidebar widget with drag-and-drop reordering and completion animations
 - **Celebration Effect** — Canvas particle animation on task completion
-- **UI/UX Polish** — ClickUp-inspired micro-interactions, animations, and hover feedback
 - **Dark Mode** — Full dark/light theme support with customizable primary color
+- **UI/UX Polish** — ClickUp-inspired micro-interactions, animations, and hover feedback
 
 See [FEATURES.md](FEATURES.md) for the complete feature list.
 
@@ -90,6 +94,13 @@ SOKETI_APP_SECRET=app-secret
 
 # AI (optional)
 AI_PLATFORM=openai
+
+# Push Notifications (optional)
+FCM_SERVER_KEY=your-fcm-key
+
+# CAPTCHA (required for public forms)
+TURNSTILE_SECRET_KEY=your-turnstile-secret
+TURNSTILE_SITE_KEY=your-turnstile-site-key
 ```
 
 ## License

@@ -9,7 +9,6 @@ use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\ExecutiveDashboardController;
 use App\Http\Controllers\Api\MyTaskController;
 use App\Http\Controllers\Api\NotificationController;
-use App\Http\Controllers\Api\NotificationPreferenceController;
 use App\Http\Controllers\Api\PersonalTodoController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\SearchController;
@@ -96,10 +95,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Mobile app device-token registration (Bearer auth, distinct path to avoid the web /api/device-tokens CSRF route).
     Route::post('/mobile/device-tokens', [DeviceTokenController::class, 'store']);
     Route::delete('/mobile/device-tokens', [DeviceTokenController::class, 'destroy']);
-
-    // Notification preferences
-    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'index']);
-    Route::post('/notification-preferences', [NotificationPreferenceController::class, 'update']);
 
     // Global search (mobile path to avoid web.php /api/search shadow)
     Route::get('/mobile/search', SearchController::class);

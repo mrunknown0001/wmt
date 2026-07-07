@@ -2,17 +2,22 @@
 
 namespace App\Services;
 
+use App\Events\AutomationRuleExecuted;
+use App\Events\TaskUpdated;
+use App\Models\CustomField;
 use App\Models\ProjectAutomationRule;
 use App\Models\Task;
 use App\Models\TaskComment;
+use App\Models\TaskCustomFieldValue;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
+use Carbon\Carbon;
 
 class AutomationRuleEngine
 {
     private static bool $executing = false;
 
-    public static function evaluate(Task $task, string $triggerType, array $oldValues = []): void
+    public static function evaluate(Task $task, string $triggerType, array $oldValues = [], array $changedFieldIds = []): void
     {
         // Guard against infinite loops — don't re-trigger rules from rule-caused changes
         if (self::$executing) {
@@ -37,8 +42,36 @@ class AutomationRuleEngine
 
         try {
             foreach ($rules as $rule) {
+                // For custom_field_changed triggers, check if the rule targets a specific field
+                if ($triggerType === 'custom_field_changed' && !empty($changedFieldIds)) {
+                    $triggerCfId = $rule->trigger_config['custom_field_id'] ?? null;
+                    if ($triggerCfId && !in_array((int) $triggerCfId, $changedFieldIds)) {
+                        continue;
+                    }
+                }
+
                 if (self::conditionsMet($task, $rule->conditions)) {
                     self::executeActions($task, $rule->actions);
+
+                    // Refresh and broadcast the updated task for real-time UI sync
+                    $task->refresh();
+                    $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
+
+                    broadcast(new TaskUpdated(
+                        $task->project_id,
+                        $task->toArray(),
+                        'updated',
+                        auth()->id() ?? $task->created_by ?? 0,
+                    ));
+
+                    // Broadcast automation rule execution for toast notifications
+                    $actionSummaries = collect($rule->actions)->map(fn ($a) => $a['type'] ?? 'unknown')->all();
+                    broadcast(new AutomationRuleExecuted(
+                        $task->project_id,
+                        $rule->name,
+                        ['id' => $task->id, 'title' => $task->title],
+                        $actionSummaries,
+                    ));
                 }
             }
         } finally {
@@ -52,6 +85,12 @@ class AutomationRuleEngine
             return true;
         }
 
+        // Eagerly load custom field values if any condition references custom fields
+        $hasCustomFieldCondition = collect($conditions)->contains(fn ($c) => ($c['field'] ?? null) === 'custom_field');
+        if ($hasCustomFieldCondition) {
+            $task->loadMissing('customFieldValues.customField');
+        }
+
         foreach ($conditions as $condition) {
             $field = $condition['field'] ?? null;
             $operator = $condition['operator'] ?? 'equals';
@@ -59,19 +98,26 @@ class AutomationRuleEngine
 
             if (!$field) continue;
 
-            $taskValue = $task->getAttribute($field);
+            if ($field === 'custom_field') {
+                $met = self::evaluateCustomFieldCondition($task, $condition);
+            } else {
+                $taskValue = $task->getAttribute($field);
 
-            // Normalize for comparison
-            $taskValue = is_null($taskValue) ? null : (string) $taskValue;
-            $value = is_null($value) ? null : (string) $value;
+                // Resolve special placeholder values
+                $value = self::resolveSpecialValue($task, $value);
 
-            $met = match ($operator) {
-                'equals' => $taskValue === $value,
-                'not_equals' => $taskValue !== $value,
-                'in' => is_array($condition['value']) && in_array($taskValue, array_map('strval', $condition['value'])),
-                'not_in' => is_array($condition['value']) && !in_array($taskValue, array_map('strval', $condition['value'])),
-                default => true,
-            };
+                // Normalize for comparison
+                $taskValue = is_null($taskValue) ? null : (string) $taskValue;
+                $value = is_null($value) ? null : (string) $value;
+
+                $met = match ($operator) {
+                    'equals' => $taskValue === $value,
+                    'not_equals' => $taskValue !== $value,
+                    'in' => is_array($condition['value']) && in_array($taskValue, array_map('strval', $condition['value'])),
+                    'not_in' => is_array($condition['value']) && !in_array($taskValue, array_map('strval', $condition['value'])),
+                    default => true,
+                };
+            }
 
             if (!$met) {
                 return false;
@@ -79,6 +125,139 @@ class AutomationRuleEngine
         }
 
         return true;
+    }
+
+    /**
+     * Resolve special placeholder values like __project_owner__ to actual IDs.
+     */
+    private static function resolveSpecialValue(Task $task, $value)
+    {
+        if ($value === '__project_owner__') {
+            $task->loadMissing('project');
+            return $task->project?->owner_id;
+        }
+
+        return $value;
+    }
+
+    private static function evaluateCustomFieldCondition(Task $task, array $condition): bool
+    {
+        $customFieldId = $condition['custom_field_id'] ?? null;
+        if (!$customFieldId) return true;
+
+        $cfv = $task->customFieldValues->firstWhere('custom_field_id', $customFieldId);
+        $customField = $cfv?->customField;
+
+        // If no custom field value record exists, try to find the field definition directly
+        if (!$customField) {
+            $customField = CustomField::where('id', $customFieldId)
+                ->where('project_id', $task->project_id)
+                ->first();
+        }
+
+        $currentValue = $cfv?->value;
+        $operator = $condition['operator'] ?? 'equals';
+
+        // Handle is_empty / is_not_empty (type-agnostic)
+        if ($operator === 'is_empty') {
+            return $currentValue === null || $currentValue === '' || (is_array($currentValue) && empty($currentValue));
+        }
+        if ($operator === 'is_not_empty') {
+            return $currentValue !== null && $currentValue !== '' && !(is_array($currentValue) && empty($currentValue));
+        }
+
+        if (!$customField) return false;
+
+        $conditionValue = $condition['value'] ?? null;
+
+        return match ($customField->type) {
+            'text', 'textarea' => self::evaluateTextCondition($currentValue, $operator, $conditionValue),
+            'number' => self::evaluateNumberCondition($currentValue, $operator, $conditionValue),
+            'date' => self::evaluateDateCondition($currentValue, $operator, $conditionValue),
+            'single_select' => self::evaluateSelectCondition($currentValue, $operator, $conditionValue, $condition),
+            'multi_select' => self::evaluateMultiSelectCondition($currentValue, $operator, $conditionValue, $condition),
+            default => true,
+        };
+    }
+
+    private static function evaluateTextCondition($value, string $operator, $expected): bool
+    {
+        $value = (string) ($value ?? '');
+        $expected = (string) ($expected ?? '');
+
+        return match ($operator) {
+            'equals' => $value === $expected,
+            'not_equals' => $value !== $expected,
+            'contains' => str_contains($value, $expected),
+            default => true,
+        };
+    }
+
+    private static function evaluateNumberCondition($value, string $operator, $expected): bool
+    {
+        if ($value === null || $value === '') return false;
+
+        $value = (float) $value;
+        $expected = (float) ($expected ?? 0);
+
+        return match ($operator) {
+            'equals' => $value == $expected,
+            'not_equals' => $value != $expected,
+            'greater_than' => $value > $expected,
+            'less_than' => $value < $expected,
+            default => true,
+        };
+    }
+
+    private static function evaluateDateCondition($value, string $operator, $expected): bool
+    {
+        if ($value === null || $value === '') return false;
+
+        try {
+            $date = Carbon::parse($value);
+            $expectedDate = Carbon::parse($expected);
+        } catch (\Exception) {
+            return false;
+        }
+
+        return match ($operator) {
+            'equals' => $date->isSameDay($expectedDate),
+            'not_equals' => !$date->isSameDay($expectedDate),
+            'before' => $date->isBefore($expectedDate),
+            'after' => $date->isAfter($expectedDate),
+            default => true,
+        };
+    }
+
+    private static function evaluateSelectCondition($value, string $operator, $expected, array $condition): bool
+    {
+        // For single_select, value is the option_id
+        $currentId = $value !== null ? (string) $value : null;
+        $expectedId = $expected !== null ? (string) $expected : null;
+
+        return match ($operator) {
+            'equals' => $currentId === $expectedId,
+            'not_equals' => $currentId !== $expectedId,
+            'in' => is_array($condition['value']) && in_array($currentId, array_map('strval', $condition['value'])),
+            'not_in' => is_array($condition['value']) && !in_array($currentId, array_map('strval', $condition['value'])),
+            default => true,
+        };
+    }
+
+    private static function evaluateMultiSelectCondition($value, string $operator, $expected, array $condition): bool
+    {
+        // For multi_select, value is a JSON array of option IDs
+        $currentIds = is_array($value) ? array_map('strval', $value) : [];
+
+        return match ($operator) {
+            'contains' => is_array($condition['value'])
+                ? !empty(array_intersect(array_map('strval', $condition['value']), $currentIds))
+                : in_array((string) $expected, $currentIds),
+            'not_contains' => is_array($condition['value'])
+                ? empty(array_intersect(array_map('strval', $condition['value']), $currentIds))
+                : !in_array((string) $expected, $currentIds),
+            default => true,
+        };
     }
 
     private static function executeActions(Task $task, array $actions): void
@@ -94,6 +273,7 @@ class AutomationRuleEngine
                 'move_to_section' => self::actionMoveToSection($task, $params),
                 'send_notification' => self::actionSendNotification($task, $params),
                 'add_comment' => self::actionAddComment($task, $params),
+                'set_custom_field' => self::actionSetCustomField($task, $params),
                 default => null,
             };
         }
@@ -124,7 +304,16 @@ class AutomationRuleEngine
     private static function actionAssignUser(Task $task, array $params): void
     {
         $userId = $params['user_id'] ?? null;
-        if (!$userId || $task->assigned_to == $userId) return;
+        if (!$userId) return;
+
+        // Resolve special placeholders
+        if ($userId === '__project_owner__') {
+            $task->loadMissing('project');
+            $userId = $task->project?->owner_id;
+            if (!$userId) return;
+        }
+
+        if ($task->assigned_to == $userId) return;
 
         $user = User::where('id', $userId)->where('is_active', true)->first();
         if (!$user) return;
@@ -195,5 +384,23 @@ class AutomationRuleEngine
         if ($sender) {
             $recipient->notify(new TaskAssignedNotification($task, $sender));
         }
+    }
+
+    private static function actionSetCustomField(Task $task, array $params): void
+    {
+        $customFieldId = $params['custom_field_id'] ?? null;
+        $value = $params['value'] ?? null;
+        if (!$customFieldId || !$task->project_id) return;
+
+        $customField = CustomField::where('id', $customFieldId)
+            ->where('project_id', $task->project_id)
+            ->first();
+        if (!$customField) return;
+
+        $cfv = TaskCustomFieldValue::updateOrCreate(
+            ['task_id' => $task->id, 'custom_field_id' => $customFieldId],
+        );
+        $cfv->setTypedValue($customField->type, $value);
+        $cfv->save();
     }
 }

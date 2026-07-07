@@ -20,6 +20,7 @@ class FormField extends Model
         'config',
         'default_value',
         'is_visible',
+        'conditions',
         'maps_to',
         'custom_field_id',
     ];
@@ -31,6 +32,7 @@ class FormField extends Model
             'is_visible' => 'boolean',
             'position' => 'integer',
             'config' => 'array',
+            'conditions' => 'array',
         ];
     }
 

@@ -107,7 +107,7 @@ class TaskController extends Controller
 
         AutomationRuleEngine::evaluate($task, 'task_created');
 
-        $task->load('assignee', 'collaborators');
+        $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'created', $request->user()->id))->toOthers();
 
         return redirect("/projects/{$project->id}")
@@ -275,7 +275,7 @@ class TaskController extends Controller
 
         $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
 
-        $task->load('assignee', 'collaborators');
+        $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'updated', $request->user()->id))->toOthers();
 
         return redirect("/projects/{$project->id}")
@@ -353,6 +353,7 @@ class TaskController extends Controller
             }
         }
 
+        $task->loadMissing('assignee', 'collaborators', 'customFieldValues.selectedOption');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'updated', $request->user()->id))->toOthers();
 
         return response()->json($response);
@@ -537,6 +538,12 @@ class TaskController extends Controller
                 ->keyBy('id');
         }
 
+        // Pre-fetch current statuses for automation rule evaluation
+        $taskIds = collect($validated['tasks'])->pluck('id')->toArray();
+        $oldStatuses = Task::where('project_id', $project->id)
+            ->whereIn('id', $taskIds)
+            ->pluck('status', 'id');
+
         foreach ($validated['tasks'] as $item) {
             $updateData = [
                 'status' => $item['status'],
@@ -548,6 +555,21 @@ class TaskController extends Controller
             Task::where('id', $item['id'])
                 ->where('project_id', $project->id)
                 ->update($updateData);
+        }
+
+        // Fire automation rules for tasks whose status changed
+        foreach ($validated['tasks'] as $item) {
+            $oldStatus = $oldStatuses[$item['id']] ?? null;
+            if ($oldStatus !== null && $oldStatus !== $item['status']) {
+                $task = Task::find($item['id']);
+                if ($task) {
+                    $oldValues = ['status' => $oldStatus];
+                    AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
+                    if ($item['status'] === 'done') {
+                        AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
+                    }
+                }
+            }
         }
 
         // Generate next occurrences for recurring tasks that just moved to done

@@ -9,22 +9,38 @@ use App\Models\Division;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DepartmentController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', Department::class);
 
-        $departments = Department::with('division', 'head')
-            ->withCount('teams', 'users')
-            ->orderBy('name')
-            ->paginate(20);
+        $query = Department::with('division', 'head')
+            ->withCount('teams', 'users');
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        if ($divisionId = $request->input('division_id')) {
+            $query->where('division_id', $divisionId);
+        }
+
+        $departments = $query->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
 
         return Inertia::render('Departments/Index', [
             'departments' => $departments,
+            'divisions' => Division::orderBy('name')->get(['id', 'name']),
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'division_id' => $request->input('division_id', ''),
+            ],
         ]);
     }
 

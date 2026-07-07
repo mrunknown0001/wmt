@@ -17,7 +17,7 @@ const COLOR_LABELS = {
 };
 
 export default function Edit() {
-    const { settings, colorPalettes } = usePage().props;
+    const { settings, colorPalettes, notificationChannelDefaults } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         app_name: settings.app_name || '',
@@ -32,6 +32,7 @@ export default function Edit() {
             { days: 7, enabled: true },
             { days: 14, enabled: true },
         ],
+        notification_channels: settings.notification_channels || notificationChannelDefaults || {},
     });
 
     const ESCALATION_LABELS = [
@@ -40,6 +41,30 @@ export default function Edit() {
         'Division Head',
         'Executives',
     ];
+
+    const NOTIFICATION_CHANNEL_LABELS = {
+        email_task_assigned: 'Task Assigned',
+        email_task_due_soon: 'Task Due Soon (tomorrow)',
+        email_task_due_reminder: 'Task Due Reminder (configurable days)',
+        email_task_overdue: 'Task Overdue',
+        email_task_comment: 'New Comment on Task',
+        email_task_mention: '@Mention in Comment',
+        email_comment_deleted: 'Comment Deleted',
+        email_task_escalated: 'Task Escalated',
+    };
+
+    const NOTIFICATION_CHANNEL_GROUPS = [
+        { label: 'Task Assignments', keys: ['email_task_assigned'] },
+        { label: 'Due Dates', keys: ['email_task_due_soon', 'email_task_due_reminder', 'email_task_overdue', 'email_task_escalated'] },
+        { label: 'Comments', keys: ['email_task_comment', 'email_task_mention', 'email_comment_deleted'] },
+    ];
+
+    const toggleNotificationChannel = (key) => {
+        setData('notification_channels', {
+            ...data.notification_channels,
+            [key]: !data.notification_channels[key],
+        });
+    };
 
     const updateEscalationTier = (index, field, value) => {
         const updated = data.escalation_tiers.map((tier, i) =>
@@ -287,6 +312,57 @@ export default function Edit() {
                                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.escalation_tiers}</p>
                                     )}
                                 </div>
+                            )}
+                        </div>
+
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    Email Notification Channels
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Control which email notifications are sent to all users system-wide.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                {NOTIFICATION_CHANNEL_GROUPS.map((group) => (
+                                    <div key={group.label}>
+                                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                            {group.label}
+                                        </p>
+                                        <div className="space-y-2">
+                                            {group.keys.map((key) => (
+                                                <div
+                                                    key={key}
+                                                    className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800"
+                                                >
+                                                    <span className="text-sm text-gray-900 dark:text-gray-100">
+                                                        {NOTIFICATION_CHANNEL_LABELS[key]}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        role="switch"
+                                                        aria-checked={data.notification_channels[key] ?? false}
+                                                        onClick={() => toggleNotificationChannel(key)}
+                                                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                                            data.notification_channels[key] ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                                data.notification_channels[key] ? 'translate-x-4' : 'translate-x-0'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {errors.notification_channels && (
+                                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.notification_channels}</p>
                             )}
                         </div>
 

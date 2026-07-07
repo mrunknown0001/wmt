@@ -192,12 +192,12 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-3 text-sm ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
-                <div className="flex items-center gap-1.5">
+            <td className={`px-6 py-3 text-sm max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                <div className="flex items-center gap-1.5 min-w-0">
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
-                    {task.title}
+                    <span className="truncate" title={task.title}>{task.title}</span>
                 </div>
             </td>
             <td className="px-6 py-3 text-sm">
@@ -400,8 +400,8 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-4 text-sm font-medium ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
-                <div className="flex items-center gap-2">
+            <td className={`px-6 py-4 text-sm font-medium max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+                <div className="flex items-center gap-2 min-w-0">
                     {(task.subtasks_count > 0 || canManageTasks) && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onToggleExpand(task.id); }}
@@ -414,7 +414,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             </svg>
                         </button>
                     )}
-                    <span>{task.title}</span>
+                    <span className="truncate min-w-0" title={task.title}>{task.title}</span>
                     {task.is_recurring && (
                         <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -676,11 +676,11 @@ function BoardScrollWrapper({ children }) {
 }
 
 // Droppable zone for sections (allows dropping tasks into/between sections)
-function SectionDropZone({ sectionId }) {
+function SectionDropZone({ sectionId, minHeight = false }) {
     const { setNodeRef, isOver } = useDroppable({ id: `section-${sectionId ?? 'null'}` });
     return (
         <tr ref={setNodeRef}>
-            <td colSpan={99} className={`transition-colors ${isOver ? 'py-2' : 'py-0'}`}>
+            <td colSpan={99} className={`transition-colors ${isOver ? 'py-2' : minHeight ? 'py-1' : 'py-0'}`}>
                 {isOver && (
                     <div className="mx-4 border-2 border-dashed border-primary-300 dark:border-primary-600 rounded py-2 text-center text-xs text-primary-500 font-medium">
                         Drop here
@@ -781,6 +781,61 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
     );
 }
 
+function AutomationToast({ toast, onDismiss }) {
+    const [visible, setVisible] = useState(false);
+    const [exiting, setExiting] = useState(false);
+
+    useEffect(() => {
+        requestAnimationFrame(() => setVisible(true));
+        const timer = setTimeout(() => {
+            setExiting(true);
+            setVisible(false);
+            setTimeout(() => onDismiss(toast.id), 300);
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    return (
+        <div
+            className={`flex items-start gap-3 rounded-lg border px-4 py-3 shadow-lg transition-all duration-300 ${
+                visible
+                    ? 'opacity-100 translate-y-0 scale-100'
+                    : exiting
+                        ? 'opacity-0 translate-y-2 scale-95'
+                        : 'opacity-0 translate-y-4 scale-95'
+            } border-purple-200 bg-purple-50 dark:bg-purple-900/30 dark:border-purple-800`}
+        >
+            <div className="shrink-0 mt-0.5 rounded-full bg-purple-100 dark:bg-purple-800/50 p-1.5">
+                <svg className="h-4 w-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                    Rule executed
+                </p>
+                <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5 truncate">
+                    <span className="font-medium">{toast.ruleName}</span>
+                    {toast.taskTitle && <> on &ldquo;{toast.taskTitle}&rdquo;</>}
+                </p>
+                {toast.actions && (
+                    <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5 capitalize">
+                        {toast.actions}
+                    </p>
+                )}
+            </div>
+            <button
+                onClick={() => onDismiss(toast.id)}
+                className="text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 shrink-0"
+            >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    );
+}
+
 export default function Show() {
     const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], auth, users } = usePage().props;
 
@@ -809,6 +864,7 @@ export default function Show() {
     const [showAutomation, setShowAutomation] = useState(false);
     const [showCustomFields, setShowCustomFields] = useState(false);
     const [celebration, setCelebration] = useState(null); // { x, y } or null
+    const [automationToasts, setAutomationToasts] = useState([]);
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -841,6 +897,17 @@ export default function Show() {
                     router.reload({ only: ['tasks'], preserveScroll: true });
                     break;
             }
+        });
+
+        channel.listen('.automation.executed', (e) => {
+            const id = `auto-${Date.now()}-${Math.random()}`;
+            const actionLabels = (e.actions || []).map(a => a.replace(/_/g, ' ')).join(', ');
+            setAutomationToasts((prev) => [...prev, {
+                id,
+                ruleName: e.rule_name,
+                taskTitle: e.task?.title,
+                actions: actionLabels,
+            }]);
         });
 
         return () => echo.leave(`project.${project.id}`);
@@ -991,13 +1058,18 @@ export default function Show() {
             method: 'POST',
             body: JSON.stringify({ tasks: payload }),
         }).then(async (res) => {
-            if (!res.ok) return;
+            if (!res.ok) {
+                setLocalTasks(serverTasks);
+                return;
+            }
             const data = await res.json();
             if (data.new_tasks?.length > 0) {
                 setLocalTasks((prev) => [...prev, ...data.new_tasks]);
             }
-        }).catch(() => {});
-    }, [project.id]);
+        }).catch(() => {
+            setLocalTasks(serverTasks);
+        });
+    }, [project.id, serverTasks]);
 
     // Persist section reorder to backend
     const persistSectionReorder = useCallback((reorderedSections) => {
@@ -1131,7 +1203,9 @@ export default function Show() {
         if (activeId === over.id) return;
 
         let targetSectionId;
-        if (overId.startsWith('section-')) {
+        if (overId.startsWith('section-header-')) {
+            targetSectionId = parseInt(overId.replace('section-header-', ''));
+        } else if (overId.startsWith('section-')) {
             const part = overId.replace('section-', '');
             targetSectionId = part === 'null' ? null : parseInt(part);
         } else {
@@ -1173,41 +1247,71 @@ export default function Show() {
         }
 
         if (tasksBySection) {
-            // Section-aware drag end
-            const activeTask = localTasks.find((t) => t.id === active.id);
-            if (!activeTask) return;
-
-            const sectionId = activeTask.section_id;
-            const sectionTasks = localTasks.filter((t) => t.section_id === sectionId && matchesFilters(t));
-
+            // Determine target section from the over element directly
             const overIdStr = String(over.id);
-            const isOverSection = overIdStr.startsWith('section-');
-            const overTask = !isOverSection ? localTasks.find((t) => t.id === over.id) : null;
+            const isOverSectionHeader = overIdStr.startsWith('section-header-');
+            const isOverSectionZone = overIdStr.startsWith('section-') && !isOverSectionHeader;
+            const isOverSection = isOverSectionHeader || isOverSectionZone;
 
-            if (!isOverSection && overTask && overTask.section_id === sectionId) {
-                // Reorder within the same section
-                const oldIndex = sectionTasks.findIndex((t) => t.id === active.id);
-                const newIndex = sectionTasks.findIndex((t) => t.id === over.id);
+            let targetSectionId;
+            if (isOverSectionHeader) {
+                targetSectionId = parseInt(overIdStr.replace('section-header-', ''));
+            } else if (isOverSectionZone) {
+                const part = overIdStr.replace('section-', '');
+                targetSectionId = part === 'null' ? null : parseInt(part);
+            } else {
+                const overTask = localTasks.find((t) => t.id === over.id);
+                if (!overTask) return;
+                targetSectionId = overTask.section_id;
+            }
 
-                if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-                    const reordered = arrayMove(sectionTasks, oldIndex, newIndex);
-                    setLocalTasks((prev) => {
-                        const updated = prev.map((t) => ({ ...t }));
+            // Compute new state and persist payload separately
+            let toPersist = null;
+            setLocalTasks((prev) => {
+                const activeTask = prev.find((t) => t.id === active.id);
+                if (!activeTask) return prev;
+
+                // Ensure the task has the target section_id
+                const updated = prev.map((t) =>
+                    t.id === active.id ? { ...t, section_id: targetSectionId } : { ...t }
+                );
+
+                const targetTasks = updated.filter((t) => t.section_id === targetSectionId && matchesFilters(t));
+
+                if (!isOverSection && over.id !== active.id) {
+                    // Dropped on a specific task — reorder relative to it
+                    const movedIdx = targetTasks.findIndex((t) => t.id === active.id);
+                    const overIdx = targetTasks.findIndex((t) => t.id === over.id);
+
+                    if (movedIdx !== -1 && overIdx !== -1 && movedIdx !== overIdx) {
+                        const reordered = arrayMove(targetTasks, movedIdx, overIdx);
                         reordered.forEach((t, i) => {
                             const idx = updated.findIndex((u) => u.id === t.id);
                             if (idx !== -1) updated[idx].position = i;
                         });
-                        return updated;
+                        toPersist = reordered;
+                    } else {
+                        targetTasks.forEach((t, i) => {
+                            const idx = updated.findIndex((u) => u.id === t.id);
+                            if (idx !== -1) updated[idx].position = i;
+                        });
+                        toPersist = targetTasks;
+                    }
+                } else {
+                    // Dropped on section area — persist with current order
+                    targetTasks.forEach((t, i) => {
+                        const idx = updated.findIndex((u) => u.id === t.id);
+                        if (idx !== -1) updated[idx].position = i;
                     });
-                    persistReorder(reordered);
-                    return;
+                    toPersist = targetTasks;
                 }
-            }
 
-            // Cross-section move — persist new section assignment with positions
-            persistReorder(sectionTasks);
+                return updated;
+            });
+            if (toPersist) persistReorder(toPersist);
         } else {
             // Flat list mode (no sections)
+            let toPersist = null;
             setLocalTasks((prev) => {
                 const filtered = prev.filter(matchesFilters);
                 const unfilteredIds = new Set(filtered.map((t) => t.id));
@@ -1229,9 +1333,10 @@ export default function Show() {
                     }
                 }
 
-                persistReorder(reordered);
+                toPersist = reordered;
                 return result;
             });
+            if (toPersist) persistReorder(toPersist);
         }
     }, [tasksBySection, localTasks, localSections, matchesFilters, persistReorder, persistSectionReorder]);
 
@@ -1240,22 +1345,22 @@ export default function Show() {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
 
+        let toPersist = null;
         setLocalTasks((prev) => prev.map((t) => {
             if (t.id !== parentId || !t.subtasks) return t;
             const oldIndex = t.subtasks.findIndex((s) => s.id === active.id);
             const newIndex = t.subtasks.findIndex((s) => s.id === over.id);
             if (oldIndex === -1 || newIndex === -1) return t;
             const reordered = arrayMove(t.subtasks, oldIndex, newIndex);
-
-            // Persist subtask order
-            const payload = reordered.map((s, i) => ({ id: s.id, status: s.status, position: i }));
-            apiFetch(`/projects/${project.id}/tasks/reorder`, {
-                method: 'POST',
-                body: JSON.stringify({ tasks: payload }),
-            });
-
+            toPersist = reordered.map((s, i) => ({ id: s.id, status: s.status, position: i, section_id: s.section_id ?? null }));
             return { ...t, subtasks: reordered };
         }));
+        if (toPersist) {
+            apiFetch(`/projects/${project.id}/tasks/reorder`, {
+                method: 'POST',
+                body: JSON.stringify({ tasks: toPersist }),
+            });
+        }
     }, [project.id]);
 
     // --- Board view drag handlers ---
@@ -1281,6 +1386,7 @@ export default function Show() {
 
         const sameColumn = activeTask.status === targetStatus;
 
+        let toPersist = null;
         setLocalTasks((prev) => {
             const updated = prev.map((t) => ({ ...t }));
             const activeIdx = updated.findIndex((t) => t.id === active.id);
@@ -1298,7 +1404,7 @@ export default function Show() {
                     updated[idx].position = i;
                 });
 
-                persistReorder(reordered);
+                toPersist = reordered;
                 return updated;
             } else {
                 // Move to different column
@@ -1317,14 +1423,14 @@ export default function Show() {
                         const idx = updated.findIndex((u) => u.id === t.id);
                         updated[idx].position = i;
                     });
-                    persistReorder(withoutMoved);
+                    toPersist = withoutMoved;
                 } else {
                     // Dropped on empty column area — append to end
                     targetTasks.forEach((t, i) => {
                         const idx = updated.findIndex((u) => u.id === t.id);
                         updated[idx].position = i;
                     });
-                    persistReorder(targetTasks);
+                    toPersist = targetTasks;
                 }
 
                 // Reindex the source column
@@ -1337,6 +1443,7 @@ export default function Show() {
                 return updated;
             }
         });
+        if (toPersist) persistReorder(toPersist);
     }, [localTasks, persistReorder]);
 
     const handleDragStart = useCallback((event) => {
@@ -1554,6 +1661,7 @@ export default function Show() {
                         rules={automationRules || []}
                         users={users}
                         sections={localSections}
+                        customFields={initialCustomFields}
                     />
                 </Card>
             )}
@@ -1854,7 +1962,7 @@ export default function Show() {
                                                                 </React.Fragment>
                                                             ))}
                                                         </SortableContext>
-                                                        <SectionDropZone sectionId={group.id} />
+                                                        <SectionDropZone sectionId={group.id} minHeight={group.id === null} />
                                                         </>
                                                     )}
                                                 </React.Fragment>
@@ -2544,6 +2652,19 @@ export default function Show() {
                     y={celebration.y}
                     onComplete={() => setCelebration(null)}
                 />
+            )}
+
+            {/* Automation rule execution toasts */}
+            {automationToasts.length > 0 && (
+                <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
+                    {automationToasts.map((toast) => (
+                        <AutomationToast
+                            key={toast.id}
+                            toast={toast}
+                            onDismiss={(id) => setAutomationToasts((prev) => prev.filter((t) => t.id !== id))}
+                        />
+                    ))}
+                </div>
             )}
         </AuthenticatedLayout>
     );

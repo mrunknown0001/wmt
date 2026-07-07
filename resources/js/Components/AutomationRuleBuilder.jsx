@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 import Input from './Input';
@@ -12,6 +12,7 @@ const TRIGGER_TYPES = [
     { value: 'task_priority_changed', label: 'Task Priority Changed' },
     { value: 'task_assigned', label: 'Task Assigned' },
     { value: 'task_completed', label: 'Task Completed' },
+    { value: 'custom_field_changed', label: 'Custom Field Changed' },
 ];
 
 const CONDITION_FIELDS = [
@@ -19,11 +20,7 @@ const CONDITION_FIELDS = [
     { value: 'priority', label: 'Priority' },
     { value: 'assigned_to', label: 'Assignee' },
     { value: 'section_id', label: 'Section' },
-];
-
-const CONDITION_OPERATORS = [
-    { value: 'equals', label: 'equals' },
-    { value: 'not_equals', label: 'does not equal' },
+    { value: 'custom_field', label: 'Custom Field' },
 ];
 
 const ACTION_TYPES = [
@@ -33,10 +30,69 @@ const ACTION_TYPES = [
     { value: 'move_to_section', label: 'Move to Section' },
     { value: 'send_notification', label: 'Send Notification' },
     { value: 'add_comment', label: 'Add Comment' },
+    { value: 'set_custom_field', label: 'Set Custom Field' },
 ];
 
 const STATUSES = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+
+function getOperatorsForCustomFieldType(cfType) {
+    switch (cfType) {
+        case 'text':
+        case 'textarea':
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+                { value: 'contains', label: 'contains' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        case 'number':
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+                { value: 'greater_than', label: 'greater than' },
+                { value: 'less_than', label: 'less than' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        case 'date':
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+                { value: 'before', label: 'is before' },
+                { value: 'after', label: 'is after' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        case 'single_select':
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+                { value: 'in', label: 'is any of' },
+                { value: 'not_in', label: 'is none of' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        case 'multi_select':
+            return [
+                { value: 'contains', label: 'contains' },
+                { value: 'not_contains', label: 'does not contain' },
+                { value: 'is_empty', label: 'is empty' },
+                { value: 'is_not_empty', label: 'is not empty' },
+            ];
+        default:
+            return [
+                { value: 'equals', label: 'equals' },
+                { value: 'not_equals', label: 'does not equal' },
+            ];
+    }
+}
+
+const STANDARD_OPERATORS = [
+    { value: 'equals', label: 'equals' },
+    { value: 'not_equals', label: 'does not equal' },
+];
 
 function triggerColor(type) {
     switch (type) {
@@ -45,50 +101,154 @@ function triggerColor(type) {
         case 'task_priority_changed': return 'purple';
         case 'task_assigned': return 'yellow';
         case 'task_completed': return 'green';
+        case 'custom_field_changed': return 'cyan';
         default: return 'gray';
     }
 }
 
 const selectClass = 'block w-full rounded-lg border px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100';
+const inputClass = selectClass;
 
-function ConditionRow({ condition, index, onChange, onRemove, users, sections }) {
+function ConditionRow({ condition, index, onChange, onRemove, users, sections, customFields }) {
     const field = condition.field || 'status';
+    const isCustomField = field === 'custom_field';
+    const selectedCfId = condition.custom_field_id;
+    const selectedCf = isCustomField ? customFields.find(cf => cf.id === Number(selectedCfId)) : null;
+    const needsValue = !['is_empty', 'is_not_empty'].includes(condition.operator);
 
-    const getValueOptions = () => {
+    const operators = useMemo(() => {
+        if (!isCustomField) return STANDARD_OPERATORS;
+        if (!selectedCf) return STANDARD_OPERATORS;
+        return getOperatorsForCustomFieldType(selectedCf.type);
+    }, [isCustomField, selectedCf]);
+
+    const getStandardValueOptions = () => {
         switch (field) {
             case 'status': return STATUSES.map(s => ({ value: s, label: formatLabel(s) }));
             case 'priority': return PRIORITIES.map(p => ({ value: p, label: formatLabel(p) }));
-            case 'assigned_to': return users.map(u => ({ value: String(u.id), label: u.name }));
+            case 'assigned_to': return [{ value: '__project_owner__', label: 'Project Owner' }, ...users.map(u => ({ value: String(u.id), label: u.name }))];
             case 'section_id': return sections.map(s => ({ value: String(s.id), label: s.name }));
             default: return [];
         }
     };
 
+    const handleFieldChange = (newField) => {
+        const updated = { ...condition, field: newField, value: '', operator: 'equals' };
+        if (newField !== 'custom_field') {
+            delete updated.custom_field_id;
+        } else {
+            updated.custom_field_id = '';
+        }
+        onChange(index, updated);
+    };
+
+    const handleCustomFieldSelect = (cfId) => {
+        onChange(index, { ...condition, custom_field_id: cfId ? Number(cfId) : '', value: '', operator: 'equals' });
+    };
+
+    const renderValueInput = () => {
+        if (!needsValue) return null;
+
+        if (isCustomField && selectedCf) {
+            const cfType = selectedCf.type;
+            if (cfType === 'single_select' || cfType === 'multi_select') {
+                const options = selectedCf.options || [];
+                return (
+                    <select
+                        value={condition.value || ''}
+                        onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                        className={selectClass}
+                    >
+                        <option value="">Select...</option>
+                        {options.map(opt => (
+                            <option key={opt.id} value={String(opt.id)}>{opt.label}</option>
+                        ))}
+                    </select>
+                );
+            }
+            if (cfType === 'number') {
+                return (
+                    <input
+                        type="number"
+                        value={condition.value || ''}
+                        onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                        placeholder="Value..."
+                        className={inputClass}
+                    />
+                );
+            }
+            if (cfType === 'date') {
+                return (
+                    <input
+                        type="date"
+                        value={condition.value || ''}
+                        onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                        className={inputClass}
+                    />
+                );
+            }
+            // text/textarea
+            return (
+                <input
+                    type="text"
+                    value={condition.value || ''}
+                    onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                    placeholder="Value..."
+                    className={inputClass}
+                />
+            );
+        }
+
+        // Standard field value select
+        return (
+            <select
+                value={condition.value || ''}
+                onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                className={selectClass}
+            >
+                <option value="">Select...</option>
+                {getStandardValueOptions().map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+            </select>
+        );
+    };
+
     return (
         <div className="flex items-start gap-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3">
-            <div className="grid grid-cols-3 gap-2 flex-1 min-w-0">
+            <div className={`grid gap-2 flex-1 min-w-0 ${isCustomField ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+                {/* Field selector */}
                 <select
                     value={field}
-                    onChange={(e) => onChange(index, { ...condition, field: e.target.value, value: '' })}
+                    onChange={(e) => handleFieldChange(e.target.value)}
                     className={selectClass}
                 >
                     {CONDITION_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
+
+                {/* Custom field selector (only when field=custom_field) */}
+                {isCustomField && (
+                    <select
+                        value={selectedCfId || ''}
+                        onChange={(e) => handleCustomFieldSelect(e.target.value)}
+                        className={selectClass}
+                    >
+                        <option value="">Select field...</option>
+                        {customFields.map(cf => (
+                            <option key={cf.id} value={cf.id}>{cf.name}</option>
+                        ))}
+                    </select>
+                )}
+
+                {/* Operator */}
                 <select
                     value={condition.operator || 'equals'}
-                    onChange={(e) => onChange(index, { ...condition, operator: e.target.value })}
+                    onChange={(e) => onChange(index, { ...condition, operator: e.target.value, ...((['is_empty', 'is_not_empty'].includes(e.target.value)) ? { value: '' } : {}) })}
                     className={selectClass}
                 >
-                    {CONDITION_OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {operators.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-                <select
-                    value={condition.value || ''}
-                    onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
-                    className={selectClass}
-                >
-                    <option value="">Select...</option>
-                    {getValueOptions().map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-                </select>
+
+                {/* Value input */}
+                {renderValueInput()}
             </div>
             <button onClick={() => onRemove(index)} className="mt-2 text-gray-400 hover:text-red-500 transition-colors shrink-0" title="Remove condition">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -99,9 +259,35 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections })
     );
 }
 
-function ActionRow({ action, index, onChange, onRemove, users, sections }) {
+function CustomFieldValueInput({ customField, value, onChange }) {
+    if (!customField) return null;
+    const cfType = customField.type;
+
+    if (cfType === 'single_select' || cfType === 'multi_select') {
+        const options = customField.options || [];
+        return (
+            <select value={value || ''} onChange={(e) => onChange(e.target.value)} className={selectClass}>
+                <option value="">Select...</option>
+                {options.map(opt => (
+                    <option key={opt.id} value={String(opt.id)}>{opt.label}</option>
+                ))}
+            </select>
+        );
+    }
+    if (cfType === 'number') {
+        return <input type="number" value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Value..." className={inputClass} />;
+    }
+    if (cfType === 'date') {
+        return <input type="date" value={value || ''} onChange={(e) => onChange(e.target.value)} className={inputClass} />;
+    }
+    return <input type="text" value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Value..." className={inputClass} />;
+}
+
+function ActionRow({ action, index, onChange, onRemove, users, sections, customFields }) {
     const type = action.type || 'change_status';
     const params = action.params || {};
+    const isSetCustomField = type === 'set_custom_field';
+    const selectedCf = isSetCustomField ? customFields.find(cf => cf.id === Number(params.custom_field_id)) : null;
 
     const renderParams = () => {
         switch (type) {
@@ -135,6 +321,7 @@ function ActionRow({ action, index, onChange, onRemove, users, sections }) {
                         className={selectClass}
                     >
                         <option value="">Select user...</option>
+                        <option value="__project_owner__">Project Owner</option>
                         {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 );
@@ -171,12 +358,34 @@ function ActionRow({ action, index, onChange, onRemove, users, sections }) {
                         className={selectClass + ' resize-none'}
                     />
                 );
+            case 'set_custom_field':
+                return (
+                    <div className="space-y-2">
+                        <select
+                            value={params.custom_field_id || ''}
+                            onChange={(e) => onChange(index, { ...action, params: { custom_field_id: e.target.value ? Number(e.target.value) : '', value: '' } })}
+                            className={selectClass}
+                        >
+                            <option value="">Select custom field...</option>
+                            {customFields.map(cf => (
+                                <option key={cf.id} value={cf.id}>{cf.name}</option>
+                            ))}
+                        </select>
+                        {selectedCf && (
+                            <CustomFieldValueInput
+                                customField={selectedCf}
+                                value={params.value}
+                                onChange={(val) => onChange(index, { ...action, params: { ...params, value: val } })}
+                            />
+                        )}
+                    </div>
+                );
             default:
                 return null;
         }
     };
 
-    const needsFullWidth = type === 'add_comment';
+    const needsFullWidth = type === 'add_comment' || type === 'set_custom_field';
 
     return (
         <div className="flex items-start gap-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3">
@@ -189,7 +398,7 @@ function ActionRow({ action, index, onChange, onRemove, users, sections }) {
                     {ACTION_TYPES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
                 </select>
                 {renderParams()}
-                {needsFullWidth && (
+                {type === 'add_comment' && (
                     <p className="text-xs text-gray-400">
                         Variables: {'{task}'}, {'{status}'}, {'{assignee}'}, {'{project}'}
                     </p>
@@ -207,17 +416,20 @@ function ActionRow({ action, index, onChange, onRemove, users, sections }) {
 const emptyRule = () => ({
     name: '',
     trigger_type: 'task_status_changed',
+    trigger_config: null,
     conditions: [],
     actions: [{ type: 'change_status', params: {} }],
 });
 
-export default function AutomationRuleBuilder({ projectId, rules: initialRules, users, sections }) {
+export default function AutomationRuleBuilder({ projectId, rules: initialRules, users, sections, customFields = [] }) {
     const [rules, setRules] = useState(initialRules || []);
     const [showForm, setShowForm] = useState(false);
     const [editingRule, setEditingRule] = useState(null);
     const [form, setForm] = useState(emptyRule());
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
+    const [deletingRule, setDeletingRule] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     const openCreate = () => {
         setEditingRule(null);
@@ -231,6 +443,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
         setForm({
             name: rule.name,
             trigger_type: rule.trigger_type,
+            trigger_config: rule.trigger_config || null,
             conditions: rule.conditions || [],
             actions: rule.actions || [],
         });
@@ -266,9 +479,63 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
         }));
     };
 
+    const validateRule = useCallback(() => {
+        const errors = [];
+        if (!form.name.trim()) errors.push('Rule name is required.');
+        if (form.actions.length === 0) errors.push('At least one action is required.');
+
+        // Validate trigger config
+        if (form.trigger_type === 'custom_field_changed' && form.trigger_config?.custom_field_id) {
+            const cf = customFields.find(c => c.id === Number(form.trigger_config.custom_field_id));
+            if (!cf) errors.push('Selected trigger custom field no longer exists.');
+        }
+
+        // Validate conditions
+        form.conditions.forEach((cond, i) => {
+            const n = i + 1;
+            if (cond.field === 'custom_field' && !cond.custom_field_id) {
+                errors.push(`Condition ${n}: Select a custom field.`);
+            }
+            const noValueNeeded = ['is_empty', 'is_not_empty'].includes(cond.operator);
+            if (!noValueNeeded && (cond.value === '' || cond.value === undefined || cond.value === null)) {
+                errors.push(`Condition ${n}: Value is required.`);
+            }
+        });
+
+        // Validate actions
+        form.actions.forEach((act, i) => {
+            const n = i + 1;
+            const p = act.params || {};
+            switch (act.type) {
+                case 'change_status':
+                    if (!p.status) errors.push(`Action ${n}: Select a status.`);
+                    break;
+                case 'change_priority':
+                    if (!p.priority) errors.push(`Action ${n}: Select a priority.`);
+                    break;
+                case 'assign_user':
+                    if (!p.user_id) errors.push(`Action ${n}: Select a user.`);
+                    break;
+                case 'move_to_section':
+                    if (!p.section_id) errors.push(`Action ${n}: Select a section.`);
+                    break;
+                case 'add_comment':
+                    if (!p.message?.trim()) errors.push(`Action ${n}: Enter a comment message.`);
+                    break;
+                case 'set_custom_field':
+                    if (!p.custom_field_id) errors.push(`Action ${n}: Select a custom field.`);
+                    else if (!p.value && p.value !== 0) errors.push(`Action ${n}: Enter a value for the custom field.`);
+                    break;
+            }
+        });
+
+        return errors;
+    }, [form, customFields]);
+
     const handleSave = useCallback(async () => {
-        if (!form.name.trim() || form.actions.length === 0) {
-            setError('Name and at least one action are required.');
+        const errors = validateRule();
+        if (errors.length > 0) {
+            setError(errors.join(' '));
             return;
         }
         setSaving(true);
@@ -317,15 +584,19 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
         }
     }, [projectId]);
 
-    const handleDelete = useCallback(async (rule) => {
-        if (!confirm(`Delete rule "${rule.name}"?`)) return;
+    const handleDelete = useCallback(async () => {
+        if (!deletingRule) return;
+        setDeleting(true);
         try {
-            await apiFetch(`/projects/${projectId}/automation-rules/${rule.id}`, { method: 'DELETE' });
-            setRules(prev => prev.filter(r => r.id !== rule.id));
+            await apiFetch(`/projects/${projectId}/automation-rules/${deletingRule.id}`, { method: 'DELETE' });
+            setRules(prev => prev.filter(r => r.id !== deletingRule.id));
+            setDeletingRule(null);
         } catch (e) {
             console.error('Failed to delete rule', e);
+        } finally {
+            setDeleting(false);
         }
-    }, [projectId]);
+    }, [projectId, deletingRule]);
 
     return (
         <div>
@@ -357,6 +628,9 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                 <div className="flex items-center gap-2 mt-0.5">
                                     <Badge color={triggerColor(rule.trigger_type)} className="text-xs">
                                         {TRIGGER_TYPES.find(t => t.value === rule.trigger_type)?.label || rule.trigger_type}
+                                        {rule.trigger_type === 'custom_field_changed' && rule.trigger_config?.custom_field_id && (
+                                            <> &middot; {customFields.find(cf => cf.id === rule.trigger_config.custom_field_id)?.name || 'Unknown'}</>
+                                        )}
                                     </Badge>
                                     <span className="text-xs text-gray-400">
                                         {rule.conditions?.length || 0} condition{(rule.conditions?.length || 0) !== 1 ? 's' : ''}, {rule.actions?.length || 0} action{(rule.actions?.length || 0) !== 1 ? 's' : ''}
@@ -368,7 +642,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                 </svg>
                             </button>
-                            <button onClick={() => handleDelete(rule)} className="text-gray-400 hover:text-red-500 p-1">
+                            <button onClick={() => setDeletingRule(rule)} className="text-gray-400 hover:text-red-500 p-1">
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
@@ -381,6 +655,24 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                     No automation rules yet. Create one to automate task workflows.
                 </div>
             )}
+
+            <Modal
+                isOpen={!!deletingRule}
+                onClose={() => setDeletingRule(null)}
+                title="Delete Automation Rule"
+                actions={
+                    <>
+                        <Button variant="secondary" onClick={() => setDeletingRule(null)}>Cancel</Button>
+                        <Button variant="danger" onClick={handleDelete} processing={deleting} processingText="Deleting...">
+                            Delete Rule
+                        </Button>
+                    </>
+                }
+            >
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Are you sure you want to delete <span className="font-medium text-gray-900 dark:text-gray-100">"{deletingRule?.name}"</span>? This action cannot be undone.
+                </p>
+            </Modal>
 
             <Modal
                 isOpen={showForm}
@@ -414,13 +706,30 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
 
                     <div>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Trigger</label>
-                        <select
-                            value={form.trigger_type}
-                            onChange={(e) => setForm(prev => ({ ...prev, trigger_type: e.target.value }))}
-                            className={selectClass}
-                        >
-                            {TRIGGER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
+                        <div className={`grid gap-2 ${form.trigger_type === 'custom_field_changed' ? 'grid-cols-2' : ''}`}>
+                            <select
+                                value={form.trigger_type}
+                                onChange={(e) => setForm(prev => ({ ...prev, trigger_type: e.target.value, trigger_config: null }))}
+                                className={selectClass}
+                            >
+                                {TRIGGER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            </select>
+                            {form.trigger_type === 'custom_field_changed' && (
+                                <select
+                                    value={form.trigger_config?.custom_field_id || ''}
+                                    onChange={(e) => setForm(prev => ({
+                                        ...prev,
+                                        trigger_config: e.target.value ? { custom_field_id: Number(e.target.value) } : null,
+                                    }))}
+                                    className={selectClass}
+                                >
+                                    <option value="">Any custom field</option>
+                                    {customFields.map(cf => (
+                                        <option key={cf.id} value={cf.id}>{cf.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
                     </div>
 
                     <div>
@@ -446,6 +755,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     onRemove={handleConditionRemove}
                                     users={users}
                                     sections={sections}
+                                    customFields={customFields}
                                 />
                             ))}
                             {form.conditions.length === 0 && (
@@ -477,6 +787,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     onRemove={handleActionRemove}
                                     users={users}
                                     sections={sections}
+                                    customFields={customFields}
                                 />
                             ))}
                         </div>

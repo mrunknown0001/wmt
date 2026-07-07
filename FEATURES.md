@@ -7,6 +7,7 @@
 - 5 roles: admin, user, supervisor, division_head, executive
 - 13 granular permissions via spatie/laravel-permission
 - Role-based sidebar visibility and route authorization
+- API authentication via Laravel Sanctum (token-based, supports mobile clients)
 
 ## Organization Hierarchy
 - **Divisions** — top-level org unit with optional head (user)
@@ -25,6 +26,7 @@
 - Due date tracking
 - Search and status filtering on index page (paginated)
 - Owner, project admins, and manage-projects permission holders can edit
+- **Archived projects view** — dedicated page for viewing, unarchiving, and permanently deleting archived projects
 
 ## Tasks
 - Full CRUD nested under projects
@@ -36,7 +38,12 @@
 - Collaborators (many-to-many with users)
 - Position-based ordering within status columns
 - Rich text descriptions via TipTap WYSIWYG editor
-- File attachments on tasks (via form submissions)
+
+### Task Attachments
+- Direct file attachments on tasks (separate from comment attachments)
+- Metadata tracked: file name, path, type, size
+- File type detection helpers (image, video, spreadsheet)
+- Cascades on task deletion
 
 ### Task Sections
 - Asana-style sections for grouping tasks within a project
@@ -79,7 +86,7 @@
 - Add/delete comments on tasks
 - Rich text comments with TipTap editor (bold, italic, underline, lists, links)
 - **@mentions** — mention users in comments with searchable autocomplete dropdown (triggers notification)
-- **File attachments** on comments with upload and download support
+- **File attachments** on comments — up to 5 files per comment with size tracking; supports images, videos, spreadsheets
 - Combined timeline view with activities (sorted by date)
 - Paginated loading (offset-based, 10 per page)
 - Filter tabs: All, Comments, Activity
@@ -113,6 +120,7 @@
 - **Expandable field configuration**: label, help text, default value, required, visible on form, maps-to
 - **Default values** per field — type-appropriate inputs (text, number, date picker, select dropdown)
 - **Visibility toggle** — hidden fields use default values silently when form is submitted
+- **Conditional visibility** — form fields support conditional display rules based on other field values
 - **"Add from Custom Fields" modal** — browse project custom fields with type icons, option previews, and checkbox selection
 - **Settings tab**:
   - Section selector — assign submitted tasks to a project section
@@ -133,6 +141,13 @@
   - Section assignment from form defaults
 - Configurable submit button text and success message
 - Styled scrollbars on modals and dropdown lists
+
+## Global Search
+- Search across projects, tasks, and users from any page
+- Minimum 2 character query
+- Keyboard navigation (arrow keys, Enter to select)
+- Returns up to 20 results per category
+- Accessible from the header/navbar
 
 ## AI Chat Assistant
 - Floating chat widget accessible from any page
@@ -163,6 +178,7 @@
 - Project-level rule builder accessible from project show page
 - Define custom rules: trigger → conditions → actions
 - **Triggers**: task created, status changed, priority changed, task assigned, task completed
+- **Configurable trigger parameters** — JSON-based trigger configuration for granular control
 - **Conditions**: filter by status, priority, assigned user, section (with equals/not_equals/in/not_in operators)
 - **Actions**: change status, change priority, assign user, move to section, send notification
 - Toggle rules active/inactive
@@ -205,6 +221,7 @@
 
 ## Centralized Activity Log
 - Org-wide audit trail across all projects and tasks
+- Tracks user actions with entity type, entity name, and field-level changes (old/new values)
 - Filterable and searchable activity history
 - Accessible from sidebar navigation
 
@@ -230,6 +247,12 @@
 - Audio chime on new notification (Web Audio API)
 - Toast notification popup (top-right, auto-dismiss 5s)
 - Deduplication — won't double-notify same task same day
+
+### Push Notifications (FCM)
+- Web push notifications via Firebase Cloud Messaging
+- Device token registration and management per user
+- Platform tracking (web/mobile)
+- Automatic FCM dispatch on all database notification events
 
 ### Email Notifications
 - All notification types support queued email delivery (`ShouldQueue`)
@@ -279,12 +302,16 @@
 - Tailwind CSS v4 for styling
 - TipTap WYSIWYG rich text editor with @mention support
 - @dnd-kit for drag-and-drop interactions (Kanban, form builder, to-do list, sections)
+- Laravel Sanctum for API token authentication (web + mobile)
+- Cloudflare Turnstile CAPTCHA integration
 - CSRF-protected API fetches
 - Policy-based authorization on all resources
 - Form request validation on all create/update operations
 - Queued notifications via Redis
+- Firebase Cloud Messaging for push notifications
 - Server-Sent Events for AI chat streaming
 - HandleInertiaRequests middleware shares auth data, settings, unread count, flash messages
 - SearchableSelect reusable component for user pickers
 - Portal-based floating dropdowns for consistent z-index behavior
 - Custom styled scrollbars for modals, dropdowns, and horizontal overflow containers
+- Scheduled commands for task reminders and escalation (`tasks:send-reminders`)

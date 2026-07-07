@@ -68,9 +68,12 @@ class FormController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
+        $savedFields = [];
         foreach ($fields as $fieldData) {
-            $form->fields()->create($fieldData);
+            $savedFields[] = $form->fields()->create($fieldData);
         }
+
+        $this->resolveConditionKeys($savedFields, $fields);
 
         return redirect()->route('projects.forms.index', $project)
             ->with('success', 'Form created successfully.');
@@ -112,16 +115,60 @@ class FormController extends Controller
         $keepIds = collect($fields)->pluck('id')->filter()->toArray();
         $form->fields()->whereNotIn('id', $keepIds)->delete();
 
-        foreach ($fields as $fieldData) {
+        $savedFields = [];
+        foreach ($fields as $i => $fieldData) {
             if (!empty($fieldData['id'])) {
-                $form->fields()->where('id', $fieldData['id'])->update($fieldData);
+                $field = $form->fields()->where('id', $fieldData['id'])->first();
+                if ($field) {
+                    unset($fieldData['id']);
+                    $field->update($fieldData);
+                    $savedFields[$i] = $field;
+                }
             } else {
-                $form->fields()->create($fieldData);
+                $savedFields[$i] = $form->fields()->create($fieldData);
             }
         }
 
+        $this->resolveConditionKeys($savedFields, $fields);
+
         return redirect()->route('projects.forms.index', $project)
             ->with('success', 'Form updated successfully.');
+    }
+
+    /**
+     * Resolve field_key references in conditions to field_id values.
+     * field_key format: "id:{id}" for saved fields, "pos:{index}" for new fields.
+     */
+    private function resolveConditionKeys(array $savedFields, array $originalFields): void
+    {
+        // Build key-to-id mapping
+        $keyToId = [];
+        foreach ($savedFields as $i => $field) {
+            $keyToId["id:{$field->id}"] = $field->id;
+            $keyToId["pos:{$i}"] = $field->id;
+        }
+
+        foreach ($savedFields as $field) {
+            $conditions = $field->conditions;
+            if (empty($conditions['rules'])) {
+                continue;
+            }
+
+            $changed = false;
+            foreach ($conditions['rules'] as &$rule) {
+                $key = $rule['field_key'] ?? null;
+                if ($key && isset($keyToId[$key])) {
+                    $rule['field_id'] = $keyToId[$key];
+                    unset($rule['field_key']);
+                    $changed = true;
+                }
+            }
+            unset($rule);
+
+            if ($changed) {
+                $field->update(['conditions' => $conditions]);
+            }
+        }
     }
 
     public function destroy(Project $project, Form $form): RedirectResponse

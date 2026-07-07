@@ -73,8 +73,9 @@ class TaskCustomFieldValue extends Model
         }
 
         match ($type) {
-            'text', 'textarea' => $this->value_text = (string) $rawValue,
-            'number' => $this->value_number = (float) $rawValue,
+            'text' => $this->value_text = mb_substr((string) $rawValue, 0, CustomField::TEXT_MAX_LENGTH),
+            'textarea' => $this->value_text = mb_substr((string) $rawValue, 0, CustomField::TEXTAREA_MAX_LENGTH),
+            'number' => $this->value_number = max(CustomField::NUMBER_MIN, min(CustomField::NUMBER_MAX, (float) $rawValue)),
             'date' => $this->value_date = $rawValue,
             'single_select' => $this->value_option_id = (int) $rawValue,
             'multi_select' => $this->value_json = is_array($rawValue) ? $rawValue : [$rawValue],

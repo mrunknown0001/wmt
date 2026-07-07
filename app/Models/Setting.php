@@ -14,7 +14,18 @@ class Setting extends Model
         4 => 'Executives',
     ];
 
-    protected $fillable = ['app_name', 'primary_color', 'max_upload_size', 'task_reminder_days', 'task_reminders_enabled', 'escalation_enabled', 'escalation_tiers'];
+    public const NOTIFICATION_CHANNEL_DEFAULTS = [
+        'email_task_assigned'     => true,
+        'email_task_due_soon'     => true,
+        'email_task_due_reminder' => true,
+        'email_task_overdue'      => true,
+        'email_task_comment'      => true,
+        'email_task_mention'      => true,
+        'email_comment_deleted'   => false,
+        'email_task_escalated'    => true,
+    ];
+
+    protected $fillable = ['app_name', 'primary_color', 'max_upload_size', 'task_reminder_days', 'task_reminders_enabled', 'escalation_enabled', 'escalation_tiers', 'notification_channels'];
 
     protected function casts(): array
     {
@@ -23,6 +34,7 @@ class Setting extends Model
             'task_reminders_enabled' => 'boolean',
             'escalation_enabled' => 'boolean',
             'escalation_tiers' => 'array',
+            'notification_channels' => 'array',
         ];
     }
 
@@ -42,6 +54,7 @@ class Setting extends Model
                     ['days' => 7, 'enabled' => true],
                     ['days' => 14, 'enabled' => true],
                 ],
+                'notification_channels' => self::NOTIFICATION_CHANNEL_DEFAULTS,
             ])->attributesToArray();
         });
 
@@ -54,6 +67,17 @@ class Setting extends Model
     public static function clearCache(): void
     {
         Cache::forget('app_settings');
+    }
+
+    public function getNotificationChannels(): array
+    {
+        return array_merge(self::NOTIFICATION_CHANNEL_DEFAULTS, $this->notification_channels ?? []);
+    }
+
+    public function wantsEmail(string $type): bool
+    {
+        $channels = $this->getNotificationChannels();
+        return $channels["email_{$type}"] ?? false;
     }
 
     public static function colorPalettes(): array
