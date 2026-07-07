@@ -17,7 +17,7 @@ class AutomationRuleEngine
 {
     private static bool $executing = false;
 
-    public static function evaluate(Task $task, string $triggerType, array $oldValues = []): void
+    public static function evaluate(Task $task, string $triggerType, array $oldValues = [], array $changedFieldIds = []): void
     {
         // Guard against infinite loops — don't re-trigger rules from rule-caused changes
         if (self::$executing) {
@@ -42,6 +42,14 @@ class AutomationRuleEngine
 
         try {
             foreach ($rules as $rule) {
+                // For custom_field_changed triggers, check if the rule targets a specific field
+                if ($triggerType === 'custom_field_changed' && !empty($changedFieldIds)) {
+                    $triggerCfId = $rule->trigger_config['custom_field_id'] ?? null;
+                    if ($triggerCfId && !in_array((int) $triggerCfId, $changedFieldIds)) {
+                        continue;
+                    }
+                }
+
                 if (self::conditionsMet($task, $rule->conditions)) {
                     self::executeActions($task, $rule->actions);
 

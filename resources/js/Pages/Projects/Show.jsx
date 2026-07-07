@@ -192,12 +192,12 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-3 text-sm ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
-                <div className="flex items-center gap-1.5">
+            <td className={`px-6 py-3 text-sm max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                <div className="flex items-center gap-1.5 min-w-0">
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
-                    {task.title}
+                    <span className="truncate" title={task.title}>{task.title}</span>
                 </div>
             </td>
             <td className="px-6 py-3 text-sm">
@@ -400,8 +400,8 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-4 text-sm font-medium ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
-                <div className="flex items-center gap-2">
+            <td className={`px-6 py-4 text-sm font-medium max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+                <div className="flex items-center gap-2 min-w-0">
                     {(task.subtasks_count > 0 || canManageTasks) && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onToggleExpand(task.id); }}
@@ -414,7 +414,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             </svg>
                         </button>
                     )}
-                    <span>{task.title}</span>
+                    <span className="truncate min-w-0" title={task.title}>{task.title}</span>
                     {task.is_recurring && (
                         <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1058,13 +1058,18 @@ export default function Show() {
             method: 'POST',
             body: JSON.stringify({ tasks: payload }),
         }).then(async (res) => {
-            if (!res.ok) return;
+            if (!res.ok) {
+                setLocalTasks(serverTasks);
+                return;
+            }
             const data = await res.json();
             if (data.new_tasks?.length > 0) {
                 setLocalTasks((prev) => [...prev, ...data.new_tasks]);
             }
-        }).catch(() => {});
-    }, [project.id]);
+        }).catch(() => {
+            setLocalTasks(serverTasks);
+        });
+    }, [project.id, serverTasks]);
 
     // Persist section reorder to backend
     const persistSectionReorder = useCallback((reorderedSections) => {
@@ -1260,7 +1265,8 @@ export default function Show() {
                 targetSectionId = overTask.section_id;
             }
 
-            // Use functional update to work with latest state
+            // Compute new state and persist payload separately
+            let toPersist = null;
             setLocalTasks((prev) => {
                 const activeTask = prev.find((t) => t.id === active.id);
                 if (!activeTask) return prev;
@@ -1283,13 +1289,13 @@ export default function Show() {
                             const idx = updated.findIndex((u) => u.id === t.id);
                             if (idx !== -1) updated[idx].position = i;
                         });
-                        persistReorder(reordered);
+                        toPersist = reordered;
                     } else {
                         targetTasks.forEach((t, i) => {
                             const idx = updated.findIndex((u) => u.id === t.id);
                             if (idx !== -1) updated[idx].position = i;
                         });
-                        persistReorder(targetTasks);
+                        toPersist = targetTasks;
                     }
                 } else {
                     // Dropped on section area — persist with current order
@@ -1297,13 +1303,15 @@ export default function Show() {
                         const idx = updated.findIndex((u) => u.id === t.id);
                         if (idx !== -1) updated[idx].position = i;
                     });
-                    persistReorder(targetTasks);
+                    toPersist = targetTasks;
                 }
 
                 return updated;
             });
+            if (toPersist) persistReorder(toPersist);
         } else {
             // Flat list mode (no sections)
+            let toPersist = null;
             setLocalTasks((prev) => {
                 const filtered = prev.filter(matchesFilters);
                 const unfilteredIds = new Set(filtered.map((t) => t.id));
@@ -1325,9 +1333,10 @@ export default function Show() {
                     }
                 }
 
-                persistReorder(reordered);
+                toPersist = reordered;
                 return result;
             });
+            if (toPersist) persistReorder(toPersist);
         }
     }, [tasksBySection, localTasks, localSections, matchesFilters, persistReorder, persistSectionReorder]);
 
@@ -1336,22 +1345,22 @@ export default function Show() {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
 
+        let toPersist = null;
         setLocalTasks((prev) => prev.map((t) => {
             if (t.id !== parentId || !t.subtasks) return t;
             const oldIndex = t.subtasks.findIndex((s) => s.id === active.id);
             const newIndex = t.subtasks.findIndex((s) => s.id === over.id);
             if (oldIndex === -1 || newIndex === -1) return t;
             const reordered = arrayMove(t.subtasks, oldIndex, newIndex);
-
-            // Persist subtask order
-            const payload = reordered.map((s, i) => ({ id: s.id, status: s.status, position: i }));
-            apiFetch(`/projects/${project.id}/tasks/reorder`, {
-                method: 'POST',
-                body: JSON.stringify({ tasks: payload }),
-            });
-
+            toPersist = reordered.map((s, i) => ({ id: s.id, status: s.status, position: i, section_id: s.section_id ?? null }));
             return { ...t, subtasks: reordered };
         }));
+        if (toPersist) {
+            apiFetch(`/projects/${project.id}/tasks/reorder`, {
+                method: 'POST',
+                body: JSON.stringify({ tasks: toPersist }),
+            });
+        }
     }, [project.id]);
 
     // --- Board view drag handlers ---
@@ -1377,6 +1386,7 @@ export default function Show() {
 
         const sameColumn = activeTask.status === targetStatus;
 
+        let toPersist = null;
         setLocalTasks((prev) => {
             const updated = prev.map((t) => ({ ...t }));
             const activeIdx = updated.findIndex((t) => t.id === active.id);
@@ -1394,7 +1404,7 @@ export default function Show() {
                     updated[idx].position = i;
                 });
 
-                persistReorder(reordered);
+                toPersist = reordered;
                 return updated;
             } else {
                 // Move to different column
@@ -1413,14 +1423,14 @@ export default function Show() {
                         const idx = updated.findIndex((u) => u.id === t.id);
                         updated[idx].position = i;
                     });
-                    persistReorder(withoutMoved);
+                    toPersist = withoutMoved;
                 } else {
                     // Dropped on empty column area — append to end
                     targetTasks.forEach((t, i) => {
                         const idx = updated.findIndex((u) => u.id === t.id);
                         updated[idx].position = i;
                     });
-                    persistReorder(targetTasks);
+                    toPersist = targetTasks;
                 }
 
                 // Reindex the source column
@@ -1433,6 +1443,7 @@ export default function Show() {
                 return updated;
             }
         });
+        if (toPersist) persistReorder(toPersist);
     }, [localTasks, persistReorder]);
 
     const handleDragStart = useCallback((event) => {

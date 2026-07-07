@@ -22,6 +22,8 @@ class ProjectAutomationRuleController extends Controller
         return [
             'name' => 'required|string|max:255',
             'trigger_type' => 'required|string|in:task_created,task_status_changed,task_priority_changed,task_assigned,task_completed,custom_field_changed',
+            'trigger_config' => 'nullable|array',
+            'trigger_config.custom_field_id' => 'nullable|integer',
             'conditions' => 'nullable|array',
             'conditions.*.field' => 'required|string|in:status,priority,assigned_to,section_id,custom_field',
             'conditions.*.operator' => 'required|string|in:equals,not_equals,in,not_in,contains,not_contains,is_empty,is_not_empty,greater_than,less_than,before,after',

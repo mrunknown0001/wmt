@@ -164,7 +164,7 @@ function DisplayValue({ customField, cfv, formatDate }) {
     switch (customField.type) {
         case 'text':
         case 'textarea':
-            return <span className={customField.type === 'textarea' ? 'line-clamp-2' : ''}>{cfv.value_text || '—'}</span>;
+            return <span className={customField.type === 'textarea' ? 'line-clamp-2' : 'truncate block max-w-xs'} title={cfv.value_text || undefined}>{cfv.value_text || '—'}</span>;
         case 'number':
             return <span>{cfv.value_number != null ? cfv.value_number : '—'}</span>;
         case 'date':

@@ -415,6 +415,7 @@ function ActionRow({ action, index, onChange, onRemove, users, sections, customF
 const emptyRule = () => ({
     name: '',
     trigger_type: 'task_status_changed',
+    trigger_config: null,
     conditions: [],
     actions: [{ type: 'change_status', params: {} }],
 });
@@ -439,6 +440,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
         setForm({
             name: rule.name,
             trigger_type: rule.trigger_type,
+            trigger_config: rule.trigger_config || null,
             conditions: rule.conditions || [],
             actions: rule.actions || [],
         });
@@ -565,6 +567,9 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                 <div className="flex items-center gap-2 mt-0.5">
                                     <Badge color={triggerColor(rule.trigger_type)} className="text-xs">
                                         {TRIGGER_TYPES.find(t => t.value === rule.trigger_type)?.label || rule.trigger_type}
+                                        {rule.trigger_type === 'custom_field_changed' && rule.trigger_config?.custom_field_id && (
+                                            <> &middot; {customFields.find(cf => cf.id === rule.trigger_config.custom_field_id)?.name || 'Unknown'}</>
+                                        )}
                                     </Badge>
                                     <span className="text-xs text-gray-400">
                                         {rule.conditions?.length || 0} condition{(rule.conditions?.length || 0) !== 1 ? 's' : ''}, {rule.actions?.length || 0} action{(rule.actions?.length || 0) !== 1 ? 's' : ''}
@@ -622,13 +627,30 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
 
                     <div>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Trigger</label>
-                        <select
-                            value={form.trigger_type}
-                            onChange={(e) => setForm(prev => ({ ...prev, trigger_type: e.target.value }))}
-                            className={selectClass}
-                        >
-                            {TRIGGER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
+                        <div className={`grid gap-2 ${form.trigger_type === 'custom_field_changed' ? 'grid-cols-2' : ''}`}>
+                            <select
+                                value={form.trigger_type}
+                                onChange={(e) => setForm(prev => ({ ...prev, trigger_type: e.target.value, trigger_config: null }))}
+                                className={selectClass}
+                            >
+                                {TRIGGER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            </select>
+                            {form.trigger_type === 'custom_field_changed' && (
+                                <select
+                                    value={form.trigger_config?.custom_field_id || ''}
+                                    onChange={(e) => setForm(prev => ({
+                                        ...prev,
+                                        trigger_config: e.target.value ? { custom_field_id: Number(e.target.value) } : null,
+                                    }))}
+                                    className={selectClass}
+                                >
+                                    <option value="">Any custom field</option>
+                                    {customFields.map(cf => (
+                                        <option key={cf.id} value={cf.id}>{cf.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
                     </div>
 
                     <div>

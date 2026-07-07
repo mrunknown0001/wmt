@@ -20,6 +20,8 @@ class TaskCustomFieldValueController extends Controller
             'values' => ['required', 'array'],
         ]);
 
+        $changedFieldIds = [];
+
         foreach ($request->input('values') as $fieldId => $rawValue) {
             $customField = CustomField::where('id', $fieldId)
                 ->where('project_id', $project->id)
@@ -34,11 +36,13 @@ class TaskCustomFieldValueController extends Controller
             );
             $cfv->setTypedValue($customField->type, $rawValue);
             $cfv->save();
+
+            $changedFieldIds[] = (int) $fieldId;
         }
 
         // Trigger automation rules for custom field changes
         $task->load('customFieldValues.customField');
-        AutomationRuleEngine::evaluate($task, 'custom_field_changed');
+        AutomationRuleEngine::evaluate($task, 'custom_field_changed', [], $changedFieldIds);
 
         return response()->json([
             'values' => $task->customFieldValues()->get()->keyBy('custom_field_id'),
