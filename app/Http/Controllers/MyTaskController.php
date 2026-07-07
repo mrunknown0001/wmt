@@ -87,7 +87,7 @@ class MyTaskController extends Controller
             'taskGroups' => $grouped,
             'isCompletedFilter' => $isCompletedFilter,
             'pagination' => [
-                'links' => $paginated->linkCollection()->toArray(),
+                'links' => $paginated->toArray()['links'],
                 'total' => $paginated->total(),
                 'from' => $paginated->firstItem(),
                 'to' => $paginated->lastItem(),
