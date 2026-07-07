@@ -103,6 +103,9 @@ class AutomationRuleEngine
             } else {
                 $taskValue = $task->getAttribute($field);
 
+                // Resolve special placeholder values
+                $value = self::resolveSpecialValue($task, $value);
+
                 // Normalize for comparison
                 $taskValue = is_null($taskValue) ? null : (string) $taskValue;
                 $value = is_null($value) ? null : (string) $value;
@@ -122,6 +125,19 @@ class AutomationRuleEngine
         }
 
         return true;
+    }
+
+    /**
+     * Resolve special placeholder values like __project_owner__ to actual IDs.
+     */
+    private static function resolveSpecialValue(Task $task, $value)
+    {
+        if ($value === '__project_owner__') {
+            $task->loadMissing('project');
+            return $task->project?->owner_id;
+        }
+
+        return $value;
     }
 
     private static function evaluateCustomFieldCondition(Task $task, array $condition): bool
@@ -288,7 +304,16 @@ class AutomationRuleEngine
     private static function actionAssignUser(Task $task, array $params): void
     {
         $userId = $params['user_id'] ?? null;
-        if (!$userId || $task->assigned_to == $userId) return;
+        if (!$userId) return;
+
+        // Resolve special placeholders
+        if ($userId === '__project_owner__') {
+            $task->loadMissing('project');
+            $userId = $task->project?->owner_id;
+            if (!$userId) return;
+        }
+
+        if ($task->assigned_to == $userId) return;
 
         $user = User::where('id', $userId)->where('is_active', true)->first();
         if (!$user) return;

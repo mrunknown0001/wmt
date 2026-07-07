@@ -126,7 +126,7 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections, c
         switch (field) {
             case 'status': return STATUSES.map(s => ({ value: s, label: formatLabel(s) }));
             case 'priority': return PRIORITIES.map(p => ({ value: p, label: formatLabel(p) }));
-            case 'assigned_to': return users.map(u => ({ value: String(u.id), label: u.name }));
+            case 'assigned_to': return [{ value: '__project_owner__', label: 'Project Owner' }, ...users.map(u => ({ value: String(u.id), label: u.name }))];
             case 'section_id': return sections.map(s => ({ value: String(s.id), label: s.name }));
             default: return [];
         }
@@ -321,6 +321,7 @@ function ActionRow({ action, index, onChange, onRemove, users, sections, customF
                         className={selectClass}
                     >
                         <option value="">Select user...</option>
+                        <option value="__project_owner__">Project Owner</option>
                         {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 );
@@ -427,6 +428,8 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
     const [form, setForm] = useState(emptyRule());
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
+    const [deletingRule, setDeletingRule] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     const openCreate = () => {
         setEditingRule(null);
@@ -476,9 +479,63 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
         }));
     };
 
+    const validateRule = useCallback(() => {
+        const errors = [];
+        if (!form.name.trim()) errors.push('Rule name is required.');
+        if (form.actions.length === 0) errors.push('At least one action is required.');
+
+        // Validate trigger config
+        if (form.trigger_type === 'custom_field_changed' && form.trigger_config?.custom_field_id) {
+            const cf = customFields.find(c => c.id === Number(form.trigger_config.custom_field_id));
+            if (!cf) errors.push('Selected trigger custom field no longer exists.');
+        }
+
+        // Validate conditions
+        form.conditions.forEach((cond, i) => {
+            const n = i + 1;
+            if (cond.field === 'custom_field' && !cond.custom_field_id) {
+                errors.push(`Condition ${n}: Select a custom field.`);
+            }
+            const noValueNeeded = ['is_empty', 'is_not_empty'].includes(cond.operator);
+            if (!noValueNeeded && (cond.value === '' || cond.value === undefined || cond.value === null)) {
+                errors.push(`Condition ${n}: Value is required.`);
+            }
+        });
+
+        // Validate actions
+        form.actions.forEach((act, i) => {
+            const n = i + 1;
+            const p = act.params || {};
+            switch (act.type) {
+                case 'change_status':
+                    if (!p.status) errors.push(`Action ${n}: Select a status.`);
+                    break;
+                case 'change_priority':
+                    if (!p.priority) errors.push(`Action ${n}: Select a priority.`);
+                    break;
+                case 'assign_user':
+                    if (!p.user_id) errors.push(`Action ${n}: Select a user.`);
+                    break;
+                case 'move_to_section':
+                    if (!p.section_id) errors.push(`Action ${n}: Select a section.`);
+                    break;
+                case 'add_comment':
+                    if (!p.message?.trim()) errors.push(`Action ${n}: Enter a comment message.`);
+                    break;
+                case 'set_custom_field':
+                    if (!p.custom_field_id) errors.push(`Action ${n}: Select a custom field.`);
+                    else if (!p.value && p.value !== 0) errors.push(`Action ${n}: Enter a value for the custom field.`);
+                    break;
+            }
+        });
+
+        return errors;
+    }, [form, customFields]);
+
     const handleSave = useCallback(async () => {
-        if (!form.name.trim() || form.actions.length === 0) {
-            setError('Name and at least one action are required.');
+        const errors = validateRule();
+        if (errors.length > 0) {
+            setError(errors.join(' '));
             return;
         }
         setSaving(true);
@@ -527,15 +584,19 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
         }
     }, [projectId]);
 
-    const handleDelete = useCallback(async (rule) => {
-        if (!confirm(`Delete rule "${rule.name}"?`)) return;
+    const handleDelete = useCallback(async () => {
+        if (!deletingRule) return;
+        setDeleting(true);
         try {
-            await apiFetch(`/projects/${projectId}/automation-rules/${rule.id}`, { method: 'DELETE' });
-            setRules(prev => prev.filter(r => r.id !== rule.id));
+            await apiFetch(`/projects/${projectId}/automation-rules/${deletingRule.id}`, { method: 'DELETE' });
+            setRules(prev => prev.filter(r => r.id !== deletingRule.id));
+            setDeletingRule(null);
         } catch (e) {
             console.error('Failed to delete rule', e);
+        } finally {
+            setDeleting(false);
         }
-    }, [projectId]);
+    }, [projectId, deletingRule]);
 
     return (
         <div>
@@ -581,7 +642,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                 </svg>
                             </button>
-                            <button onClick={() => handleDelete(rule)} className="text-gray-400 hover:text-red-500 p-1">
+                            <button onClick={() => setDeletingRule(rule)} className="text-gray-400 hover:text-red-500 p-1">
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
@@ -594,6 +655,24 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                     No automation rules yet. Create one to automate task workflows.
                 </div>
             )}
+
+            <Modal
+                isOpen={!!deletingRule}
+                onClose={() => setDeletingRule(null)}
+                title="Delete Automation Rule"
+                actions={
+                    <>
+                        <Button variant="secondary" onClick={() => setDeletingRule(null)}>Cancel</Button>
+                        <Button variant="danger" onClick={handleDelete} processing={deleting} processingText="Deleting...">
+                            Delete Rule
+                        </Button>
+                    </>
+                }
+            >
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Are you sure you want to delete <span className="font-medium text-gray-900 dark:text-gray-100">"{deletingRule?.name}"</span>? This action cannot be undone.
+                </p>
+            </Modal>
 
             <Modal
                 isOpen={showForm}

@@ -376,7 +376,7 @@ function FieldOptionsEditor({ options, onChange }) {
 
 // --- Condition Rule Row ---
 function ConditionRuleRow({ rule, index, availableFields, onUpdate, onRemove }) {
-    const selectedField = availableFields.find(f => f.id === rule.field_id);
+    const selectedField = availableFields.find(f => f._conditionKey === rule.field_key);
 
     const getOperators = () => {
         if (!selectedField) return [{ value: 'equals', label: 'equals' }];
@@ -456,13 +456,13 @@ function ConditionRuleRow({ rule, index, availableFields, onUpdate, onRemove }) 
     return (
         <div className="flex items-center gap-2">
             <select
-                value={rule.field_id || ''}
-                onChange={(e) => onUpdate(index, { ...rule, field_id: e.target.value ? Number(e.target.value) : '', value: '', operator: 'equals' })}
+                value={rule.field_key || ''}
+                onChange={(e) => onUpdate(index, { ...rule, field_key: e.target.value || '', value: '', operator: 'equals' })}
                 className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             >
                 <option value="">Select field...</option>
                 {availableFields.map(f => (
-                    <option key={f.id} value={f.id}>{f.label || 'Untitled'}</option>
+                    <option key={f._conditionKey} value={f._conditionKey}>{f.label || 'Untitled'}</option>
                 ))}
             </select>
             <select
@@ -492,22 +492,23 @@ function FieldConditionsEditor({ field, fieldIndex, allFields, customFields = []
     const conditions = field.conditions || { logic: 'all', rules: [] };
     const rules = conditions.rules || [];
 
-    // Only show saved fields (with IDs) that are not static types, not attachment, and not this field
-    // Enrich select/multi_select fields with options from mapped custom fields
-    const availableFields = allFields.filter((f, i) => {
-        if (i === fieldIndex) return false;
-        if (STATIC_TYPES.includes(f.type)) return false;
-        if (f.type === 'attachment') return false;
-        return f.id != null;
-    }).map(f => {
+    // Show all non-static, non-attachment fields (except self)
+    // Assign a stable _conditionKey: use `id:{id}` for saved fields, `pos:{index}` for unsaved
+    const availableFields = allFields.map((f, i) => {
+        const enriched = { ...f, _conditionKey: f.id ? `id:${f.id}` : `pos:${i}` };
         // For custom-field-mapped select fields, include options from the custom field
         if (f.maps_to === 'custom_field' && f.custom_field_id && ['select', 'multi_select'].includes(f.type)) {
             const cf = customFields.find(c => c.id === f.custom_field_id);
             if (cf?.options?.length) {
-                return { ...f, options: cf.options };
+                enriched.options = cf.options;
             }
         }
-        return f;
+        return enriched;
+    }).filter((f, i) => {
+        if (i === fieldIndex) return false;
+        if (STATIC_TYPES.includes(f.type)) return false;
+        if (f.type === 'attachment') return false;
+        return true;
     });
 
     const updateConditions = (updated) => {
@@ -517,7 +518,7 @@ function FieldConditionsEditor({ field, fieldIndex, allFields, customFields = []
     const addRule = () => {
         updateConditions({
             logic: conditions.logic || 'all',
-            rules: [...rules, { field_id: '', operator: 'equals', value: '' }],
+            rules: [...rules, { field_key: '', operator: 'equals', value: '' }],
         });
     };
 
@@ -567,7 +568,7 @@ function FieldConditionsEditor({ field, fieldIndex, allFields, customFields = []
                 ))}
             </div>
 
-            {availableFields.length > 0 ? (
+            {availableFields.length > 0 && (
                 <button
                     type="button"
                     onClick={addRule}
@@ -575,12 +576,6 @@ function FieldConditionsEditor({ field, fieldIndex, allFields, customFields = []
                 >
                     + Add condition
                 </button>
-            ) : (
-                rules.length === 0 && (
-                    <p className="text-xs text-gray-400">
-                        Save the form first to enable field conditions.
-                    </p>
-                )
             )}
         </div>
     );
@@ -968,20 +963,27 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
 
     const removeField = (index) => {
         const removedField = fields[index];
-        const removedId = removedField?.id;
+        const removedKey = removedField?.id ? `id:${removedField.id}` : `pos:${index}`;
         let newFields = fields.filter((_, i) => i !== index);
 
-        // Clean up conditions referencing the removed field
-        if (removedId) {
-            newFields = newFields.map(f => {
-                if (!f.conditions?.rules?.length) return f;
-                const filteredRules = f.conditions.rules.filter(r => r.field_id !== removedId);
-                return {
-                    ...f,
-                    conditions: filteredRules.length > 0 ? { ...f.conditions, rules: filteredRules } : null,
-                };
-            });
-        }
+        // Clean up conditions referencing the removed field and update pos: keys
+        newFields = newFields.map((f, newIdx) => {
+            if (!f.conditions?.rules?.length) return f;
+            const filteredRules = f.conditions.rules
+                .filter(r => r.field_key !== removedKey)
+                .map(r => {
+                    // Update pos: references since indices shifted
+                    if (r.field_key?.startsWith('pos:')) {
+                        const oldPos = parseInt(r.field_key.split(':')[1]);
+                        if (oldPos > index) return { ...r, field_key: `pos:${oldPos - 1}` };
+                    }
+                    return r;
+                });
+            return {
+                ...f,
+                conditions: filteredRules.length > 0 ? { ...f.conditions, rules: filteredRules } : null,
+            };
+        });
 
         onChange(newFields.map((f, i) => ({ ...f, position: i })));
         setDeleteIndex(null);
@@ -996,7 +998,35 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
         const oldIndex = parseInt(active.id.replace('field-', ''));
         const newIndex = parseInt(over.id.replace('field-', ''));
 
-        const newFields = arrayMove(fields, oldIndex, newIndex).map((f, i) => ({ ...f, position: i }));
+        // Build position mapping for pos: condition references
+        const posMapping = {};
+        fields.forEach((_, i) => {
+            let dest = i;
+            if (i === oldIndex) dest = newIndex;
+            else if (oldIndex < newIndex && i > oldIndex && i <= newIndex) dest = i - 1;
+            else if (oldIndex > newIndex && i >= newIndex && i < oldIndex) dest = i + 1;
+            posMapping[i] = dest;
+        });
+
+        const newFields = arrayMove(fields, oldIndex, newIndex).map((f, i) => {
+            const updated = { ...f, position: i };
+            // Update pos: references in conditions
+            if (updated.conditions?.rules?.length) {
+                updated.conditions = {
+                    ...updated.conditions,
+                    rules: updated.conditions.rules.map(r => {
+                        if (r.field_key?.startsWith('pos:')) {
+                            const oldPos = parseInt(r.field_key.split(':')[1]);
+                            if (posMapping[oldPos] !== undefined) {
+                                return { ...r, field_key: `pos:${posMapping[oldPos]}` };
+                            }
+                        }
+                        return r;
+                    }),
+                };
+            }
+            return updated;
+        });
         onChange(newFields);
 
         // Update expanded index if needed

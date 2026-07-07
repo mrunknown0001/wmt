@@ -29,7 +29,7 @@ export default function AssigneePicker({ currentAssignee, users, isOpen, onToggl
                 ref={anchorRef}
                 onClick={(e) => { e.stopPropagation(); onToggle(); }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="cursor-pointer flex items-center gap-2"
+                className="cursor-pointer flex items-center gap-2 rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-700/60 transition-all"
             >
                 {currentAssignee ? (
                     <>

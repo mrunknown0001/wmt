@@ -32,7 +32,14 @@ export default function FormsEdit() {
             config: f.config,
             default_value: f.default_value || null,
             is_visible: f.is_visible !== false,
-            conditions: f.conditions || null,
+            // Convert field_id in conditions to field_key format for FormBuilder
+            conditions: f.conditions?.rules?.length > 0 ? {
+                ...f.conditions,
+                rules: f.conditions.rules.map(r => ({
+                    ...r,
+                    field_key: r.field_key || (r.field_id ? `id:${r.field_id}` : ''),
+                })),
+            } : null,
             maps_to: f.maps_to,
             custom_field_id: f.custom_field_id,
         })),

@@ -161,9 +161,14 @@ class PublicFormController extends Controller
             foreach ($form->fields as $field) {
                 if (in_array($field->position, $titleFieldIds)) {
                     $val = $fieldValues[$field->id] ?? null;
-                    if ($val !== null && $val !== '') {
-                        $titleParts[] = is_array($val) ? implode(', ', $val) : $val;
+                    if ($val === null || $val === '') continue;
+
+                    // Resolve option IDs to labels for select/multi_select fields
+                    if (in_array($field->type, ['select', 'multi_select'])) {
+                        $val = $this->resolveOptionLabels($field, $val);
                     }
+
+                    $titleParts[] = is_array($val) ? implode(', ', $val) : $val;
                 }
             }
             if (!empty($titleParts)) {
@@ -316,5 +321,27 @@ class PublicFormController extends Controller
         }
 
         return $logic === 'all' ? !in_array(false, $results, true) : in_array(true, $results, true);
+    }
+
+    private function resolveOptionLabels($field, $val): string|array
+    {
+        // Build option ID → label map
+        $optionMap = [];
+        if ($field->customField && $field->customField->options) {
+            foreach ($field->customField->options as $opt) {
+                $optionMap[(string) $opt->id] = $opt->label;
+            }
+        } elseif (!empty($field->config['options'])) {
+            foreach ($field->config['options'] as $opt) {
+                $key = (string) ($opt['id'] ?? $opt['value'] ?? '');
+                $optionMap[$key] = $opt['label'] ?? $key;
+            }
+        }
+
+        if (is_array($val)) {
+            return array_map(fn ($v) => $optionMap[(string) $v] ?? $v, $val);
+        }
+
+        return $optionMap[(string) $val] ?? $val;
     }
 }
