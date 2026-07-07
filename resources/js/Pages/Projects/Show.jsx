@@ -676,11 +676,11 @@ function BoardScrollWrapper({ children }) {
 }
 
 // Droppable zone for sections (allows dropping tasks into/between sections)
-function SectionDropZone({ sectionId }) {
+function SectionDropZone({ sectionId, minHeight = false }) {
     const { setNodeRef, isOver } = useDroppable({ id: `section-${sectionId ?? 'null'}` });
     return (
         <tr ref={setNodeRef}>
-            <td colSpan={99} className={`transition-colors ${isOver ? 'py-2' : 'py-0'}`}>
+            <td colSpan={99} className={`transition-colors ${isOver ? 'py-2' : minHeight ? 'py-1' : 'py-0'}`}>
                 {isOver && (
                     <div className="mx-4 border-2 border-dashed border-primary-300 dark:border-primary-600 rounded py-2 text-center text-xs text-primary-500 font-medium">
                         Drop here
@@ -1198,7 +1198,9 @@ export default function Show() {
         if (activeId === over.id) return;
 
         let targetSectionId;
-        if (overId.startsWith('section-')) {
+        if (overId.startsWith('section-header-')) {
+            targetSectionId = parseInt(overId.replace('section-header-', ''));
+        } else if (overId.startsWith('section-')) {
             const part = overId.replace('section-', '');
             targetSectionId = part === 'null' ? null : parseInt(part);
         } else {
@@ -1240,39 +1242,66 @@ export default function Show() {
         }
 
         if (tasksBySection) {
-            // Section-aware drag end
-            const activeTask = localTasks.find((t) => t.id === active.id);
-            if (!activeTask) return;
-
-            const sectionId = activeTask.section_id;
-            const sectionTasks = localTasks.filter((t) => t.section_id === sectionId && matchesFilters(t));
-
+            // Determine target section from the over element directly
             const overIdStr = String(over.id);
-            const isOverSection = overIdStr.startsWith('section-');
-            const overTask = !isOverSection ? localTasks.find((t) => t.id === over.id) : null;
+            const isOverSectionHeader = overIdStr.startsWith('section-header-');
+            const isOverSectionZone = overIdStr.startsWith('section-') && !isOverSectionHeader;
+            const isOverSection = isOverSectionHeader || isOverSectionZone;
 
-            if (!isOverSection && overTask && overTask.section_id === sectionId) {
-                // Reorder within the same section
-                const oldIndex = sectionTasks.findIndex((t) => t.id === active.id);
-                const newIndex = sectionTasks.findIndex((t) => t.id === over.id);
+            let targetSectionId;
+            if (isOverSectionHeader) {
+                targetSectionId = parseInt(overIdStr.replace('section-header-', ''));
+            } else if (isOverSectionZone) {
+                const part = overIdStr.replace('section-', '');
+                targetSectionId = part === 'null' ? null : parseInt(part);
+            } else {
+                const overTask = localTasks.find((t) => t.id === over.id);
+                if (!overTask) return;
+                targetSectionId = overTask.section_id;
+            }
 
-                if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-                    const reordered = arrayMove(sectionTasks, oldIndex, newIndex);
-                    setLocalTasks((prev) => {
-                        const updated = prev.map((t) => ({ ...t }));
+            // Use functional update to work with latest state
+            setLocalTasks((prev) => {
+                const activeTask = prev.find((t) => t.id === active.id);
+                if (!activeTask) return prev;
+
+                // Ensure the task has the target section_id
+                const updated = prev.map((t) =>
+                    t.id === active.id ? { ...t, section_id: targetSectionId } : { ...t }
+                );
+
+                const targetTasks = updated.filter((t) => t.section_id === targetSectionId && matchesFilters(t));
+
+                if (!isOverSection && over.id !== active.id) {
+                    // Dropped on a specific task — reorder relative to it
+                    const movedIdx = targetTasks.findIndex((t) => t.id === active.id);
+                    const overIdx = targetTasks.findIndex((t) => t.id === over.id);
+
+                    if (movedIdx !== -1 && overIdx !== -1 && movedIdx !== overIdx) {
+                        const reordered = arrayMove(targetTasks, movedIdx, overIdx);
                         reordered.forEach((t, i) => {
                             const idx = updated.findIndex((u) => u.id === t.id);
                             if (idx !== -1) updated[idx].position = i;
                         });
-                        return updated;
+                        persistReorder(reordered);
+                    } else {
+                        targetTasks.forEach((t, i) => {
+                            const idx = updated.findIndex((u) => u.id === t.id);
+                            if (idx !== -1) updated[idx].position = i;
+                        });
+                        persistReorder(targetTasks);
+                    }
+                } else {
+                    // Dropped on section area — persist with current order
+                    targetTasks.forEach((t, i) => {
+                        const idx = updated.findIndex((u) => u.id === t.id);
+                        if (idx !== -1) updated[idx].position = i;
                     });
-                    persistReorder(reordered);
-                    return;
+                    persistReorder(targetTasks);
                 }
-            }
 
-            // Cross-section move — persist new section assignment with positions
-            persistReorder(sectionTasks);
+                return updated;
+            });
         } else {
             // Flat list mode (no sections)
             setLocalTasks((prev) => {
@@ -1922,7 +1951,7 @@ export default function Show() {
                                                                 </React.Fragment>
                                                             ))}
                                                         </SortableContext>
-                                                        <SectionDropZone sectionId={group.id} />
+                                                        <SectionDropZone sectionId={group.id} minHeight={group.id === null} />
                                                         </>
                                                     )}
                                                 </React.Fragment>
