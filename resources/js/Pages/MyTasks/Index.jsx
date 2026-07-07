@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, router, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
+import Pagination from '../../Components/Pagination';
 import PriorityBadge from '../../Components/PriorityBadge';
 import StatusBadge from '../../Components/StatusBadge';
 import EmptyState from '../../Components/EmptyState';
@@ -11,12 +12,17 @@ import { formatDate, formatLabel, taskEditUrl } from '../../utils';
 const TASK_STATUSES = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
-const sections = [
+const activeSections = [
     { key: 'overdue', label: 'Overdue', color: 'red' },
     { key: 'dueToday', label: 'Due Today', color: 'yellow' },
     { key: 'upcoming', label: 'Upcoming (Next 7 Days)', color: 'blue' },
     { key: 'later', label: 'Later', color: 'gray' },
     { key: 'noDueDate', label: 'No Due Date', color: 'gray' },
+];
+
+const completedSections = [
+    { key: 'completedOnTime', label: 'Completed On Time', color: 'green' },
+    { key: 'completedLate', label: 'Completed Late', color: 'orange' },
 ];
 
 const sectionStyles = {
@@ -40,9 +46,46 @@ const sectionStyles = {
         badge: 'bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-400',
         row: 'border-l-gray-400',
     },
+    green: {
+        header: 'text-green-700 dark:text-green-400',
+        badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
+        row: 'border-l-green-500',
+    },
+    orange: {
+        header: 'text-orange-700 dark:text-orange-400',
+        badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
+        row: 'border-l-orange-500',
+    },
 };
 
-function TaskSection({ section, tasks }) {
+function CompletionBadge({ task }) {
+    if (task.status !== 'done' && task.status !== 'cancelled') return null;
+
+    const isLate = task.due_date && task.completed_at && new Date(task.completed_at) > new Date(new Date(task.due_date).setHours(23, 59, 59, 999));
+    const isOnTime = !isLate;
+
+    return (
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded ${
+            isOnTime
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+                : 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400'
+        }`}>
+            {isOnTime ? (
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+            ) : (
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+                    <circle cx="12" cy="12" r="9" strokeLinecap="round" />
+                </svg>
+            )}
+            {isOnTime ? 'On Time' : 'Late'}
+        </span>
+    );
+}
+
+function TaskSection({ section, tasks, showCompletionBadge = false }) {
     if (!tasks || tasks.length === 0) return null;
 
     const style = sectionStyles[section.color];
@@ -74,6 +117,7 @@ function TaskSection({ section, tasks }) {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
+                                {showCompletionBadge && <CompletionBadge task={task} />}
                                 <PriorityBadge priority={task.priority} />
                                 <StatusBadge status={task.status} type="task" />
                                 {(task.start_date || task.due_date) && (
@@ -214,10 +258,11 @@ function QuickAddTask({ canAssignOthers, users, projects, priorities }) {
     );
 }
 
-export default function Index({ allTasks, taskGroups: defaultGroups, stats: defaultStats, canAssignOthers = false, users = [], projects = [], statuses = TASK_STATUSES, priorities = PRIORITIES }) {
-    const [filterSearch, setFilterSearch] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
-    const [filterPriority, setFilterPriority] = useState('');
+export default function Index({ taskGroups, isCompletedFilter, pagination, stats, filters, canAssignOthers = false, users = [], projects = [], statuses = TASK_STATUSES, priorities = PRIORITIES }) {
+    const [filterSearch, setFilterSearch] = useState(filters.search || '');
+    const [filterStatus, setFilterStatus] = useState(filters.status || '');
+    const [filterPriority, setFilterPriority] = useState(filters.priority || '');
+    const searchTimeout = useRef(null);
 
     // Reload task list when task-related notifications arrive
     useEffect(() => {
@@ -231,38 +276,47 @@ export default function Index({ allTasks, taskGroups: defaultGroups, stats: defa
         return () => window.removeEventListener('wmt:notification', handler);
     }, []);
 
-    const hasActiveFilters = filterSearch || filterStatus || filterPriority;
+    const applyFilters = (overrides = {}) => {
+        const params = {
+            status: overrides.status ?? filterStatus,
+            priority: overrides.priority ?? filterPriority,
+            search: overrides.search ?? filterSearch,
+        };
 
-    const { taskGroups, stats } = useMemo(() => {
-        if (!hasActiveFilters) {
-            return { taskGroups: defaultGroups, stats: defaultStats };
-        }
+        // Remove empty params
+        Object.keys(params).forEach((k) => { if (!params[k]) delete params[k]; });
 
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() + 7);
-
-        const filtered = allTasks.filter((t) => {
-            if (filterSearch && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false;
-            if (filterStatus && t.status !== filterStatus) return false;
-            if (filterPriority && t.priority !== filterPriority) return false;
-            return true;
+        router.get('/my-tasks', params, {
+            preserveState: true,
+            preserveScroll: true,
         });
+    };
 
-        const bucket = (test) => filtered.filter(test);
-        const groups = {
-            overdue: bucket((t) => { if (!t.due_date) return false; const d = new Date(t.due_date); d.setHours(0,0,0,0); return d < today; }),
-            dueToday: bucket((t) => { if (!t.due_date) return false; const d = new Date(t.due_date); d.setHours(0,0,0,0); return d.getTime() === today.getTime(); }),
-            upcoming: bucket((t) => { if (!t.due_date) return false; const d = new Date(t.due_date); d.setHours(0,0,0,0); return d > today && d <= weekEnd; }),
-            later: bucket((t) => { if (!t.due_date) return false; const d = new Date(t.due_date); d.setHours(0,0,0,0); return d > weekEnd; }),
-            noDueDate: bucket((t) => !t.due_date),
-        };
+    const handleSearchChange = (value) => {
+        setFilterSearch(value);
+        clearTimeout(searchTimeout.current);
+        searchTimeout.current = setTimeout(() => applyFilters({ search: value }), 400);
+    };
 
-        return {
-            taskGroups: groups,
-            stats: { total: filtered.length, overdue: groups.overdue.length, dueToday: groups.dueToday.length },
-        };
-    }, [allTasks, defaultGroups, defaultStats, filterSearch, filterStatus, filterPriority, hasActiveFilters]);
+    const handleStatusChange = (value) => {
+        setFilterStatus(value);
+        applyFilters({ status: value });
+    };
 
+    const handlePriorityChange = (value) => {
+        setFilterPriority(value);
+        applyFilters({ priority: value });
+    };
+
+    const clearFilters = () => {
+        setFilterSearch('');
+        setFilterStatus('');
+        setFilterPriority('');
+        router.get('/my-tasks', {}, { preserveState: true, preserveScroll: true });
+    };
+
+    const hasActiveFilters = filterSearch || filterStatus || filterPriority;
+    const sections = isCompletedFilter ? completedSections : activeSections;
     const hasAnyTasks = Object.values(taskGroups).some(group => group.length > 0);
 
     return (
@@ -274,7 +328,7 @@ export default function Index({ allTasks, taskGroups: defaultGroups, stats: defa
                 <Card>
                     <div className="text-center">
                         <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{stats.total}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Tasks</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Active Tasks</p>
                     </div>
                 </Card>
                 <Card>
@@ -314,14 +368,14 @@ export default function Index({ allTasks, taskGroups: defaultGroups, stats: defa
                     <input
                         type="text"
                         value={filterSearch}
-                        onChange={(e) => setFilterSearch(e.target.value)}
+                        onChange={(e) => handleSearchChange(e.target.value)}
                         placeholder="Search tasks..."
                         className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     />
                 </div>
                 <select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    onChange={(e) => handleStatusChange(e.target.value)}
                     className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 >
                     <option value="">All Statuses</option>
@@ -331,7 +385,7 @@ export default function Index({ allTasks, taskGroups: defaultGroups, stats: defa
                 </select>
                 <select
                     value={filterPriority}
-                    onChange={(e) => setFilterPriority(e.target.value)}
+                    onChange={(e) => handlePriorityChange(e.target.value)}
                     className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 >
                     <option value="">All Priorities</option>
@@ -341,7 +395,7 @@ export default function Index({ allTasks, taskGroups: defaultGroups, stats: defa
                 </select>
                 {hasActiveFilters && (
                     <button
-                        onClick={() => { setFilterSearch(''); setFilterStatus(''); setFilterPriority(''); }}
+                        onClick={clearFilters}
                         className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
                     >
                         Clear
@@ -350,13 +404,21 @@ export default function Index({ allTasks, taskGroups: defaultGroups, stats: defa
             </div>
 
             {hasAnyTasks ? (
-                sections.map((section) => (
-                    <TaskSection
-                        key={section.key}
-                        section={section}
-                        tasks={taskGroups[section.key]}
-                    />
-                ))
+                <>
+                    {sections.map((section) => (
+                        <TaskSection
+                            key={section.key}
+                            section={section}
+                            tasks={taskGroups[section.key]}
+                            showCompletionBadge={isCompletedFilter}
+                        />
+                    ))}
+                    {pagination?.links && (
+                        <div className="mt-4">
+                            <Pagination links={pagination.links} />
+                        </div>
+                    )}
+                </>
             ) : (
                 <Card>
                     <EmptyState

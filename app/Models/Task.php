@@ -33,6 +33,7 @@ class Task extends Model
         'created_by',
         'start_date',
         'due_date',
+        'completed_at',
         'position',
         'is_recurring',
         'recurrence_frequency',
@@ -47,11 +48,30 @@ class Task extends Model
         return [
             'start_date' => 'date',
             'due_date' => 'date',
+            'completed_at' => 'datetime',
             'position' => 'integer',
             'is_recurring' => 'boolean',
             'recurrence_interval' => 'integer',
             'escalation_level' => 'integer',
         ];
+    }
+
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::saving(function (Task $task) {
+            if ($task->isDirty('status')) {
+                $newStatus = $task->status;
+                $oldStatus = $task->getOriginal('status');
+
+                if ($newStatus === 'done' && $oldStatus !== 'done') {
+                    $task->completed_at = now();
+                } elseif ($oldStatus === 'done' && $newStatus !== 'done') {
+                    $task->completed_at = null;
+                }
+            }
+        });
     }
 
     public function calculateNextDueDate(): ?\Carbon\Carbon
