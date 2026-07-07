@@ -781,6 +781,61 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
     );
 }
 
+function AutomationToast({ toast, onDismiss }) {
+    const [visible, setVisible] = useState(false);
+    const [exiting, setExiting] = useState(false);
+
+    useEffect(() => {
+        requestAnimationFrame(() => setVisible(true));
+        const timer = setTimeout(() => {
+            setExiting(true);
+            setVisible(false);
+            setTimeout(() => onDismiss(toast.id), 300);
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    return (
+        <div
+            className={`flex items-start gap-3 rounded-lg border px-4 py-3 shadow-lg transition-all duration-300 ${
+                visible
+                    ? 'opacity-100 translate-y-0 scale-100'
+                    : exiting
+                        ? 'opacity-0 translate-y-2 scale-95'
+                        : 'opacity-0 translate-y-4 scale-95'
+            } border-purple-200 bg-purple-50 dark:bg-purple-900/30 dark:border-purple-800`}
+        >
+            <div className="shrink-0 mt-0.5 rounded-full bg-purple-100 dark:bg-purple-800/50 p-1.5">
+                <svg className="h-4 w-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                    Rule executed
+                </p>
+                <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5 truncate">
+                    <span className="font-medium">{toast.ruleName}</span>
+                    {toast.taskTitle && <> on &ldquo;{toast.taskTitle}&rdquo;</>}
+                </p>
+                {toast.actions && (
+                    <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5 capitalize">
+                        {toast.actions}
+                    </p>
+                )}
+            </div>
+            <button
+                onClick={() => onDismiss(toast.id)}
+                className="text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 shrink-0"
+            >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    );
+}
+
 export default function Show() {
     const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], auth, users } = usePage().props;
 
@@ -809,6 +864,7 @@ export default function Show() {
     const [showAutomation, setShowAutomation] = useState(false);
     const [showCustomFields, setShowCustomFields] = useState(false);
     const [celebration, setCelebration] = useState(null); // { x, y } or null
+    const [automationToasts, setAutomationToasts] = useState([]);
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -841,6 +897,17 @@ export default function Show() {
                     router.reload({ only: ['tasks'], preserveScroll: true });
                     break;
             }
+        });
+
+        channel.listen('.automation.executed', (e) => {
+            const id = `auto-${Date.now()}-${Math.random()}`;
+            const actionLabels = (e.actions || []).map(a => a.replace(/_/g, ' ')).join(', ');
+            setAutomationToasts((prev) => [...prev, {
+                id,
+                ruleName: e.rule_name,
+                taskTitle: e.task?.title,
+                actions: actionLabels,
+            }]);
         });
 
         return () => echo.leave(`project.${project.id}`);
@@ -2545,6 +2612,19 @@ export default function Show() {
                     y={celebration.y}
                     onComplete={() => setCelebration(null)}
                 />
+            )}
+
+            {/* Automation rule execution toasts */}
+            {automationToasts.length > 0 && (
+                <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
+                    {automationToasts.map((toast) => (
+                        <AutomationToast
+                            key={toast.id}
+                            toast={toast}
+                            onDismiss={(id) => setAutomationToasts((prev) => prev.filter((t) => t.id !== id))}
+                        />
+                    ))}
+                </div>
             )}
         </AuthenticatedLayout>
     );

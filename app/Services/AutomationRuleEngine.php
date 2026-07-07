@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Events\AutomationRuleExecuted;
+use App\Events\TaskUpdated;
 use App\Models\CustomField;
 use App\Models\ProjectAutomationRule;
 use App\Models\Task;
@@ -42,6 +44,26 @@ class AutomationRuleEngine
             foreach ($rules as $rule) {
                 if (self::conditionsMet($task, $rule->conditions)) {
                     self::executeActions($task, $rule->actions);
+
+                    // Refresh and broadcast the updated task for real-time UI sync
+                    $task->refresh();
+                    $task->load('assignee', 'collaborators');
+
+                    broadcast(new TaskUpdated(
+                        $task->project_id,
+                        $task->toArray(),
+                        'updated',
+                        auth()->id() ?? $task->created_by ?? 0,
+                    ));
+
+                    // Broadcast automation rule execution for toast notifications
+                    $actionSummaries = collect($rule->actions)->map(fn ($a) => $a['type'] ?? 'unknown')->all();
+                    broadcast(new AutomationRuleExecuted(
+                        $task->project_id,
+                        $rule->name,
+                        ['id' => $task->id, 'title' => $task->title],
+                        $actionSummaries,
+                    ));
                 }
             }
         } finally {
