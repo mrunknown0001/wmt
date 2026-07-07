@@ -107,7 +107,7 @@ class TaskController extends Controller
 
         AutomationRuleEngine::evaluate($task, 'task_created');
 
-        $task->load('assignee', 'collaborators');
+        $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'created', $request->user()->id))->toOthers();
 
         return redirect("/projects/{$project->id}")
@@ -275,7 +275,7 @@ class TaskController extends Controller
 
         $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
 
-        $task->load('assignee', 'collaborators');
+        $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'updated', $request->user()->id))->toOthers();
 
         return redirect("/projects/{$project->id}")
@@ -353,6 +353,7 @@ class TaskController extends Controller
             }
         }
 
+        $task->loadMissing('assignee', 'collaborators', 'customFieldValues.selectedOption');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'updated', $request->user()->id))->toOthers();
 
         return response()->json($response);

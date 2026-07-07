@@ -47,7 +47,7 @@ class AutomationRuleEngine
 
                     // Refresh and broadcast the updated task for real-time UI sync
                     $task->refresh();
-                    $task->load('assignee', 'collaborators');
+                    $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
 
                     broadcast(new TaskUpdated(
                         $task->project_id,
