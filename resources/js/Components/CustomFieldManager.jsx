@@ -165,6 +165,8 @@ export default function CustomFieldManager({ projectId, initialFields = [] }) {
     const [editingField, setEditingField] = useState(null);
     const [deleteField, setDeleteField] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [dragIndex, setDragIndex] = useState(null);
+    const [dragOverIndex, setDragOverIndex] = useState(null);
 
     const [form, setForm] = useState({
         name: '',
@@ -244,6 +246,48 @@ export default function CustomFieldManager({ projectId, initialFields = [] }) {
         }
     }, [deleteField, projectId]);
 
+    const handleDragStart = (e, index) => {
+        setDragIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDragOverIndex(index);
+    };
+
+    const handleDrop = async (e, dropIndex) => {
+        e.preventDefault();
+        if (dragIndex === null || dragIndex === dropIndex) {
+            setDragIndex(null);
+            setDragOverIndex(null);
+            return;
+        }
+
+        const reordered = [...fields];
+        const [moved] = reordered.splice(dragIndex, 1);
+        reordered.splice(dropIndex, 0, moved);
+        setFields(reordered);
+        setDragIndex(null);
+        setDragOverIndex(null);
+
+        try {
+            await apiFetch(`/projects/${projectId}/custom-fields/reorder`, {
+                method: 'POST',
+                body: JSON.stringify({ order: reordered.map(f => f.id) }),
+            });
+        } catch (e) {
+            console.error('Failed to reorder custom fields', e);
+            setFields(fields); // revert on failure
+        }
+    };
+
+    const handleDragEnd = () => {
+        setDragIndex(null);
+        setDragOverIndex(null);
+    };
+
     const typeLabel = (type) => FIELD_TYPES.find(t => t.value === type)?.label || type;
 
     return (
@@ -257,12 +301,24 @@ export default function CustomFieldManager({ projectId, initialFields = [] }) {
                 <p className="text-sm text-gray-500 dark:text-gray-400">No custom fields yet. Add one to track additional data on tasks.</p>
             ) : (
                 <div className="space-y-2">
-                    {fields.map(field => (
+                    {fields.map((field, index) => (
                         <div
                             key={field.id}
-                            className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, index)}
+                            onDragOver={(e) => handleDragOver(e, index)}
+                            onDrop={(e) => handleDrop(e, index)}
+                            onDragEnd={handleDragEnd}
+                            className={`flex items-center justify-between p-3 rounded-lg border bg-gray-50 dark:bg-gray-800/50 transition-all ${
+                                dragOverIndex === index && dragIndex !== index
+                                    ? 'border-primary-400 dark:border-primary-500 ring-1 ring-primary-400/30'
+                                    : 'border-gray-200 dark:border-gray-700'
+                            } ${dragIndex === index ? 'opacity-50' : ''}`}
                         >
                             <div className="flex items-center gap-3">
+                                <span className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Drag to reorder">
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                                </span>
                                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{field.name}</span>
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
                                     {typeLabel(field.type)}
