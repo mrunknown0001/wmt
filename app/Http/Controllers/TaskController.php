@@ -8,6 +8,7 @@ use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskAttachment;
 use App\Models\CustomField;
 use App\Models\TaskCustomFieldValue;
 use App\Models\User;
@@ -118,7 +119,7 @@ class TaskController extends Controller
     {
         $this->authorize('update', $task);
 
-        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title');
+        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'attachments');
         $task->loadCount('subtasks');
 
         $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [
@@ -195,12 +196,25 @@ class TaskController extends Controller
             || $project->owner_id === auth()->id()
             || $project->isProjectAdmin(auth()->user());
 
+        $taskAttachments = $task->attachments->map(fn ($a) => [
+            'id' => $a->id,
+            'file_name' => $a->file_name,
+            'file_type' => $a->file_type,
+            'file_size' => $a->file_size,
+            'url' => asset('storage/' . $a->file_path),
+            'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/attachments/{$a->id}/download"),
+            'is_image' => $a->isImage(),
+            'is_video' => $a->isVideo(),
+            'is_spreadsheet' => $a->isSpreadsheet(),
+        ]);
+
         $customFields = $project->customFields()->with('options')->get();
         $customFieldValues = $task->customFieldValues()->get()->keyBy('custom_field_id');
 
         return Inertia::render('Tasks/Edit', [
             'project' => $project,
             'task' => $task,
+            'taskAttachments' => $taskAttachments,
             'timeline' => $timeline,
             'totalComments' => $task->comments()->count(),
             'totalActivities' => $task->activities()->count(),
@@ -590,5 +604,14 @@ class TaskController extends Controller
             'success' => true,
             'new_tasks' => $newTasks,
         ]);
+    }
+
+    public function downloadAttachment(Project $project, Task $task, TaskAttachment $attachment): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        if ($attachment->task_id !== $task->id) {
+            abort(404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 }

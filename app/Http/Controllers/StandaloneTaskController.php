@@ -8,6 +8,7 @@ use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskAttachment;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\ActivityLogger;
@@ -71,7 +72,7 @@ class StandaloneTaskController extends Controller
     {
         $this->authorize('update', $task);
 
-        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'project');
+        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'project', 'attachments');
         $task->loadCount('subtasks');
 
         $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [
@@ -143,12 +144,25 @@ class StandaloneTaskController extends Controller
                 ->toArray();
         }
 
+        $taskAttachments = $task->attachments->map(fn ($a) => [
+            'id' => $a->id,
+            'file_name' => $a->file_name,
+            'file_type' => $a->file_type,
+            'file_size' => $a->file_size,
+            'url' => asset('storage/' . $a->file_path),
+            'download_url' => url("/tasks/{$task->id}/attachments/{$a->id}/download"),
+            'is_image' => $a->isImage(),
+            'is_video' => $a->isVideo(),
+            'is_spreadsheet' => $a->isSpreadsheet(),
+        ]);
+
         $canManageTaskDetails = auth()->user()->can('manage-tasks')
             || $task->created_by === auth()->id();
 
         return Inertia::render('Tasks/Edit', [
             'project' => $task->project,
             'task' => $task,
+            'taskAttachments' => $taskAttachments,
             'timeline' => $timeline,
             'totalComments' => $task->comments()->count(),
             'totalActivities' => $task->activities()->count(),
@@ -299,5 +313,14 @@ class StandaloneTaskController extends Controller
         }
 
         return response()->json(['items' => $items->values()]);
+    }
+
+    public function downloadAttachment(Task $task, TaskAttachment $attachment): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        if ($attachment->task_id !== $task->id) {
+            abort(404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 }

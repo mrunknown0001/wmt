@@ -80,6 +80,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'storeStandalone'])->name('standalone-tasks.comments.store');
     Route::delete('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroyStandalone'])->name('standalone-tasks.comments.destroy');
     Route::get('/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'downloadStandalone'])->name('standalone-tasks.comments.attachments.download');
+    Route::get('/tasks/{task}/attachments/{attachment}/download', [StandaloneTaskController::class, 'downloadAttachment'])->name('standalone-tasks.attachments.download');
 
     // Calendar
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
@@ -101,6 +102,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
     Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download'])->name('tasks.comments.attachments.download');
+    Route::get('/projects/{project}/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
 
     // Task Sections
     Route::post('/projects/{project}/sections', [TaskSectionController::class, 'store'])->name('projects.sections.store');
