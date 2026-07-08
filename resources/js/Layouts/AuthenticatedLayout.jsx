@@ -8,11 +8,11 @@ import Badge from '../Components/Badge';
 import FlashMessage from '../Components/FlashMessage';
 import ThemeToggle from '../Components/ThemeToggle';
 import NotificationBell from '../Components/NotificationBell';
-import Tooltip from '../Components/Tooltip';
 import NotificationToast from '../Components/NotificationToast';
 import AiChatWidget from '../Components/AiChat/AiChatWidget';
 import GlobalSearch from '../Components/GlobalSearch';
 import SidebarTodoWidget from '../Components/SidebarTodoWidget';
+import Tooltip from '../Components/Tooltip';
 
 const HomeIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">

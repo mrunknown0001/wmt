@@ -17,7 +17,7 @@ export default function ThemeToggle({ className = '' }) {
     const { theme, toggleTheme } = useTheme();
 
     return (
-        <Tooltip content={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+            <Tooltip content={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
             <button
                 onClick={toggleTheme}
                 className={`p-1.5 rounded-lg transition-colors ${className}`}
@@ -25,6 +25,6 @@ export default function ThemeToggle({ className = '' }) {
             >
                 {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
             </button>
-        </Tooltip>
+            </Tooltip>
     );
 }

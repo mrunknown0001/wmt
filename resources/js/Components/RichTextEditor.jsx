@@ -11,7 +11,7 @@ import Tooltip from './Tooltip';
 
 function ToolbarButton({ onClick, active, title, children }) {
     return (
-        <Tooltip content={title}>
+            <Tooltip content={title}>
             <button
                 type="button"
                 onClick={onClick}
@@ -23,7 +23,7 @@ function ToolbarButton({ onClick, active, title, children }) {
             >
                 {children}
             </button>
-        </Tooltip>
+            </Tooltip>
     );
 }
 

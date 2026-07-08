@@ -98,7 +98,7 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
         <div ref={setNodeRef} style={style} className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
             {/* Collapsed Row */}
             <div className="flex items-center gap-2 px-3 py-2.5">
-                <Tooltip content="Drag to reorder">
+                    <Tooltip content="Drag to reorder">
                     <button
                         {...attributes}
                         {...listeners}
@@ -109,7 +109,7 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                             <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
                         </svg>
                     </button>
-                </Tooltip>
+                    </Tooltip>
                 <span className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
                     {getFieldIcon(field.type)}
                 </span>
@@ -132,7 +132,7 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                 {field.conditions?.rules?.length > 0 && (
                     <span className="text-xs text-purple-600 dark:text-purple-400 shrink-0">Conditional</span>
                 )}
-                <Tooltip content={isExpanded ? 'Collapse' : 'Expand'}>
+                    <Tooltip content={isExpanded ? 'Collapse' : 'Expand'}>
                     <button
                         type="button"
                         onClick={() => onToggleExpand(fieldIndex)}
@@ -142,8 +142,8 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                </Tooltip>
-                <Tooltip content="Remove">
+                    </Tooltip>
+                    <Tooltip content="Remove">
                     <button
                         type="button"
                         onClick={() => onRemove(fieldIndex)}
@@ -153,7 +153,7 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                     </button>
-                </Tooltip>
+                    </Tooltip>
             </div>
 
             {/* Expanded Config */}
@@ -477,7 +477,7 @@ function ConditionRuleRow({ rule, index, availableFields, onUpdate, onRemove }) 
                 {getOperators().map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             {renderValueInput()}
-            <Tooltip content="Remove condition">
+                <Tooltip content="Remove condition">
                 <button
                     type="button"
                     onClick={() => onRemove(index)}
@@ -487,7 +487,7 @@ function ConditionRuleRow({ rule, index, availableFields, onUpdate, onRemove }) 
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
-            </Tooltip>
+                </Tooltip>
         </div>
     );
 }

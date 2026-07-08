@@ -36,7 +36,7 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
             className={`bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm card-hover cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-lg transform-none!' : ''} ${isSelected ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
         >
             <div className="flex items-start gap-2 mb-2">
-                <Tooltip content={isDone ? 'Mark incomplete' : 'Mark complete'}>
+                    <Tooltip content={isDone ? 'Mark incomplete' : 'Mark complete'}>
                     <button
                         onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id, e); }}
                         onPointerDown={(e) => e.stopPropagation()}
@@ -50,13 +50,13 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                     </button>
-                </Tooltip>
+                    </Tooltip>
                 <div className="flex-1 flex items-start justify-between gap-2">
                     <PriorityBadge priority={task.priority} />
                     {(canEdit || canDelete) && (
                         <div className="flex items-center gap-1">
                             {canEdit && (
-                                <Tooltip content="Edit">
+                                    <Tooltip content="Edit">
                                     <Link
                                         href={`/projects/${projectId}/tasks/${task.id}/edit`}
                                         className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
@@ -65,10 +65,10 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                         </svg>
                                     </Link>
-                                </Tooltip>
+                                    </Tooltip>
                             )}
                             {canDelete && (
-                                <Tooltip content="Delete">
+                                    <Tooltip content="Delete">
                                     <button
                                         onClick={() => onDelete(task.id, task.title)}
                                         className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
@@ -77,7 +77,7 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
                                     </button>
-                                </Tooltip>
+                                    </Tooltip>
                             )}
                         </div>
                     )}
@@ -92,11 +92,11 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                     {task.title}
                 </button>
                 {task.is_recurring && (
-                    <Tooltip content="Recurring task">
+                        <Tooltip content="Recurring task">
                         <svg className="h-3.5 w-3.5 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
-                    </Tooltip>
+                        </Tooltip>
                 )}
             </div>
             {task.subtasks_count > 0 && (
@@ -116,16 +116,14 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                         {task.assignee?.name || 'Unassigned'}
                     </span>
                     {task.collaborators?.length > 0 && (
-                        <Tooltip content={task.collaborators.map((c) => c.name).join(', ')}>
-                        <div className="flex -space-x-1.5 ml-1">
+                        <Tooltip content={task.collaborators.map((c) => c.name).join(', ')}><div className="flex -space-x-1.5 ml-1">
                             {task.collaborators.slice(0, 2).map((c) => (
                                 <Avatar key={c.id} name={c.name} size="sm" className="ring-1 ring-white dark:ring-gray-800" />
                             ))}
                             {task.collaborators.length > 2 && (
                                 <span className="text-xs text-gray-400 ml-1">+{task.collaborators.length - 2}</span>
                             )}
-                        </div>
-                        </Tooltip>
+                        </div></Tooltip>
                     )}
                 </div>
                 {(task.start_date || task.due_date) && (

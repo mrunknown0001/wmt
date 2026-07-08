@@ -17,8 +17,8 @@ import {
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import InlinePopover from './InlinePopover';
-import Tooltip from './Tooltip';
 import Modal, { ConfirmModal } from './Modal';
+import Tooltip from './Tooltip';
 import { apiFetch } from '../utils';
 
 function SortableTodoItem({ todo, onToggle, onDelete, modal }) {
@@ -58,7 +58,7 @@ function SortableTodoItem({ todo, onToggle, onDelete, modal }) {
             } ${fading ? 'opacity-30 line-through' : ''}`}
         >
             {modal && !todo.is_completed && (
-                <Tooltip content="Drag to reorder">
+                    <Tooltip content="Drag to reorder">
                     <button
                         {...attributes}
                         {...listeners}
@@ -68,7 +68,7 @@ function SortableTodoItem({ todo, onToggle, onDelete, modal }) {
                             <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
                         </svg>
                     </button>
-                </Tooltip>
+                    </Tooltip>
             )}
             <button
                 onClick={handleToggle}
@@ -378,7 +378,7 @@ export default function SidebarTodoWidget({ collapsed }) {
         return (
             <>
                 <div className="px-2 py-1">
-                    <Tooltip content="To-Do List">
+                        <Tooltip content="To-Do List">
                         <button
                             ref={anchorRef}
                             onClick={() => {
@@ -400,13 +400,13 @@ export default function SidebarTodoWidget({ collapsed }) {
                                 </span>
                             )}
                         </button>
-                    </Tooltip>
+                        </Tooltip>
                 </div>
                 <InlinePopover isOpen={isOpen} onClose={() => setIsOpen(false)} anchorRef={anchorRef} className="w-72">
                     <div className="bg-gray-800 rounded-lg border border-gray-700 py-3">
                         <div className="flex items-center justify-between px-3 pb-2">
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">To-Do List</p>
-                            <Tooltip content="Expand">
+                                <Tooltip content="Expand">
                                 <button
                                     onClick={() => { setIsOpen(false); setShowModal(true); }}
                                     className="text-gray-500 hover:text-gray-300 transition-colors"
@@ -415,7 +415,7 @@ export default function SidebarTodoWidget({ collapsed }) {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
                                     </svg>
                                 </button>
-                            </Tooltip>
+                                </Tooltip>
                         </div>
                         <TodoList {...todoListProps} />
                     </div>
@@ -443,7 +443,7 @@ export default function SidebarTodoWidget({ collapsed }) {
             <div className="px-3 py-2">
                 <div className="flex items-center justify-between px-2 mb-2">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">To-Do List</p>
-                    <Tooltip content="Expand">
+                        <Tooltip content="Expand">
                         <button
                             onClick={() => setShowModal(true)}
                             className="text-gray-600 hover:text-gray-400 transition-colors"
@@ -452,7 +452,7 @@ export default function SidebarTodoWidget({ collapsed }) {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
                             </svg>
                         </button>
-                    </Tooltip>
+                        </Tooltip>
                 </div>
                 <TodoList {...todoListProps} />
             </div>

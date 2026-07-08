@@ -37,10 +37,10 @@ import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
 import InlineDatePicker from '../../Components/InlineDatePicker';
 import CelebrationEffect from '../../Components/CelebrationEffect';
-import Tooltip from '../../Components/Tooltip';
 import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
 import TaskContextMenu from '../../Components/TaskContextMenu';
 import TaskDetailPanel from '../../Components/TaskDetailPanel';
+import Tooltip from '../../Components/Tooltip';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import echo from '../../echo';
 
@@ -242,11 +242,9 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                                     )}
                                     <InlineDatePicker currentDate={task.due_date} isOpen={openPopover === 'due_date'} onToggle={togglePopover('due_date')} onSelect={(date) => handleFieldUpdate('due_date', date)} isOverdue={isOverdue} />
                                     {!task.start_date && (
-                                        <Tooltip content="Add start date">
-                                            <button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
+                                        <Tooltip content="Add start date"><button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
                                                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                                            </button>
-                                        </Tooltip>
+                                            </button></Tooltip>
                                     )}
                                     {!task.start_date && openPopover === 'start_date' && (
                                         <InlineDatePicker currentDate={null} isOpen={true} onToggle={togglePopover('start_date')} onSelect={(date) => handleFieldUpdate('start_date', date)} hidden />
@@ -480,11 +478,9 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                                     )}
                                     <InlineDatePicker currentDate={task.due_date} isOpen={openPopover === 'due_date'} onToggle={togglePopover('due_date')} onSelect={(date) => handleFieldUpdate('due_date', date)} isOverdue={isOverdue} />
                                     {!task.start_date && (
-                                        <Tooltip content="Add start date">
-                                            <button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
+                                        <Tooltip content="Add start date"><button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
                                                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                                            </button>
-                                        </Tooltip>
+                                            </button></Tooltip>
                                     )}
                                     {!task.start_date && openPopover === 'start_date' && (
                                         <InlineDatePicker currentDate={null} isOpen={true} onToggle={togglePopover('start_date')} onSelect={(date) => handleFieldUpdate('start_date', date)} hidden />
@@ -564,10 +560,10 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                         <button
                             className="truncate min-w-0 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
                             onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                    >
-                        {task.title}
-                    </button>
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            {task.title}
+                        </button>
                     </Tooltip>
                     {task.is_recurring && (
                         <Tooltip content="Recurring task">
@@ -3129,13 +3125,11 @@ export default function Show() {
                     <button onClick={() => handleBulkAction('delete')} className="text-sm px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors">Delete</button>
 
                     {/* Close */}
-                    <Tooltip content="Clear selection">
-                        <button onClick={clearSelection} className="p-1 rounded hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors ml-1">
+                    <Tooltip content="Clear selection"><button onClick={clearSelection} className="p-1 rounded hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors ml-1">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                        </button>
-                    </Tooltip>
+                        </button></Tooltip>
                 </div>
             )}
 

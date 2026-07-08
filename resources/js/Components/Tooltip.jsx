@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useLayoutEffect, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 const FALLBACKS = {
     top: ['top', 'bottom', 'right', 'left'],
@@ -7,139 +8,120 @@ const FALLBACKS = {
     right: ['right', 'left', 'top', 'bottom'],
 };
 
-const GAP = 8;
-const VIEWPORT_PADDING = 4;
-const ARROW_SIZE = 4;
-const ARROW_EDGE_MIN = 8;
+const GAP = 6;
+const EDGE = 6;
+const ARROW = 5;
+const ARROW_MIN = 10;
 
-function calcCoords(wr, tr, side) {
+function place(tr, tp, side) {
+    const cx = tr.left + tr.width / 2;
+    const cy = tr.top + tr.height / 2;
     switch (side) {
-        case 'top':
-            return { top: wr.top - tr.height - GAP, left: wr.left + wr.width / 2 - tr.width / 2 };
-        case 'bottom':
-            return { top: wr.bottom + GAP, left: wr.left + wr.width / 2 - tr.width / 2 };
-        case 'left':
-            return { top: wr.top + wr.height / 2 - tr.height / 2, left: wr.left - tr.width - GAP };
-        case 'right':
-            return { top: wr.top + wr.height / 2 - tr.height / 2, left: wr.right + GAP };
+        case 'top': return { top: tr.top - tp.height - GAP, left: cx - tp.width / 2 };
+        case 'bottom': return { top: tr.bottom + GAP, left: cx - tp.width / 2 };
+        case 'left': return { top: cy - tp.height / 2, left: tr.left - tp.width - GAP };
+        case 'right': return { top: cy - tp.height / 2, left: tr.right + GAP };
     }
 }
 
-function fitsViewport(coords, tr) {
-    return (
-        coords.top >= VIEWPORT_PADDING &&
-        coords.left >= VIEWPORT_PADDING &&
-        coords.top + tr.height <= window.innerHeight - VIEWPORT_PADDING &&
-        coords.left + tr.width <= window.innerWidth - VIEWPORT_PADDING
-    );
+function inView(coords, tp) {
+    return coords.top >= EDGE && coords.left >= EDGE &&
+        coords.top + tp.height <= window.innerHeight - EDGE &&
+        coords.left + tp.width <= window.innerWidth - EDGE;
 }
 
-function calcArrowStyle(side, wr, finalCoords, tr) {
-    const triggerCenterX = wr.left + wr.width / 2;
-    const triggerCenterY = wr.top + wr.height / 2;
+function arrowStyle(side, tr, coords, tp) {
+    const cx = tr.left + tr.width / 2;
+    const cy = tr.top + tr.height / 2;
+    const base = { position: 'absolute', width: 0, height: 0 };
 
     if (side === 'top' || side === 'bottom') {
-        let arrowLeft = triggerCenterX - finalCoords.left;
-        arrowLeft = Math.max(ARROW_EDGE_MIN, Math.min(arrowLeft, tr.width - ARROW_EDGE_MIN));
+        const x = Math.max(ARROW_MIN, Math.min(cx - coords.left, tp.width - ARROW_MIN));
         return {
-            position: 'absolute',
-            left: arrowLeft,
-            transform: 'translateX(-50%)',
-            width: 0,
-            height: 0,
-            borderWidth: ARROW_SIZE,
+            ...base, left: x, transform: 'translateX(-50%)',
+            borderLeft: `${ARROW}px solid transparent`, borderRight: `${ARROW}px solid transparent`,
             ...(side === 'top'
-                ? { top: '100%', borderColor: 'transparent', borderTopColor: 'var(--arrow-color)' }
-                : { bottom: '100%', borderColor: 'transparent', borderBottomColor: 'var(--arrow-color)' }),
+                ? { bottom: -ARROW, borderTop: `${ARROW}px solid #1f2937` }
+                : { top: -ARROW, borderBottom: `${ARROW}px solid #1f2937` }),
         };
     }
-    // left or right
-    let arrowTop = triggerCenterY - finalCoords.top;
-    arrowTop = Math.max(ARROW_EDGE_MIN, Math.min(arrowTop, tr.height - ARROW_EDGE_MIN));
+    const y = Math.max(ARROW_MIN, Math.min(cy - coords.top, tp.height - ARROW_MIN));
     return {
-        position: 'absolute',
-        top: arrowTop,
-        transform: 'translateY(-50%)',
-        width: 0,
-        height: 0,
-        borderWidth: ARROW_SIZE,
+        ...base, top: y, transform: 'translateY(-50%)',
+        borderTop: `${ARROW}px solid transparent`, borderBottom: `${ARROW}px solid transparent`,
         ...(side === 'left'
-            ? { left: '100%', borderColor: 'transparent', borderLeftColor: 'var(--arrow-color)' }
-            : { right: '100%', borderColor: 'transparent', borderRightColor: 'var(--arrow-color)' }),
+            ? { right: -ARROW, borderLeft: `${ARROW}px solid #1f2937` }
+            : { left: -ARROW, borderRight: `${ARROW}px solid #1f2937` }),
     };
 }
 
-export default function Tooltip({ children, content, position = 'top', className = '', delay = 150 }) {
+const ORIGINS = { top: 'center bottom', bottom: 'center top', left: 'right center', right: 'left center' };
+
+export default function Tooltip({ children, content, position = 'top', delay = 300 }) {
     const [visible, setVisible] = useState(false);
-    const [placement, setPlacement] = useState(null);
-    const timerRef = useRef(null);
-    const wrapperRef = useRef(null);
-    const tooltipRef = useRef(null);
+    const [layout, setLayout] = useState(null);
+    const triggerRef = useRef(null);
+    const tipRef = useRef(null);
+    const timer = useRef(null);
 
     const show = useCallback(() => {
-        timerRef.current = setTimeout(() => setVisible(true), delay);
+        timer.current = setTimeout(() => setVisible(true), delay);
     }, [delay]);
 
     const hide = useCallback(() => {
-        clearTimeout(timerRef.current);
+        clearTimeout(timer.current);
         setVisible(false);
-        setPlacement(null);
+        setLayout(null);
     }, []);
 
-    // Clean up timer on unmount
-    useEffect(() => () => clearTimeout(timerRef.current), []);
+    useEffect(() => () => clearTimeout(timer.current), []);
 
-    // Calculate position synchronously before paint
     useLayoutEffect(() => {
-        if (!visible || !wrapperRef.current || !tooltipRef.current) return;
+        if (!visible || !triggerRef.current || !tipRef.current) return;
 
-        const wr = wrapperRef.current.getBoundingClientRect();
-        const tr = tooltipRef.current.getBoundingClientRect();
+        const tr = triggerRef.current.getBoundingClientRect();
+        const tp = tipRef.current.getBoundingClientRect();
 
-        let resolvedSide = position;
-        let coords = calcCoords(wr, tr, position);
+        let side = position;
+        let coords = place(tr, tp, position);
 
-        // Try fallback positions if preferred side overflows
-        if (!fitsViewport(coords, tr)) {
-            for (const side of FALLBACKS[position]) {
-                const c = calcCoords(wr, tr, side);
-                if (fitsViewport(c, tr)) {
-                    resolvedSide = side;
-                    coords = c;
-                    break;
-                }
+        if (!inView(coords, tp)) {
+            for (const s of FALLBACKS[position]) {
+                const c = place(tr, tp, s);
+                if (inView(c, tp)) { side = s; coords = c; break; }
             }
         }
 
-        // Clamp to viewport edges as a last resort
-        coords.left = Math.max(VIEWPORT_PADDING, Math.min(coords.left, window.innerWidth - tr.width - VIEWPORT_PADDING));
-        coords.top = Math.max(VIEWPORT_PADDING, Math.min(coords.top, window.innerHeight - tr.height - VIEWPORT_PADDING));
+        coords.left = Math.max(EDGE, Math.min(coords.left, window.innerWidth - tp.width - EDGE));
+        coords.top = Math.max(EDGE, Math.min(coords.top, window.innerHeight - tp.height - EDGE));
 
-        const arrowStyle = calcArrowStyle(resolvedSide, wr, coords, tr);
-
-        setPlacement({ ...coords, side: resolvedSide, arrowStyle });
+        setLayout({ ...coords, side, arrow: arrowStyle(side, tr, coords, tp) });
     }, [visible, position]);
 
     if (!content) return children;
 
     return (
-        <span
-            ref={wrapperRef}
-            className={`relative inline-flex ${className}`}
-            onMouseEnter={show}
-            onMouseLeave={hide}
-        >
-            {children}
-            {visible && (
-                <span
-                    ref={tooltipRef}
-                    className={`fixed z-9999 px-2.5 py-1 rounded-md bg-gray-900 dark:bg-gray-700 text-white text-xs font-medium whitespace-nowrap shadow-lg pointer-events-none [--arrow-color:var(--color-gray-900)] dark:[--arrow-color:var(--color-gray-700)] ${placement ? 'animate-fade-in' : 'opacity-0'}`}
-                    style={placement ? { top: placement.top, left: placement.left } : { top: -9999, left: -9999 }}
+        <>
+            <span ref={triggerRef} className="inline-flex" onMouseEnter={show} onMouseLeave={hide}>
+                {children}
+            </span>
+            {visible && createPortal(
+                <div
+                    ref={tipRef}
+                    role="tooltip"
+                    className="fixed z-9999 pointer-events-none"
+                    style={layout
+                        ? { top: layout.top, left: layout.left, transformOrigin: ORIGINS[layout.side] }
+                        : { top: -9999, left: -9999 }
+                    }
                 >
-                    {content}
-                    {placement && <span style={placement.arrowStyle} />}
-                </span>
+                    <div className={`px-2 py-1 rounded bg-gray-800 text-white text-xs font-medium leading-snug whitespace-nowrap shadow-lg ${layout ? 'animate-tooltip' : 'opacity-0'}`}>
+                        {content}
+                    </div>
+                    {layout && <span style={layout.arrow} />}
+                </div>,
+                document.body
             )}
-        </span>
+        </>
     );
 }
