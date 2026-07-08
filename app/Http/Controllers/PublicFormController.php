@@ -30,6 +30,9 @@ class PublicFormController extends Controller
                 'description' => $form->description,
                 'submit_button_text' => $form->submit_button_text,
                 'project_name' => $form->project->name,
+                'logo_url' => $form->logo_path ? asset('storage/' . $form->logo_path) : null,
+                'logo_position' => $form->logo_position ?? 'left',
+                'banner_url' => $form->banner_path ? asset('storage/' . $form->banner_path) : null,
                 'fields' => $form->fields->map(function ($field) {
                     $data = [
                         'id' => $field->id,

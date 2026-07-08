@@ -8,6 +8,7 @@ use App\Models\Form;
 use App\Models\Project;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -61,7 +62,14 @@ class FormController extends Controller
 
         $validated = $request->validated();
         $fields = $validated['fields'];
-        unset($validated['fields']);
+        unset($validated['fields'], $validated['logo'], $validated['banner'], $validated['remove_logo'], $validated['remove_banner']);
+
+        if ($request->hasFile('logo')) {
+            $validated['logo_path'] = $request->file('logo')->store('form-assets/logos', 'public');
+        }
+        if ($request->hasFile('banner')) {
+            $validated['banner_path'] = $request->file('banner')->store('form-assets/banners', 'public');
+        }
 
         $form = $project->forms()->create([
             ...$validated,
@@ -94,6 +102,8 @@ class FormController extends Controller
             'form' => [
                 ...$form->toArray(),
                 'public_url' => $form->public_url,
+                'logo_url' => $form->logo_path ? asset('storage/' . $form->logo_path) : null,
+                'banner_url' => $form->banner_path ? asset('storage/' . $form->banner_path) : null,
             ],
             'customFields' => $customFields,
             'sections' => $sections,
@@ -107,7 +117,29 @@ class FormController extends Controller
 
         $validated = $request->validated();
         $fields = $validated['fields'];
-        unset($validated['fields']);
+        $removeLogo = $validated['remove_logo'] ?? false;
+        $removeBanner = $validated['remove_banner'] ?? false;
+        unset($validated['fields'], $validated['logo'], $validated['banner'], $validated['remove_logo'], $validated['remove_banner']);
+
+        if ($request->hasFile('logo')) {
+            if ($form->logo_path) {
+                Storage::disk('public')->delete($form->logo_path);
+            }
+            $validated['logo_path'] = $request->file('logo')->store('form-assets/logos', 'public');
+        } elseif ($removeLogo && $form->logo_path) {
+            Storage::disk('public')->delete($form->logo_path);
+            $validated['logo_path'] = null;
+        }
+
+        if ($request->hasFile('banner')) {
+            if ($form->banner_path) {
+                Storage::disk('public')->delete($form->banner_path);
+            }
+            $validated['banner_path'] = $request->file('banner')->store('form-assets/banners', 'public');
+        } elseif ($removeBanner && $form->banner_path) {
+            Storage::disk('public')->delete($form->banner_path);
+            $validated['banner_path'] = null;
+        }
 
         $form->update($validated);
 
@@ -175,6 +207,13 @@ class FormController extends Controller
     {
         $this->authorizeProject($project);
         abort_if($form->project_id !== $project->id, 404);
+
+        if ($form->logo_path) {
+            Storage::disk('public')->delete($form->logo_path);
+        }
+        if ($form->banner_path) {
+            Storage::disk('public')->delete($form->banner_path);
+        }
 
         $form->delete();
 

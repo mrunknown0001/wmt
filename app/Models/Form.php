@@ -19,6 +19,9 @@ class Form extends Model
         'success_message',
         'task_defaults',
         'created_by',
+        'logo_path',
+        'logo_position',
+        'banner_path',
     ];
 
     protected function casts(): array
