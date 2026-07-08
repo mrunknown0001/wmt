@@ -1,4 +1,4 @@
-import { Link, router, usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useState, useCallback, useRef } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
@@ -10,31 +10,8 @@ import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
 import { formatDate, formatLabel } from '../../utils';
 import { ConfirmModal } from '../../Components/Modal';
-import Tooltip from '../../Components/Tooltip';
-
-const EditIcon = () => (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-    </svg>
-);
-
-const TrashIcon = () => (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-    </svg>
-);
-
-const ArchiveIcon = () => (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-    </svg>
-);
-
-const UnarchiveIcon = () => (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4l2-2m0 0l2 2m-2-2v4" />
-    </svg>
-);
+import ProjectContextMenu from '../../Components/ProjectContextMenu';
+import DuplicateProjectModal from '../../Components/DuplicateProjectModal';
 
 const PROJECT_STATUSES = ['active', 'on_hold', 'completed', 'archived'];
 
@@ -43,6 +20,7 @@ export default function Index() {
     const canManageAll = auth.user?.permissions?.includes('manage-projects');
     const canManage = (project) => canManageAll || project.owner_id === auth.user?.id || project.user_is_admin;
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [duplicateTarget, setDuplicateTarget] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
     const [status, setStatus] = useState(filters?.status || '');
     const debounceRef = useRef(null);
@@ -166,36 +144,18 @@ export default function Index() {
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">{formatDate(project.due_date) || '—'}</td>
                                             <td className="px-6 py-4 text-sm text-right" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center justify-end gap-1">
-                                                    {canManage(project) && (
-                                                        <>
-                                                            <Tooltip content={project.status === 'archived' ? 'Unarchive' : 'Archive'}>
-                                                                <button
-                                                                    onClick={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
-                                                                    className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
-                                                                >
-                                                                    {project.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
-                                                                </button>
-                                                            </Tooltip>
-                                                            <Tooltip content="Edit">
-                                                                <Link
-                                                                    href={`/projects/${project.id}/edit`}
-                                                                    className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                                                                >
-                                                                    <EditIcon />
-                                                                </Link>
-                                                            </Tooltip>
-                                                            <Tooltip content="Delete">
-                                                                <button
-                                                                    onClick={() => setDeleteTarget(project)}
-                                                                    className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                                                                >
-                                                                    <TrashIcon />
-                                                                </button>
-                                                            </Tooltip>
-                                                        </>
-                                                    )}
-                                                </div>
+                                                {canManage(project) && (
+                                                    <div className="flex items-center justify-end">
+                                                        <ProjectContextMenu
+                                                            project={project}
+                                                            isArchived={project.status === 'archived'}
+                                                            onEdit={() => router.visit(`/projects/${project.id}/edit`)}
+                                                            onDuplicate={() => setDuplicateTarget(project)}
+                                                            onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
+                                                            onDelete={() => setDeleteTarget(project)}
+                                                        />
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -220,6 +180,12 @@ export default function Index() {
                 onConfirm={handleDelete}
                 title="Delete Project"
                 message={`Delete project "${deleteTarget?.name}"? This will also delete all its tasks.`}
+            />
+
+            <DuplicateProjectModal
+                isOpen={!!duplicateTarget}
+                onClose={() => setDuplicateTarget(null)}
+                project={duplicateTarget}
             />
         </AuthenticatedLayout>
     );

@@ -40,6 +40,8 @@ import CelebrationEffect from '../../Components/CelebrationEffect';
 import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
 import TaskContextMenu from '../../Components/TaskContextMenu';
 import TaskDetailPanel from '../../Components/TaskDetailPanel';
+import ProjectContextMenu from '../../Components/ProjectContextMenu';
+import DuplicateProjectModal from '../../Components/DuplicateProjectModal';
 import Tooltip from '../../Components/Tooltip';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import echo from '../../echo';
@@ -882,6 +884,7 @@ export default function Show() {
     const [filterSearch, setFilterSearch] = useState('');
     const [filterDueDate, setFilterDueDate] = useState('');
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const [duplicateTarget, setDuplicateTarget] = useState(null);
     const [localTasks, setLocalTasks] = useState(serverTasks);
     const [activeId, setActiveId] = useState(null);
     const [expandedTasks, setExpandedTasks] = useState(new Set());
@@ -1855,19 +1858,14 @@ export default function Show() {
                                     <AutomationIcon /> Automation
                                 </Button>
                             )}
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
-                            >
-                                <ArchiveIcon /> {project.status === 'archived' ? 'Unarchive' : 'Archive'}
-                            </Button>
-                            <LinkButton href={`/projects/${project.id}/edit`} variant="secondary" size="sm">
-                                <EditIcon /> Edit
-                            </LinkButton>
-                            <Button variant="danger" size="sm" onClick={handleDeleteProject}>
-                                <TrashIcon /> Delete
-                            </Button>
+                            <ProjectContextMenu
+                                project={project}
+                                isArchived={project.status === 'archived'}
+                                onEdit={() => router.visit(`/projects/${project.id}/edit`)}
+                                onDuplicate={() => setDuplicateTarget(project)}
+                                onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
+                                onDelete={handleDeleteProject}
+                            />
                             </>
                         )}
                     </div>
@@ -3157,6 +3155,12 @@ export default function Show() {
                 onConfirm={handleConfirmDelete}
                 title={confirmDelete?.title}
                 message={confirmDelete?.message}
+            />
+
+            <DuplicateProjectModal
+                isOpen={!!duplicateTarget}
+                onClose={() => setDuplicateTarget(null)}
+                project={duplicateTarget}
             />
 
             {celebration && (

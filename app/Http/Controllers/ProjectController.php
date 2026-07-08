@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Project;
+use App\Models\Task;
+use App\Models\TaskCustomFieldValue;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -273,6 +276,165 @@ class ProjectController extends Controller
         $label = $newStatus === 'archived' ? 'archived' : 'unarchived';
 
         return back()->with('success', "Project {$label} successfully.");
+    }
+
+    public function duplicate(Request $request, Project $project): JsonResponse
+    {
+        $this->authorize('view', $project);
+        $this->authorize('create', Project::class);
+
+        $request->validate([
+            'include_tasks' => 'boolean',
+            'copy_due_dates' => 'boolean',
+            'copy_assignees' => 'boolean',
+            'copy_subtasks' => 'boolean',
+        ]);
+
+        $includeTasks = $request->boolean('include_tasks', true);
+        $copyDueDates = $request->boolean('copy_due_dates', true);
+        $copyAssignees = $request->boolean('copy_assignees', true);
+        $copySubtasks = $request->boolean('copy_subtasks', true);
+
+        $newProject = DB::transaction(function () use ($project, $request, $includeTasks, $copyDueDates, $copyAssignees, $copySubtasks) {
+            $newProject = Project::create([
+                'name' => "Copy of {$project->name}",
+                'description' => $project->description,
+                'status' => 'active',
+                'owner_id' => $request->user()->id,
+                'due_date' => $copyDueDates ? $project->due_date : null,
+            ]);
+
+            // Copy members
+            $members = $project->members()->get();
+            if ($members->isNotEmpty()) {
+                $memberData = $members->mapWithKeys(fn ($m) => [$m->id => ['role' => $m->pivot->role]]);
+                $newProject->members()->sync($memberData);
+            }
+
+            // Copy custom fields + options (build mapping)
+            $customFieldMap = [];
+            $optionMap = [];
+            foreach ($project->customFields()->with('options')->get() as $oldField) {
+                $newField = $newProject->customFields()->create([
+                    'name' => $oldField->name,
+                    'type' => $oldField->type,
+                    'is_required' => $oldField->is_required,
+                    'position' => $oldField->position,
+                    'config' => $oldField->config,
+                ]);
+                $customFieldMap[$oldField->id] = $newField->id;
+                foreach ($oldField->options as $oldOption) {
+                    $newOption = $newField->options()->create([
+                        'label' => $oldOption->label,
+                        'color' => $oldOption->color,
+                        'position' => $oldOption->position,
+                    ]);
+                    $optionMap[$oldOption->id] = $newOption->id;
+                }
+            }
+
+            // Copy sections (build mapping)
+            $sectionMap = [];
+            foreach ($project->sections()->orderBy('position')->get() as $oldSection) {
+                $newSection = $newProject->sections()->create([
+                    'name' => $oldSection->name,
+                    'position' => $oldSection->position,
+                ]);
+                $sectionMap[$oldSection->id] = $newSection->id;
+            }
+
+            // Copy tasks if requested
+            if ($includeTasks) {
+                $parentTasks = $project->tasks()
+                    ->whereNull('parent_id')
+                    ->with(['collaborators', 'customFieldValues'])
+                    ->orderBy('position')
+                    ->get();
+
+                foreach ($parentTasks as $oldTask) {
+                    $newTask = $this->duplicateTask(
+                        $newProject, $oldTask, null,
+                        $copyDueDates, $copyAssignees,
+                        $request->user()->id,
+                        $sectionMap, $customFieldMap, $optionMap
+                    );
+
+                    if ($copySubtasks) {
+                        foreach ($oldTask->subtasks()->with(['collaborators', 'customFieldValues'])->orderBy('position')->get() as $oldSubtask) {
+                            $this->duplicateTask(
+                                $newProject, $oldSubtask, $newTask->id,
+                                $copyDueDates, $copyAssignees,
+                                $request->user()->id,
+                                $sectionMap, $customFieldMap, $optionMap
+                            );
+                        }
+                    }
+                }
+            }
+
+            return $newProject;
+        });
+
+        ActivityLogger::logCreated($newProject, $request->user());
+
+        return response()->json([
+            'success' => true,
+            'project' => [
+                'id' => $newProject->id,
+                'name' => $newProject->name,
+            ],
+        ]);
+    }
+
+    private function duplicateTask(
+        Project $newProject,
+        Task $oldTask,
+        ?int $parentId,
+        bool $copyDueDates,
+        bool $copyAssignees,
+        int $createdBy,
+        array $sectionMap,
+        array $customFieldMap,
+        array $optionMap,
+    ): Task {
+        $newTask = $newProject->tasks()->create([
+            'title' => $oldTask->title,
+            'description' => $oldTask->description,
+            'status' => $oldTask->status,
+            'priority' => $oldTask->priority,
+            'assigned_to' => $copyAssignees ? $oldTask->assigned_to : null,
+            'created_by' => $createdBy,
+            'start_date' => $copyDueDates ? $oldTask->start_date : null,
+            'due_date' => $copyDueDates ? $oldTask->due_date : null,
+            'position' => $oldTask->position,
+            'section_id' => isset($oldTask->section_id) ? ($sectionMap[$oldTask->section_id] ?? null) : null,
+            'parent_id' => $parentId,
+        ]);
+
+        if ($copyAssignees && $oldTask->collaborators->isNotEmpty()) {
+            $newTask->collaborators()->sync($oldTask->collaborators->pluck('id'));
+        }
+
+        foreach ($oldTask->customFieldValues as $cfv) {
+            $newCfId = $customFieldMap[$cfv->custom_field_id] ?? null;
+            if (!$newCfId) continue;
+
+            TaskCustomFieldValue::create([
+                'task_id' => $newTask->id,
+                'custom_field_id' => $newCfId,
+                'value_text' => $cfv->value_text,
+                'value_number' => $cfv->value_number,
+                'value_date' => $cfv->value_date,
+                'value_json' => $cfv->value_json
+                    ? array_map(fn ($id) => $optionMap[$id] ?? $id, $cfv->value_json)
+                    : null,
+                'value_option_id' => $cfv->value_option_id
+                    ? ($optionMap[$cfv->value_option_id] ?? null)
+                    : null,
+            ]);
+        }
+
+        return $newTask;
     }
 
     public function destroy(Project $project): RedirectResponse
