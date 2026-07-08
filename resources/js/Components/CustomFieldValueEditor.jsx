@@ -114,6 +114,19 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
             );
         }
 
+        case 'formula':
+            return (
+                <div>
+                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                        {field.name}
+                        <span className="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500">Formula</span>
+                    </label>
+                    <div className="px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 italic">
+                        Computed automatically
+                    </div>
+                </div>
+            );
+
         default:
             return null;
     }

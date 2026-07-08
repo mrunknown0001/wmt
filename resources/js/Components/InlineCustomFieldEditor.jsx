@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import InlinePopover from './InlinePopover';
 import InlineDatePicker from './InlineDatePicker';
 import Tooltip from './Tooltip';
+import { formatFormulaResult } from '../formulaEngine';
 
 function SelectOptions({ options, selectedId, onSelect }) {
     return (
@@ -162,6 +163,12 @@ function TextNumberEditor({ value, type, onSave, onClose }) {
 }
 
 function DisplayValue({ customField, cfv, formatDate }) {
+    if (customField.type === 'formula') {
+        const val = customField._formulaValue;
+        if (val == null) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+        return <span>{formatFormulaResult(val, customField.config)}</span>;
+    }
+
     if (!cfv) return <span className="text-gray-300 dark:text-gray-600">—</span>;
 
     switch (customField.type) {
@@ -213,6 +220,15 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
     const anchorRef = useRef(null);
     const cfValues = task.custom_field_values || [];
     const cfv = cfValues.find(v => v.custom_field_id === customField.id);
+
+    // Formula fields are read-only — no inline editing
+    if (customField.type === 'formula') {
+        return (
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+                <DisplayValue customField={customField} cfv={cfv} formatDate={formatDateFn} />
+            </span>
+        );
+    }
 
     const handleSave = (value) => {
         onToggle(false);

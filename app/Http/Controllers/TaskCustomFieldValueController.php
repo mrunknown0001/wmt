@@ -27,7 +27,7 @@ class TaskCustomFieldValueController extends Controller
                 ->where('project_id', $project->id)
                 ->first();
 
-            if (!$customField) {
+            if (!$customField || $customField->type === 'formula') {
                 continue;
             }
 

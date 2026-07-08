@@ -44,6 +44,7 @@ import ProjectContextMenu from '../../Components/ProjectContextMenu';
 import DuplicateProjectModal from '../../Components/DuplicateProjectModal';
 import Tooltip from '../../Components/Tooltip';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
+import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import echo from '../../echo';
 
 const TASK_STATUSES = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
@@ -104,6 +105,12 @@ const TrashIcon = () => (
 
 // Render a custom field value for a task row
 function renderCustomFieldValue(task, customField) {
+    if (customField.type === 'formula') {
+        const val = customField._formulaValue;
+        if (val == null) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+        return <span>{formatFormulaResult(val, customField.config)}</span>;
+    }
+
     const cfValues = task.custom_field_values || [];
     const cfv = cfValues.find(v => v.custom_field_id === customField.id);
     if (!cfv) return <span className="text-gray-300 dark:text-gray-600">—</span>;
@@ -154,7 +161,7 @@ function renderCustomFieldValue(task, customField) {
 }
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail, columnOrder = [] }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {} }) {
     const {
         attributes,
         listeners,
@@ -265,12 +272,13 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     const cfId = Number(colId.replace('cf-', ''));
                     const cf = customFields.find(f => f.id === cfId);
                     if (!cf) return null;
+                    const cfDisplay = cf.type === 'formula' ? { ...cf, _formulaValue: formulaResults[task.id]?.[cf.id] ?? null } : cf;
                     return (
                         <td key={colId} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {canEditTask ? (
-                                <InlineCustomFieldEditor task={task} customField={cf} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
+                            {canEditTask && cf.type !== 'formula' ? (
+                                <InlineCustomFieldEditor task={task} customField={cfDisplay} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
                             ) : (
-                                renderCustomFieldValue(task, cf)
+                                renderCustomFieldValue(task, cfDisplay)
                             )}
                         </td>
                     );
@@ -376,7 +384,7 @@ function SortableColumnHeader({ id, children }) {
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail, columnOrder = [] }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {} }) {
     const {
         attributes,
         listeners,
@@ -501,12 +509,13 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     const cfId = Number(colId.replace('cf-', ''));
                     const cf = customFields.find(f => f.id === cfId);
                     if (!cf) return null;
+                    const cfDisplay = cf.type === 'formula' ? { ...cf, _formulaValue: formulaResults[task.id]?.[cf.id] ?? null } : cf;
                     return (
                         <td key={colId} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {canEditTask ? (
-                                <InlineCustomFieldEditor task={task} customField={cf} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
+                            {canEditTask && cf.type !== 'formula' ? (
+                                <InlineCustomFieldEditor task={task} customField={cfDisplay} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
                             ) : (
-                                renderCustomFieldValue(task, cf)
+                                renderCustomFieldValue(task, cfDisplay)
                             )}
                         </td>
                     );
@@ -943,6 +952,24 @@ export default function Show() {
                 return colId;
         }
     }, [localCustomFields]);
+
+    // Pre-compute formula field values for all tasks
+    const formulaResults = useMemo(() => {
+        const formulaFields = localCustomFields.filter(cf => cf.type === 'formula');
+        if (formulaFields.length === 0) return {};
+        const results = {};
+        const allTasks = [];
+        for (const task of localTasks) {
+            allTasks.push(task);
+            if (task.subtasks) {
+                for (const sub of task.subtasks) allTasks.push(sub);
+            }
+        }
+        for (const task of allTasks) {
+            results[task.id] = computeAllFormulas(task, localCustomFields);
+        }
+        return results;
+    }, [localTasks, localCustomFields]);
 
     const handleColumnDragEnd = useCallback((event) => {
         const { active, over } = event;
@@ -2178,6 +2205,7 @@ export default function Show() {
                                                                         columnOrder={effectiveColumnOrder}
                                                                         onContextMenu={handleContextMenu}
                                                                         onOpenDetail={setDetailTaskId}
+                                                                        formulaResults={formulaResults}
                                                                     />
                                                                     {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                                         <DndContext
@@ -2203,6 +2231,7 @@ export default function Show() {
                                                                                         columnOrder={effectiveColumnOrder}
                                                                                         onContextMenu={handleContextMenu}
                                                                                         onOpenDetail={setDetailTaskId}
+                                                                                        formulaResults={formulaResults}
                                                                                     />
                                                                                 ))}
                                                                             </SortableContext>
@@ -2285,6 +2314,7 @@ export default function Show() {
                                                             columnOrder={effectiveColumnOrder}
                                                             onContextMenu={handleContextMenu}
                                                             onOpenDetail={setDetailTaskId}
+                                                            formulaResults={formulaResults}
                                                         />
                                                         {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                             <DndContext
@@ -2310,6 +2340,7 @@ export default function Show() {
                                                                             columnOrder={effectiveColumnOrder}
                                                                             onContextMenu={handleContextMenu}
                                                                             onOpenDetail={setDetailTaskId}
+                                                                            formulaResults={formulaResults}
                                                                         />
                                                                     ))}
                                                                 </SortableContext>

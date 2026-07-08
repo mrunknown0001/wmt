@@ -7,6 +7,7 @@ import Modal from './Modal';
 import { ConfirmModal } from './Modal';
 import Tooltip from './Tooltip';
 import { apiFetch } from '../utils';
+import { validateFormula } from '../formulaEngine';
 
 const FIELD_TYPES = [
     { value: 'text', label: 'Text' },
@@ -15,6 +16,7 @@ const FIELD_TYPES = [
     { value: 'date', label: 'Date' },
     { value: 'single_select', label: 'Single Select' },
     { value: 'multi_select', label: 'Multi Select' },
+    { value: 'formula', label: 'Formula' },
 ];
 
 const OPTION_COLORS = [
@@ -166,6 +168,128 @@ function OptionEditor({ options, onChange }) {
     );
 }
 
+const MATH_FUNCTIONS = ['ABS', 'ROUND', 'CEIL', 'FLOOR', 'MIN', 'MAX', 'SUM', 'AVG', 'POWER', 'SQRT'];
+const DATE_FUNCTIONS = ['DATE_ADD', 'DATE_SUB', 'DATE_DIFF', 'TODAY'];
+const CONDITIONAL_FUNCTIONS = ['IF'];
+const BUILT_IN_FIELDS = [
+    { name: 'Due Date', type: 'date' },
+    { name: 'Start Date', type: 'date' },
+    { name: 'Created Date', type: 'date' },
+];
+
+function FormulaEditor({ config, onChange, availableFields }) {
+    const textareaRef = useRef(null);
+    const handleFormulaChange = (formula) => onChange({ ...config, formula });
+
+    const insertAtCursor = (text) => {
+        const el = textareaRef.current;
+        if (!el) { handleFormulaChange(config.formula + text); return; }
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        const before = config.formula.slice(0, start);
+        const after = config.formula.slice(end);
+        handleFormulaChange(before + text + after);
+        requestAnimationFrame(() => {
+            el.focus();
+            el.selectionStart = el.selectionEnd = start + text.length;
+        });
+    };
+
+    const validation = config.formula ? validateFormula(config.formula) : null;
+
+    const chipBase = 'px-2 py-0.5 text-xs rounded border cursor-pointer transition-colors';
+
+    return (
+        <div className="space-y-3">
+            <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Formula</label>
+                <textarea
+                    ref={textareaRef}
+                    value={config.formula}
+                    onChange={(e) => handleFormulaChange(e.target.value)}
+                    placeholder='e.g. {Cost} * {Quantity}'
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-mono dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 resize-y"
+                />
+                {validation && !validation.valid && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">{validation.error}</p>
+                )}
+                {validation && validation.valid && config.formula && (
+                    <p className="mt-1 text-xs text-green-600 dark:text-green-400">Formula is valid</p>
+                )}
+            </div>
+
+            <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Insert Field</label>
+                <div className="flex flex-wrap gap-1">
+                    {availableFields.map(f => (
+                        <button key={f.id} type="button" onClick={() => insertAtCursor(`{${f.name}}`)}
+                            className={`${chipBase} bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50`}>
+                            {f.name}
+                        </button>
+                    ))}
+                    {BUILT_IN_FIELDS.map(f => (
+                        <button key={f.name} type="button" onClick={() => insertAtCursor(`{${f.name}}`)}
+                            className={`${chipBase} bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50`}>
+                            {f.name}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Insert Function</label>
+                <div className="space-y-1.5">
+                    <div className="flex flex-wrap gap-1">
+                        {MATH_FUNCTIONS.map(fn => (
+                            <button key={fn} type="button" onClick={() => insertAtCursor(`${fn}(`)}
+                                className={`${chipBase} bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600`}>
+                                {fn}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                        {DATE_FUNCTIONS.map(fn => (
+                            <button key={fn} type="button" onClick={() => insertAtCursor(fn === 'TODAY' ? 'TODAY()' : `${fn}(`)}
+                                className={`${chipBase} bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50`}>
+                                {fn}
+                            </button>
+                        ))}
+                        {CONDITIONAL_FUNCTIONS.map(fn => (
+                            <button key={fn} type="button" onClick={() => insertAtCursor(`${fn}(`)}
+                                className={`${chipBase} bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50`}>
+                                {fn}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex gap-4">
+                <div className="flex-1">
+                    <Select label="Result Type" id="formula-result-type" value={config.result_type || 'number'}
+                        onChange={(e) => onChange({ ...config, result_type: e.target.value })}
+                        options={[{ value: 'number', label: 'Number' }, { value: 'date', label: 'Date' }]}
+                    />
+                </div>
+                {(config.result_type || 'number') === 'number' && (
+                    <div className="w-32">
+                        <Input label="Decimals" id="formula-decimals" type="number"
+                            value={config.decimal_places ?? 2}
+                            onChange={(e) => onChange({ ...config, decimal_places: Number(e.target.value) })}
+                            min={0} max={10}
+                        />
+                    </div>
+                )}
+            </div>
+
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+                Reference fields with {'{Field Name}'}. Operators: +, -, *, /, %. Functions: ROUND, AVG, IF, DATE_DIFF, etc.
+            </p>
+        </div>
+    );
+}
+
 export default function CustomFieldManager({ projectId, initialFields = [], onFieldsChange }) {
     const [fields, setFieldsInternal] = useState(initialFields);
 
@@ -194,10 +318,11 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
         name: '',
         type: 'text',
         options: [],
+        config: { formula: '', result_type: 'number', decimal_places: 2 },
     });
 
     const resetForm = () => {
-        setForm({ name: '', type: 'text', options: [] });
+        setForm({ name: '', type: 'text', options: [], config: { formula: '', result_type: 'number', decimal_places: 2 } });
         setEditingField(null);
     };
 
@@ -212,6 +337,7 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
             name: field.name,
             type: field.type,
             options: field.options || [],
+            config: field.config || { formula: '', result_type: 'number', decimal_places: 2 },
         });
         setShowModal(true);
     };
@@ -219,10 +345,20 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
     const handleSave = useCallback(async () => {
         setSaving(true);
         try {
+            if (form.type === 'formula') {
+                const v = validateFormula(form.config.formula);
+                if (!v.valid) {
+                    alert('Invalid formula: ' + v.error);
+                    setSaving(false);
+                    return;
+                }
+            }
+
             const payload = {
                 name: form.name,
                 type: form.type,
                 options: ['single_select', 'multi_select'].includes(form.type) ? form.options : undefined,
+                config: form.type === 'formula' ? form.config : undefined,
             };
 
             let result;
@@ -396,7 +532,7 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
                         label="Type"
                         id="cf-type"
                         value={form.type}
-                        onChange={(e) => setForm(prev => ({ ...prev, type: e.target.value, options: [] }))}
+                        onChange={(e) => setForm(prev => ({ ...prev, type: e.target.value, options: [], config: { formula: '', result_type: 'number', decimal_places: 2 } }))}
                         options={FIELD_TYPES}
                         disabled={!!editingField}
                     />
@@ -404,6 +540,13 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
                         <OptionEditor
                             options={form.options}
                             onChange={(opts) => setForm(prev => ({ ...prev, options: opts }))}
+                        />
+                    )}
+                    {form.type === 'formula' && (
+                        <FormulaEditor
+                            config={form.config}
+                            onChange={(config) => setForm(prev => ({ ...prev, config }))}
+                            availableFields={fields.filter(f => f.type !== 'formula' || (editingField && f.id !== editingField.id))}
                         />
                     )}
                 </div>

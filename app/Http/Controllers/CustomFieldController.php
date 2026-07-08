@@ -38,6 +38,11 @@ class CustomFieldController extends Controller
         $validated['position'] = $validated['position']
             ?? ($project->customFields()->max('position') + 1);
 
+        // Formula fields cannot be required (they are computed)
+        if (($validated['type'] ?? '') === 'formula') {
+            $validated['is_required'] = false;
+        }
+
         $field = $project->customFields()->create($validated);
 
         if (in_array($field->type, ['single_select', 'multi_select'])) {

@@ -6,6 +6,7 @@ import Avatar from './Avatar';
 import RichTextEditor from './RichTextEditor';
 import Tooltip from './Tooltip';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo } from '../utils';
+import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
 
 function formatFileSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
@@ -311,19 +312,33 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Custom Fields</label>
                                 <div className="space-y-2">
                                     {customFields.map(cf => {
-                                        const cfv = customFieldValues[cf.id];
                                         let displayValue = '—';
-                                        if (cfv) {
-                                            if (cf.type === 'text') displayValue = cfv.value_text || '—';
-                                            else if (cf.type === 'number') displayValue = cfv.value_number ?? '—';
-                                            else if (cf.type === 'date') displayValue = cfv.value_date ? formatDate(cfv.value_date) : '—';
-                                            else if (cf.type === 'single_select') {
-                                                const opt = cf.options?.find(o => o.id === cfv.selected_option_id);
-                                                displayValue = opt?.label || '—';
-                                            } else if (cf.type === 'multi_select') {
-                                                const ids = cfv.value_json || [];
-                                                const labels = ids.map(id => cf.options?.find(o => o.id === id)?.label).filter(Boolean);
-                                                displayValue = labels.join(', ') || '—';
+                                        if (cf.type === 'formula') {
+                                            // Build a task-like object for formula evaluation
+                                            const taskForFormula = {
+                                                ...taskData,
+                                                custom_field_values: Object.entries(customFieldValues).map(([fieldId, val]) => ({
+                                                    custom_field_id: Number(fieldId),
+                                                    ...val,
+                                                })),
+                                            };
+                                            const results = computeAllFormulas(taskForFormula, customFields);
+                                            const val = results[cf.id];
+                                            displayValue = val != null ? formatFormulaResult(val, cf.config) : '—';
+                                        } else {
+                                            const cfv = customFieldValues[cf.id];
+                                            if (cfv) {
+                                                if (cf.type === 'text') displayValue = cfv.value_text || '—';
+                                                else if (cf.type === 'number') displayValue = cfv.value_number ?? '—';
+                                                else if (cf.type === 'date') displayValue = cfv.value_date ? formatDate(cfv.value_date) : '—';
+                                                else if (cf.type === 'single_select') {
+                                                    const opt = cf.options?.find(o => o.id === cfv.selected_option_id);
+                                                    displayValue = opt?.label || '—';
+                                                } else if (cf.type === 'multi_select') {
+                                                    const ids = cfv.value_json || [];
+                                                    const labels = ids.map(id => cf.options?.find(o => o.id === id)?.label).filter(Boolean);
+                                                    displayValue = labels.join(', ') || '—';
+                                                }
                                             }
                                         }
                                         return (

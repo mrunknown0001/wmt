@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CustomField extends Model
 {
-    public const TYPES = ['text', 'textarea', 'number', 'date', 'single_select', 'multi_select'];
+    public const TYPES = ['text', 'textarea', 'number', 'date', 'single_select', 'multi_select', 'formula'];
 
     public const TEXT_MAX_LENGTH = 255;
     public const TEXTAREA_MAX_LENGTH = 10000;

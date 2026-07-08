@@ -92,7 +92,7 @@ class TaskController extends Controller
         // Save custom field values
         foreach ($customFieldValues as $fieldId => $value) {
             $customField = CustomField::where('id', $fieldId)->where('project_id', $project->id)->first();
-            if (!$customField || $value === null || $value === '') continue;
+            if (!$customField || $customField->type === 'formula' || $value === null || $value === '') continue;
             $cfv = new TaskCustomFieldValue(['task_id' => $task->id, 'custom_field_id' => $fieldId]);
             $cfv->setTypedValue($customField->type, $value);
             $cfv->save();
@@ -302,7 +302,7 @@ class TaskController extends Controller
         if ($customFieldValues !== null) {
             foreach ($customFieldValues as $fieldId => $value) {
                 $customField = CustomField::where('id', $fieldId)->where('project_id', $project->id)->first();
-                if (!$customField) continue;
+                if (!$customField || $customField->type === 'formula') continue;
                 $cfv = TaskCustomFieldValue::updateOrCreate(
                     ['task_id' => $task->id, 'custom_field_id' => $fieldId],
                 );
