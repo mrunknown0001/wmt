@@ -720,8 +720,8 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
 
     return (
         <tr ref={setNodeRef} style={style} className="bg-gray-100 dark:bg-gray-800/80">
-            <td colSpan={99} className="px-4 py-2">
-                <div className="flex items-center gap-2">
+            <td colSpan={99} className="px-0 py-2">
+                <div className="sticky left-0 flex items-center gap-2 px-4 w-fit">
                     {canManage && (
                         <button
                             {...attributes}
@@ -1959,13 +1959,15 @@ export default function Show() {
                                                                     )}
                                                                     {expandedTasks.has(task.id) && canManageTasks && (
                                                                         <tr className="bg-gray-50/50 dark:bg-gray-800/30">
-                                                                            <td colSpan={99} className="pl-14 py-2">
-                                                                                <Link
-                                                                                    href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
-                                                                                    className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                                                                >
-                                                                                    + Add subtask
-                                                                                </Link>
+                                                                            <td colSpan={99} className="px-0 py-2">
+                                                                                <div className="sticky left-0 pl-14 w-fit">
+                                                                                    <Link
+                                                                                        href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
+                                                                                        className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                                                    >
+                                                                                        + Add subtask
+                                                                                    </Link>
+                                                                                </div>
                                                                             </td>
                                                                         </tr>
                                                                     )}
@@ -1980,7 +1982,8 @@ export default function Show() {
                                             {/* Add section button */}
                                             {canManageTasks && (
                                                 <tr>
-                                                    <td colSpan={99} className="px-6 py-2">
+                                                    <td colSpan={99} className="px-0 py-2">
+                                                        <div className="sticky left-0 px-6 w-fit">
                                                         {addingSectionName !== null ? (
                                                             <input
                                                                 autoFocus
@@ -2002,6 +2005,7 @@ export default function Show() {
                                                                 + Add section
                                                             </button>
                                                         )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )}
@@ -2072,7 +2076,8 @@ export default function Show() {
                                             {/* Add section button when no sections exist yet */}
                                             {canManageTasks && (
                                                 <tr>
-                                                    <td colSpan={99} className="px-6 py-2">
+                                                    <td colSpan={99} className="px-0 py-2">
+                                                        <div className="sticky left-0 px-6 w-fit">
                                                         {addingSectionName !== null ? (
                                                             <input
                                                                 autoFocus
@@ -2094,6 +2099,7 @@ export default function Show() {
                                                                 + Add section
                                                             </button>
                                                         )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )}
