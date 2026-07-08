@@ -54,13 +54,10 @@ class ExportController extends Controller
 
         $customFields = $project->customFields()->with('options')->orderBy('position')->get();
 
-        // Flatten tasks with subtasks
+        // Parent tasks only (no subtasks)
         $flatTasks = [];
         foreach ($tasks as $task) {
             $flatTasks[] = ['task' => $task, 'isSubtask' => false];
-            foreach ($task->subtasks as $subtask) {
-                $flatTasks[] = ['task' => $subtask, 'isSubtask' => true];
-            }
         }
 
         $filename = preg_replace('/[^A-Za-z0-9_\- ]/', '', $project->name) . '_' . now()->format('Y-m-d') . '.xlsx';
