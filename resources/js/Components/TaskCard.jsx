@@ -5,7 +5,7 @@ import PriorityBadge from './PriorityBadge';
 import Avatar from './Avatar';
 import { formatDate } from '../utils';
 
-export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete, onToggleComplete, isSelected, onToggleSelect }) {
+export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete, onToggleComplete, isSelected, onToggleSelect, onContextMenu, onOpenDetail }) {
     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
@@ -31,6 +31,7 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
             {...attributes}
             {...listeners}
             onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
+            onContextMenu={(e) => onContextMenu?.(e, task)}
             className={`bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm card-hover cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-lg transform-none!' : ''} ${isSelected ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
         >
             <div className="flex items-start gap-2 mb-2">
@@ -79,7 +80,13 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                 </div>
             </div>
             <div className={`flex items-start gap-1 mb-2 ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
-                <p className="text-sm font-medium line-clamp-2">{task.title}</p>
+                <button
+                    className="text-sm font-medium line-clamp-2 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                >
+                    {task.title}
+                </button>
                 {task.is_recurring && (
                     <svg className="h-3.5 w-3.5 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

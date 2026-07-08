@@ -20,6 +20,8 @@ class UpdateSettingRequest extends FormRequest
             'app_name' => ['required', 'string', 'max:255'],
             'primary_color' => ['required', 'string', 'in:blue,indigo,violet,teal,green,red,orange,rose'],
             'max_upload_size' => ['required', 'integer', 'min:1', 'max:100'],
+            'attachment_retention_enabled' => ['required', 'boolean'],
+            'attachment_retention_days' => ['required_if:attachment_retention_enabled,true', 'integer', 'min:1', 'max:365'],
             'task_reminders_enabled' => ['required', 'boolean'],
             'task_reminder_days' => ['required_if:task_reminders_enabled,true', 'array', 'min:1'],
             'task_reminder_days.*' => ['integer', 'min:1', 'max:30'],

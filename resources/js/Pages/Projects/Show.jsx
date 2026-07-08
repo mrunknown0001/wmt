@@ -37,6 +37,8 @@ import AssigneePicker from '../../Components/AssigneePicker';
 import InlineDatePicker from '../../Components/InlineDatePicker';
 import CelebrationEffect from '../../Components/CelebrationEffect';
 import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
+import TaskContextMenu from '../../Components/TaskContextMenu';
+import TaskDetailPanel from '../../Components/TaskDetailPanel';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import echo from '../../echo';
 
@@ -63,6 +65,12 @@ const CalendarIcon = () => (
 const GanttIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h10M4 12h16M4 18h7" />
+    </svg>
+);
+
+const DashboardIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
     </svg>
 );
 
@@ -142,7 +150,7 @@ function renderCustomFieldValue(task, customField) {
 }
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [] }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail }) {
     const {
         attributes,
         listeners,
@@ -161,6 +169,10 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
+    const stickyBg = isDragging
+        ? 'bg-blue-50 dark:bg-blue-900/30'
+        : 'bg-gray-50 dark:bg-gray-800 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50';
+
     const [openPopover, setOpenPopover] = useState(null);
 
     const togglePopover = (name) => (forceClose) => {
@@ -174,8 +186,8 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     };
 
     return (
-        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
-            <td className="relative pl-10 pr-2 py-3 w-10">
+        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} onContextMenu={(e) => onContextMenu?.(e, task)} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
+            <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-3 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
@@ -192,12 +204,19 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-3 text-sm max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] pl-10 pr-6 py-3 text-sm max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
                 <div className="flex items-center gap-1.5 min-w-0">
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
-                    <span className="truncate" title={task.title}>{task.title}</span>
+                    <button
+                        className="truncate text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                        title={task.title}
+                        onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        {task.title}
+                    </button>
                 </div>
             </td>
             <td className="px-6 py-3 text-sm">
@@ -314,7 +333,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     )}
                 </td>
             ))}
-            <td className="px-6 py-3 text-sm text-right">
+            <td className={`sticky right-0 z-10 ${stickyBg} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-3 text-sm text-right`}>
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
                         <Link
@@ -343,7 +362,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [] }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail }) {
     const {
         attributes,
         listeners,
@@ -361,6 +380,12 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
 
     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
+
+    const stickyBg = isDragging
+        ? 'bg-blue-50 dark:bg-blue-900/30'
+        : isSelected
+            ? 'bg-primary-100 dark:bg-primary-900/30'
+            : 'bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50';
 
     const [openPopover, setOpenPopover] = useState(null);
 
@@ -381,9 +406,10 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             {...attributes}
             {...listeners}
             onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
+            onContextMenu={(e) => onContextMenu?.(e, task)}
             className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
         >
-            <td className="relative pl-6 pr-2 py-4 w-10">
+            <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-4 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
@@ -400,7 +426,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-4 text-sm font-medium max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm font-medium max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
                 <div className="flex items-center gap-2 min-w-0">
                     {(task.subtasks_count > 0 || canManageTasks) && (
                         <button
@@ -414,7 +440,14 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             </svg>
                         </button>
                     )}
-                    <span className="truncate min-w-0" title={task.title}>{task.title}</span>
+                    <button
+                        className="truncate min-w-0 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                        title={task.title}
+                        onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        {task.title}
+                    </button>
                     {task.is_recurring && (
                         <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -551,7 +584,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     )}
                 </td>
             ))}
-            <td className="px-6 py-4 text-sm text-right">
+            <td className={`sticky right-0 z-10 ${stickyBg} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm text-right`}>
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
                         <Link
@@ -710,8 +743,8 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
 
     return (
         <tr ref={setNodeRef} style={style} className="bg-gray-100 dark:bg-gray-800/80">
-            <td colSpan={99} className="px-4 py-2">
-                <div className="flex items-center gap-2">
+            <td colSpan={99} className="px-0 py-2">
+                <div className="sticky left-0 flex items-center gap-2 px-4 w-fit">
                     {canManage && (
                         <button
                             {...attributes}
@@ -839,6 +872,7 @@ function AutomationToast({ toast, onDismiss }) {
 export default function Show() {
     const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], auth, users } = usePage().props;
 
+    const [localCustomFields, setLocalCustomFields] = useState(initialCustomFields);
     const [showDetails, setShowDetails] = useState(false);
     const [view, setView] = useState('list');
     const [filterStatus, setFilterStatus] = useState('');
@@ -865,12 +899,15 @@ export default function Show() {
     const [showCustomFields, setShowCustomFields] = useState(false);
     const [celebration, setCelebration] = useState(null); // { x, y } or null
     const [automationToasts, setAutomationToasts] = useState([]);
+    const [contextMenu, setContextMenu] = useState(null); // { task, x, y } or null
+    const [detailTaskId, setDetailTaskId] = useState(null); // task ID for detail panel
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
         setLocalTasks(serverTasks);
         setLocalSections(serverSections);
-    }, [serverTasks, serverSections]);
+        setLocalCustomFields(initialCustomFields);
+    }, [serverTasks, serverSections, initialCustomFields]);
 
     // Real-time task updates via Echo
     useEffect(() => {
@@ -973,6 +1010,107 @@ export default function Show() {
         });
         return groups;
     }, [filteredTasks, localSections]);
+
+    // Dashboard statistics computed from all tasks (unfiltered)
+    const dashboardStats = useMemo(() => {
+        // Flatten all tasks including subtasks
+        const allTasks = [];
+        localTasks.forEach((t) => {
+            allTasks.push(t);
+            if (t.subtasks && t.subtasks.length > 0) {
+                t.subtasks.forEach((st) => allTasks.push(st));
+            }
+        });
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(today);
+        endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+        endOfWeek.setHours(23, 59, 59, 999);
+
+        const total = allTasks.length;
+
+        // Status counts
+        const byStatus = {};
+        TASK_STATUSES.forEach((s) => (byStatus[s] = 0));
+        allTasks.forEach((t) => {
+            if (byStatus[t.status] !== undefined) byStatus[t.status]++;
+        });
+
+        // Active = not done and not cancelled
+        const activeTasks = allTasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled');
+        const nonCancelled = allTasks.filter((t) => t.status !== 'cancelled');
+        const completionRate = nonCancelled.length > 0 ? Math.round((byStatus.done / nonCancelled.length) * 100) : 0;
+
+        // Due date analysis (only active tasks)
+        const overdue = activeTasks.filter((t) => {
+            if (!t.due_date) return false;
+            const d = new Date(t.due_date);
+            d.setHours(0, 0, 0, 0);
+            return d < today;
+        });
+        const dueToday = activeTasks.filter((t) => {
+            if (!t.due_date) return false;
+            const d = new Date(t.due_date);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === today.getTime();
+        });
+        const dueThisWeek = activeTasks.filter((t) => {
+            if (!t.due_date) return false;
+            const d = new Date(t.due_date);
+            d.setHours(0, 0, 0, 0);
+            return d >= today && d <= endOfWeek;
+        });
+        const noDueDate = activeTasks.filter((t) => !t.due_date);
+
+        // Priority counts (active only)
+        const byPriority = { low: 0, medium: 0, high: 0, urgent: 0 };
+        activeTasks.forEach((t) => {
+            if (byPriority[t.priority] !== undefined) byPriority[t.priority]++;
+        });
+
+        // Assignee workload
+        const assigneeMap = {};
+        allTasks.forEach((t) => {
+            const key = t.assigned_to || 'unassigned';
+            if (!assigneeMap[key]) {
+                assigneeMap[key] = {
+                    user: t.assignee || null,
+                    total: 0,
+                    done: 0,
+                    active: 0,
+                    overdue: 0,
+                };
+            }
+            assigneeMap[key].total++;
+            if (t.status === 'done') {
+                assigneeMap[key].done++;
+            } else if (t.status !== 'cancelled') {
+                assigneeMap[key].active++;
+                if (t.due_date) {
+                    const d = new Date(t.due_date);
+                    d.setHours(0, 0, 0, 0);
+                    if (d < today) assigneeMap[key].overdue++;
+                }
+            }
+        });
+        const assignees = Object.entries(assigneeMap)
+            .map(([key, val]) => ({ id: key, ...val }))
+            .sort((a, b) => b.total - a.total);
+
+        return {
+            total,
+            byStatus,
+            completionRate,
+            overdue,
+            dueToday,
+            dueThisWeek,
+            noDueDate,
+            byPriority,
+            assignees,
+            activeTasks: activeTasks.length,
+        };
+    }, [localTasks]);
 
     // Section management handlers
     const handleCreateSection = useCallback(async (name) => {
@@ -1158,7 +1296,7 @@ export default function Show() {
                 value_option_id: fieldType === 'single_select' ? value : null,
                 value_json: fieldType === 'multi_select' ? value : null,
                 selected_option: fieldType === 'single_select' && value
-                    ? (initialCustomFields.find(cf => cf.id === fieldId)?.options || []).find(o => o.id === Number(value)) || null
+                    ? (localCustomFields.find(cf => cf.id === fieldId)?.options || []).find(o => o.id === Number(value)) || null
                     : null,
             };
             if (idx >= 0) { values[idx] = { ...values[idx], ...entry }; }
@@ -1187,7 +1325,7 @@ export default function Show() {
         }).catch(() => {
             setLocalTasks(serverTasks);
         });
-    }, [project.id, initialCustomFields, serverTasks]);
+    }, [project.id, localCustomFields, serverTasks]);
 
     // --- List view drag over (cross-section movement) ---
     const handleListDragOver = useCallback((event) => {
@@ -1497,6 +1635,35 @@ export default function Show() {
         });
     }, []);
 
+    // --- Context menu handlers ---
+    const handleContextMenu = useCallback((e, task) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({ task, x: e.clientX, y: e.clientY });
+    }, []);
+
+    const handleDuplicateTask = useCallback(async (task) => {
+        try {
+            const res = await apiFetch(`/projects/${project.id}/tasks/${task.id}/duplicate`, { method: 'POST' });
+            if (!res.ok) throw new Error('Duplicate failed');
+            const data = await res.json();
+            if (data.task) {
+                setLocalTasks((prev) => [...prev, data.task]);
+            }
+        } catch {
+            router.reload({ only: ['tasks'] });
+        }
+    }, [project.id]);
+
+    const handleAddSubtask = useCallback((task) => {
+        router.visit(`/projects/${project.id}/tasks/create?parent_id=${task.id}`);
+    }, [project.id]);
+
+    const handleCopyTaskLink = useCallback((task) => {
+        const url = `${window.location.origin}/projects/${project.id}/tasks/${task.id}/edit`;
+        navigator.clipboard.writeText(url).catch(() => {});
+    }, [project.id]);
+
     // --- Selection helpers ---
     const toggleTaskSelection = useCallback((taskId) => {
         setSelectedTasks((prev) => {
@@ -1612,8 +1779,17 @@ export default function Show() {
                     { label: project.name },
                 ]}
                 actions={
-                    canManageProject && (
-                        <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => window.location.href = `/projects/${project.id}/export`}
+                        >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            Export
+                        </Button>
+                        {canManageProject && (
+                            <>
                             <LinkButton href={`/projects/${project.id}/forms`} variant="secondary" size="sm">
                                 Forms
                             </LinkButton>
@@ -1638,8 +1814,9 @@ export default function Show() {
                             <Button variant="danger" size="sm" onClick={handleDeleteProject}>
                                 <TrashIcon /> Delete
                             </Button>
-                        </div>
-                    )
+                            </>
+                        )}
+                    </div>
                 }
             />
 
@@ -1648,7 +1825,8 @@ export default function Show() {
                 <Card className="mb-6">
                     <CustomFieldManager
                         projectId={project.id}
-                        initialFields={initialCustomFields}
+                        initialFields={localCustomFields}
+                        onFieldsChange={setLocalCustomFields}
                     />
                 </Card>
             )}
@@ -1661,7 +1839,7 @@ export default function Show() {
                         rules={automationRules || []}
                         users={users}
                         sections={localSections}
-                        customFields={initialCustomFields}
+                        customFields={localCustomFields}
                     />
                 </Card>
             )}
@@ -1767,6 +1945,16 @@ export default function Show() {
                         >
                             <GanttIcon /> <span className="hidden sm:inline">Gantt</span>
                         </button>
+                        <button
+                            onClick={() => setView('dashboard')}
+                            className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                view === 'dashboard'
+                                    ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                            }`}
+                        >
+                            <DashboardIcon /> <span className="hidden sm:inline">Dashboard</span>
+                        </button>
                     </div>
 
                     {/* Filters */}
@@ -1858,16 +2046,16 @@ export default function Show() {
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
-                                        <th className="pl-6 pr-2 py-3 w-10"></th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Title</th>
+                                        <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 pl-6 pr-2 py-3 w-[52px] min-w-[52px]"></th>
+                                        <th className="sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">Title</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Priority</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assignee</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dates</th>
-                                        {initialCustomFields.map(cf => (
+                                        {localCustomFields.map(cf => (
                                             <th key={cf.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">{cf.name}</th>
                                         ))}
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                                        <th className="sticky right-0 z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.08)]">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -1919,7 +2107,9 @@ export default function Show() {
                                                                         onToggleExpand={handleToggleExpand}
                                                                         isSelected={selectedTasks.has(task.id)}
                                                                         onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
-                                                                        customFields={initialCustomFields}
+                                                                        customFields={localCustomFields}
+                                                                        onContextMenu={handleContextMenu}
+                                                                        onOpenDetail={setDetailTaskId}
                                                                     />
                                                                     {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                                         <DndContext
@@ -1941,7 +2131,9 @@ export default function Show() {
                                                                                         users={users}
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
                                                                                         onCustomFieldUpdate={handleCustomFieldUpdate}
-                                                                                        customFields={initialCustomFields}
+                                                                                        customFields={localCustomFields}
+                                                                                        onContextMenu={handleContextMenu}
+                                                                                        onOpenDetail={setDetailTaskId}
                                                                                     />
                                                                                 ))}
                                                                             </SortableContext>
@@ -1949,13 +2141,15 @@ export default function Show() {
                                                                     )}
                                                                     {expandedTasks.has(task.id) && canManageTasks && (
                                                                         <tr className="bg-gray-50/50 dark:bg-gray-800/30">
-                                                                            <td colSpan={99} className="pl-14 py-2">
-                                                                                <Link
-                                                                                    href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
-                                                                                    className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                                                                >
-                                                                                    + Add subtask
-                                                                                </Link>
+                                                                            <td colSpan={99} className="px-0 py-2">
+                                                                                <div className="sticky left-0 pl-14 w-fit">
+                                                                                    <Link
+                                                                                        href={`/projects/${project.id}/tasks/create?parent_id=${task.id}`}
+                                                                                        className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                                                    >
+                                                                                        + Add subtask
+                                                                                    </Link>
+                                                                                </div>
                                                                             </td>
                                                                         </tr>
                                                                     )}
@@ -1970,7 +2164,8 @@ export default function Show() {
                                             {/* Add section button */}
                                             {canManageTasks && (
                                                 <tr>
-                                                    <td colSpan={99} className="px-6 py-2">
+                                                    <td colSpan={99} className="px-0 py-2">
+                                                        <div className="sticky left-0 px-6 w-fit">
                                                         {addingSectionName !== null ? (
                                                             <input
                                                                 autoFocus
@@ -1992,6 +2187,7 @@ export default function Show() {
                                                                 + Add section
                                                             </button>
                                                         )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )}
@@ -2016,7 +2212,9 @@ export default function Show() {
                                                             onToggleExpand={handleToggleExpand}
                                                             isSelected={selectedTasks.has(task.id)}
                                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
-                                                            customFields={initialCustomFields}
+                                                            customFields={localCustomFields}
+                                                            onContextMenu={handleContextMenu}
+                                                            onOpenDetail={setDetailTaskId}
                                                         />
                                                         {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                             <DndContext
@@ -2038,7 +2236,9 @@ export default function Show() {
                                                                             users={users}
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
                                                                             onCustomFieldUpdate={handleCustomFieldUpdate}
-                                                                            customFields={initialCustomFields}
+                                                                            customFields={localCustomFields}
+                                                                            onContextMenu={handleContextMenu}
+                                                                            onOpenDetail={setDetailTaskId}
                                                                         />
                                                                     ))}
                                                                 </SortableContext>
@@ -2062,7 +2262,8 @@ export default function Show() {
                                             {/* Add section button when no sections exist yet */}
                                             {canManageTasks && (
                                                 <tr>
-                                                    <td colSpan={99} className="px-6 py-2">
+                                                    <td colSpan={99} className="px-0 py-2">
+                                                        <div className="sticky left-0 px-6 w-fit">
                                                         {addingSectionName !== null ? (
                                                             <input
                                                                 autoFocus
@@ -2084,6 +2285,7 @@ export default function Show() {
                                                                 + Add section
                                                             </button>
                                                         )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )}
@@ -2097,7 +2299,7 @@ export default function Show() {
                                     <table className="min-w-full">
                                         <tbody>
                                             <tr className="bg-white dark:bg-gray-800 shadow-lg rounded-lg">
-                                                <td className="pl-6 pr-2 py-4 w-10"></td>
+                                                <td className="pl-6 pr-2 py-4 w-[52px] min-w-[52px]"></td>
                                                 <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{activeTask.title}</td>
                                                 <td className="px-6 py-4 text-sm">
                                                     <StatusBadge status={activeTask.status} type="task" />
@@ -2159,6 +2361,8 @@ export default function Show() {
                                             onToggleComplete={handleToggleComplete}
                                             selectedTasks={selectedTasks}
                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                            onContextMenu={handleContextMenu}
+                                            onOpenDetail={setDetailTaskId}
                                         />
                                     ))}
                                 </div>
@@ -2308,14 +2512,14 @@ export default function Show() {
                                                 {!cell.outside && (
                                                     <div className="space-y-0.5">
                                                         {visible.map((task) => (
-                                                            <Link
+                                                            <button
                                                                 key={task.id}
-                                                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                                className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
+                                                                onClick={() => setDetailTaskId(task.id)}
+                                                                className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity cursor-pointer ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
                                                                 title={task.title}
                                                             >
                                                                 {task.title}
-                                                            </Link>
+                                                            </button>
                                                         ))}
                                                         {overflow > 0 && (
                                                             <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1">+{overflow} more</p>
@@ -2476,16 +2680,16 @@ export default function Show() {
                                             return (
                                                 <div key={task.id} className={`flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${opacityCls}`}>
                                                     <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
-                                                        <Link
-                                                            href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                            className={`text-sm truncate block max-w-full hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
+                                                        <button
+                                                            onClick={() => setDetailTaskId(task.id)}
+                                                            className={`text-sm truncate block max-w-full text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
                                                             title={task.title}
                                                         >
                                                             {task.isSubtask && (
                                                                 <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                                                             )}
                                                             {task.title}
-                                                        </Link>
+                                                        </button>
                                                         <div className="flex items-center gap-1.5 mt-0.5">
                                                             {task.assignee && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate">{task.assignee.name}</span>}
                                                         </div>
@@ -2536,15 +2740,15 @@ export default function Show() {
                                                 {tasksNoDate.map((task) => (
                                                     <div key={task.id} className="flex border-b border-gray-100 dark:border-gray-700/50">
                                                         <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
-                                                            <Link
-                                                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                                className="text-sm text-gray-500 dark:text-gray-400 truncate block hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                            <button
+                                                                onClick={() => setDetailTaskId(task.id)}
+                                                                className="text-sm text-gray-500 dark:text-gray-400 truncate block text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
                                                             >
                                                                 {task.isSubtask && (
                                                                     <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                                                                 )}
                                                                 {task.title}
-                                                            </Link>
+                                                            </button>
                                                         </div>
                                                         <div className="flex-1 flex items-center px-4">
                                                             <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">No dates set</span>
@@ -2567,6 +2771,223 @@ export default function Show() {
                                     <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{key}</span>
                                 </span>
                             ))}
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Dashboard View */}
+            {view === 'dashboard' && (() => {
+                const STATUS_COLORS = {
+                    backlog: { bg: 'bg-gray-100 dark:bg-gray-700', bar: 'bg-gray-400', text: 'text-gray-600 dark:text-gray-300' },
+                    to_do: { bg: 'bg-blue-50 dark:bg-blue-900/30', bar: 'bg-blue-500', text: 'text-blue-600 dark:text-blue-400' },
+                    in_progress: { bg: 'bg-yellow-50 dark:bg-yellow-900/30', bar: 'bg-yellow-500', text: 'text-yellow-600 dark:text-yellow-400' },
+                    in_review: { bg: 'bg-purple-50 dark:bg-purple-900/30', bar: 'bg-purple-500', text: 'text-purple-600 dark:text-purple-400' },
+                    done: { bg: 'bg-green-50 dark:bg-green-900/30', bar: 'bg-green-500', text: 'text-green-600 dark:text-green-400' },
+                    cancelled: { bg: 'bg-red-50 dark:bg-red-900/30', bar: 'bg-red-300', text: 'text-red-400 dark:text-red-500' },
+                };
+                const PRIORITY_COLORS = {
+                    urgent: { bg: 'bg-red-50 dark:bg-red-900/30', bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400', border: 'border-red-200 dark:border-red-800' },
+                    high: { bg: 'bg-orange-50 dark:bg-orange-900/30', bar: 'bg-orange-500', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800' },
+                    medium: { bg: 'bg-blue-50 dark:bg-blue-900/30', bar: 'bg-blue-500', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-800' },
+                    low: { bg: 'bg-gray-50 dark:bg-gray-800', bar: 'bg-gray-400', text: 'text-gray-500 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+                };
+
+                const stats = dashboardStats;
+
+                return (
+                    <div className="space-y-6">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Total Tasks */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Tasks</span>
+                                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div className="bg-green-500 h-2 rounded-full transition-all duration-500" style={{ width: `${stats.completionRate}%` }} />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{stats.completionRate}% complete</p>
+                            </div>
+
+                            {/* Completed */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed</span>
+                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/40">
+                                        <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                    </span>
+                                </div>
+                                <span className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.byStatus.done}</span>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">of {stats.total - stats.byStatus.cancelled} actionable</p>
+                            </div>
+
+                            {/* In Progress */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">In Progress</span>
+                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-900/40">
+                                        <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    </span>
+                                </div>
+                                <span className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.activeTasks}</span>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{stats.byStatus.backlog} backlog, {stats.byStatus.to_do} to do, {stats.byStatus.in_progress} active, {stats.byStatus.in_review} in review</p>
+                            </div>
+
+                            {/* Overdue */}
+                            <div className={`bg-white dark:bg-gray-800 rounded-xl border p-5 ${stats.overdue.length > 0 ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-gray-700'}`}>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Overdue</span>
+                                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg ${stats.overdue.length > 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                        <svg className={`w-4 h-4 ${stats.overdue.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    </span>
+                                </div>
+                                <span className={`text-2xl font-bold ${stats.overdue.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.overdue.length}</span>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">past due date</p>
+                            </div>
+                        </div>
+
+                        {/* Status Breakdown + Priority Breakdown */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* Status Breakdown */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Status Breakdown</h3>
+                                {stats.total === 0 ? (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">No tasks yet</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {/* Stacked bar */}
+                                        <div className="flex rounded-full h-3 overflow-hidden">
+                                            {TASK_STATUSES.map((s) => {
+                                                const pct = stats.total > 0 ? (stats.byStatus[s] / stats.total) * 100 : 0;
+                                                if (pct === 0) return null;
+                                                return <div key={s} className={`${STATUS_COLORS[s].bar} transition-all duration-500`} style={{ width: `${pct}%` }} title={`${formatLabel(s)}: ${stats.byStatus[s]}`} />;
+                                            })}
+                                        </div>
+                                        {/* Legend */}
+                                        <div className="space-y-2">
+                                            {TASK_STATUSES.map((s) => (
+                                                <div key={s} className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-2.5 h-2.5 rounded-full ${STATUS_COLORS[s].bar}`} />
+                                                        <span className="text-sm text-gray-600 dark:text-gray-300">{formatLabel(s)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium text-gray-900 dark:text-white">{stats.byStatus[s]}</span>
+                                                        <span className="text-xs text-gray-400 w-10 text-right">{stats.total > 0 ? Math.round((stats.byStatus[s] / stats.total) * 100) : 0}%</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Priority Breakdown */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Priority Breakdown</h3>
+                                {stats.activeTasks === 0 ? (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">No active tasks</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {['urgent', 'high', 'medium', 'low'].map((p) => {
+                                            const count = stats.byPriority[p];
+                                            const pct = stats.activeTasks > 0 ? (count / stats.activeTasks) * 100 : 0;
+                                            return (
+                                                <div key={p}>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className={`text-sm font-medium ${PRIORITY_COLORS[p].text}`}>{formatLabel(p)}</span>
+                                                        <span className="text-sm text-gray-600 dark:text-gray-300">{count}</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                                                        <div className={`${PRIORITY_COLORS[p].bar} h-2 rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Due Date Overview */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Due Date Overview</h3>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className={`rounded-lg p-4 ${stats.overdue.length > 0 ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
+                                    <p className={`text-2xl font-bold ${stats.overdue.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.overdue.length}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Overdue</p>
+                                </div>
+                                <div className={`rounded-lg p-4 ${stats.dueToday.length > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
+                                    <p className={`text-2xl font-bold ${stats.dueToday.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.dueToday.length}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due Today</p>
+                                </div>
+                                <div className={`rounded-lg p-4 ${stats.dueThisWeek.length > 0 ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
+                                    <p className={`text-2xl font-bold ${stats.dueThisWeek.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.dueThisWeek.length}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due This Week</p>
+                                </div>
+                                <div className="rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50">
+                                    <p className="text-2xl font-bold text-gray-500 dark:text-gray-400">{stats.noDueDate.length}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">No Due Date</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Assignee Workload */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Assignee Workload</h3>
+                            {stats.assignees.length === 0 ? (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">No tasks assigned</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-200 dark:border-gray-700">
+                                                <th className="text-left py-2 pr-4 font-medium text-gray-500 dark:text-gray-400">Assignee</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Total</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Active</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Done</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Overdue</th>
+                                                <th className="text-left py-2 pl-4 font-medium text-gray-500 dark:text-gray-400">Progress</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stats.assignees.map((a) => {
+                                                const progressPct = a.total > 0 ? Math.round((a.done / a.total) * 100) : 0;
+                                                return (
+                                                    <tr key={a.id} className="border-b border-gray-100 dark:border-gray-700/50 last:border-0">
+                                                        <td className="py-2.5 pr-4">
+                                                            {a.user ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Avatar user={a.user} size="sm" />
+                                                                    <span className="text-gray-900 dark:text-white font-medium">{a.user.name}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-400 dark:text-gray-500 italic">Unassigned</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="text-center py-2.5 px-3 text-gray-900 dark:text-white font-medium">{a.total}</td>
+                                                        <td className="text-center py-2.5 px-3 text-blue-600 dark:text-blue-400">{a.active}</td>
+                                                        <td className="text-center py-2.5 px-3 text-green-600 dark:text-green-400">{a.done}</td>
+                                                        <td className="text-center py-2.5 px-3">
+                                                            <span className={a.overdue > 0 ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-400 dark:text-gray-500'}>{a.overdue}</span>
+                                                        </td>
+                                                        <td className="py-2.5 pl-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-20 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+                                                                    <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                                                                </div>
+                                                                <span className="text-xs text-gray-400 w-8">{progressPct}%</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -2637,6 +3058,23 @@ export default function Show() {
                 </div>
             )}
 
+            {/* Task Context Menu */}
+            {contextMenu && (
+                <TaskContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    task={contextMenu.task}
+                    canEdit={canEditTask(contextMenu.task)}
+                    canDelete={canManageTasks}
+                    onDuplicate={handleDuplicateTask}
+                    onToggleComplete={handleToggleComplete}
+                    onAddSubtask={handleAddSubtask}
+                    onCopyLink={handleCopyTaskLink}
+                    onDelete={handleDeleteTask}
+                    onClose={() => setContextMenu(null)}
+                />
+            )}
+
             {/* Confirm Delete Modal */}
             <ConfirmModal
                 isOpen={!!confirmDelete}
@@ -2665,6 +3103,18 @@ export default function Show() {
                         />
                     ))}
                 </div>
+            )}
+            {/* Task detail slide-over panel */}
+            {detailTaskId && (
+                <TaskDetailPanel
+                    projectId={project.id}
+                    taskId={detailTaskId}
+                    onClose={() => setDetailTaskId(null)}
+                    onTaskUpdate={(taskId, field, value) => {
+                        handleInlineUpdate(taskId, field, value);
+                    }}
+                    users={users}
+                />
             )}
         </AuthenticatedLayout>
     );

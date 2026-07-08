@@ -357,8 +357,17 @@ export default function PublicForm() {
                     <ThemeToggle className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
                 </div>
                 <div className="w-full max-w-2xl mx-auto">
-                    <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 px-8 py-8">
+                    <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        {formDef.banner_url && (
+                            <img src={formDef.banner_url} alt="" className="w-full h-40 sm:h-48 object-cover" />
+                        )}
+                        <div className="px-8 py-8">
                         <div className="mb-6">
+                            {formDef.logo_url && (
+                                <div className={`mb-4 flex ${formDef.logo_position === 'center' ? 'justify-center' : formDef.logo_position === 'right' ? 'justify-end' : 'justify-start'}`}>
+                                    <img src={formDef.logo_url} alt="" className="max-h-16 object-contain" />
+                                </div>
+                            )}
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{formDef.project_name}</p>
                             <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{formDef.name}</h1>
                             {formDef.description && (
@@ -390,6 +399,7 @@ export default function PublicForm() {
                                 {formDef.submit_button_text || 'Submit'}
                             </Button>
                         </form>
+                    </div>
                     </div>
 
                     <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-4">

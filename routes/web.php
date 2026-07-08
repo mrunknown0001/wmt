@@ -23,6 +23,7 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FormController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\TaskCustomFieldValueController;
@@ -69,6 +70,7 @@ Route::middleware('auth')->group(function () {
 
     // My Tasks
     Route::get('/my-tasks', [MyTaskController::class, 'index'])->name('my-tasks');
+    Route::get('/my-tasks/export', [ExportController::class, 'myTasks'])->name('my-tasks.export');
 
     // Standalone Tasks (not project-scoped)
     Route::post('/tasks', [StandaloneTaskController::class, 'store'])->name('tasks.store');
@@ -80,6 +82,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'storeStandalone'])->name('standalone-tasks.comments.store');
     Route::delete('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroyStandalone'])->name('standalone-tasks.comments.destroy');
     Route::get('/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'downloadStandalone'])->name('standalone-tasks.comments.attachments.download');
+    Route::get('/tasks/{task}/attachments/{attachment}/download', [StandaloneTaskController::class, 'downloadAttachment'])->name('standalone-tasks.attachments.download');
 
     // Calendar
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
@@ -93,14 +96,18 @@ Route::middleware('auth')->group(function () {
     Route::resource('projects.tasks', TaskController::class)
         ->except(['index', 'show'])
         ->scoped();
+    Route::get('/projects/{project}/export', [ExportController::class, 'projectTasks'])->name('projects.export');
     Route::patch('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
     Route::post('/projects/{project}/tasks/reorder', [TaskController::class, 'reorder'])->name('projects.tasks.reorder');
     Route::post('/projects/{project}/tasks/bulk', [TaskController::class, 'bulkAction'])->name('projects.tasks.bulk');
+    Route::post('/projects/{project}/tasks/{task}/duplicate', [TaskController::class, 'duplicate'])->name('projects.tasks.duplicate');
+    Route::get('/projects/{project}/tasks/{task}/detail', [TaskController::class, 'show'])->name('projects.tasks.detail');
     Route::patch('/projects/{project}/tasks/{task}/patch', [TaskController::class, 'patchField'])->name('projects.tasks.patch');
     Route::get('/projects/{project}/tasks/{task}/timeline', [TaskController::class, 'timeline'])->name('projects.tasks.timeline');
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
     Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download'])->name('tasks.comments.attachments.download');
+    Route::get('/projects/{project}/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
 
     // Task Sections
     Route::post('/projects/{project}/sections', [TaskSectionController::class, 'store'])->name('projects.sections.store');

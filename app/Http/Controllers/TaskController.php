@@ -8,6 +8,7 @@ use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskAttachment;
 use App\Models\CustomField;
 use App\Models\TaskCustomFieldValue;
 use App\Models\User;
@@ -114,11 +115,62 @@ class TaskController extends Controller
             ->with('success', 'Task created successfully.');
     }
 
+    public function duplicate(Request $request, Project $project, Task $task): JsonResponse
+    {
+        if (!$request->user()->can('manage-tasks') && $project->owner_id !== $request->user()->id && !$project->isProjectAdmin($request->user())) {
+            abort(403);
+        }
+
+        $maxPosition = $project->tasks()
+            ->where('status', $task->status)
+            ->when($task->parent_id, fn ($q) => $q->where('parent_id', $task->parent_id), fn ($q) => $q->whereNull('parent_id'))
+            ->max('position') ?? -1;
+
+        $newTask = $project->tasks()->create([
+            'title' => "Copy of {$task->title}",
+            'description' => $task->description,
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'assigned_to' => $task->assigned_to,
+            'created_by' => $request->user()->id,
+            'start_date' => $task->start_date,
+            'due_date' => $task->due_date,
+            'section_id' => $task->section_id,
+            'parent_id' => $task->parent_id,
+            'position' => $maxPosition + 1,
+        ]);
+
+        if ($task->collaborators()->count() > 0) {
+            $newTask->collaborators()->sync($task->collaborators->pluck('id'));
+        }
+
+        foreach ($task->customFieldValues as $cfv) {
+            TaskCustomFieldValue::create([
+                'task_id' => $newTask->id,
+                'custom_field_id' => $cfv->custom_field_id,
+                'value_text' => $cfv->value_text,
+                'value_number' => $cfv->value_number,
+                'value_date' => $cfv->value_date,
+                'selected_option_id' => $cfv->selected_option_id,
+            ]);
+        }
+
+        TaskActivityLogger::logCreated($newTask, $request->user());
+        ActivityLogger::logCreated($newTask, $request->user());
+
+        $newTask->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
+        $newTask->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        broadcast(new TaskUpdated($project->id, $newTask->toArray(), 'created', $request->user()->id))->toOthers();
+
+        return response()->json(['success' => true, 'task' => $newTask]);
+    }
+
     public function edit(Project $project, Task $task): Response
     {
         $this->authorize('update', $task);
 
-        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title');
+        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'attachments');
         $task->loadCount('subtasks');
 
         $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [
@@ -195,12 +247,25 @@ class TaskController extends Controller
             || $project->owner_id === auth()->id()
             || $project->isProjectAdmin(auth()->user());
 
+        $taskAttachments = $task->attachments->map(fn ($a) => [
+            'id' => $a->id,
+            'file_name' => $a->file_name,
+            'file_type' => $a->file_type,
+            'file_size' => $a->file_size,
+            'url' => asset('storage/' . $a->file_path),
+            'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/attachments/{$a->id}/download"),
+            'is_image' => $a->isImage(),
+            'is_video' => $a->isVideo(),
+            'is_spreadsheet' => $a->isSpreadsheet(),
+        ]);
+
         $customFields = $project->customFields()->with('options')->get();
         $customFieldValues = $task->customFieldValues()->get()->keyBy('custom_field_id');
 
         return Inertia::render('Tasks/Edit', [
             'project' => $project,
             'task' => $task,
+            'taskAttachments' => $taskAttachments,
             'timeline' => $timeline,
             'totalComments' => $task->comments()->count(),
             'totalActivities' => $task->activities()->count(),
@@ -295,6 +360,73 @@ class TaskController extends Controller
 
         return redirect("/projects/{$project->id}")
             ->with('success', 'Task deleted successfully.');
+    }
+
+    public function show(Project $project, Task $task): JsonResponse
+    {
+        $this->authorize('update', $task);
+
+        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'section:id,name', 'attachments');
+        $task->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [
+            'id' => $c->id,
+            'type' => 'comment',
+            'body' => $c->body,
+            'user' => $c->user ? ['id' => $c->user->id, 'name' => $c->user->name] : null,
+            'attachments' => $c->attachments->map(fn ($a) => [
+                'id' => $a->id,
+                'file_name' => $a->file_name,
+                'file_type' => $a->file_type,
+                'file_size' => $a->file_size,
+                'url' => asset('storage/' . $a->file_path),
+                'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
+                'is_image' => str_starts_with($a->file_type, 'image/'),
+                'is_video' => str_starts_with($a->file_type, 'video/'),
+            ]),
+            'created_at' => $c->created_at->toIso8601String(),
+        ]);
+
+        $activities = $task->activities()->with('user')->latest()->take(10)->get()->map(fn ($a) => [
+            'id' => $a->id,
+            'type' => 'activity',
+            'field' => $a->field,
+            'old_value' => $a->old_value,
+            'new_value' => $a->new_value,
+            'description' => $a->description,
+            'user' => $a->user ? ['id' => $a->user->id, 'name' => $a->user->name] : null,
+            'created_at' => $a->created_at->toIso8601String(),
+        ]);
+
+        $timeline = $comments->concat($activities)->sortByDesc('created_at')->values();
+
+        $taskAttachments = $task->attachments->map(fn ($a) => [
+            'id' => $a->id,
+            'file_name' => $a->file_name,
+            'file_type' => $a->file_type,
+            'file_size' => $a->file_size,
+            'url' => asset('storage/' . $a->file_path),
+            'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/attachments/{$a->id}/download"),
+            'is_image' => $a->isImage(),
+            'is_video' => $a->isVideo(),
+            'is_spreadsheet' => $a->isSpreadsheet(),
+        ]);
+
+        $customFields = $project->customFields()->with('options')->get();
+        $customFieldValues = $task->customFieldValues()->get()->keyBy('custom_field_id');
+
+        $subtasks = $task->subtasks()->with('assignee')->orderBy('position')->get(['id', 'title', 'status', 'priority', 'assigned_to', 'due_date']);
+
+        return response()->json([
+            'task' => $task,
+            'taskAttachments' => $taskAttachments,
+            'timeline' => $timeline,
+            'totalComments' => $task->comments()->count(),
+            'totalActivities' => $task->activities()->count(),
+            'customFields' => $customFields,
+            'customFieldValues' => $customFieldValues,
+            'subtasks' => $subtasks,
+        ]);
     }
 
     public function patchField(PatchTaskRequest $request, Project $project, Task $task): JsonResponse
@@ -590,5 +722,14 @@ class TaskController extends Controller
             'success' => true,
             'new_tasks' => $newTasks,
         ]);
+    }
+
+    public function downloadAttachment(Project $project, Task $task, TaskAttachment $attachment): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        if ($attachment->task_id !== $task->id) {
+            abort(404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 }

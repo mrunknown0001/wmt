@@ -135,6 +135,12 @@ function OptionEditor({ options, onChange }) {
                             type="text"
                             value={opt.label}
                             onChange={(e) => updateOption(i, 'label', e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (opt.label.trim()) addOption();
+                                }
+                            }}
                             placeholder={`Option ${i + 1}`}
                             className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                         />
@@ -159,8 +165,23 @@ function OptionEditor({ options, onChange }) {
     );
 }
 
-export default function CustomFieldManager({ projectId, initialFields = [] }) {
-    const [fields, setFields] = useState(initialFields);
+export default function CustomFieldManager({ projectId, initialFields = [], onFieldsChange }) {
+    const [fields, setFieldsInternal] = useState(initialFields);
+
+    // Wrap setFields to also notify parent
+    const setFields = useCallback((updater) => {
+        setFieldsInternal((prev) => {
+            const next = typeof updater === 'function' ? updater(prev) : updater;
+            onFieldsChange?.(next);
+            return next;
+        });
+    }, [onFieldsChange]);
+
+    // Sync when parent provides updated initialFields (e.g. after server refresh)
+    useEffect(() => {
+        setFieldsInternal(initialFields);
+    }, [initialFields]);
+
     const [showModal, setShowModal] = useState(false);
     const [editingField, setEditingField] = useState(null);
     const [deleteField, setDeleteField] = useState(null);

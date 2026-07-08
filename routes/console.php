@@ -9,3 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('tasks:send-reminders')->dailyAt('08:00');
+
+Schedule::command('backup:run --only-db')->dailyAt('02:00');
+Schedule::command('backup:clean')->dailyAt('02:30');
+Schedule::command('attachments:purge')->dailyAt('03:00');
