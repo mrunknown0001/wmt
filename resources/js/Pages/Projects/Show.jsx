@@ -161,6 +161,10 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
+    const stickyBg = isDragging
+        ? 'bg-blue-50 dark:bg-blue-900/30'
+        : 'bg-gray-50 dark:bg-gray-800 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50';
+
     const [openPopover, setOpenPopover] = useState(null);
 
     const togglePopover = (name) => (forceClose) => {
@@ -175,7 +179,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 
     return (
         <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
-            <td className="relative pl-10 pr-2 py-3 w-10">
+            <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-3 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
@@ -192,7 +196,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-3 text-sm max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] pl-10 pr-6 py-3 text-sm max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
                 <div className="flex items-center gap-1.5 min-w-0">
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -314,7 +318,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     )}
                 </td>
             ))}
-            <td className="px-6 py-3 text-sm text-right">
+            <td className={`sticky right-0 z-10 ${stickyBg} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-3 text-sm text-right`}>
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
                         <Link
@@ -362,6 +366,12 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
+    const stickyBg = isDragging
+        ? 'bg-blue-50 dark:bg-blue-900/30'
+        : isSelected
+            ? 'bg-primary-100 dark:bg-primary-900/30'
+            : 'bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50';
+
     const [openPopover, setOpenPopover] = useState(null);
 
     const togglePopover = (name) => (forceClose) => {
@@ -383,7 +393,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
             className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
         >
-            <td className="relative pl-6 pr-2 py-4 w-10">
+            <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-4 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
@@ -400,7 +410,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     </svg>
                 </button>
             </td>
-            <td className={`px-6 py-4 text-sm font-medium max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm font-medium max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
                 <div className="flex items-center gap-2 min-w-0">
                     {(task.subtasks_count > 0 || canManageTasks) && (
                         <button
@@ -551,7 +561,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     )}
                 </td>
             ))}
-            <td className="px-6 py-4 text-sm text-right">
+            <td className={`sticky right-0 z-10 ${stickyBg} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm text-right`}>
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
                         <Link
@@ -1858,8 +1868,8 @@ export default function Show() {
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <tr>
-                                        <th className="pl-6 pr-2 py-3 w-10"></th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Title</th>
+                                        <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 pl-6 pr-2 py-3 w-[52px] min-w-[52px]"></th>
+                                        <th className="sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">Title</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Priority</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assignee</th>
@@ -1867,7 +1877,7 @@ export default function Show() {
                                         {initialCustomFields.map(cf => (
                                             <th key={cf.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">{cf.name}</th>
                                         ))}
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                                        <th className="sticky right-0 z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.08)]">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -2097,7 +2107,7 @@ export default function Show() {
                                     <table className="min-w-full">
                                         <tbody>
                                             <tr className="bg-white dark:bg-gray-800 shadow-lg rounded-lg">
-                                                <td className="pl-6 pr-2 py-4 w-10"></td>
+                                                <td className="pl-6 pr-2 py-4 w-[52px] min-w-[52px]"></td>
                                                 <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{activeTask.title}</td>
                                                 <td className="px-6 py-4 text-sm">
                                                     <StatusBadge status={activeTask.status} type="task" />
