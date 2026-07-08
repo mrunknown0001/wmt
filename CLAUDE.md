@@ -110,6 +110,13 @@ Division → Department → Team → Users (fixed hierarchy)
 - TaskController nested under projects (create/store/edit/update/destroy)
 - Frontend: Projects Index/Create/Edit/Show; Tasks Create/Edit
 - Project show page displays task list with status/priority badges
+- Project show page has 5 view modes: List, Board, Calendar, Gantt, Dashboard
+- Dashboard view shows project analytics computed client-side from loaded tasks:
+  - Summary cards: Total Tasks (with completion progress bar), Completed, In Progress, Overdue
+  - Status breakdown: stacked bar chart + legend with counts/percentages per status
+  - Priority breakdown: progress bars for urgent/high/medium/low (active tasks only)
+  - Due date overview: Overdue, Due Today, Due This Week, No Due Date cards
+  - Assignee workload: table with total/active/done/overdue per assignee + progress bar
 - Sidebar updated with Projects link (visible to all authenticated users)
 - Task statuses: backlog, to_do, in_progress, in_review, done, cancelled
 - Task priorities: low, medium, high, urgent
