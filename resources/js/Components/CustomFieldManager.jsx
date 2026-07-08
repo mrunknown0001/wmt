@@ -135,6 +135,12 @@ function OptionEditor({ options, onChange }) {
                             type="text"
                             value={opt.label}
                             onChange={(e) => updateOption(i, 'label', e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (opt.label.trim()) addOption();
+                                }
+                            }}
                             placeholder={`Option ${i + 1}`}
                             className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                         />
