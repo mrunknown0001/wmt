@@ -38,6 +38,7 @@ import InlineDatePicker from '../../Components/InlineDatePicker';
 import CelebrationEffect from '../../Components/CelebrationEffect';
 import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
 import TaskContextMenu from '../../Components/TaskContextMenu';
+import TaskDetailPanel from '../../Components/TaskDetailPanel';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import echo from '../../echo';
 
@@ -143,7 +144,7 @@ function renderCustomFieldValue(task, customField) {
 }
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail }) {
     const {
         attributes,
         listeners,
@@ -202,7 +203,14 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
-                    <span className="truncate" title={task.title}>{task.title}</span>
+                    <button
+                        className="truncate text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                        title={task.title}
+                        onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        {task.title}
+                    </button>
                 </div>
             </td>
             <td className="px-6 py-3 text-sm">
@@ -348,7 +356,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail }) {
     const {
         attributes,
         listeners,
@@ -426,7 +434,14 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             </svg>
                         </button>
                     )}
-                    <span className="truncate min-w-0" title={task.title}>{task.title}</span>
+                    <button
+                        className="truncate min-w-0 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                        title={task.title}
+                        onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        {task.title}
+                    </button>
                     {task.is_recurring && (
                         <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -879,6 +894,7 @@ export default function Show() {
     const [celebration, setCelebration] = useState(null); // { x, y } or null
     const [automationToasts, setAutomationToasts] = useState([]);
     const [contextMenu, setContextMenu] = useState(null); // { task, x, y } or null
+    const [detailTaskId, setDetailTaskId] = useState(null); // task ID for detail panel
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -1976,6 +1992,7 @@ export default function Show() {
                                                                         onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                                                         customFields={localCustomFields}
                                                                         onContextMenu={handleContextMenu}
+                                                                        onOpenDetail={setDetailTaskId}
                                                                     />
                                                                     {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                                         <DndContext
@@ -1999,6 +2016,7 @@ export default function Show() {
                                                                                         onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                                         customFields={localCustomFields}
                                                                                         onContextMenu={handleContextMenu}
+                                                                                        onOpenDetail={setDetailTaskId}
                                                                                     />
                                                                                 ))}
                                                                             </SortableContext>
@@ -2079,6 +2097,7 @@ export default function Show() {
                                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                                             customFields={localCustomFields}
                                                             onContextMenu={handleContextMenu}
+                                                            onOpenDetail={setDetailTaskId}
                                                         />
                                                         {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                             <DndContext
@@ -2102,6 +2121,7 @@ export default function Show() {
                                                                             onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                             customFields={localCustomFields}
                                                                             onContextMenu={handleContextMenu}
+                                                                            onOpenDetail={setDetailTaskId}
                                                                         />
                                                                     ))}
                                                                 </SortableContext>
@@ -2225,6 +2245,7 @@ export default function Show() {
                                             selectedTasks={selectedTasks}
                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                             onContextMenu={handleContextMenu}
+                                            onOpenDetail={setDetailTaskId}
                                         />
                                     ))}
                                 </div>
@@ -2374,14 +2395,14 @@ export default function Show() {
                                                 {!cell.outside && (
                                                     <div className="space-y-0.5">
                                                         {visible.map((task) => (
-                                                            <Link
+                                                            <button
                                                                 key={task.id}
-                                                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                                className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
+                                                                onClick={() => setDetailTaskId(task.id)}
+                                                                className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity cursor-pointer ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
                                                                 title={task.title}
                                                             >
                                                                 {task.title}
-                                                            </Link>
+                                                            </button>
                                                         ))}
                                                         {overflow > 0 && (
                                                             <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1">+{overflow} more</p>
@@ -2542,16 +2563,16 @@ export default function Show() {
                                             return (
                                                 <div key={task.id} className={`flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${opacityCls}`}>
                                                     <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
-                                                        <Link
-                                                            href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                            className={`text-sm truncate block max-w-full hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
+                                                        <button
+                                                            onClick={() => setDetailTaskId(task.id)}
+                                                            className={`text-sm truncate block max-w-full text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
                                                             title={task.title}
                                                         >
                                                             {task.isSubtask && (
                                                                 <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                                                             )}
                                                             {task.title}
-                                                        </Link>
+                                                        </button>
                                                         <div className="flex items-center gap-1.5 mt-0.5">
                                                             {task.assignee && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate">{task.assignee.name}</span>}
                                                         </div>
@@ -2602,15 +2623,15 @@ export default function Show() {
                                                 {tasksNoDate.map((task) => (
                                                     <div key={task.id} className="flex border-b border-gray-100 dark:border-gray-700/50">
                                                         <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
-                                                            <Link
-                                                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                                className="text-sm text-gray-500 dark:text-gray-400 truncate block hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                            <button
+                                                                onClick={() => setDetailTaskId(task.id)}
+                                                                className="text-sm text-gray-500 dark:text-gray-400 truncate block text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
                                                             >
                                                                 {task.isSubtask && (
                                                                     <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                                                                 )}
                                                                 {task.title}
-                                                            </Link>
+                                                            </button>
                                                         </div>
                                                         <div className="flex-1 flex items-center px-4">
                                                             <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">No dates set</span>
@@ -2748,6 +2769,18 @@ export default function Show() {
                         />
                     ))}
                 </div>
+            )}
+            {/* Task detail slide-over panel */}
+            {detailTaskId && (
+                <TaskDetailPanel
+                    projectId={project.id}
+                    taskId={detailTaskId}
+                    onClose={() => setDetailTaskId(null)}
+                    onTaskUpdate={(taskId, field, value) => {
+                        handleInlineUpdate(taskId, field, value);
+                    }}
+                    users={users}
+                />
             )}
         </AuthenticatedLayout>
     );

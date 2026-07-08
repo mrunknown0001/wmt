@@ -12,7 +12,7 @@ const columnColors = {
     cancelled: 'bg-red-500',
 };
 
-export default function KanbanColumn({ status, tasks, projectId, canManageTasks, auth, onDeleteTask, onToggleComplete, selectedTasks, onToggleSelect, onContextMenu }) {
+export default function KanbanColumn({ status, tasks, projectId, canManageTasks, auth, onDeleteTask, onToggleComplete, selectedTasks, onToggleSelect, onContextMenu, onOpenDetail }) {
     const canEditTask = (task) => canManageTasks || task.assigned_to === auth?.user?.id;
 
     const { setNodeRef, isOver } = useDroppable({ id: `column-${status}` });
@@ -48,6 +48,7 @@ export default function KanbanColumn({ status, tasks, projectId, canManageTasks,
                             isSelected={selectedTasks?.has(task.id)}
                             onToggleSelect={onToggleSelect}
                             onContextMenu={onContextMenu}
+                            onOpenDetail={onOpenDetail}
                         />
                     ))}
                 </SortableContext>

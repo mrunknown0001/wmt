@@ -362,6 +362,73 @@ class TaskController extends Controller
             ->with('success', 'Task deleted successfully.');
     }
 
+    public function show(Project $project, Task $task): JsonResponse
+    {
+        $this->authorize('update', $task);
+
+        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'section:id,name', 'attachments');
+        $task->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [
+            'id' => $c->id,
+            'type' => 'comment',
+            'body' => $c->body,
+            'user' => $c->user ? ['id' => $c->user->id, 'name' => $c->user->name] : null,
+            'attachments' => $c->attachments->map(fn ($a) => [
+                'id' => $a->id,
+                'file_name' => $a->file_name,
+                'file_type' => $a->file_type,
+                'file_size' => $a->file_size,
+                'url' => asset('storage/' . $a->file_path),
+                'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
+                'is_image' => str_starts_with($a->file_type, 'image/'),
+                'is_video' => str_starts_with($a->file_type, 'video/'),
+            ]),
+            'created_at' => $c->created_at->toIso8601String(),
+        ]);
+
+        $activities = $task->activities()->with('user')->latest()->take(10)->get()->map(fn ($a) => [
+            'id' => $a->id,
+            'type' => 'activity',
+            'field' => $a->field,
+            'old_value' => $a->old_value,
+            'new_value' => $a->new_value,
+            'description' => $a->description,
+            'user' => $a->user ? ['id' => $a->user->id, 'name' => $a->user->name] : null,
+            'created_at' => $a->created_at->toIso8601String(),
+        ]);
+
+        $timeline = $comments->concat($activities)->sortByDesc('created_at')->values();
+
+        $taskAttachments = $task->attachments->map(fn ($a) => [
+            'id' => $a->id,
+            'file_name' => $a->file_name,
+            'file_type' => $a->file_type,
+            'file_size' => $a->file_size,
+            'url' => asset('storage/' . $a->file_path),
+            'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/attachments/{$a->id}/download"),
+            'is_image' => $a->isImage(),
+            'is_video' => $a->isVideo(),
+            'is_spreadsheet' => $a->isSpreadsheet(),
+        ]);
+
+        $customFields = $project->customFields()->with('options')->get();
+        $customFieldValues = $task->customFieldValues()->get()->keyBy('custom_field_id');
+
+        $subtasks = $task->subtasks()->with('assignee')->orderBy('position')->get(['id', 'title', 'status', 'priority', 'assigned_to', 'due_date']);
+
+        return response()->json([
+            'task' => $task,
+            'taskAttachments' => $taskAttachments,
+            'timeline' => $timeline,
+            'totalComments' => $task->comments()->count(),
+            'totalActivities' => $task->activities()->count(),
+            'customFields' => $customFields,
+            'customFieldValues' => $customFieldValues,
+            'subtasks' => $subtasks,
+        ]);
+    }
+
     public function patchField(PatchTaskRequest $request, Project $project, Task $task): JsonResponse
     {
         $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);

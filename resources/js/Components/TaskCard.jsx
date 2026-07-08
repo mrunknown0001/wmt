@@ -5,7 +5,7 @@ import PriorityBadge from './PriorityBadge';
 import Avatar from './Avatar';
 import { formatDate } from '../utils';
 
-export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete, onToggleComplete, isSelected, onToggleSelect, onContextMenu }) {
+export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete, onToggleComplete, isSelected, onToggleSelect, onContextMenu, onOpenDetail }) {
     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
@@ -80,7 +80,13 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                 </div>
             </div>
             <div className={`flex items-start gap-1 mb-2 ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
-                <p className="text-sm font-medium line-clamp-2">{task.title}</p>
+                <button
+                    className="text-sm font-medium line-clamp-2 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                >
+                    {task.title}
+                </button>
                 {task.is_recurring && (
                     <svg className="h-3.5 w-3.5 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

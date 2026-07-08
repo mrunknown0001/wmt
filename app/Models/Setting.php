@@ -25,13 +25,14 @@ class Setting extends Model
         'email_task_escalated'    => true,
     ];
 
-    protected $fillable = ['app_name', 'primary_color', 'max_upload_size', 'task_reminder_days', 'task_reminders_enabled', 'escalation_enabled', 'escalation_tiers', 'notification_channels'];
+    protected $fillable = ['app_name', 'primary_color', 'max_upload_size', 'attachment_retention_enabled', 'attachment_retention_days', 'task_reminder_days', 'task_reminders_enabled', 'escalation_enabled', 'escalation_tiers', 'notification_channels'];
 
     protected function casts(): array
     {
         return [
             'task_reminder_days' => 'array',
             'task_reminders_enabled' => 'boolean',
+            'attachment_retention_enabled' => 'boolean',
             'escalation_enabled' => 'boolean',
             'escalation_tiers' => 'array',
             'notification_channels' => 'array',
@@ -45,6 +46,8 @@ class Setting extends Model
                 'app_name' => 'WMT',
                 'primary_color' => 'blue',
                 'max_upload_size' => 10,
+                'attachment_retention_enabled' => false,
+                'attachment_retention_days' => 90,
                 'task_reminder_days' => [7, 3, 1],
                 'task_reminders_enabled' => true,
                 'escalation_enabled' => true,
