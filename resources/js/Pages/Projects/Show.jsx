@@ -851,6 +851,7 @@ function AutomationToast({ toast, onDismiss }) {
 export default function Show() {
     const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], auth, users } = usePage().props;
 
+    const [localCustomFields, setLocalCustomFields] = useState(initialCustomFields);
     const [showDetails, setShowDetails] = useState(false);
     const [view, setView] = useState('list');
     const [filterStatus, setFilterStatus] = useState('');
@@ -883,7 +884,8 @@ export default function Show() {
     useMemo(() => {
         setLocalTasks(serverTasks);
         setLocalSections(serverSections);
-    }, [serverTasks, serverSections]);
+        setLocalCustomFields(initialCustomFields);
+    }, [serverTasks, serverSections, initialCustomFields]);
 
     // Real-time task updates via Echo
     useEffect(() => {
@@ -1171,7 +1173,7 @@ export default function Show() {
                 value_option_id: fieldType === 'single_select' ? value : null,
                 value_json: fieldType === 'multi_select' ? value : null,
                 selected_option: fieldType === 'single_select' && value
-                    ? (initialCustomFields.find(cf => cf.id === fieldId)?.options || []).find(o => o.id === Number(value)) || null
+                    ? (localCustomFields.find(cf => cf.id === fieldId)?.options || []).find(o => o.id === Number(value)) || null
                     : null,
             };
             if (idx >= 0) { values[idx] = { ...values[idx], ...entry }; }
@@ -1200,7 +1202,7 @@ export default function Show() {
         }).catch(() => {
             setLocalTasks(serverTasks);
         });
-    }, [project.id, initialCustomFields, serverTasks]);
+    }, [project.id, localCustomFields, serverTasks]);
 
     // --- List view drag over (cross-section movement) ---
     const handleListDragOver = useCallback((event) => {
@@ -1690,7 +1692,8 @@ export default function Show() {
                 <Card className="mb-6">
                     <CustomFieldManager
                         projectId={project.id}
-                        initialFields={initialCustomFields}
+                        initialFields={localCustomFields}
+                        onFieldsChange={setLocalCustomFields}
                     />
                 </Card>
             )}
@@ -1703,7 +1706,7 @@ export default function Show() {
                         rules={automationRules || []}
                         users={users}
                         sections={localSections}
-                        customFields={initialCustomFields}
+                        customFields={localCustomFields}
                     />
                 </Card>
             )}
@@ -1906,7 +1909,7 @@ export default function Show() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Priority</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assignee</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dates</th>
-                                        {initialCustomFields.map(cf => (
+                                        {localCustomFields.map(cf => (
                                             <th key={cf.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">{cf.name}</th>
                                         ))}
                                         <th className="sticky right-0 z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.08)]">Actions</th>
@@ -1961,7 +1964,7 @@ export default function Show() {
                                                                         onToggleExpand={handleToggleExpand}
                                                                         isSelected={selectedTasks.has(task.id)}
                                                                         onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
-                                                                        customFields={initialCustomFields}
+                                                                        customFields={localCustomFields}
                                                                         onContextMenu={handleContextMenu}
                                                                     />
                                                                     {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
@@ -1984,7 +1987,7 @@ export default function Show() {
                                                                                         users={users}
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
                                                                                         onCustomFieldUpdate={handleCustomFieldUpdate}
-                                                                                        customFields={initialCustomFields}
+                                                                                        customFields={localCustomFields}
                                                                                         onContextMenu={handleContextMenu}
                                                                                     />
                                                                                 ))}
@@ -2064,7 +2067,7 @@ export default function Show() {
                                                             onToggleExpand={handleToggleExpand}
                                                             isSelected={selectedTasks.has(task.id)}
                                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
-                                                            customFields={initialCustomFields}
+                                                            customFields={localCustomFields}
                                                             onContextMenu={handleContextMenu}
                                                         />
                                                         {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
@@ -2087,7 +2090,7 @@ export default function Show() {
                                                                             users={users}
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
                                                                             onCustomFieldUpdate={handleCustomFieldUpdate}
-                                                                            customFields={initialCustomFields}
+                                                                            customFields={localCustomFields}
                                                                             onContextMenu={handleContextMenu}
                                                                         />
                                                                     ))}

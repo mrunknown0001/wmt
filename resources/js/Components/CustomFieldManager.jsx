@@ -159,8 +159,23 @@ function OptionEditor({ options, onChange }) {
     );
 }
 
-export default function CustomFieldManager({ projectId, initialFields = [] }) {
-    const [fields, setFields] = useState(initialFields);
+export default function CustomFieldManager({ projectId, initialFields = [], onFieldsChange }) {
+    const [fields, setFieldsInternal] = useState(initialFields);
+
+    // Wrap setFields to also notify parent
+    const setFields = useCallback((updater) => {
+        setFieldsInternal((prev) => {
+            const next = typeof updater === 'function' ? updater(prev) : updater;
+            onFieldsChange?.(next);
+            return next;
+        });
+    }, [onFieldsChange]);
+
+    // Sync when parent provides updated initialFields (e.g. after server refresh)
+    useEffect(() => {
+        setFieldsInternal(initialFields);
+    }, [initialFields]);
+
     const [showModal, setShowModal] = useState(false);
     const [editingField, setEditingField] = useState(null);
     const [deleteField, setDeleteField] = useState(null);
