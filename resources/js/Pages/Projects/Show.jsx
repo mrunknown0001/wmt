@@ -13,6 +13,7 @@ import {
 import {
     SortableContext,
     verticalListSortingStrategy,
+    horizontalListSortingStrategy,
     arrayMove,
     sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
@@ -150,7 +151,7 @@ function renderCustomFieldValue(task, customField) {
 }
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail, columnOrder = [] }) {
     const {
         attributes,
         listeners,
@@ -183,6 +184,96 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     const handleFieldUpdate = (field, value) => {
         setOpenPopover(null);
         onTaskUpdate(task.id, field, value);
+    };
+
+    const renderCell = (colId) => {
+        switch (colId) {
+            case 'status':
+                return (
+                    <td key="status" className="px-6 py-3 text-sm">
+                        {canEditTask ? (
+                            <StatusPicker currentStatus={task.status} isOpen={openPopover === 'status'} onToggle={togglePopover('status')} onSelect={(status) => handleFieldUpdate('status', status)} />
+                        ) : (
+                            <StatusBadge status={task.status} type="task" />
+                        )}
+                    </td>
+                );
+            case 'priority':
+                return (
+                    <td key="priority" className="px-6 py-3 text-sm">
+                        {canEditTask ? (
+                            <PriorityPicker currentPriority={task.priority} isOpen={openPopover === 'priority'} onToggle={togglePopover('priority')} onSelect={(priority) => handleFieldUpdate('priority', priority)} />
+                        ) : (
+                            <PriorityBadge priority={task.priority} />
+                        )}
+                    </td>
+                );
+            case 'assignee':
+                return (
+                    <td key="assignee" className="px-6 py-3 text-sm">
+                        {canManageTaskDetails ? (
+                            <AssigneePicker currentAssignee={task.assignee} users={users} isOpen={openPopover === 'assignee'} onToggle={togglePopover('assignee')} onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)} />
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                {task.assignee ? (
+                                    <>
+                                        <Avatar name={task.assignee.name} size="sm" />
+                                        <span className="text-gray-700 dark:text-gray-300 text-xs">{task.assignee.name}</span>
+                                    </>
+                                ) : (
+                                    <span className="text-gray-400 text-xs">Unassigned</span>
+                                )}
+                            </div>
+                        )}
+                    </td>
+                );
+            case 'dates':
+                return (
+                    <td key="dates" className="px-6 py-3 text-sm">
+                        <div className="flex items-center gap-1">
+                            {canManageTaskDetails ? (
+                                <>
+                                    {task.start_date && (
+                                        <>
+                                            <InlineDatePicker currentDate={task.start_date} isOpen={openPopover === 'start_date'} onToggle={togglePopover('start_date')} onSelect={(date) => handleFieldUpdate('start_date', date)} onClear={() => handleFieldUpdate('start_date', null)} />
+                                            <span className="text-gray-300 dark:text-gray-600">→</span>
+                                        </>
+                                    )}
+                                    <InlineDatePicker currentDate={task.due_date} isOpen={openPopover === 'due_date'} onToggle={togglePopover('due_date')} onSelect={(date) => handleFieldUpdate('due_date', date)} isOverdue={isOverdue} />
+                                    {!task.start_date && (
+                                        <button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors" title="Add start date">
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                        </button>
+                                    )}
+                                    {!task.start_date && openPopover === 'start_date' && (
+                                        <InlineDatePicker currentDate={null} isOpen={true} onToggle={togglePopover('start_date')} onSelect={(date) => handleFieldUpdate('start_date', date)} hidden />
+                                    )}
+                                </>
+                            ) : (
+                                <span className={`text-xs ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                                    {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
+                                </span>
+                            )}
+                        </div>
+                    </td>
+                );
+            default:
+                if (colId.startsWith('cf-')) {
+                    const cfId = Number(colId.replace('cf-', ''));
+                    const cf = customFields.find(f => f.id === cfId);
+                    if (!cf) return null;
+                    return (
+                        <td key={colId} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            {canEditTask ? (
+                                <InlineCustomFieldEditor task={task} customField={cf} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
+                            ) : (
+                                renderCustomFieldValue(task, cf)
+                            )}
+                        </td>
+                    );
+                }
+                return null;
+        }
     };
 
     return (
@@ -219,120 +310,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     </button>
                 </div>
             </td>
-            <td className="px-6 py-3 text-sm">
-                {canEditTask ? (
-                    <StatusPicker
-                        currentStatus={task.status}
-                        isOpen={openPopover === 'status'}
-                        onToggle={togglePopover('status')}
-                        onSelect={(status) => handleFieldUpdate('status', status)}
-                    />
-                ) : (
-                    <StatusBadge status={task.status} type="task" />
-                )}
-            </td>
-            <td className="px-6 py-3 text-sm">
-                {canEditTask ? (
-                    <PriorityPicker
-                        currentPriority={task.priority}
-                        isOpen={openPopover === 'priority'}
-                        onToggle={togglePopover('priority')}
-                        onSelect={(priority) => handleFieldUpdate('priority', priority)}
-                    />
-                ) : (
-                    <PriorityBadge priority={task.priority} />
-                )}
-            </td>
-            <td className="px-6 py-3 text-sm">
-                {canManageTaskDetails ? (
-                    <AssigneePicker
-                        currentAssignee={task.assignee}
-                        users={users}
-                        isOpen={openPopover === 'assignee'}
-                        onToggle={togglePopover('assignee')}
-                        onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)}
-                    />
-                ) : (
-                    <div className="flex items-center gap-2">
-                        {task.assignee ? (
-                            <>
-                                <Avatar name={task.assignee.name} size="sm" />
-                                <span className="text-gray-700 dark:text-gray-300 text-xs">{task.assignee.name}</span>
-                            </>
-                        ) : (
-                            <span className="text-gray-400 text-xs">Unassigned</span>
-                        )}
-                    </div>
-                )}
-            </td>
-            <td className="px-6 py-3 text-sm">
-                <div className="flex items-center gap-1">
-                    {canManageTaskDetails ? (
-                        <>
-                            {task.start_date && (
-                                <>
-                                    <InlineDatePicker
-                                        currentDate={task.start_date}
-                                        isOpen={openPopover === 'start_date'}
-                                        onToggle={togglePopover('start_date')}
-                                        onSelect={(date) => handleFieldUpdate('start_date', date)}
-                                        onClear={() => handleFieldUpdate('start_date', null)}
-                                    />
-                                    <span className="text-gray-300 dark:text-gray-600">→</span>
-                                </>
-                            )}
-                            <InlineDatePicker
-                                currentDate={task.due_date}
-                                isOpen={openPopover === 'due_date'}
-                                onToggle={togglePopover('due_date')}
-                                onSelect={(date) => handleFieldUpdate('due_date', date)}
-                                isOverdue={isOverdue}
-                            />
-                            {!task.start_date && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
-                                    title="Add start date"
-                                >
-                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                </button>
-                            )}
-                            {!task.start_date && openPopover === 'start_date' && (
-                                <InlineDatePicker
-                                    currentDate={null}
-                                    isOpen={true}
-                                    onToggle={togglePopover('start_date')}
-                                    onSelect={(date) => handleFieldUpdate('start_date', date)}
-                                    hidden
-                                />
-                            )}
-                        </>
-                    ) : (
-                        <span className={`text-xs ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
-                        </span>
-                    )}
-                </div>
-            </td>
-            {customFields.map(cf => (
-                <td key={cf.id} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {canEditTask ? (
-                        <InlineCustomFieldEditor
-                            task={task}
-                            customField={cf}
-                            isOpen={openPopover === `cf-${cf.id}`}
-                            onToggle={togglePopover(`cf-${cf.id}`)}
-                            onUpdate={onCustomFieldUpdate}
-                            formatDate={formatDate}
-                        />
-                    ) : (
-                        renderCustomFieldValue(task, cf)
-                    )}
-                </td>
-            ))}
+            {columnOrder.map(colId => renderCell(colId))}
             <td className={`sticky right-0 z-10 ${stickyBg} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-3 text-sm text-right`}>
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
@@ -361,8 +339,37 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     );
 }
 
+// Default reorderable column IDs (excluding sticky checkbox, title, actions)
+const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates'];
+
+// Draggable column header for list view
+function SortableColumnHeader({ id, children }) {
+    const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id });
+    return (
+        <th
+            ref={setNodeRef}
+            {...attributes}
+            {...listeners}
+            className={`group/col px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap select-none transition-colors
+                ${isDragging
+                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 cursor-grabbing opacity-50'
+                    : 'text-gray-500 dark:text-gray-400 cursor-grab hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                }`}
+        >
+            <div className="flex items-center gap-1.5">
+                <svg className="h-3 w-3 shrink-0 opacity-0 group-hover/col:opacity-40 transition-opacity" fill="currentColor" viewBox="0 0 24 24">
+                    <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+                    <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                    <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+                </svg>
+                {children}
+            </div>
+        </th>
+    );
+}
+
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail, columnOrder = [] }) {
     const {
         attributes,
         listeners,
@@ -397,6 +404,106 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     const handleFieldUpdate = (field, value) => {
         setOpenPopover(null);
         onTaskUpdate(task.id, field, value);
+    };
+
+    const renderCell = (colId) => {
+        switch (colId) {
+            case 'status':
+                return (
+                    <td key="status" className="px-6 py-4 text-sm">
+                        {canEditTask ? (
+                            <StatusPicker currentStatus={task.status} isOpen={openPopover === 'status'} onToggle={togglePopover('status')} onSelect={(status) => handleFieldUpdate('status', status)} />
+                        ) : (
+                            <StatusBadge status={task.status} type="task" />
+                        )}
+                    </td>
+                );
+            case 'priority':
+                return (
+                    <td key="priority" className="px-6 py-4 text-sm">
+                        {canEditTask ? (
+                            <PriorityPicker currentPriority={task.priority} isOpen={openPopover === 'priority'} onToggle={togglePopover('priority')} onSelect={(priority) => handleFieldUpdate('priority', priority)} />
+                        ) : (
+                            <PriorityBadge priority={task.priority} />
+                        )}
+                    </td>
+                );
+            case 'assignee':
+                return (
+                    <td key="assignee" className="px-6 py-4 text-sm">
+                        <div className="flex items-center gap-2">
+                            {canManageTaskDetails ? (
+                                <AssigneePicker currentAssignee={task.assignee} users={users} isOpen={openPopover === 'assignee'} onToggle={togglePopover('assignee')} onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)} />
+                            ) : (
+                                task.assignee ? (
+                                    <div className="flex items-center gap-2">
+                                        <Avatar name={task.assignee.name} size="sm" />
+                                        <span className="text-gray-700 dark:text-gray-300">{task.assignee.name}</span>
+                                    </div>
+                                ) : (
+                                    <span className="text-gray-400">Unassigned</span>
+                                )
+                            )}
+                            {task.collaborators?.length > 0 && (
+                                <div className="flex -space-x-1.5" title={task.collaborators.map((c) => c.name).join(', ')}>
+                                    {task.collaborators.slice(0, 3).map((c) => (
+                                        <Avatar key={c.id} name={c.name} size="sm" className="ring-1 ring-white dark:ring-gray-800" />
+                                    ))}
+                                    {task.collaborators.length > 3 && (
+                                        <span className="text-xs text-gray-400 ml-1">+{task.collaborators.length - 3}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </td>
+                );
+            case 'dates':
+                return (
+                    <td key="dates" className="px-6 py-4 text-sm">
+                        <div className="flex items-center gap-1">
+                            {canManageTaskDetails ? (
+                                <>
+                                    {task.start_date && (
+                                        <>
+                                            <InlineDatePicker currentDate={task.start_date} isOpen={openPopover === 'start_date'} onToggle={togglePopover('start_date')} onSelect={(date) => handleFieldUpdate('start_date', date)} onClear={() => handleFieldUpdate('start_date', null)} />
+                                            <span className="text-gray-300 dark:text-gray-600">→</span>
+                                        </>
+                                    )}
+                                    <InlineDatePicker currentDate={task.due_date} isOpen={openPopover === 'due_date'} onToggle={togglePopover('due_date')} onSelect={(date) => handleFieldUpdate('due_date', date)} isOverdue={isOverdue} />
+                                    {!task.start_date && (
+                                        <button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors" title="Add start date">
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                        </button>
+                                    )}
+                                    {!task.start_date && openPopover === 'start_date' && (
+                                        <InlineDatePicker currentDate={null} isOpen={true} onToggle={togglePopover('start_date')} onSelect={(date) => handleFieldUpdate('start_date', date)} hidden />
+                                    )}
+                                </>
+                            ) : (
+                                <span className={`text-sm ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                                    {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
+                                </span>
+                            )}
+                        </div>
+                    </td>
+                );
+            default:
+                if (colId.startsWith('cf-')) {
+                    const cfId = Number(colId.replace('cf-', ''));
+                    const cf = customFields.find(f => f.id === cfId);
+                    if (!cf) return null;
+                    return (
+                        <td key={colId} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            {canEditTask ? (
+                                <InlineCustomFieldEditor task={task} customField={cf} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
+                            ) : (
+                                renderCustomFieldValue(task, cf)
+                            )}
+                        </td>
+                    );
+                }
+                return null;
+        }
     };
 
     return (
@@ -460,130 +567,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     )}
                 </div>
             </td>
-            <td className="px-6 py-4 text-sm">
-                {canEditTask ? (
-                    <StatusPicker
-                        currentStatus={task.status}
-                        isOpen={openPopover === 'status'}
-                        onToggle={togglePopover('status')}
-                        onSelect={(status) => handleFieldUpdate('status', status)}
-                    />
-                ) : (
-                    <StatusBadge status={task.status} type="task" />
-                )}
-            </td>
-            <td className="px-6 py-4 text-sm">
-                {canEditTask ? (
-                    <PriorityPicker
-                        currentPriority={task.priority}
-                        isOpen={openPopover === 'priority'}
-                        onToggle={togglePopover('priority')}
-                        onSelect={(priority) => handleFieldUpdate('priority', priority)}
-                    />
-                ) : (
-                    <PriorityBadge priority={task.priority} />
-                )}
-            </td>
-            <td className="px-6 py-4 text-sm">
-                <div className="flex items-center gap-2">
-                    {canManageTaskDetails ? (
-                        <AssigneePicker
-                            currentAssignee={task.assignee}
-                            users={users}
-                            isOpen={openPopover === 'assignee'}
-                            onToggle={togglePopover('assignee')}
-                            onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)}
-                        />
-                    ) : (
-                        task.assignee ? (
-                            <div className="flex items-center gap-2">
-                                <Avatar name={task.assignee.name} size="sm" />
-                                <span className="text-gray-700 dark:text-gray-300">{task.assignee.name}</span>
-                            </div>
-                        ) : (
-                            <span className="text-gray-400">Unassigned</span>
-                        )
-                    )}
-                    {task.collaborators?.length > 0 && (
-                        <div className="flex -space-x-1.5" title={task.collaborators.map((c) => c.name).join(', ')}>
-                            {task.collaborators.slice(0, 3).map((c) => (
-                                <Avatar key={c.id} name={c.name} size="sm" className="ring-1 ring-white dark:ring-gray-800" />
-                            ))}
-                            {task.collaborators.length > 3 && (
-                                <span className="text-xs text-gray-400 ml-1">+{task.collaborators.length - 3}</span>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </td>
-            <td className="px-6 py-4 text-sm">
-                <div className="flex items-center gap-1">
-                    {canManageTaskDetails ? (
-                        <>
-                            {task.start_date && (
-                                <>
-                                    <InlineDatePicker
-                                        currentDate={task.start_date}
-                                        isOpen={openPopover === 'start_date'}
-                                        onToggle={togglePopover('start_date')}
-                                        onSelect={(date) => handleFieldUpdate('start_date', date)}
-                                        onClear={() => handleFieldUpdate('start_date', null)}
-                                    />
-                                    <span className="text-gray-300 dark:text-gray-600">→</span>
-                                </>
-                            )}
-                            <InlineDatePicker
-                                currentDate={task.due_date}
-                                isOpen={openPopover === 'due_date'}
-                                onToggle={togglePopover('due_date')}
-                                onSelect={(date) => handleFieldUpdate('due_date', date)}
-                                isOverdue={isOverdue}
-                            />
-                            {!task.start_date && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
-                                    title="Add start date"
-                                >
-                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                </button>
-                            )}
-                            {!task.start_date && openPopover === 'start_date' && (
-                                <InlineDatePicker
-                                    currentDate={null}
-                                    isOpen={true}
-                                    onToggle={togglePopover('start_date')}
-                                    onSelect={(date) => handleFieldUpdate('start_date', date)}
-                                    hidden
-                                />
-                            )}
-                        </>
-                    ) : (
-                        <span className={`text-sm ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
-                        </span>
-                    )}
-                </div>
-            </td>
-            {customFields.map(cf => (
-                <td key={cf.id} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {canEditTask ? (
-                        <InlineCustomFieldEditor
-                            task={task}
-                            customField={cf}
-                            isOpen={openPopover === `cf-${cf.id}`}
-                            onToggle={togglePopover(`cf-${cf.id}`)}
-                            onUpdate={onCustomFieldUpdate}
-                            formatDate={formatDate}
-                        />
-                    ) : (
-                        renderCustomFieldValue(task, cf)
-                    )}
-                </td>
-            ))}
+            {columnOrder.map(colId => renderCell(colId))}
             <td className={`sticky right-0 z-10 ${stickyBg} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm text-right`}>
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
@@ -901,6 +885,59 @@ export default function Show() {
     const [automationToasts, setAutomationToasts] = useState([]);
     const [contextMenu, setContextMenu] = useState(null); // { task, x, y } or null
     const [detailTaskId, setDetailTaskId] = useState(null); // task ID for detail panel
+
+    // Column order for list view (draggable header reordering)
+    const [columnOrder, setColumnOrder] = useState(() => {
+        try {
+            const saved = localStorage.getItem(`wmt-col-order-${project.id}`);
+            if (saved) return JSON.parse(saved);
+        } catch {}
+        return null;
+    });
+    const [activeColumnId, setActiveColumnId] = useState(null);
+
+    const effectiveColumnOrder = useMemo(() => {
+        const cfIds = localCustomFields.map(cf => `cf-${cf.id}`);
+        const allIds = [...DEFAULT_COLUMN_IDS, ...cfIds];
+        if (!columnOrder) return allIds;
+        const valid = columnOrder.filter(id => allIds.includes(id));
+        const missing = allIds.filter(id => !valid.includes(id));
+        return [...valid, ...missing];
+    }, [columnOrder, localCustomFields]);
+
+    const columnSensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    );
+
+    const getColumnLabel = useCallback((colId) => {
+        switch (colId) {
+            case 'status': return 'Status';
+            case 'priority': return 'Priority';
+            case 'assignee': return 'Assignee';
+            case 'dates': return 'Dates';
+            default:
+                if (colId.startsWith('cf-')) {
+                    const cfId = Number(colId.replace('cf-', ''));
+                    return localCustomFields.find(cf => cf.id === cfId)?.name || colId;
+                }
+                return colId;
+        }
+    }, [localCustomFields]);
+
+    const handleColumnDragEnd = useCallback((event) => {
+        const { active, over } = event;
+        setActiveColumnId(null);
+        if (!over || active.id === over.id) return;
+        setColumnOrder(prev => {
+            const order = prev ? [...prev] : [...effectiveColumnOrder];
+            const oldIdx = order.indexOf(active.id);
+            const newIdx = order.indexOf(over.id);
+            if (oldIdx === -1 || newIdx === -1) return prev;
+            const newOrder = arrayMove(order, oldIdx, newIdx);
+            try { localStorage.setItem(`wmt-col-order-${project.id}`, JSON.stringify(newOrder)); } catch {}
+            return newOrder;
+        });
+    }, [effectiveColumnOrder, project.id]);
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -2045,18 +2082,33 @@ export default function Show() {
                             <div className="overflow-x-auto styled-scrollbar-x">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
+                                    <DndContext
+                                        sensors={columnSensors}
+                                        collisionDetection={closestCorners}
+                                        onDragStart={(e) => setActiveColumnId(e.active.id)}
+                                        onDragEnd={handleColumnDragEnd}
+                                        onDragCancel={() => setActiveColumnId(null)}
+                                    >
                                     <tr>
                                         <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 pl-6 pr-2 py-3 w-[52px] min-w-[52px]"></th>
                                         <th className="sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">Title</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Priority</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assignee</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dates</th>
-                                        {localCustomFields.map(cf => (
-                                            <th key={cf.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">{cf.name}</th>
-                                        ))}
+                                        <SortableContext items={effectiveColumnOrder} strategy={horizontalListSortingStrategy}>
+                                            {effectiveColumnOrder.map(colId => (
+                                                <SortableColumnHeader key={colId} id={colId}>
+                                                    {getColumnLabel(colId)}
+                                                </SortableColumnHeader>
+                                            ))}
+                                        </SortableContext>
                                         <th className="sticky right-0 z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.08)]">Actions</th>
                                     </tr>
+                                    <DragOverlay>
+                                        {activeColumnId ? (
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-primary-700 dark:text-primary-300 uppercase tracking-wider bg-primary-50 dark:bg-primary-900/50 rounded shadow-lg whitespace-nowrap">
+                                                {getColumnLabel(activeColumnId)}
+                                            </th>
+                                        ) : null}
+                                    </DragOverlay>
+                                    </DndContext>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                     {tasksBySection ? (
@@ -2108,6 +2160,7 @@ export default function Show() {
                                                                         isSelected={selectedTasks.has(task.id)}
                                                                         onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                                                         customFields={localCustomFields}
+                                                                        columnOrder={effectiveColumnOrder}
                                                                         onContextMenu={handleContextMenu}
                                                                         onOpenDetail={setDetailTaskId}
                                                                     />
@@ -2132,6 +2185,7 @@ export default function Show() {
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
                                                                                         onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                                         customFields={localCustomFields}
+                                                                                        columnOrder={effectiveColumnOrder}
                                                                                         onContextMenu={handleContextMenu}
                                                                                         onOpenDetail={setDetailTaskId}
                                                                                     />
@@ -2213,6 +2267,7 @@ export default function Show() {
                                                             isSelected={selectedTasks.has(task.id)}
                                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                                             customFields={localCustomFields}
+                                                            columnOrder={effectiveColumnOrder}
                                                             onContextMenu={handleContextMenu}
                                                             onOpenDetail={setDetailTaskId}
                                                         />
@@ -2237,6 +2292,7 @@ export default function Show() {
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
                                                                             onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                             customFields={localCustomFields}
+                                                                            columnOrder={effectiveColumnOrder}
                                                                             onContextMenu={handleContextMenu}
                                                                             onOpenDetail={setDetailTaskId}
                                                                         />
