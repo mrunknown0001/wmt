@@ -23,6 +23,7 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FormController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\TaskCustomFieldValueController;
@@ -69,6 +70,7 @@ Route::middleware('auth')->group(function () {
 
     // My Tasks
     Route::get('/my-tasks', [MyTaskController::class, 'index'])->name('my-tasks');
+    Route::get('/my-tasks/export', [ExportController::class, 'myTasks'])->name('my-tasks.export');
 
     // Standalone Tasks (not project-scoped)
     Route::post('/tasks', [StandaloneTaskController::class, 'store'])->name('tasks.store');
@@ -94,6 +96,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('projects.tasks', TaskController::class)
         ->except(['index', 'show'])
         ->scoped();
+    Route::get('/projects/{project}/export', [ExportController::class, 'projectTasks'])->name('projects.export');
     Route::patch('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
     Route::post('/projects/{project}/tasks/reorder', [TaskController::class, 'reorder'])->name('projects.tasks.reorder');
     Route::post('/projects/{project}/tasks/bulk', [TaskController::class, 'bulkAction'])->name('projects.tasks.bulk');

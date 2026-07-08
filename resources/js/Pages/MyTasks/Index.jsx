@@ -6,6 +6,7 @@ import Card from '../../Components/Card';
 import Pagination from '../../Components/Pagination';
 import PriorityBadge from '../../Components/PriorityBadge';
 import StatusBadge from '../../Components/StatusBadge';
+import Button from '../../Components/Button';
 import EmptyState from '../../Components/EmptyState';
 import { formatDate, formatLabel, taskEditUrl } from '../../utils';
 
@@ -321,7 +322,26 @@ export default function Index({ taskGroups, isCompletedFilter, pagination, stats
 
     return (
         <AuthenticatedLayout title="My Tasks">
-            <PageHeader title="My Tasks" />
+            <PageHeader
+                title="My Tasks"
+                actions={
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                            const params = new URLSearchParams();
+                            if (filterStatus) params.set('status', filterStatus);
+                            if (filterPriority) params.set('priority', filterPriority);
+                            if (filterSearch) params.set('search', filterSearch);
+                            const qs = params.toString();
+                            window.location.href = `/my-tasks/export${qs ? '?' + qs : ''}`;
+                        }}
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Export
+                    </Button>
+                }
+            />
 
             {/* Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
