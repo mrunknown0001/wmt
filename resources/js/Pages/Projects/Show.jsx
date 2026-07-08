@@ -68,6 +68,12 @@ const GanttIcon = () => (
     </svg>
 );
 
+const DashboardIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+);
+
 const AutomationIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1005,6 +1011,107 @@ export default function Show() {
         return groups;
     }, [filteredTasks, localSections]);
 
+    // Dashboard statistics computed from all tasks (unfiltered)
+    const dashboardStats = useMemo(() => {
+        // Flatten all tasks including subtasks
+        const allTasks = [];
+        localTasks.forEach((t) => {
+            allTasks.push(t);
+            if (t.subtasks && t.subtasks.length > 0) {
+                t.subtasks.forEach((st) => allTasks.push(st));
+            }
+        });
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(today);
+        endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+        endOfWeek.setHours(23, 59, 59, 999);
+
+        const total = allTasks.length;
+
+        // Status counts
+        const byStatus = {};
+        TASK_STATUSES.forEach((s) => (byStatus[s] = 0));
+        allTasks.forEach((t) => {
+            if (byStatus[t.status] !== undefined) byStatus[t.status]++;
+        });
+
+        // Active = not done and not cancelled
+        const activeTasks = allTasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled');
+        const nonCancelled = allTasks.filter((t) => t.status !== 'cancelled');
+        const completionRate = nonCancelled.length > 0 ? Math.round((byStatus.done / nonCancelled.length) * 100) : 0;
+
+        // Due date analysis (only active tasks)
+        const overdue = activeTasks.filter((t) => {
+            if (!t.due_date) return false;
+            const d = new Date(t.due_date);
+            d.setHours(0, 0, 0, 0);
+            return d < today;
+        });
+        const dueToday = activeTasks.filter((t) => {
+            if (!t.due_date) return false;
+            const d = new Date(t.due_date);
+            d.setHours(0, 0, 0, 0);
+            return d.getTime() === today.getTime();
+        });
+        const dueThisWeek = activeTasks.filter((t) => {
+            if (!t.due_date) return false;
+            const d = new Date(t.due_date);
+            d.setHours(0, 0, 0, 0);
+            return d >= today && d <= endOfWeek;
+        });
+        const noDueDate = activeTasks.filter((t) => !t.due_date);
+
+        // Priority counts (active only)
+        const byPriority = { low: 0, medium: 0, high: 0, urgent: 0 };
+        activeTasks.forEach((t) => {
+            if (byPriority[t.priority] !== undefined) byPriority[t.priority]++;
+        });
+
+        // Assignee workload
+        const assigneeMap = {};
+        allTasks.forEach((t) => {
+            const key = t.assigned_to || 'unassigned';
+            if (!assigneeMap[key]) {
+                assigneeMap[key] = {
+                    user: t.assignee || null,
+                    total: 0,
+                    done: 0,
+                    active: 0,
+                    overdue: 0,
+                };
+            }
+            assigneeMap[key].total++;
+            if (t.status === 'done') {
+                assigneeMap[key].done++;
+            } else if (t.status !== 'cancelled') {
+                assigneeMap[key].active++;
+                if (t.due_date) {
+                    const d = new Date(t.due_date);
+                    d.setHours(0, 0, 0, 0);
+                    if (d < today) assigneeMap[key].overdue++;
+                }
+            }
+        });
+        const assignees = Object.entries(assigneeMap)
+            .map(([key, val]) => ({ id: key, ...val }))
+            .sort((a, b) => b.total - a.total);
+
+        return {
+            total,
+            byStatus,
+            completionRate,
+            overdue,
+            dueToday,
+            dueThisWeek,
+            noDueDate,
+            byPriority,
+            assignees,
+            activeTasks: activeTasks.length,
+        };
+    }, [localTasks]);
+
     // Section management handlers
     const handleCreateSection = useCallback(async (name) => {
         if (!name.trim()) return;
@@ -1838,6 +1945,16 @@ export default function Show() {
                         >
                             <GanttIcon /> <span className="hidden sm:inline">Gantt</span>
                         </button>
+                        <button
+                            onClick={() => setView('dashboard')}
+                            className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                view === 'dashboard'
+                                    ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                            }`}
+                        >
+                            <DashboardIcon /> <span className="hidden sm:inline">Dashboard</span>
+                        </button>
                     </div>
 
                     {/* Filters */}
@@ -2654,6 +2771,223 @@ export default function Show() {
                                     <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{key}</span>
                                 </span>
                             ))}
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Dashboard View */}
+            {view === 'dashboard' && (() => {
+                const STATUS_COLORS = {
+                    backlog: { bg: 'bg-gray-100 dark:bg-gray-700', bar: 'bg-gray-400', text: 'text-gray-600 dark:text-gray-300' },
+                    to_do: { bg: 'bg-blue-50 dark:bg-blue-900/30', bar: 'bg-blue-500', text: 'text-blue-600 dark:text-blue-400' },
+                    in_progress: { bg: 'bg-yellow-50 dark:bg-yellow-900/30', bar: 'bg-yellow-500', text: 'text-yellow-600 dark:text-yellow-400' },
+                    in_review: { bg: 'bg-purple-50 dark:bg-purple-900/30', bar: 'bg-purple-500', text: 'text-purple-600 dark:text-purple-400' },
+                    done: { bg: 'bg-green-50 dark:bg-green-900/30', bar: 'bg-green-500', text: 'text-green-600 dark:text-green-400' },
+                    cancelled: { bg: 'bg-red-50 dark:bg-red-900/30', bar: 'bg-red-300', text: 'text-red-400 dark:text-red-500' },
+                };
+                const PRIORITY_COLORS = {
+                    urgent: { bg: 'bg-red-50 dark:bg-red-900/30', bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400', border: 'border-red-200 dark:border-red-800' },
+                    high: { bg: 'bg-orange-50 dark:bg-orange-900/30', bar: 'bg-orange-500', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800' },
+                    medium: { bg: 'bg-blue-50 dark:bg-blue-900/30', bar: 'bg-blue-500', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-800' },
+                    low: { bg: 'bg-gray-50 dark:bg-gray-800', bar: 'bg-gray-400', text: 'text-gray-500 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+                };
+
+                const stats = dashboardStats;
+
+                return (
+                    <div className="space-y-6">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Total Tasks */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Tasks</span>
+                                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div className="bg-green-500 h-2 rounded-full transition-all duration-500" style={{ width: `${stats.completionRate}%` }} />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{stats.completionRate}% complete</p>
+                            </div>
+
+                            {/* Completed */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed</span>
+                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/40">
+                                        <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                    </span>
+                                </div>
+                                <span className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.byStatus.done}</span>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">of {stats.total - stats.byStatus.cancelled} actionable</p>
+                            </div>
+
+                            {/* In Progress */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">In Progress</span>
+                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-900/40">
+                                        <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    </span>
+                                </div>
+                                <span className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.activeTasks}</span>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{stats.byStatus.backlog} backlog, {stats.byStatus.to_do} to do, {stats.byStatus.in_progress} active, {stats.byStatus.in_review} in review</p>
+                            </div>
+
+                            {/* Overdue */}
+                            <div className={`bg-white dark:bg-gray-800 rounded-xl border p-5 ${stats.overdue.length > 0 ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-gray-700'}`}>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Overdue</span>
+                                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg ${stats.overdue.length > 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                        <svg className={`w-4 h-4 ${stats.overdue.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    </span>
+                                </div>
+                                <span className={`text-2xl font-bold ${stats.overdue.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.overdue.length}</span>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">past due date</p>
+                            </div>
+                        </div>
+
+                        {/* Status Breakdown + Priority Breakdown */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* Status Breakdown */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Status Breakdown</h3>
+                                {stats.total === 0 ? (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">No tasks yet</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {/* Stacked bar */}
+                                        <div className="flex rounded-full h-3 overflow-hidden">
+                                            {TASK_STATUSES.map((s) => {
+                                                const pct = stats.total > 0 ? (stats.byStatus[s] / stats.total) * 100 : 0;
+                                                if (pct === 0) return null;
+                                                return <div key={s} className={`${STATUS_COLORS[s].bar} transition-all duration-500`} style={{ width: `${pct}%` }} title={`${formatLabel(s)}: ${stats.byStatus[s]}`} />;
+                                            })}
+                                        </div>
+                                        {/* Legend */}
+                                        <div className="space-y-2">
+                                            {TASK_STATUSES.map((s) => (
+                                                <div key={s} className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-2.5 h-2.5 rounded-full ${STATUS_COLORS[s].bar}`} />
+                                                        <span className="text-sm text-gray-600 dark:text-gray-300">{formatLabel(s)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium text-gray-900 dark:text-white">{stats.byStatus[s]}</span>
+                                                        <span className="text-xs text-gray-400 w-10 text-right">{stats.total > 0 ? Math.round((stats.byStatus[s] / stats.total) * 100) : 0}%</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Priority Breakdown */}
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Priority Breakdown</h3>
+                                {stats.activeTasks === 0 ? (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">No active tasks</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {['urgent', 'high', 'medium', 'low'].map((p) => {
+                                            const count = stats.byPriority[p];
+                                            const pct = stats.activeTasks > 0 ? (count / stats.activeTasks) * 100 : 0;
+                                            return (
+                                                <div key={p}>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className={`text-sm font-medium ${PRIORITY_COLORS[p].text}`}>{formatLabel(p)}</span>
+                                                        <span className="text-sm text-gray-600 dark:text-gray-300">{count}</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                                                        <div className={`${PRIORITY_COLORS[p].bar} h-2 rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Due Date Overview */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Due Date Overview</h3>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className={`rounded-lg p-4 ${stats.overdue.length > 0 ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
+                                    <p className={`text-2xl font-bold ${stats.overdue.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.overdue.length}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Overdue</p>
+                                </div>
+                                <div className={`rounded-lg p-4 ${stats.dueToday.length > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
+                                    <p className={`text-2xl font-bold ${stats.dueToday.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.dueToday.length}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due Today</p>
+                                </div>
+                                <div className={`rounded-lg p-4 ${stats.dueThisWeek.length > 0 ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
+                                    <p className={`text-2xl font-bold ${stats.dueThisWeek.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.dueThisWeek.length}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due This Week</p>
+                                </div>
+                                <div className="rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50">
+                                    <p className="text-2xl font-bold text-gray-500 dark:text-gray-400">{stats.noDueDate.length}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">No Due Date</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Assignee Workload */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Assignee Workload</h3>
+                            {stats.assignees.length === 0 ? (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">No tasks assigned</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-200 dark:border-gray-700">
+                                                <th className="text-left py-2 pr-4 font-medium text-gray-500 dark:text-gray-400">Assignee</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Total</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Active</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Done</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Overdue</th>
+                                                <th className="text-left py-2 pl-4 font-medium text-gray-500 dark:text-gray-400">Progress</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stats.assignees.map((a) => {
+                                                const progressPct = a.total > 0 ? Math.round((a.done / a.total) * 100) : 0;
+                                                return (
+                                                    <tr key={a.id} className="border-b border-gray-100 dark:border-gray-700/50 last:border-0">
+                                                        <td className="py-2.5 pr-4">
+                                                            {a.user ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Avatar user={a.user} size="sm" />
+                                                                    <span className="text-gray-900 dark:text-white font-medium">{a.user.name}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-400 dark:text-gray-500 italic">Unassigned</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="text-center py-2.5 px-3 text-gray-900 dark:text-white font-medium">{a.total}</td>
+                                                        <td className="text-center py-2.5 px-3 text-blue-600 dark:text-blue-400">{a.active}</td>
+                                                        <td className="text-center py-2.5 px-3 text-green-600 dark:text-green-400">{a.done}</td>
+                                                        <td className="text-center py-2.5 px-3">
+                                                            <span className={a.overdue > 0 ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-400 dark:text-gray-500'}>{a.overdue}</span>
+                                                        </td>
+                                                        <td className="py-2.5 pl-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-20 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+                                                                    <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                                                                </div>
+                                                                <span className="text-xs text-gray-400 w-8">{progressPct}%</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     </div>
                 );
