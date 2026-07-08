@@ -115,6 +115,57 @@ class TaskController extends Controller
             ->with('success', 'Task created successfully.');
     }
 
+    public function duplicate(Request $request, Project $project, Task $task): JsonResponse
+    {
+        if (!$request->user()->can('manage-tasks') && $project->owner_id !== $request->user()->id && !$project->isProjectAdmin($request->user())) {
+            abort(403);
+        }
+
+        $maxPosition = $project->tasks()
+            ->where('status', $task->status)
+            ->when($task->parent_id, fn ($q) => $q->where('parent_id', $task->parent_id), fn ($q) => $q->whereNull('parent_id'))
+            ->max('position') ?? -1;
+
+        $newTask = $project->tasks()->create([
+            'title' => "Copy of {$task->title}",
+            'description' => $task->description,
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'assigned_to' => $task->assigned_to,
+            'created_by' => $request->user()->id,
+            'start_date' => $task->start_date,
+            'due_date' => $task->due_date,
+            'section_id' => $task->section_id,
+            'parent_id' => $task->parent_id,
+            'position' => $maxPosition + 1,
+        ]);
+
+        if ($task->collaborators()->count() > 0) {
+            $newTask->collaborators()->sync($task->collaborators->pluck('id'));
+        }
+
+        foreach ($task->customFieldValues as $cfv) {
+            TaskCustomFieldValue::create([
+                'task_id' => $newTask->id,
+                'custom_field_id' => $cfv->custom_field_id,
+                'value_text' => $cfv->value_text,
+                'value_number' => $cfv->value_number,
+                'value_date' => $cfv->value_date,
+                'selected_option_id' => $cfv->selected_option_id,
+            ]);
+        }
+
+        TaskActivityLogger::logCreated($newTask, $request->user());
+        ActivityLogger::logCreated($newTask, $request->user());
+
+        $newTask->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
+        $newTask->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        broadcast(new TaskUpdated($project->id, $newTask->toArray(), 'created', $request->user()->id))->toOthers();
+
+        return response()->json(['success' => true, 'task' => $newTask]);
+    }
+
     public function edit(Project $project, Task $task): Response
     {
         $this->authorize('update', $task);

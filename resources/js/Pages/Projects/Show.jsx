@@ -37,6 +37,7 @@ import AssigneePicker from '../../Components/AssigneePicker';
 import InlineDatePicker from '../../Components/InlineDatePicker';
 import CelebrationEffect from '../../Components/CelebrationEffect';
 import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
+import TaskContextMenu from '../../Components/TaskContextMenu';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import echo from '../../echo';
 
@@ -142,7 +143,7 @@ function renderCustomFieldValue(task, customField) {
 }
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [] }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu }) {
     const {
         attributes,
         listeners,
@@ -178,7 +179,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     };
 
     return (
-        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
+        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} onContextMenu={(e) => onContextMenu?.(e, task)} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
             <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-3 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <button
@@ -347,7 +348,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [] }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu }) {
     const {
         attributes,
         listeners,
@@ -391,6 +392,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             {...attributes}
             {...listeners}
             onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
+            onContextMenu={(e) => onContextMenu?.(e, task)}
             className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
         >
             <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-4 w-[52px] min-w-[52px]`}>
@@ -875,6 +877,7 @@ export default function Show() {
     const [showCustomFields, setShowCustomFields] = useState(false);
     const [celebration, setCelebration] = useState(null); // { x, y } or null
     const [automationToasts, setAutomationToasts] = useState([]);
+    const [contextMenu, setContextMenu] = useState(null); // { task, x, y } or null
 
     // Sync local state when server data changes (after Inertia navigation)
     useMemo(() => {
@@ -1507,6 +1510,34 @@ export default function Show() {
         });
     }, []);
 
+    // --- Context menu handlers ---
+    const handleContextMenu = useCallback((e, task) => {
+        e.preventDefault();
+        setContextMenu({ task, x: e.clientX, y: e.clientY });
+    }, []);
+
+    const handleDuplicateTask = useCallback(async (task) => {
+        try {
+            const res = await apiFetch(`/projects/${project.id}/tasks/${task.id}/duplicate`, { method: 'POST' });
+            if (!res.ok) throw new Error('Duplicate failed');
+            const data = await res.json();
+            if (data.task) {
+                setLocalTasks((prev) => [...prev, data.task]);
+            }
+        } catch {
+            router.reload({ only: ['tasks'] });
+        }
+    }, [project.id]);
+
+    const handleAddSubtask = useCallback((task) => {
+        router.visit(`/projects/${project.id}/tasks/create?parent_id=${task.id}`);
+    }, [project.id]);
+
+    const handleCopyTaskLink = useCallback((task) => {
+        const url = `${window.location.origin}/projects/${project.id}/tasks/${task.id}/edit`;
+        navigator.clipboard.writeText(url).catch(() => {});
+    }, [project.id]);
+
     // --- Selection helpers ---
     const toggleTaskSelection = useCallback((taskId) => {
         setSelectedTasks((prev) => {
@@ -1930,6 +1961,7 @@ export default function Show() {
                                                                         isSelected={selectedTasks.has(task.id)}
                                                                         onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                                                         customFields={initialCustomFields}
+                                                                        onContextMenu={handleContextMenu}
                                                                     />
                                                                     {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                                         <DndContext
@@ -1952,6 +1984,7 @@ export default function Show() {
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
                                                                                         onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                                         customFields={initialCustomFields}
+                                                                                        onContextMenu={handleContextMenu}
                                                                                     />
                                                                                 ))}
                                                                             </SortableContext>
@@ -2031,6 +2064,7 @@ export default function Show() {
                                                             isSelected={selectedTasks.has(task.id)}
                                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                                             customFields={initialCustomFields}
+                                                            onContextMenu={handleContextMenu}
                                                         />
                                                         {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                             <DndContext
@@ -2053,6 +2087,7 @@ export default function Show() {
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
                                                                             onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                             customFields={initialCustomFields}
+                                                                            onContextMenu={handleContextMenu}
                                                                         />
                                                                     ))}
                                                                 </SortableContext>
@@ -2175,6 +2210,7 @@ export default function Show() {
                                             onToggleComplete={handleToggleComplete}
                                             selectedTasks={selectedTasks}
                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                            onContextMenu={handleContextMenu}
                                         />
                                     ))}
                                 </div>
@@ -2651,6 +2687,23 @@ export default function Show() {
                         </svg>
                     </button>
                 </div>
+            )}
+
+            {/* Task Context Menu */}
+            {contextMenu && (
+                <TaskContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    task={contextMenu.task}
+                    canEdit={canEditTask(contextMenu.task)}
+                    canDelete={canManageTasks}
+                    onDuplicate={handleDuplicateTask}
+                    onToggleComplete={handleToggleComplete}
+                    onAddSubtask={handleAddSubtask}
+                    onCopyLink={handleCopyTaskLink}
+                    onDelete={handleDeleteTask}
+                    onClose={() => setContextMenu(null)}
+                />
             )}
 
             {/* Confirm Delete Modal */}
