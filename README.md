@@ -44,7 +44,7 @@ Default admin login: `admin@wmt.com` / `password`
 
 - **Organization Hierarchy** — Divisions → Departments → Teams → Users
 - **Project Management** — Full CRUD with owner/admin roles, member management, archived projects view
-- **Kanban Board** — Drag-and-drop task cards with inline editing and dual view (board/list)
+- **Kanban Board** — Drag-and-drop task cards with inline editing and 5 views (list/board/calendar/gantt/dashboard)
 - **Task Sections** — Asana-style grouping within projects
 - **Subtasks** — Hierarchical parent-child tasks with progress tracking
 - **Recurring Tasks** — Daily/weekly/monthly/yearly with auto-generation

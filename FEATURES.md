@@ -51,8 +51,8 @@
 - Drag-and-drop section reordering
 - Tasks organized within sections on the board
 
-### Kanban Board (Projects/Show)
-- Dual view toggle: Kanban board and list view
+### Project Views (Projects/Show)
+- 5 view modes: List, Board (Kanban), Calendar, Gantt, Dashboard
 - Drag-and-drop cards between columns and within columns (@dnd-kit)
 - Inline field editing: status, priority, assignee, due date — all via PATCH endpoint
 - Toggle complete button (circle checkbox) on each card
@@ -62,6 +62,15 @@
 - Priority and status badges
 - Sticky header for scrollable boards
 - Collapsible project details panel
+
+### Project Dashboard View
+- Summary cards: Total Tasks (with completion progress bar), Completed, In Progress, Overdue
+- Status breakdown: stacked horizontal bar chart with per-status counts and percentages
+- Priority breakdown: progress bars for urgent, high, medium, low (active tasks only)
+- Due date overview: Overdue, Due Today, Due This Week, No Due Date cards with color-coded highlights
+- Assignee workload table: total/active/done/overdue per assignee with progress bar
+- All stats computed client-side from loaded tasks (no extra API calls)
+- Reactive updates when tasks are added, updated, or deleted
 
 ### Inline Editing Components
 - **StatusPicker** — popover dropdown for quick status changes
