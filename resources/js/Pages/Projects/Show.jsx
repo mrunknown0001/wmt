@@ -1513,6 +1513,7 @@ export default function Show() {
     // --- Context menu handlers ---
     const handleContextMenu = useCallback((e, task) => {
         e.preventDefault();
+        e.stopPropagation();
         setContextMenu({ task, x: e.clientX, y: e.clientY });
     }, []);
 

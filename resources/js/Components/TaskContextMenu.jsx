@@ -1,37 +1,59 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function TaskContextMenu({ x, y, task, canEdit, canDelete, onDuplicate, onToggleComplete, onAddSubtask, onCopyLink, onDelete, onClose }) {
     const menuRef = useRef(null);
+    const [position, setPosition] = useState({ left: x, top: y });
 
+    // Adjust position if menu overflows viewport
     useEffect(() => {
         const el = menuRef.current;
         if (!el) return;
 
-        // Adjust position if menu overflows viewport
         const rect = el.getBoundingClientRect();
+        let left = x;
+        let top = y;
+
         if (rect.right > window.innerWidth) {
-            el.style.left = `${x - rect.width}px`;
+            left = x - rect.width;
         }
         if (rect.bottom > window.innerHeight) {
-            el.style.top = `${y - rect.height}px`;
+            top = y - rect.height;
         }
+
+        setPosition({ left, top });
     }, [x, y]);
 
+    // Close on click outside, Escape, scroll, or another right-click
     useEffect(() => {
-        const handleClose = () => onClose();
-        const handleKeyDown = (e) => { if (e.key === 'Escape') onClose(); };
+        // Delay listener registration to avoid catching the opening event
+        const raf = requestAnimationFrame(() => {
+            const handleMouseDown = (e) => {
+                if (menuRef.current && !menuRef.current.contains(e.target)) {
+                    onClose();
+                }
+            };
+            const handleKeyDown = (e) => {
+                if (e.key === 'Escape') onClose();
+            };
+            const handleScroll = () => onClose();
 
-        document.addEventListener('click', handleClose);
-        document.addEventListener('contextmenu', handleClose);
-        document.addEventListener('keydown', handleKeyDown);
-        document.addEventListener('scroll', handleClose, true);
+            document.addEventListener('mousedown', handleMouseDown);
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('scroll', handleScroll, true);
+
+            cleanup = () => {
+                document.removeEventListener('mousedown', handleMouseDown);
+                document.removeEventListener('keydown', handleKeyDown);
+                document.removeEventListener('scroll', handleScroll, true);
+            };
+        });
+
+        let cleanup = null;
 
         return () => {
-            document.removeEventListener('click', handleClose);
-            document.removeEventListener('contextmenu', handleClose);
-            document.removeEventListener('keydown', handleKeyDown);
-            document.removeEventListener('scroll', handleClose, true);
+            cancelAnimationFrame(raf);
+            cleanup?.();
         };
     }, [onClose]);
 
@@ -44,9 +66,9 @@ export default function TaskContextMenu({ x, y, task, canEdit, canDelete, onDupl
     return createPortal(
         <div
             ref={menuRef}
-            style={{ position: 'fixed', left: x, top: y, zIndex: 9999 }}
-            className="min-w-[200px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 animate-in fade-in zoom-in-95 duration-100"
-            onClick={(e) => e.stopPropagation()}
+            style={{ position: 'fixed', left: position.left, top: position.top, zIndex: 9999 }}
+            className="min-w-[200px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1"
+            onContextMenu={(e) => e.preventDefault()}
         >
             {canEdit && (
                 <button className={itemClass} onClick={() => { onDuplicate(task); onClose(); }}>
