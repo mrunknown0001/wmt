@@ -10,6 +10,7 @@ import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
 import { formatDate, formatLabel } from '../../utils';
 import { ConfirmModal } from '../../Components/Modal';
+import Tooltip from '../../Components/Tooltip';
 
 const EditIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -168,27 +169,30 @@ export default function Index() {
                                                 <div className="flex items-center justify-end gap-1">
                                                     {canManage(project) && (
                                                         <>
-                                                            <button
-                                                                onClick={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
-                                                                className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
-                                                                title={project.status === 'archived' ? 'Unarchive' : 'Archive'}
-                                                            >
-                                                                {project.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
-                                                            </button>
-                                                            <Link
-                                                                href={`/projects/${project.id}/edit`}
-                                                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                                                                title="Edit"
-                                                            >
-                                                                <EditIcon />
-                                                            </Link>
-                                                            <button
-                                                                onClick={() => setDeleteTarget(project)}
-                                                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                                                                title="Delete"
-                                                            >
-                                                                <TrashIcon />
-                                                            </button>
+                                                            <Tooltip content={project.status === 'archived' ? 'Unarchive' : 'Archive'}>
+                                                                <button
+                                                                    onClick={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
+                                                                    className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+                                                                >
+                                                                    {project.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
+                                                                </button>
+                                                            </Tooltip>
+                                                            <Tooltip content="Edit">
+                                                                <Link
+                                                                    href={`/projects/${project.id}/edit`}
+                                                                    className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                                                                >
+                                                                    <EditIcon />
+                                                                </Link>
+                                                            </Tooltip>
+                                                            <Tooltip content="Delete">
+                                                                <button
+                                                                    onClick={() => setDeleteTarget(project)}
+                                                                    className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                                                                >
+                                                                    <TrashIcon />
+                                                                </button>
+                                                            </Tooltip>
                                                         </>
                                                     )}
                                                 </div>

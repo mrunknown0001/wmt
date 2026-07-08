@@ -17,6 +17,7 @@ import {
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import InlinePopover from './InlinePopover';
+import Tooltip from './Tooltip';
 import Modal, { ConfirmModal } from './Modal';
 import { apiFetch } from '../utils';
 
@@ -57,16 +58,17 @@ function SortableTodoItem({ todo, onToggle, onDelete, modal }) {
             } ${fading ? 'opacity-30 line-through' : ''}`}
         >
             {modal && !todo.is_completed && (
-                <button
-                    {...attributes}
-                    {...listeners}
-                    className="shrink-0 cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 touch-none opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Drag to reorder"
-                >
-                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
-                    </svg>
-                </button>
+                <Tooltip content="Drag to reorder">
+                    <button
+                        {...attributes}
+                        {...listeners}
+                        className="shrink-0 cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 touch-none opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                        <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                        </svg>
+                    </button>
+                </Tooltip>
             )}
             <button
                 onClick={handleToggle}
@@ -376,42 +378,44 @@ export default function SidebarTodoWidget({ collapsed }) {
         return (
             <>
                 <div className="px-2 py-1">
-                    <button
-                        ref={anchorRef}
-                        onClick={() => {
-                            if (isOpen) {
-                                setIsOpen(false);
-                            } else {
-                                loadTodos();
-                                setIsOpen(true);
-                            }
-                        }}
-                        className="relative w-full flex items-center justify-center p-2 rounded-lg text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors"
-                        title="To-Do List"
-                    >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {incompleteCount > 0 && (
-                            <span className="absolute -top-0.5 -right-0.5 bg-primary-500 text-white text-[9px] font-bold rounded-full h-4 min-w-4 flex items-center justify-center px-0.5">
-                                {incompleteCount > 99 ? '99+' : incompleteCount}
-                            </span>
-                        )}
-                    </button>
+                    <Tooltip content="To-Do List">
+                        <button
+                            ref={anchorRef}
+                            onClick={() => {
+                                if (isOpen) {
+                                    setIsOpen(false);
+                                } else {
+                                    loadTodos();
+                                    setIsOpen(true);
+                                }
+                            }}
+                            className="relative w-full flex items-center justify-center p-2 rounded-lg text-gray-300 hover:bg-gray-700/50 hover:text-white transition-colors"
+                        >
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {incompleteCount > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 bg-primary-500 text-white text-[9px] font-bold rounded-full h-4 min-w-4 flex items-center justify-center px-0.5">
+                                    {incompleteCount > 99 ? '99+' : incompleteCount}
+                                </span>
+                            )}
+                        </button>
+                    </Tooltip>
                 </div>
                 <InlinePopover isOpen={isOpen} onClose={() => setIsOpen(false)} anchorRef={anchorRef} className="w-72">
                     <div className="bg-gray-800 rounded-lg border border-gray-700 py-3">
                         <div className="flex items-center justify-between px-3 pb-2">
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">To-Do List</p>
-                            <button
-                                onClick={() => { setIsOpen(false); setShowModal(true); }}
-                                className="text-gray-500 hover:text-gray-300 transition-colors"
-                                title="Expand"
-                            >
-                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                                </svg>
-                            </button>
+                            <Tooltip content="Expand">
+                                <button
+                                    onClick={() => { setIsOpen(false); setShowModal(true); }}
+                                    className="text-gray-500 hover:text-gray-300 transition-colors"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                                    </svg>
+                                </button>
+                            </Tooltip>
                         </div>
                         <TodoList {...todoListProps} />
                     </div>
@@ -439,15 +443,16 @@ export default function SidebarTodoWidget({ collapsed }) {
             <div className="px-3 py-2">
                 <div className="flex items-center justify-between px-2 mb-2">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">To-Do List</p>
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="text-gray-600 hover:text-gray-400 transition-colors"
-                        title="Expand"
-                    >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                        </svg>
-                    </button>
+                    <Tooltip content="Expand">
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="text-gray-600 hover:text-gray-400 transition-colors"
+                        >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                            </svg>
+                        </button>
+                    </Tooltip>
                 </div>
                 <TodoList {...todoListProps} />
             </div>

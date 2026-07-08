@@ -8,6 +8,7 @@ import Badge from '../Components/Badge';
 import FlashMessage from '../Components/FlashMessage';
 import ThemeToggle from '../Components/ThemeToggle';
 import NotificationBell from '../Components/NotificationBell';
+import Tooltip from '../Components/Tooltip';
 import NotificationToast from '../Components/NotificationToast';
 import AiChatWidget from '../Components/AiChat/AiChatWidget';
 import GlobalSearch from '../Components/GlobalSearch';
@@ -252,15 +253,16 @@ export default function AuthenticatedLayout({ children, title }) {
                                 <p className="text-sm font-medium text-white truncate">{auth.user?.name}</p>
                                 <Badge color="blue" className="mt-0.5">{auth.user?.roles?.[0]}</Badge>
                             </div>
+                            <Tooltip content="Logout">
                             <button
                                 onClick={handleLogout}
                                 className="text-gray-400 hover:text-white transition-colors p-1 icon-hover"
-                                title="Logout"
                             >
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                 </svg>
                             </button>
+                            </Tooltip>
                         </>
                     )}
                 </div>
@@ -312,15 +314,16 @@ export default function AuthenticatedLayout({ children, title }) {
                             </svg>
                         </button>
                         {/* Desktop hamburger — collapses/expands sidebar */}
+                        <Tooltip content={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
                         <button
                             onClick={toggleSidebarCollapsed}
                             className="hidden lg:flex p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 icon-hover"
-                            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                         >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </button>
+                        </Tooltip>
                         <span className="text-lg font-semibold text-gray-800 dark:text-gray-100 lg:hidden">{appName}</span>
                         <div className="flex-1 flex justify-center">
                             <GlobalSearch />

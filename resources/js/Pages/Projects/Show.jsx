@@ -37,6 +37,7 @@ import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
 import InlineDatePicker from '../../Components/InlineDatePicker';
 import CelebrationEffect from '../../Components/CelebrationEffect';
+import Tooltip from '../../Components/Tooltip';
 import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
 import TaskContextMenu from '../../Components/TaskContextMenu';
 import TaskDetailPanel from '../../Components/TaskDetailPanel';
@@ -241,9 +242,11 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                                     )}
                                     <InlineDatePicker currentDate={task.due_date} isOpen={openPopover === 'due_date'} onToggle={togglePopover('due_date')} onSelect={(date) => handleFieldUpdate('due_date', date)} isOverdue={isOverdue} />
                                     {!task.start_date && (
-                                        <button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors" title="Add start date">
-                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                                        </button>
+                                        <Tooltip content="Add start date">
+                                            <button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
+                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                            </button>
+                                        </Tooltip>
                                     )}
                                     {!task.start_date && openPopover === 'start_date' && (
                                         <InlineDatePicker currentDate={null} isOpen={true} onToggle={togglePopover('start_date')} onSelect={(date) => handleFieldUpdate('start_date', date)} hidden />
@@ -280,58 +283,62 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
         <tr ref={setNodeRef} style={style} {...attributes} {...listeners} onContextMenu={(e) => onContextMenu?.(e, task)} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
             <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-3 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    className={`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
-                        isDone
-                            ? 'bg-green-500 border-green-500 text-white scale-110'
-                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
-                    }`}
-                    title={isDone ? 'Mark incomplete' : 'Mark complete'}
-                >
-                    <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                </button>
+                <Tooltip content={isDone ? 'Mark incomplete' : 'Mark complete'}>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className={`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                            isDone
+                                ? 'bg-green-500 border-green-500 text-white scale-110'
+                                : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
+                        }`}
+                    >
+                        <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </button>
+                </Tooltip>
             </td>
             <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] pl-10 pr-6 py-3 text-sm max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
                 <div className="flex items-center gap-1.5 min-w-0">
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
-                    <button
-                        className="truncate text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
-                        title={task.title}
-                        onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                    >
-                        {task.title}
-                    </button>
+                    <Tooltip content={task.title}>
+                        <button
+                            className="truncate text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            {task.title}
+                        </button>
+                    </Tooltip>
                 </div>
             </td>
             {columnOrder.map(colId => renderCell(colId))}
             <td className={`sticky right-0 z-10 ${stickyBg} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-3 text-sm text-right`}>
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
-                        <Link
-                            href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                            title="Edit"
-                        >
-                            <EditIcon />
-                        </Link>
+                        <Tooltip content="Edit">
+                            <Link
+                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                            >
+                                <EditIcon />
+                            </Link>
+                        </Tooltip>
                     )}
                     {canManageTasks && (
-                        <button
-                            onClick={() => handleDeleteTask(task.id, task.title)}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                            title="Delete"
-                        >
-                            <TrashIcon />
-                        </button>
+                        <Tooltip content="Delete">
+                            <button
+                                onClick={() => handleDeleteTask(task.id, task.title)}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                            >
+                                <TrashIcon />
+                            </button>
+                        </Tooltip>
                     )}
                 </div>
             </td>
@@ -445,14 +452,16 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                                 )
                             )}
                             {task.collaborators?.length > 0 && (
-                                <div className="flex -space-x-1.5" title={task.collaborators.map((c) => c.name).join(', ')}>
-                                    {task.collaborators.slice(0, 3).map((c) => (
-                                        <Avatar key={c.id} name={c.name} size="sm" className="ring-1 ring-white dark:ring-gray-800" />
-                                    ))}
-                                    {task.collaborators.length > 3 && (
-                                        <span className="text-xs text-gray-400 ml-1">+{task.collaborators.length - 3}</span>
-                                    )}
-                                </div>
+                                <Tooltip content={task.collaborators.map((c) => c.name).join(', ')}>
+                                    <div className="flex -space-x-1.5">
+                                        {task.collaborators.slice(0, 3).map((c) => (
+                                            <Avatar key={c.id} name={c.name} size="sm" className="ring-1 ring-white dark:ring-gray-800" />
+                                        ))}
+                                        {task.collaborators.length > 3 && (
+                                            <span className="text-xs text-gray-400 ml-1">+{task.collaborators.length - 3}</span>
+                                        )}
+                                    </div>
+                                </Tooltip>
                             )}
                         </div>
                     </td>
@@ -471,9 +480,11 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                                     )}
                                     <InlineDatePicker currentDate={task.due_date} isOpen={openPopover === 'due_date'} onToggle={togglePopover('due_date')} onSelect={(date) => handleFieldUpdate('due_date', date)} isOverdue={isOverdue} />
                                     {!task.start_date && (
-                                        <button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors" title="Add start date">
-                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                                        </button>
+                                        <Tooltip content="Add start date">
+                                            <button onClick={(e) => { e.stopPropagation(); togglePopover('start_date')(); }} onPointerDown={(e) => e.stopPropagation()} className="ml-1 text-gray-300 dark:text-gray-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
+                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                            </button>
+                                        </Tooltip>
                                     )}
                                     {!task.start_date && openPopover === 'start_date' && (
                                         <InlineDatePicker currentDate={null} isOpen={true} onToggle={togglePopover('start_date')} onSelect={(date) => handleFieldUpdate('start_date', date)} hidden />
@@ -518,47 +529,52 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
         >
             <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-4 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <button
-                    onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
-                        isDone
-                            ? 'bg-green-500 border-green-500 text-white scale-110'
-                            : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
-                    }`}
-                    title={isDone ? 'Mark incomplete' : 'Mark complete'}
-                >
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                </button>
+                <Tooltip content={isDone ? 'Mark incomplete' : 'Mark complete'}>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, e); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                            isDone
+                                ? 'bg-green-500 border-green-500 text-white scale-110'
+                                : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-green-400 hover:text-green-400 hover:scale-110'
+                        }`}
+                    >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </button>
+                </Tooltip>
             </td>
             <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm font-medium max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
                 <div className="flex items-center gap-2 min-w-0">
                     {(task.subtasks_count > 0 || canManageTasks) && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onToggleExpand(task.id); }}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                            title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
-                        >
-                            <svg className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
+                        <Tooltip content={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onToggleExpand(task.id); }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            >
+                                <svg className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </Tooltip>
                     )}
-                    <button
-                        className="truncate min-w-0 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
-                        title={task.title}
-                        onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+                    <Tooltip content={task.title}>
+                        <button
+                            className="truncate min-w-0 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
                         onPointerDown={(e) => e.stopPropagation()}
                     >
                         {task.title}
                     </button>
+                    </Tooltip>
                     {task.is_recurring && (
-                        <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} title="Recurring task">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
+                        <Tooltip content="Recurring task">
+                            <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </Tooltip>
                     )}
                     {task.subtasks_count > 0 && (
                         <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
@@ -571,22 +587,24 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             <td className={`sticky right-0 z-10 ${stickyBg} shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm text-right`}>
                 <div className="flex items-center justify-end gap-1">
                     {canEditTask && (
-                        <Link
-                            href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                            title="Edit"
-                        >
-                            <EditIcon />
-                        </Link>
+                        <Tooltip content="Edit">
+                            <Link
+                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                            >
+                                <EditIcon />
+                            </Link>
+                        </Tooltip>
                     )}
                     {canManageTasks && (
-                        <button
-                            onClick={() => handleDeleteTask(task.id, task.title)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                            title="Delete"
-                        >
-                            <TrashIcon />
-                        </button>
+                        <Tooltip content="Delete">
+                            <button
+                                onClick={() => handleDeleteTask(task.id, task.title)}
+                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                            >
+                                <TrashIcon />
+                            </button>
+                        </Tooltip>
                     )}
                 </div>
             </td>
@@ -730,16 +748,17 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
             <td colSpan={99} className="px-0 py-2">
                 <div className="sticky left-0 flex items-center gap-2 px-4 w-fit">
                     {canManage && (
-                        <button
-                            {...attributes}
-                            {...listeners}
-                            className="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-                            title="Drag to reorder section"
-                        >
-                            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
-                            </svg>
-                        </button>
+                        <Tooltip content="Drag to reorder section">
+                            <button
+                                {...attributes}
+                                {...listeners}
+                                className="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                            >
+                                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                                </svg>
+                            </button>
+                        </Tooltip>
                     )}
                     <button
                         onClick={onToggleCollapse}
@@ -772,24 +791,26 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
                     <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">{taskCount}</span>
                     {canManage && (
                         <>
-                            <Link
-                                href={`/projects/${projectId}/tasks/create?section_id=${section.id}`}
-                                className="ml-auto text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                title="Add task to section"
-                            >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                </svg>
-                            </Link>
-                            <button
-                                onClick={onDelete}
-                                className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                                title="Delete section"
-                            >
-                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
+                            <Tooltip content="Add task to section">
+                                <Link
+                                    href={`/projects/${projectId}/tasks/create?section_id=${section.id}`}
+                                    className="ml-auto text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </Link>
+                            </Tooltip>
+                            <Tooltip content="Delete section">
+                                <button
+                                    onClick={onDelete}
+                                    className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </Tooltip>
                         </>
                     )}
                 </div>
@@ -2568,14 +2589,14 @@ export default function Show() {
                                                 {!cell.outside && (
                                                     <div className="space-y-0.5">
                                                         {visible.map((task) => (
-                                                            <button
-                                                                key={task.id}
-                                                                onClick={() => setDetailTaskId(task.id)}
-                                                                className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity cursor-pointer ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
-                                                                title={task.title}
-                                                            >
-                                                                {task.title}
-                                                            </button>
+                                                            <Tooltip key={task.id} content={task.title}>
+                                                                <button
+                                                                    onClick={() => setDetailTaskId(task.id)}
+                                                                    className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity cursor-pointer ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
+                                                                >
+                                                                    {task.title}
+                                                                </button>
+                                                            </Tooltip>
                                                         ))}
                                                         {overflow > 0 && (
                                                             <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1">+{overflow} more</p>
@@ -2736,16 +2757,17 @@ export default function Show() {
                                             return (
                                                 <div key={task.id} className={`flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${opacityCls}`}>
                                                     <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
-                                                        <button
-                                                            onClick={() => setDetailTaskId(task.id)}
-                                                            className={`text-sm truncate block max-w-full text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
-                                                            title={task.title}
-                                                        >
-                                                            {task.isSubtask && (
-                                                                <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                                                            )}
-                                                            {task.title}
-                                                        </button>
+                                                        <Tooltip content={task.title}>
+                                                            <button
+                                                                onClick={() => setDetailTaskId(task.id)}
+                                                                className={`text-sm truncate block max-w-full text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
+                                                            >
+                                                                {task.isSubtask && (
+                                                                    <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                                                )}
+                                                                {task.title}
+                                                            </button>
+                                                        </Tooltip>
                                                         <div className="flex items-center gap-1.5 mt-0.5">
                                                             {task.assignee && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate">{task.assignee.name}</span>}
                                                         </div>
@@ -2767,11 +2789,11 @@ export default function Show() {
                                                         </div>
                                                         {/* Task bar */}
                                                         {barOffset >= 0 && barOffset < days.length && (
+                                                            <Tooltip content={`${task.title} — ${tooltipDate} — ${formatLabel(task.status)}`}>
                                                             <Link
                                                                 href={`/projects/${project.id}/tasks/${task.id}/edit`}
                                                                 className="absolute top-1/2 -translate-y-1/2 group z-10"
                                                                 style={{ left: `${barOffset * COL_WIDTH + (hasRange ? 0 : COL_WIDTH / 2 - 12)}px` }}
-                                                                title={`${task.title} — ${tooltipDate} — ${formatLabel(task.status)}`}
                                                             >
                                                                 <div
                                                                     className={`h-5 rounded-full ${barColor} shadow-sm group-hover:shadow-md transition-shadow flex items-center justify-center`}
@@ -2780,6 +2802,7 @@ export default function Show() {
                                                                     <span className="text-[9px] text-white font-medium truncate px-1.5">{task.title}</span>
                                                                 </div>
                                                             </Link>
+                                                            </Tooltip>
                                                         )}
                                                     </div>
                                                 </div>
@@ -2918,7 +2941,7 @@ export default function Show() {
                                             {TASK_STATUSES.map((s) => {
                                                 const pct = stats.total > 0 ? (stats.byStatus[s] / stats.total) * 100 : 0;
                                                 if (pct === 0) return null;
-                                                return <div key={s} className={`${STATUS_COLORS[s].bar} transition-all duration-500`} style={{ width: `${pct}%` }} title={`${formatLabel(s)}: ${stats.byStatus[s]}`} />;
+                                                return <Tooltip key={s} content={`${formatLabel(s)}: ${stats.byStatus[s]}`}><div className={`${STATUS_COLORS[s].bar} transition-all duration-500`} style={{ width: `${pct}%` }} /></Tooltip>;
                                             })}
                                         </div>
                                         {/* Legend */}
@@ -3106,11 +3129,13 @@ export default function Show() {
                     <button onClick={() => handleBulkAction('delete')} className="text-sm px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors">Delete</button>
 
                     {/* Close */}
-                    <button onClick={clearSelection} className="p-1 rounded hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors ml-1" title="Clear selection">
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <Tooltip content="Clear selection">
+                        <button onClick={clearSelection} className="p-1 rounded hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors ml-1">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </Tooltip>
                 </div>
             )}
 

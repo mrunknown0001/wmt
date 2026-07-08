@@ -4,6 +4,7 @@ import StatusBadge from './StatusBadge';
 import PriorityBadge from './PriorityBadge';
 import Avatar from './Avatar';
 import RichTextEditor from './RichTextEditor';
+import Tooltip from './Tooltip';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo } from '../utils';
 
 function formatFileSize(bytes) {
@@ -168,15 +169,17 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                         <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">Task Details</h2>
                     </div>
                     <div className="flex items-center gap-2">
+                        <Tooltip content="Open full editor">
                         <Link
                             href={`/projects/${projectId}/tasks/${taskId}/edit`}
                             className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                            title="Open full editor"
                         >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                         </Link>
+                        </Tooltip>
+                        <Tooltip content="Close">
                         <button
                             onClick={handleClose}
                             className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -185,6 +188,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
+                        </Tooltip>
                     </div>
                 </div>
 

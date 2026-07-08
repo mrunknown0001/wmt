@@ -1,4 +1,5 @@
 import Card from '../Card';
+import Tooltip from '../Tooltip';
 import { formatLabel, svgStatusColors } from '../../utils';
 
 export default function TaskStatsBar({ taskStats }) {
@@ -35,12 +36,12 @@ export default function TaskStatsBar({ taskStats }) {
                 <>
                     <div className="flex h-3 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
                         {Object.entries(byStatus).map(([status, count]) => (
-                            <div
-                                key={status}
-                                style={{ width: `${(count / total) * 100}%`, backgroundColor: svgStatusColors[status] }}
-                                className="transition-all"
-                                title={`${formatLabel(status)}: ${count}`}
-                            />
+                            <Tooltip key={status} content={`${formatLabel(status)}: ${count}`}>
+                                <div
+                                    style={{ width: `${(count / total) * 100}%`, backgroundColor: svgStatusColors[status] }}
+                                    className="transition-all h-full"
+                                />
+                            </Tooltip>
                         ))}
                     </div>
                     <div className="flex flex-wrap gap-3 mt-2">

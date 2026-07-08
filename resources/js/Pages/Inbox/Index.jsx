@@ -6,6 +6,7 @@ import Card from '../../Components/Card';
 import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
 import Button from '../../Components/Button';
+import Tooltip from '../../Components/Tooltip';
 
 function timeAgo(dateString) {
     const date = new Date(dateString);
@@ -303,41 +304,44 @@ export default function Index({ notifications, filter = 'inbox' }) {
                                     {/* Action buttons */}
                                     <div className="flex items-center gap-1 shrink-0">
                                         {/* Bookmark toggle */}
-                                        <button
-                                            onClick={(e) => handleToggleBookmark(e, notification)}
-                                            className={`p-1.5 rounded-md transition-all duration-150 ${
-                                                notification.bookmarked_at
-                                                    ? 'text-amber-500 hover:text-amber-600 dark:text-amber-400'
-                                                    : 'text-gray-300 opacity-0 group-hover:opacity-100 hover:text-amber-500 dark:text-gray-600 dark:hover:text-amber-400'
-                                            }`}
-                                            title={notification.bookmarked_at ? 'Remove bookmark' : 'Bookmark'}
-                                        >
-                                            <svg className="h-4 w-4" fill={notification.bookmarked_at ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                                            </svg>
-                                        </button>
+                                        <Tooltip content={notification.bookmarked_at ? 'Remove bookmark' : 'Bookmark'}>
+                                            <button
+                                                onClick={(e) => handleToggleBookmark(e, notification)}
+                                                className={`p-1.5 rounded-md transition-all duration-150 ${
+                                                    notification.bookmarked_at
+                                                        ? 'text-amber-500 hover:text-amber-600 dark:text-amber-400'
+                                                        : 'text-gray-300 opacity-0 group-hover:opacity-100 hover:text-amber-500 dark:text-gray-600 dark:hover:text-amber-400'
+                                                }`}
+                                            >
+                                                <svg className="h-4 w-4" fill={notification.bookmarked_at ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                                </svg>
+                                            </button>
+                                        </Tooltip>
 
                                         {/* Archive / Unarchive */}
                                         {filter === 'archived' ? (
-                                            <button
-                                                onClick={(e) => handleUnarchive(e, notification)}
-                                                className="p-1.5 rounded-md text-gray-300 opacity-0 group-hover:opacity-100 hover:text-blue-500 dark:text-gray-600 dark:hover:text-blue-400 transition-all duration-150"
-                                                title="Move to inbox"
-                                            >
-                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                                </svg>
-                                            </button>
+                                            <Tooltip content="Move to inbox">
+                                                <button
+                                                    onClick={(e) => handleUnarchive(e, notification)}
+                                                    className="p-1.5 rounded-md text-gray-300 opacity-0 group-hover:opacity-100 hover:text-blue-500 dark:text-gray-600 dark:hover:text-blue-400 transition-all duration-150"
+                                                >
+                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                    </svg>
+                                                </button>
+                                            </Tooltip>
                                         ) : (
-                                            <button
-                                                onClick={(e) => handleArchive(e, notification)}
-                                                className="p-1.5 rounded-md text-gray-300 opacity-0 group-hover:opacity-100 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-all duration-150"
-                                                title="Archive"
-                                            >
-                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                                                </svg>
-                                            </button>
+                                            <Tooltip content="Archive">
+                                                <button
+                                                    onClick={(e) => handleArchive(e, notification)}
+                                                    className="p-1.5 rounded-md text-gray-300 opacity-0 group-hover:opacity-100 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-all duration-150"
+                                                >
+                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                                    </svg>
+                                                </button>
+                                            </Tooltip>
                                         )}
 
                                         {/* Unread dot */}

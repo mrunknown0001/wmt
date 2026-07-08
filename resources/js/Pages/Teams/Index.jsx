@@ -8,6 +8,7 @@ import LinkButton from '../../Components/LinkButton';
 import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
 import { ConfirmModal } from '../../Components/Modal';
+import Tooltip from '../../Components/Tooltip';
 
 const EditIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -142,20 +143,22 @@ export default function Index() {
                                             <td className="px-6 py-4 text-sm text-right">
                                                 {canManage && (
                                                     <div className="flex items-center justify-end gap-1">
-                                                        <Link
-                                                            href={`/teams/${team.id}/edit`}
-                                                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                                                            title="Edit"
-                                                        >
-                                                            <EditIcon />
-                                                        </Link>
-                                                        <button
-                                                            onClick={() => setDeleteTarget(team)}
-                                                            className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                                                            title="Delete"
-                                                        >
-                                                            <TrashIcon />
-                                                        </button>
+                                                        <Tooltip content="Edit">
+                                                            <Link
+                                                                href={`/teams/${team.id}/edit`}
+                                                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                                                            >
+                                                                <EditIcon />
+                                                            </Link>
+                                                        </Tooltip>
+                                                        <Tooltip content="Delete">
+                                                            <button
+                                                                onClick={() => setDeleteTarget(team)}
+                                                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                                                            >
+                                                                <TrashIcon />
+                                                            </button>
+                                                        </Tooltip>
                                                     </div>
                                                 )}
                                             </td>

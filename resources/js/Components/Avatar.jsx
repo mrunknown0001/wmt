@@ -1,4 +1,5 @@
 import { getInitials } from '../utils';
+import Tooltip from './Tooltip';
 
 const gradients = [
     'from-blue-500 to-indigo-600',
@@ -31,11 +32,12 @@ export default function Avatar({ name, size = 'md', className = '' }) {
     const gradientClass = gradients[hashName(name)];
 
     return (
-        <span
-            className={`inline-flex items-center justify-center rounded-full text-white font-medium shrink-0 bg-linear-to-br ${gradientClass} shadow-sm ${sizes[size]} ${className}`}
-            title={name || 'Unknown'}
-        >
-            {getInitials(name)}
-        </span>
+        <Tooltip content={name || 'Unknown'}>
+            <span
+                className={`inline-flex items-center justify-center rounded-full text-white font-medium shrink-0 bg-linear-to-br ${gradientClass} shadow-sm ${sizes[size]} ${className}`}
+            >
+                {getInitials(name)}
+            </span>
+        </Tooltip>
     );
 }

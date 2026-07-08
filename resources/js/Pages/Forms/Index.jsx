@@ -7,6 +7,7 @@ import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import Badge from '../../Components/Badge';
 import { ConfirmModal } from '../../Components/Modal';
+import Tooltip from '../../Components/Tooltip';
 import { apiFetch } from '../../utils';
 
 export default function FormsIndex() {
@@ -88,13 +89,14 @@ export default function FormsIndex() {
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2 ml-4">
-                                    <button
-                                        onClick={() => copyUrl(form)}
-                                        className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                                        title="Copy public URL"
-                                    >
-                                        {copied === form.id ? 'Copied!' : 'Copy Link'}
-                                    </button>
+                                    <Tooltip content="Copy public URL">
+                                        <button
+                                            onClick={() => copyUrl(form)}
+                                            className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                        >
+                                            {copied === form.id ? 'Copied!' : 'Copy Link'}
+                                        </button>
+                                    </Tooltip>
                                     <button
                                         onClick={() => handleToggle(form)}
                                         className={`text-xs px-2 py-1 rounded border transition-colors ${

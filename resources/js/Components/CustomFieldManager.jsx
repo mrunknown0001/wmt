@@ -5,6 +5,7 @@ import Input from './Input';
 import Select from './Select';
 import Modal from './Modal';
 import { ConfirmModal } from './Modal';
+import Tooltip from './Tooltip';
 import { apiFetch } from '../utils';
 
 const FIELD_TYPES = [
@@ -337,29 +338,33 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
                             } ${dragIndex === index ? 'opacity-50' : ''}`}
                         >
                             <div className="flex items-center gap-3">
-                                <span className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Drag to reorder">
-                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
-                                </span>
+                                <Tooltip content="Drag to reorder">
+                                    <span className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                                    </span>
+                                </Tooltip>
                                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{field.name}</span>
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
                                     {typeLabel(field.type)}
                                 </span>
                             </div>
                             <div className="flex items-center gap-1">
-                                <button
-                                    onClick={() => openEdit(field)}
-                                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                                    title="Edit"
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                </button>
-                                <button
-                                    onClick={() => setDeleteField(field)}
-                                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                                    title="Delete"
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
+                                <Tooltip content="Edit">
+                                    <button
+                                        onClick={() => openEdit(field)}
+                                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    </button>
+                                </Tooltip>
+                                <Tooltip content="Delete">
+                                    <button
+                                        onClick={() => setDeleteField(field)}
+                                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                </Tooltip>
                             </div>
                         </div>
                     ))}

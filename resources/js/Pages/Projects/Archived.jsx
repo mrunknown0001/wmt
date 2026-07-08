@@ -9,6 +9,7 @@ import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
 import { formatDate } from '../../utils';
 import { ConfirmModal } from '../../Components/Modal';
+import Tooltip from '../../Components/Tooltip';
 
 const UnarchiveIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -122,20 +123,22 @@ export default function Archived() {
                                                 <div className="flex items-center justify-end gap-1">
                                                     {canManage(project) && (
                                                         <>
-                                                            <button
-                                                                onClick={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
-                                                                className="p-1.5 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
-                                                                title="Unarchive"
-                                                            >
-                                                                <UnarchiveIcon />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setDeleteTarget(project)}
-                                                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                                                                title="Delete"
-                                                            >
-                                                                <TrashIcon />
-                                                            </button>
+                                                            <Tooltip content="Unarchive">
+                                                                <button
+                                                                    onClick={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
+                                                                    className="p-1.5 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
+                                                                >
+                                                                    <UnarchiveIcon />
+                                                                </button>
+                                                            </Tooltip>
+                                                            <Tooltip content="Delete">
+                                                                <button
+                                                                    onClick={() => setDeleteTarget(project)}
+                                                                    className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                                                                >
+                                                                    <TrashIcon />
+                                                                </button>
+                                                            </Tooltip>
                                                         </>
                                                     )}
                                                 </div>

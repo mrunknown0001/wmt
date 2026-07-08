@@ -12,6 +12,7 @@ import LinkButton from '../../Components/LinkButton';
 import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
+import Tooltip from '../../Components/Tooltip';
 import { formatLabel, apiFetch, taskEditUrl } from '../../utils';
 import echo from '../../echo';
 
@@ -190,16 +191,17 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone }) {
                                     )}
                                 </a>
                                 {att.download_url && (
-                                    <a
-                                        href={att.download_url}
-                                        className="absolute top-1 right-1 p-1 rounded-md bg-white/80 dark:bg-gray-800/80 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                        title="Download"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                        </svg>
-                                    </a>
+                                    <Tooltip content="Download">
+                                        <a
+                                            href={att.download_url}
+                                            className="absolute top-1 right-1 p-1 rounded-md bg-white/80 dark:bg-gray-800/80 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                            </svg>
+                                        </a>
+                                    </Tooltip>
                                 )}
                             </div>
                         ))}
@@ -647,18 +649,20 @@ export default function Edit() {
                                     )}
 
                                     <div className="flex items-center justify-between mt-2">
-                                        <label className="cursor-pointer text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="Attach files">
-                                            <input
-                                                type="file"
-                                                multiple
-                                                accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4,.mov,.avi,.wmv,.webm,.xls,.xlsx,.csv"
-                                                onChange={handleFileSelect}
-                                                className="hidden"
-                                            />
-                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-                                            </svg>
-                                        </label>
+                                        <Tooltip content="Attach files">
+                                            <label className="cursor-pointer text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                                                <input
+                                                    type="file"
+                                                    multiple
+                                                    accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4,.mov,.avi,.wmv,.webm,.xls,.xlsx,.csv"
+                                                    onChange={handleFileSelect}
+                                                    className="hidden"
+                                                />
+                                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                                                </svg>
+                                            </label>
+                                        </Tooltip>
                                         <Button type="submit" size="sm" processing={posting} processingText="Posting..." disabled={(!commentBody || commentBody === '<p></p>') && attachments.length === 0}>
                                             Comment
                                         </Button>
@@ -714,16 +718,17 @@ export default function Edit() {
                                                         )}
                                                     </a>
                                                     {att.download_url && (
-                                                        <a
-                                                            href={att.download_url}
-                                                            className="absolute top-1 right-1 p-1 rounded-md bg-white/80 dark:bg-gray-800/80 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                                            title="Download"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                                            </svg>
-                                                        </a>
+                                                        <Tooltip content="Download">
+                                                            <a
+                                                                href={att.download_url}
+                                                                className="absolute top-1 right-1 p-1 rounded-md bg-white/80 dark:bg-gray-800/80 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                                                </svg>
+                                                            </a>
+                                                        </Tooltip>
                                                     )}
                                                 </div>
                                             ))}

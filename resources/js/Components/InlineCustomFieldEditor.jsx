@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import InlinePopover from './InlinePopover';
 import InlineDatePicker from './InlineDatePicker';
+import Tooltip from './Tooltip';
 
 function SelectOptions({ options, selectedId, onSelect }) {
     return (
@@ -166,7 +167,7 @@ function DisplayValue({ customField, cfv, formatDate }) {
     switch (customField.type) {
         case 'text':
         case 'textarea':
-            return <span className={customField.type === 'textarea' ? 'line-clamp-2' : 'truncate block max-w-xs'} title={cfv.value_text || undefined}>{cfv.value_text || '—'}</span>;
+            return <Tooltip content={cfv.value_text || undefined}><span className={customField.type === 'textarea' ? 'line-clamp-2' : 'truncate block max-w-xs'}>{cfv.value_text || '—'}</span></Tooltip>;
         case 'number':
             return <span>{cfv.value_number != null ? cfv.value_number : '—'}</span>;
         case 'date':

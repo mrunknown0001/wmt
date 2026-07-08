@@ -3,6 +3,7 @@ import { router, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import PageHeader from '../Components/PageHeader';
 import StatusBadge from '../Components/StatusBadge';
+import Tooltip from '../Components/Tooltip';
 import { taskEditUrl } from '../utils';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -26,14 +27,15 @@ const MAX_VISIBLE_TASKS = 3;
 
 function TaskPill({ task }) {
     return (
-        <Link
-            href={taskEditUrl(task)}
-            onClick={(e) => e.stopPropagation()}
-            className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
-            title={`${task.title} (${task.project?.name || 'No project'})`}
-        >
-            {task.title}
-        </Link>
+        <Tooltip content={`${task.title} (${task.project?.name || 'No project'})`}>
+            <Link
+                href={taskEditUrl(task)}
+                onClick={(e) => e.stopPropagation()}
+                className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
+            >
+                {task.title}
+            </Link>
+        </Tooltip>
     );
 }
 

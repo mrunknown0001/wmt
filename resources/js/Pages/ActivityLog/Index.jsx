@@ -6,6 +6,7 @@ import Card from '../../Components/Card';
 import Badge from '../../Components/Badge';
 import Avatar from '../../Components/Avatar';
 import Pagination from '../../Components/Pagination';
+import Tooltip from '../../Components/Tooltip';
 import { formatLabel, timeAgo } from '../../utils';
 
 const ENTITY_COLORS = {
@@ -41,13 +42,15 @@ function ActivityOverTimeChart({ data }) {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Activity Over Time (30 days)</h3>
             <div className="flex items-end gap-0.5 h-32">
                 {entries.map(([date, count]) => (
-                    <div key={date} className="flex-1 flex flex-col items-center justify-end h-full group relative" title={`${date}: ${count}`}>
-                        <div className="absolute -top-5 hidden group-hover:block text-xs text-gray-500 bg-white dark:bg-gray-800 px-1 rounded shadow">{count}</div>
-                        <div
-                            className="w-full bg-blue-500 dark:bg-blue-400 rounded-t transition-all"
-                            style={{ height: `${Math.max((count / maxCount) * 100, 4)}%` }}
-                        />
-                    </div>
+                    <Tooltip key={date} content={`${date}: ${count}`}>
+                        <div className="flex-1 flex flex-col items-center justify-end h-full group relative">
+                            <div className="absolute -top-5 hidden group-hover:block text-xs text-gray-500 bg-white dark:bg-gray-800 px-1 rounded shadow">{count}</div>
+                            <div
+                                className="w-full bg-blue-500 dark:bg-blue-400 rounded-t transition-all"
+                                style={{ height: `${Math.max((count / maxCount) * 100, 4)}%` }}
+                            />
+                        </div>
+                    </Tooltip>
                 ))}
             </div>
             <div className="flex justify-between mt-1">

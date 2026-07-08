@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Button from './Button';
+import Tooltip from './Tooltip';
 
 const SIZES = {
     sm: 'max-w-sm',
@@ -48,11 +49,13 @@ export default function Modal({ isOpen, onClose, title, children, actions, size 
                 {title && (
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-                        <button onClick={handleClose} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                        <Tooltip content="Close">
+                            <button onClick={handleClose} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </Tooltip>
                     </div>
                 )}
                 <div className="text-sm text-gray-600 dark:text-gray-300">{children}</div>

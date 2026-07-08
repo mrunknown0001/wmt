@@ -20,6 +20,7 @@ import Input from './Input';
 import Select from './Select';
 import Button from './Button';
 import Modal, { ConfirmModal } from './Modal';
+import Tooltip from './Tooltip';
 
 const FIELD_TYPES = [
     { value: 'text', label: 'Text Input', icon: 'A' },
@@ -97,17 +98,18 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
         <div ref={setNodeRef} style={style} className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
             {/* Collapsed Row */}
             <div className="flex items-center gap-2 px-3 py-2.5">
-                <button
-                    {...attributes}
-                    {...listeners}
-                    className="shrink-0 cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 touch-none"
-                    title="Drag to reorder"
-                    type="button"
-                >
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
-                    </svg>
-                </button>
+                <Tooltip content="Drag to reorder">
+                    <button
+                        {...attributes}
+                        {...listeners}
+                        className="shrink-0 cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 touch-none"
+                        type="button"
+                    >
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                        </svg>
+                    </button>
+                </Tooltip>
                 <span className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
                     {getFieldIcon(field.type)}
                 </span>
@@ -130,26 +132,28 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                 {field.conditions?.rules?.length > 0 && (
                     <span className="text-xs text-purple-600 dark:text-purple-400 shrink-0">Conditional</span>
                 )}
-                <button
-                    type="button"
-                    onClick={() => onToggleExpand(fieldIndex)}
-                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors shrink-0"
-                    title={isExpanded ? 'Collapse' : 'Expand'}
-                >
-                    <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                </button>
-                <button
-                    type="button"
-                    onClick={() => onRemove(fieldIndex)}
-                    className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                    title="Remove"
-                >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                </button>
+                <Tooltip content={isExpanded ? 'Collapse' : 'Expand'}>
+                    <button
+                        type="button"
+                        onClick={() => onToggleExpand(fieldIndex)}
+                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors shrink-0"
+                    >
+                        <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                </Tooltip>
+                <Tooltip content="Remove">
+                    <button
+                        type="button"
+                        onClick={() => onRemove(fieldIndex)}
+                        className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </Tooltip>
             </div>
 
             {/* Expanded Config */}
@@ -473,16 +477,17 @@ function ConditionRuleRow({ rule, index, availableFields, onUpdate, onRemove }) 
                 {getOperators().map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             {renderValueInput()}
-            <button
-                type="button"
-                onClick={() => onRemove(index)}
-                className="text-gray-400 hover:text-red-500 shrink-0"
-                title="Remove condition"
-            >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
+            <Tooltip content="Remove condition">
+                <button
+                    type="button"
+                    onClick={() => onRemove(index)}
+                    className="text-gray-400 hover:text-red-500 shrink-0"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </Tooltip>
         </div>
     );
 }

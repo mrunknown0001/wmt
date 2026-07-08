@@ -1,4 +1,5 @@
 import { useTheme } from '../ThemeContext';
+import Tooltip from './Tooltip';
 
 const SunIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -16,13 +17,14 @@ export default function ThemeToggle({ className = '' }) {
     const { theme, toggleTheme } = useTheme();
 
     return (
-        <button
-            onClick={toggleTheme}
-            className={`p-1.5 rounded-lg transition-colors ${className}`}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-        </button>
+        <Tooltip content={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+            <button
+                onClick={toggleTheme}
+                className={`p-1.5 rounded-lg transition-colors ${className}`}
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+                {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            </button>
+        </Tooltip>
     );
 }

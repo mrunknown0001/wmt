@@ -7,21 +7,23 @@ import Mention from '@tiptap/extension-mention';
 import { useEffect, useCallback, useMemo } from 'react';
 import tippy from 'tippy.js';
 import MentionList from './MentionList';
+import Tooltip from './Tooltip';
 
 function ToolbarButton({ onClick, active, title, children }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            title={title}
-            className={`p-1.5 rounded transition-colors ${
-                active
-                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
-            }`}
-        >
-            {children}
-        </button>
+        <Tooltip content={title}>
+            <button
+                type="button"
+                onClick={onClick}
+                className={`p-1.5 rounded transition-colors ${
+                    active
+                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
+                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
+                }`}
+            >
+                {children}
+            </button>
+        </Tooltip>
     );
 }
 

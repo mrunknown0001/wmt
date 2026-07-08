@@ -4,6 +4,7 @@ import Button from './Button';
 import Input from './Input';
 import Badge from './Badge';
 import EmptyState from './EmptyState';
+import Tooltip from './Tooltip';
 import { apiFetch, formatLabel } from '../utils';
 
 const TRIGGER_TYPES = [
@@ -250,11 +251,11 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections, c
                 {/* Value input */}
                 {renderValueInput()}
             </div>
-            <button onClick={() => onRemove(index)} className="mt-2 text-gray-400 hover:text-red-500 transition-colors shrink-0" title="Remove condition">
+            <Tooltip content="Remove condition"><button onClick={() => onRemove(index)} className="mt-2 text-gray-400 hover:text-red-500 transition-colors shrink-0">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-            </button>
+            </button></Tooltip>
         </div>
     );
 }
@@ -404,11 +405,11 @@ function ActionRow({ action, index, onChange, onRemove, users, sections, customF
                     </p>
                 )}
             </div>
-            <button onClick={() => onRemove(index)} className="mt-2 text-gray-400 hover:text-red-500 transition-colors shrink-0" title="Remove action">
+            <Tooltip content="Remove action"><button onClick={() => onRemove(index)} className="mt-2 text-gray-400 hover:text-red-500 transition-colors shrink-0">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-            </button>
+            </button></Tooltip>
         </div>
     );
 }
