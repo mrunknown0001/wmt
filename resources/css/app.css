@@ -284,6 +284,12 @@
     background-color: var(--color-primary-500);
 }
 
+/* Strip bottom margin from last content element inside main (prevents trailing whitespace) */
+main > *:last-child,
+main > *:last-child > *:last-child {
+    margin-bottom: 0;
+}
+
 /* Subtle dot pattern for main content area */
 .bg-pattern {
     background-image: radial-gradient(circle, rgb(0 0 0 / 0.04) 1px, transparent 1px);
