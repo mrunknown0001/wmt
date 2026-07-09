@@ -2,6 +2,13 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+html, body {
+    background-color: #f9fafb; /* gray-50 */
+}
+html.dark, html.dark body {
+    background-color: #111827; /* gray-900 */
+}
+
 /* ── Animation timing tokens ── */
 :root {
     --duration-fast: 150ms;
