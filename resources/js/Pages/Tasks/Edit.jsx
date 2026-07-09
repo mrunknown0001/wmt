@@ -702,16 +702,14 @@ export default function Edit() {
                                         className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                                     />
                                     <div className="flex items-center gap-2">
-                                        <select
+                                        <SearchableSelect
                                             value={newSubtaskAssignee}
-                                            onChange={(e) => setNewSubtaskAssignee(e.target.value)}
-                                            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                                        >
-                                            <option value="">Unassigned</option>
-                                            {users.map(u => (
-                                                <option key={u.id} value={u.id}>{u.name}</option>
-                                            ))}
-                                        </select>
+                                            onChange={(val) => setNewSubtaskAssignee(val)}
+                                            options={users.map(u => ({ value: u.id, label: u.name }))}
+                                            placeholder="Unassigned"
+                                            showAvatar
+                                            className="flex-1"
+                                        />
                                         <input
                                             type="date"
                                             value={newSubtaskDueDate}
