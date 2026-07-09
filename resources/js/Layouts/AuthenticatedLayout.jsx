@@ -26,6 +26,12 @@ const FolderIcon = () => (
     </svg>
 );
 
+const ArchiveIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+    </svg>
+);
+
 const BuildingIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -185,8 +191,11 @@ export default function AuthenticatedLayout({ children, title }) {
 
                 {hasPermission('view-projects') && (
                     <div className="space-y-0.5">
-                        <NavLink href="/projects" icon={<FolderIcon />} active={isActive('/projects')} collapsed={collapsed}>
+                        <NavLink href="/projects" icon={<FolderIcon />} active={currentUrl === '/projects' || (currentUrl.startsWith('/projects') && !currentUrl.startsWith('/projects/archived'))} collapsed={collapsed}>
                             Projects
+                        </NavLink>
+                        <NavLink href="/projects/archived" icon={<ArchiveIcon />} active={currentUrl.startsWith('/projects/archived')} collapsed={collapsed}>
+                            Archived
                         </NavLink>
                     </div>
                 )}

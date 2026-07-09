@@ -13,26 +13,28 @@ import { ConfirmModal } from '../../Components/Modal';
 import ProjectContextMenu from '../../Components/ProjectContextMenu';
 import DuplicateProjectModal from '../../Components/DuplicateProjectModal';
 
-const PROJECT_STATUSES = ['active', 'on_hold', 'completed', 'archived'];
+const PROJECT_STATUSES = ['active', 'on_hold', 'completed'];
 
 export default function Index() {
-    const { projects, auth, filters } = usePage().props;
+    const { projects, auth, filters, owners = [] } = usePage().props;
     const canManageAll = auth.user?.permissions?.includes('manage-projects');
     const canManage = (project) => canManageAll || project.owner_id === auth.user?.id || project.user_is_admin;
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [duplicateTarget, setDuplicateTarget] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
     const [status, setStatus] = useState(filters?.status || '');
+    const [owner, setOwner] = useState(filters?.owner || '');
     const debounceRef = useRef(null);
 
     const applyFilters = useCallback((overrides = {}) => {
         const params = {
             search: overrides.search ?? search,
             status: overrides.status ?? status,
+            owner: overrides.owner ?? owner,
         };
         Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; });
         router.get('/projects', params, { preserveState: true, preserveScroll: true });
-    }, [search, status]);
+    }, [search, status, owner]);
 
     const handleSearchChange = (value) => {
         setSearch(value);
@@ -45,13 +47,19 @@ export default function Index() {
         applyFilters({ status: value });
     };
 
+    const handleOwnerChange = (value) => {
+        setOwner(value);
+        applyFilters({ owner: value });
+    };
+
     const clearFilters = () => {
         setSearch('');
         setStatus('');
+        setOwner('');
         router.get('/projects', {}, { preserveState: true, preserveScroll: true });
     };
 
-    const hasActiveFilters = search || status;
+    const hasActiveFilters = search || status || owner;
 
     const handleDelete = () => {
         if (deleteTarget) {
@@ -96,6 +104,16 @@ export default function Index() {
                             <option key={s} value={s}>{formatLabel(s)}</option>
                         ))}
                     </select>
+                    <select
+                        value={owner}
+                        onChange={(e) => handleOwnerChange(e.target.value)}
+                        className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                        <option value="">All Owners</option>
+                        {owners.map((o) => (
+                            <option key={o.id} value={o.id}>{o.name}</option>
+                        ))}
+                    </select>
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
@@ -104,6 +122,17 @@ export default function Index() {
                             Clear
                         </button>
                     )}
+                    <div className="ml-auto">
+                        <button
+                            onClick={() => router.visit('/projects/archived')}
+                            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                        >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                            </svg>
+                            Archived
+                        </button>
+                    </div>
                 </div>
 
                 <Card padding={false}>

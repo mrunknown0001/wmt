@@ -26,6 +26,7 @@ class ProjectController extends Controller
         $userId = $user->id;
 
         $query = Project::with('owner')
+            ->where('status', '!=', 'archived')
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
 
@@ -44,6 +45,10 @@ class ProjectController extends Controller
 
         if ($status = $request->input('status')) {
             $query->where('status', $status);
+        }
+
+        if ($ownerId = $request->input('owner')) {
+            $query->where('owner_id', $ownerId);
         }
 
         $projects = $query->orderBy('created_at', 'desc')
@@ -68,7 +73,10 @@ class ProjectController extends Controller
             'filters' => [
                 'search' => $request->input('search', ''),
                 'status' => $request->input('status', ''),
+                'owner' => $request->input('owner', ''),
             ],
+            'owners' => User::whereHas('ownedProjects', fn ($q) => $q->where('status', '!=', 'archived'))
+                ->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -97,6 +105,10 @@ class ProjectController extends Controller
             $query->where('name', 'like', '%' . $search . '%');
         }
 
+        if ($ownerId = $request->input('owner')) {
+            $query->where('owner_id', $ownerId);
+        }
+
         $projects = $query->orderBy('updated_at', 'desc')
             ->paginate(20)
             ->withQueryString();
@@ -117,7 +129,10 @@ class ProjectController extends Controller
             'projects' => $projects,
             'filters' => [
                 'search' => $request->input('search', ''),
+                'owner' => $request->input('owner', ''),
             ],
+            'owners' => User::whereHas('ownedProjects', fn ($q) => $q->where('status', 'archived'))
+                ->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
