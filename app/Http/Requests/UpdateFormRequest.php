@@ -46,7 +46,7 @@ class UpdateFormRequest extends FormRequest
             'fields.*.conditions.rules.*.field_id' => ['nullable', 'integer'],
             'fields.*.conditions.rules.*.operator' => ['required', 'string', 'in:equals,not_equals,contains,is_empty,is_not_empty'],
             'fields.*.conditions.rules.*.value' => ['nullable'],
-            'fields.*.maps_to' => ['nullable', 'string', 'in:title,description,custom_field'],
+            'fields.*.maps_to' => ['nullable', 'string', 'in:title,description,custom_field,assignee'],
             'fields.*.custom_field_id' => ['nullable', 'exists:custom_fields,id'],
         ];
     }

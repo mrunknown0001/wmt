@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FormField extends Model
 {
-    public const TYPES = ['text', 'textarea', 'select', 'multi_select', 'date', 'number', 'heading', 'description', 'attachment'];
+    public const TYPES = ['text', 'textarea', 'select', 'multi_select', 'date', 'number', 'email', 'heading', 'description', 'attachment'];
     public const STATIC_TYPES = ['heading', 'description'];
 
     protected $fillable = [

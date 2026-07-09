@@ -27,6 +27,7 @@ const FIELD_TYPES = [
     { value: 'textarea', label: 'Text Area', icon: 'P' },
     { value: 'number', label: 'Number', icon: '#' },
     { value: 'date', label: 'Date', icon: 'D' },
+    { value: 'email', label: 'Email', icon: '@' },
     { value: 'select', label: 'Dropdown', icon: 'v' },
     { value: 'multi_select', label: 'Multi Select', icon: 'M' },
     { value: 'attachment', label: 'Attachment', icon: '📎' },
@@ -83,12 +84,16 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
     allFields.forEach((f, i) => {
         if (i === fieldIndex) return;
         if (f.maps_to === 'description') usedMappings.add('description');
+        if (f.maps_to === 'assignee') usedMappings.add('assignee');
         if (f.maps_to === 'custom_field' && f.custom_field_id) usedMappings.add(`custom_field:${f.custom_field_id}`);
     });
 
     const mapOptions = [{ value: '', label: 'No mapping' }];
     if (!usedMappings.has('description')) {
         mapOptions.push({ value: 'description', label: 'Task Description' });
+    }
+    if (field.type === 'email' && field.config?.email_mode === 'registered_user' && !usedMappings.has('assignee')) {
+        mapOptions.push({ value: 'assignee', label: 'Task Assignee (auto-assign)' });
     }
 
     const isCustomFieldMapped = field.maps_to === 'custom_field' && field.custom_field_id;
@@ -235,6 +240,28 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                         />
                     )}
 
+                    {/* Email mode selector */}
+                    {field.type === 'email' && (
+                        <Select
+                            label="Email Mode"
+                            id={`field-${fieldIndex}-email-mode`}
+                            value={field.config?.email_mode || 'plain'}
+                            onChange={(e) => {
+                                const newMode = e.target.value;
+                                const newConfig = { ...field.config, email_mode: newMode };
+                                const updates = { config: newConfig };
+                                if (newMode !== 'registered_user' && field.maps_to === 'assignee') {
+                                    updates.maps_to = null;
+                                }
+                                onChange(fieldIndex, { ...field, ...updates });
+                            }}
+                            options={[
+                                { value: 'plain', label: 'Plain email (validates format only)' },
+                                { value: 'registered_user', label: 'Registered user (must match a user)' },
+                            ]}
+                        />
+                    )}
+
                     {/* Maps To for non-custom-field items */}
                     {!isStatic && !isCustomFieldMapped && field.type !== 'attachment' && (
                         <Select
@@ -288,6 +315,17 @@ function DefaultValueInput({ field, fieldIndex, onChange, customFields }) {
     const mappedCf = isCustomFieldMapped ? customFields?.find(cf => cf.id === field.custom_field_id) : null;
 
     switch (field.type) {
+        case 'email':
+            return (
+                <Input
+                    label="Default Value"
+                    id={`field-${fieldIndex}-default`}
+                    type="email"
+                    value={field.default_value || ''}
+                    onChange={(e) => onChange('default_value', e.target.value)}
+                    placeholder="Default email (optional)"
+                />
+            );
         case 'text':
         case 'textarea':
             return (
@@ -391,6 +429,7 @@ function ConditionRuleRow({ rule, index, availableFields, onUpdate, onRemove }) 
         switch (selectedField.type) {
             case 'text':
             case 'textarea':
+            case 'email':
                 return [
                     { value: 'equals', label: 'equals' },
                     { value: 'not_equals', label: 'does not equal' },
@@ -954,7 +993,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
             help_text: '',
             is_required: false,
             position: fields.length,
-            config: null,
+            config: type === 'email' ? { email_mode: 'plain' } : null,
             default_value: null,
             is_visible: true,
             conditions: null,

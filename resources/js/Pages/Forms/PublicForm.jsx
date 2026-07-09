@@ -170,6 +170,26 @@ export default function PublicForm() {
                     </p>
                 );
 
+            case 'email':
+                return (
+                    <div key={field.id}>
+                        <Input
+                            label={field.label + (field.is_required ? ' *' : '')}
+                            id={`field-${field.id}`}
+                            type="email"
+                            value={value || ''}
+                            onChange={(e) => setFieldValue(field.id, e.target.value)}
+                            error={fieldError}
+                            placeholder={field.config?.placeholder || ''}
+                            maxLength={255}
+                        />
+                        {field.config?.email_mode === 'registered_user' && (
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Must be a registered user's email address.</p>
+                        )}
+                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                    </div>
+                );
+
             case 'text':
                 return (
                     <div key={field.id}>

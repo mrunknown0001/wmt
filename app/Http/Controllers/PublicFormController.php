@@ -122,19 +122,42 @@ class PublicFormController extends Controller
                 $fieldRules[] = 'nullable';
             }
 
-            match ($field->type) {
-                'text', 'textarea' => $fieldRules[] = 'string',
-                'number' => $fieldRules[] = 'numeric',
-                'date' => $fieldRules[] = 'date',
-                'select' => $fieldRules[] = 'string',
-                'multi_select' => $fieldRules[] = 'array',
-                default => null,
-            };
+            if ($field->type === 'email') {
+                $fieldRules[] = 'string';
+                $fieldRules[] = 'email';
+                if (($field->config['email_mode'] ?? 'plain') === 'registered_user') {
+                    $fieldRules[] = 'exists:users,email';
+                    $fieldRules[] = function ($attribute, $value, $fail) {
+                        $user = \App\Models\User::where('email', $value)->first();
+                        if ($user && !$user->is_active) {
+                            $fail('The selected user is inactive.');
+                        }
+                    };
+                }
+            } else {
+                match ($field->type) {
+                    'text', 'textarea' => $fieldRules[] = 'string',
+                    'number' => $fieldRules[] = 'numeric',
+                    'date' => $fieldRules[] = 'date',
+                    'select' => $fieldRules[] = 'string',
+                    'multi_select' => $fieldRules[] = 'array',
+                    default => null,
+                };
+            }
 
             $rules[$key] = $fieldRules;
         }
 
-        $validated = $request->validate($rules);
+        // Build custom error messages for email fields
+        $messages = [];
+        foreach ($form->fields as $field) {
+            if ($field->type === 'email') {
+                $messages["fields.{$field->id}.exists"] = 'No registered user found with this email address.';
+                $messages["fields.{$field->id}.email"] = 'Please enter a valid email address.';
+            }
+        }
+
+        $validated = $request->validate($rules, $messages);
         $fieldValues = $validated['fields'] ?? [];
 
         // Merge default values for hidden fields
@@ -201,6 +224,13 @@ class PublicFormController extends Controller
 
             if ($field->maps_to === 'description') {
                 $taskData['description'] = $value;
+            } elseif ($field->maps_to === 'assignee' && $field->type === 'email') {
+                $assigneeUser = \App\Models\User::where('email', $value)
+                    ->where('is_active', true)
+                    ->first();
+                if ($assigneeUser) {
+                    $taskData['assigned_to'] = $assigneeUser->id;
+                }
             } elseif ($field->maps_to === 'custom_field' && $field->custom_field_id) {
                 $customFieldMappings[$field->custom_field_id] = $value;
             }
