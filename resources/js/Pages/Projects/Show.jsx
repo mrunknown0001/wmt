@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     DndContext,
@@ -758,7 +759,9 @@ const SECTION_COLORS = [
 
 function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditing, editingName, onEditName, onStartEditing, onRename, onCancelEditing, onAddTask, onDelete, onColorChange, canManage, projectId, taskCount }) {
     const [showColorPicker, setShowColorPicker] = useState(false);
+    const colorBtnRef = useRef(null);
     const colorPickerRef = useRef(null);
+    const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 });
 
     const {
         attributes,
@@ -772,7 +775,8 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
     useEffect(() => {
         if (!showColorPicker) return;
         const handler = (e) => {
-            if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+            if (colorPickerRef.current && !colorPickerRef.current.contains(e.target) &&
+                colorBtnRef.current && !colorBtnRef.current.contains(e.target)) {
                 setShowColorPicker(false);
             }
         };
@@ -815,16 +819,27 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
                     </button>
                     {/* Color indicator + picker */}
                     {canManage ? (
-                        <div className="relative" ref={colorPickerRef}>
+                        <>
                             <Tooltip content="Section color">
                                 <button
-                                    onClick={() => setShowColorPicker(!showColorPicker)}
+                                    ref={colorBtnRef}
+                                    onClick={() => {
+                                        if (!showColorPicker && colorBtnRef.current) {
+                                            const rect = colorBtnRef.current.getBoundingClientRect();
+                                            setPickerPos({ top: rect.bottom + 4, left: rect.left });
+                                        }
+                                        setShowColorPicker(!showColorPicker);
+                                    }}
                                     className="w-3 h-3 rounded-full border border-gray-300 dark:border-gray-500 shrink-0 transition-colors hover:ring-2 hover:ring-primary-300"
                                     style={{ backgroundColor: sectionColor || '#d1d5db' }}
                                 />
                             </Tooltip>
-                            {showColorPicker && (
-                                <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 grid grid-cols-4 gap-1.5 w-[120px]">
+                            {showColorPicker && createPortal(
+                                <div
+                                    ref={colorPickerRef}
+                                    className="fixed z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 grid grid-cols-4 gap-1.5 w-[120px]"
+                                    style={{ top: pickerPos.top, left: pickerPos.left }}
+                                >
                                     {SECTION_COLORS.map((color) => (
                                         <button
                                             key={color ?? 'none'}
@@ -843,9 +858,10 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
                                             )}
                                         </button>
                                     ))}
-                                </div>
+                                </div>,
+                                document.body
                             )}
-                        </div>
+                        </>
                     ) : (
                         sectionColor && <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: sectionColor }} />
                     )}
