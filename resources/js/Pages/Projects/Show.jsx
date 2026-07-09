@@ -1027,7 +1027,7 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
                     ) : (
                         <span
                             ref={colorBtnRef}
-                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-semibold text-white shadow-sm ${canManage ? 'cursor-pointer hover:opacity-85 transition-opacity' : ''}`}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold text-white shadow-sm ${canManage ? 'cursor-pointer hover:opacity-85 transition-opacity' : ''}`}
                             style={{ backgroundColor: activeSectionColor }}
                             onClick={canManage ? (e) => {
                                 if (e.detail === 2) {
