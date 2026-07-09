@@ -165,7 +165,7 @@ function renderCustomFieldValue(task, customField) {
 }
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {} }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {}, columnWidths = {} }) {
     const {
         attributes,
         listeners,
@@ -200,11 +200,17 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
         onTaskUpdate(task.id, field, value);
     };
 
+    const colStyle = (colId) => {
+        const w = columnWidths[colId];
+        return w ? { width: w, minWidth: w, maxWidth: w } : undefined;
+    };
+
     const renderCell = (colId) => {
+        const cStyle = colStyle(colId);
         switch (colId) {
             case 'status':
                 return (
-                    <td key="status" className="px-6 py-3 text-sm">
+                    <td key="status" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
                         {canEditTask ? (
                             <StatusPicker currentStatus={task.status} isOpen={openPopover === 'status'} onToggle={togglePopover('status')} onSelect={(status) => handleFieldUpdate('status', status)} />
                         ) : (
@@ -214,7 +220,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                 );
             case 'priority':
                 return (
-                    <td key="priority" className="px-6 py-3 text-sm">
+                    <td key="priority" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
                         {canEditTask ? (
                             <PriorityPicker currentPriority={task.priority} isOpen={openPopover === 'priority'} onToggle={togglePopover('priority')} onSelect={(priority) => handleFieldUpdate('priority', priority)} />
                         ) : (
@@ -224,15 +230,15 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                 );
             case 'assignee':
                 return (
-                    <td key="assignee" className="px-6 py-3 text-sm">
+                    <td key="assignee" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
                         {canManageTaskDetails ? (
                             <AssigneePicker currentAssignee={task.assignee} users={users} isOpen={openPopover === 'assignee'} onToggle={togglePopover('assignee')} onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)} />
                         ) : (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 overflow-hidden">
                                 {task.assignee ? (
                                     <>
                                         <Avatar name={task.assignee.name} size="sm" />
-                                        <span className="text-gray-700 dark:text-gray-300 text-xs">{task.assignee.name}</span>
+                                        <span className="text-gray-700 dark:text-gray-300 text-xs truncate">{task.assignee.name}</span>
                                     </>
                                 ) : (
                                     <span className="text-gray-400 text-xs">Unassigned</span>
@@ -243,8 +249,8 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                 );
             case 'dates':
                 return (
-                    <td key="dates" className="px-6 py-3 text-sm">
-                        <div className="flex items-center gap-1">
+                    <td key="dates" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
+                        <div className="flex items-center gap-1 overflow-hidden">
                             {canManageTaskDetails ? (
                                 <>
                                     {task.start_date && (
@@ -264,7 +270,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                                     )}
                                 </>
                             ) : (
-                                <span className={`text-xs ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                                <span className={`text-xs truncate ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
                                     {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
                                 </span>
                             )}
@@ -278,12 +284,14 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     if (!cf) return null;
                     const cfDisplay = cf.type === 'formula' ? { ...cf, _formulaValue: formulaResults[task.id]?.[cf.id] ?? null } : cf;
                     return (
-                        <td key={colId} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                        <td key={colId} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 overflow-hidden" style={cStyle}>
+                            <div className="truncate">
                             {canEditTask && cf.type !== 'formula' ? (
                                 <InlineCustomFieldEditor task={task} customField={cfDisplay} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
                             ) : (
                                 renderCustomFieldValue(task, cfDisplay)
                             )}
+                            </div>
                         </td>
                     );
                 }
@@ -311,8 +319,8 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     </button>
                 </Tooltip>
             </td>
-            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] pl-10 pr-6 py-3 text-sm max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
-                <div className="flex items-center gap-1.5 min-w-0">
+            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] pl-10 pr-6 py-3 text-sm overflow-hidden ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`} style={colStyle('title')}>
+                <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
@@ -361,34 +369,70 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 // Default reorderable column IDs (excluding sticky checkbox, title, actions)
 const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates'];
 
+// Resize handle for column headers
+function ColumnResizeHandle({ onResize }) {
+    const handleMouseDown = useCallback((e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const th = e.target.closest('th');
+        if (!th) return;
+        const startX = e.clientX;
+        const startWidth = th.getBoundingClientRect().width;
+        const onMouseMove = (ev) => {
+            const newWidth = Math.max(60, startWidth + (ev.clientX - startX));
+            onResize(newWidth);
+        };
+        const onMouseUp = () => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    }, [onResize]);
+
+    return (
+        <div
+            onMouseDown={handleMouseDown}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize opacity-0 hover:opacity-100 group-hover/col:opacity-50 hover:!opacity-100 bg-primary-400 transition-opacity z-10"
+        />
+    );
+}
+
 // Draggable column header for list view
-function SortableColumnHeader({ id, children }) {
+function SortableColumnHeader({ id, children, width, onResize }) {
     const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id });
     return (
         <th
             ref={setNodeRef}
             {...attributes}
             {...listeners}
-            className={`group/col px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap select-none transition-colors
+            style={width ? { width, minWidth: width, maxWidth: width } : undefined}
+            className={`group/col relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap select-none transition-colors overflow-hidden text-ellipsis
                 ${isDragging
                     ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 cursor-grabbing opacity-50'
                     : 'text-gray-500 dark:text-gray-400 cursor-grab hover:bg-gray-100 dark:hover:bg-gray-700/50'
                 }`}
         >
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 overflow-hidden">
                 <svg className="h-3 w-3 shrink-0 opacity-0 group-hover/col:opacity-40 transition-opacity" fill="currentColor" viewBox="0 0 24 24">
                     <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
                     <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
                     <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
                 </svg>
-                {children}
+                <span className="truncate">{children}</span>
             </div>
+            {onResize && <ColumnResizeHandle onResize={onResize} />}
         </th>
     );
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {} }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {}, columnWidths = {} }) {
     const {
         attributes,
         listeners,
@@ -425,11 +469,17 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
         onTaskUpdate(task.id, field, value);
     };
 
+    const colStyle = (colId) => {
+        const w = columnWidths[colId];
+        return w ? { width: w, minWidth: w, maxWidth: w } : undefined;
+    };
+
     const renderCell = (colId) => {
+        const cStyle = colStyle(colId);
         switch (colId) {
             case 'status':
                 return (
-                    <td key="status" className="px-6 py-4 text-sm">
+                    <td key="status" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
                         {canEditTask ? (
                             <StatusPicker currentStatus={task.status} isOpen={openPopover === 'status'} onToggle={togglePopover('status')} onSelect={(status) => handleFieldUpdate('status', status)} />
                         ) : (
@@ -439,7 +489,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 );
             case 'priority':
                 return (
-                    <td key="priority" className="px-6 py-4 text-sm">
+                    <td key="priority" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
                         {canEditTask ? (
                             <PriorityPicker currentPriority={task.priority} isOpen={openPopover === 'priority'} onToggle={togglePopover('priority')} onSelect={(priority) => handleFieldUpdate('priority', priority)} />
                         ) : (
@@ -449,15 +499,15 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 );
             case 'assignee':
                 return (
-                    <td key="assignee" className="px-6 py-4 text-sm">
-                        <div className="flex items-center gap-2">
+                    <td key="assignee" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
+                        <div className="flex items-center gap-2 overflow-hidden">
                             {canManageTaskDetails ? (
                                 <AssigneePicker currentAssignee={task.assignee} users={users} isOpen={openPopover === 'assignee'} onToggle={togglePopover('assignee')} onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)} />
                             ) : (
                                 task.assignee ? (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 overflow-hidden">
                                         <Avatar name={task.assignee.name} size="sm" />
-                                        <span className="text-gray-700 dark:text-gray-300">{task.assignee.name}</span>
+                                        <span className="text-gray-700 dark:text-gray-300 truncate">{task.assignee.name}</span>
                                     </div>
                                 ) : (
                                     <span className="text-gray-400">Unassigned</span>
@@ -480,8 +530,8 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 );
             case 'dates':
                 return (
-                    <td key="dates" className="px-6 py-4 text-sm">
-                        <div className="flex items-center gap-1">
+                    <td key="dates" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
+                        <div className="flex items-center gap-1 overflow-hidden">
                             {canManageTaskDetails ? (
                                 <>
                                     {task.start_date && (
@@ -501,7 +551,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                                     )}
                                 </>
                             ) : (
-                                <span className={`text-sm ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                                <span className={`text-sm truncate ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
                                     {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
                                 </span>
                             )}
@@ -515,12 +565,14 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     if (!cf) return null;
                     const cfDisplay = cf.type === 'formula' ? { ...cf, _formulaValue: formulaResults[task.id]?.[cf.id] ?? null } : cf;
                     return (
-                        <td key={colId} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                        <td key={colId} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 overflow-hidden" style={cStyle}>
+                            <div className="truncate">
                             {canEditTask && cf.type !== 'formula' ? (
                                 <InlineCustomFieldEditor task={task} customField={cfDisplay} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
                             ) : (
                                 renderCustomFieldValue(task, cfDisplay)
                             )}
+                            </div>
                         </td>
                     );
                 }
@@ -556,8 +608,8 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     </button>
                 </Tooltip>
             </td>
-            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm font-medium max-w-xs ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
-                <div className="flex items-center gap-2 min-w-0">
+            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm font-medium overflow-hidden ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`} style={colStyle('title')}>
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                     {(task.subtasks_count > 0 || canManageTasks) && (
                         <Tooltip content={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}>
                             <button
@@ -1015,6 +1067,27 @@ export default function Show() {
         return null;
     });
     const [activeColumnId, setActiveColumnId] = useState(null);
+
+    // Column widths (persisted per project)
+    const [columnWidths, setColumnWidths] = useState(() => {
+        try {
+            const saved = localStorage.getItem(`wmt-col-widths-${project.id}`);
+            if (saved) return JSON.parse(saved);
+        } catch {}
+        return {};
+    });
+
+    const getColumnWidth = useCallback((colId) => {
+        return columnWidths[colId] || null;
+    }, [columnWidths]);
+
+    const handleColumnResize = useCallback((colId, width) => {
+        setColumnWidths(prev => {
+            const next = { ...prev, [colId]: Math.max(60, width) };
+            try { localStorage.setItem(`wmt-col-widths-${project.id}`, JSON.stringify(next)); } catch {}
+            return next;
+        });
+    }, [project.id]);
 
     const effectiveColumnOrder = useMemo(() => {
         const cfIds = localCustomFields.map(cf => `cf-${cf.id}`);
@@ -2225,7 +2298,7 @@ export default function Show() {
                             onDragEnd={handleListDragEnd}
                         >
                             <div className="overflow-x-auto styled-scrollbar-x">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed' }}>
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <DndContext
                                         sensors={columnSensors}
@@ -2236,15 +2309,21 @@ export default function Show() {
                                     >
                                     <tr>
                                         <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 pl-6 pr-2 py-3 w-[52px] min-w-[52px]"></th>
-                                        <th className="sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">Title</th>
+                                        <th
+                                            className="group/col sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] relative overflow-hidden"
+                                            style={columnWidths['title'] ? { width: columnWidths['title'], minWidth: 60, maxWidth: columnWidths['title'] } : { width: 300, minWidth: 60 }}
+                                        >
+                                            <span className="truncate">Title</span>
+                                            <ColumnResizeHandle onResize={(w) => handleColumnResize('title', w)} />
+                                        </th>
                                         <SortableContext items={effectiveColumnOrder} strategy={horizontalListSortingStrategy}>
                                             {effectiveColumnOrder.map(colId => (
-                                                <SortableColumnHeader key={colId} id={colId}>
+                                                <SortableColumnHeader key={colId} id={colId} width={getColumnWidth(colId)} onResize={(w) => handleColumnResize(colId, w)}>
                                                     {getColumnLabel(colId)}
                                                 </SortableColumnHeader>
                                             ))}
                                         </SortableContext>
-                                        <th className="sticky right-0 z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.08)]">Actions</th>
+                                        <th className="sticky right-0 z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.08)]" style={{ width: 100 }}>Actions</th>
                                     </tr>
                                     <DragOverlay>
                                         {activeColumnId ? (
@@ -2310,6 +2389,7 @@ export default function Show() {
                                                                         onContextMenu={handleContextMenu}
                                                                         onOpenDetail={setDetailTaskId}
                                                                         formulaResults={formulaResults}
+                                                                        columnWidths={columnWidths}
                                                                     />
                                                                     {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                                         <DndContext
@@ -2419,6 +2499,7 @@ export default function Show() {
                                                             onContextMenu={handleContextMenu}
                                                             onOpenDetail={setDetailTaskId}
                                                             formulaResults={formulaResults}
+                                                            columnWidths={columnWidths}
                                                         />
                                                         {expandedTasks.has(task.id) && task.subtasks?.length > 0 && (
                                                             <DndContext
@@ -2445,6 +2526,7 @@ export default function Show() {
                                                                             onContextMenu={handleContextMenu}
                                                                             onOpenDetail={setDetailTaskId}
                                                                             formulaResults={formulaResults}
+                                                                            columnWidths={columnWidths}
                                                                         />
                                                                     ))}
                                                                 </SortableContext>
