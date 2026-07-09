@@ -52,7 +52,9 @@ class PublicFormController extends Controller
                         $data['options'] = $field->customField->options->map(fn ($o) => [
                             'id' => $o->id,
                             'label' => $o->label,
+                            'position' => $o->position,
                         ]);
+                        $data['sort_mode'] = $field->customField->config['sort_mode'] ?? 'alphabetical';
                     } elseif (in_array($field->type, ['select', 'multi_select']) && !empty($field->config['options'])) {
                         $data['options'] = $field->config['options'];
                     }

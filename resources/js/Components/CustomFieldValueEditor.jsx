@@ -66,7 +66,9 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                     id={`cf-${field.id}`}
                     value={value || ''}
                     onChange={(e) => handleChange(e.target.value)}
-                    options={[...(field.options || [])].sort((a, b) => a.label.localeCompare(b.label)).map(opt => ({
+                    options={[...(field.options || [])].sort((a, b) =>
+                        field.config?.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
+                    ).map(opt => ({
                         value: String(opt.id),
                         label: opt.label,
                     }))}
@@ -91,7 +93,9 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                         {field.name}
                     </label>
                     <div className="space-y-1">
-                        {[...(field.options || [])].sort((a, b) => a.label.localeCompare(b.label)).map(opt => (
+                        {[...(field.options || [])].sort((a, b) =>
+                            field.config?.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
+                        ).map(opt => (
                             <label key={opt.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input
                                     type="checkbox"

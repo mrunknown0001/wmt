@@ -242,7 +242,9 @@ export default function PublicForm() {
                             id={`field-${field.id}`}
                             value={value || ''}
                             onChange={(e) => setFieldValue(field.id, e.target.value)}
-                            options={[...(field.options || [])].sort((a, b) => a.label.localeCompare(b.label)).map(opt => ({
+                            options={[...(field.options || [])].sort((a, b) =>
+                                field.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
+                            ).map(opt => ({
                                 value: String(opt.id ?? opt.value),
                                 label: opt.label,
                             }))}
@@ -261,7 +263,9 @@ export default function PublicForm() {
                             {field.label}{field.is_required ? ' *' : ''}
                         </label>
                         <div className="space-y-1">
-                            {[...(field.options || [])].sort((a, b) => a.label.localeCompare(b.label)).map(opt => {
+                            {[...(field.options || [])].sort((a, b) =>
+                                field.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
+                            ).map(opt => {
                                 const optVal = String(opt.id ?? opt.value);
                                 return (
                                     <label key={optVal} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">

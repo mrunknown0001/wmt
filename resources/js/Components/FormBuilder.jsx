@@ -248,7 +248,9 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
 
                     {/* Options for select/multi_select mapped to custom field */}
                     {['select', 'multi_select'].includes(field.type) && isCustomFieldMapped && mappedCf && (() => {
-                        const opts = [...(mappedCf.options || [])].sort((a, b) => a.label.localeCompare(b.label));
+                        const opts = [...(mappedCf.options || [])].sort((a, b) =>
+                            mappedCf.config?.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
+                        );
                         if (!opts.length) return null;
                         return (
                             <div className="space-y-2">
@@ -320,7 +322,9 @@ function DefaultValueInput({ field, fieldIndex, onChange, customFields }) {
             );
         case 'select': {
             const opts = isCustomFieldMapped && mappedCf
-                ? [...(mappedCf.options || [])].sort((a, b) => a.label.localeCompare(b.label)).map(o => ({ value: String(o.id), label: o.label }))
+                ? [...(mappedCf.options || [])].sort((a, b) =>
+                    mappedCf.config?.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
+                ).map(o => ({ value: String(o.id), label: o.label }))
                 : (field.config?.options || []).map(o => ({ value: o.value, label: o.label }));
             return (
                 <Select
@@ -669,7 +673,9 @@ function CustomFieldsModal({ isOpen, onClose, customFields, currentFields, onUpd
             <div className="space-y-1 max-h-96 overflow-y-auto styled-scrollbar">
                 {customFields.map(cf => {
                     const icon = getFieldIcon(CUSTOM_FIELD_TYPE_MAP[cf.type] || 'text');
-                    const opts = (cf.options || []).sort((a, b) => a.label.localeCompare(b.label));
+                    const opts = [...(cf.options || [])].sort((a, b) =>
+                        cf.config?.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
+                    );
                     const showOpts = opts.slice(0, 3);
                     const moreCount = opts.length - showOpts.length;
 

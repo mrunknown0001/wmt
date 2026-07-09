@@ -34,6 +34,7 @@ class UpdateCustomFieldRequest extends FormRequest
             ],
             'config.result_type' => ['required_if:type,formula', 'string', 'in:number,date'],
             'config.decimal_places' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'config.sort_mode' => ['nullable', 'string', 'in:alphabetical,manual'],
             'options' => ['required_if:type,single_select,multi_select', 'array', 'min:1'],
             'options.*.id' => ['nullable', 'integer'],
             'options.*.label' => ['required_with:options', 'string', 'max:255'],

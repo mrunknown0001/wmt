@@ -83,12 +83,14 @@ function ColorPickerPopover({ color, onChange, onClose, anchorRef }) {
     );
 }
 
-function OptionEditor({ options, onChange }) {
+function OptionEditor({ options, onChange, sortMode }) {
     const listRef = useRef(null);
     const lastInputRef = useRef(null);
     const prevCountRef = useRef(options.length);
     const [colorPickerIndex, setColorPickerIndex] = useState(null);
     const colorBtnRefs = useRef({});
+    const [optDragIndex, setOptDragIndex] = useState(null);
+    const [optDragOverIndex, setOptDragOverIndex] = useState(null);
 
     useEffect(() => {
         if (options.length > prevCountRef.current && lastInputRef.current) {
@@ -112,12 +114,49 @@ function OptionEditor({ options, onChange }) {
         onChange(options.filter((_, i) => i !== index));
     };
 
+    const handleOptDragStart = (e, index) => {
+        setOptDragIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleOptDrop = (e, dropIndex) => {
+        e.preventDefault();
+        if (optDragIndex === null || optDragIndex === dropIndex) {
+            setOptDragIndex(null);
+            setOptDragOverIndex(null);
+            return;
+        }
+        const reordered = [...options];
+        const [moved] = reordered.splice(optDragIndex, 1);
+        reordered.splice(dropIndex, 0, moved);
+        onChange(reordered);
+        setOptDragIndex(null);
+        setOptDragOverIndex(null);
+    };
+
+    const isManual = sortMode === 'manual';
+
     return (
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options</label>
             <div ref={listRef} className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                 {options.map((opt, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                    <div
+                        key={i}
+                        draggable={isManual}
+                        onDragStart={isManual ? (e) => handleOptDragStart(e, i) : undefined}
+                        onDragOver={isManual ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOptDragOverIndex(i); } : undefined}
+                        onDrop={isManual ? (e) => handleOptDrop(e, i) : undefined}
+                        onDragEnd={isManual ? () => { setOptDragIndex(null); setOptDragOverIndex(null); } : undefined}
+                        className={`flex items-center gap-2 ${
+                            optDragOverIndex === i && optDragIndex !== i ? 'ring-1 ring-primary-400/50 rounded' : ''
+                        } ${optDragIndex === i ? 'opacity-50' : ''}`}
+                    >
+                        {isManual && (
+                            <span className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                            </span>
+                        )}
                         <button
                             type="button"
                             ref={(el) => { colorBtnRefs.current[i] = el; }}
@@ -318,11 +357,11 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
         name: '',
         type: 'text',
         options: [],
-        config: { formula: '', result_type: 'number', decimal_places: 2 },
+        config: { formula: '', result_type: 'number', decimal_places: 2, sort_mode: 'alphabetical' },
     });
 
     const resetForm = () => {
-        setForm({ name: '', type: 'text', options: [], config: { formula: '', result_type: 'number', decimal_places: 2 } });
+        setForm({ name: '', type: 'text', options: [], config: { formula: '', result_type: 'number', decimal_places: 2, sort_mode: 'alphabetical' } });
         setEditingField(null);
     };
 
@@ -337,7 +376,7 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
             name: field.name,
             type: field.type,
             options: field.options || [],
-            config: field.config || { formula: '', result_type: 'number', decimal_places: 2 },
+            config: { formula: '', result_type: 'number', decimal_places: 2, sort_mode: 'alphabetical', ...field.config },
         });
         setShowModal(true);
     };
@@ -369,7 +408,7 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 name: form.name,
                 type: form.type,
                 options: ['single_select', 'multi_select'].includes(form.type) ? form.options : undefined,
-                config: (form.type === 'formula' || form.type === 'number') ? form.config : undefined,
+                config: (form.type === 'formula' || form.type === 'number' || ['single_select', 'multi_select'].includes(form.type)) ? form.config : undefined,
             };
 
             let result;
@@ -558,10 +597,45 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                         </div>
                     )}
                     {['single_select', 'multi_select'].includes(form.type) && (
-                        <OptionEditor
-                            options={form.options}
-                            onChange={(opts) => setForm(prev => ({ ...prev, options: opts }))}
-                        />
+                        <>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Option Order</label>
+                                <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm(prev => ({ ...prev, config: { ...prev.config, sort_mode: 'alphabetical' } }))}
+                                        className={`flex-1 px-3 py-1.5 text-sm font-medium transition-colors ${
+                                            (form.config.sort_mode || 'alphabetical') === 'alphabetical'
+                                                ? 'bg-primary-600 text-white'
+                                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        Alphabetical
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm(prev => ({ ...prev, config: { ...prev.config, sort_mode: 'manual' } }))}
+                                        className={`flex-1 px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                                            form.config.sort_mode === 'manual'
+                                                ? 'bg-primary-600 text-white'
+                                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        Manual
+                                    </button>
+                                </div>
+                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                    {(form.config.sort_mode || 'alphabetical') === 'alphabetical'
+                                        ? 'Options will be sorted A-Z when displayed'
+                                        : 'Drag options to set your preferred order'}
+                                </p>
+                            </div>
+                            <OptionEditor
+                                options={form.options}
+                                onChange={(opts) => setForm(prev => ({ ...prev, options: opts }))}
+                                sortMode={form.config.sort_mode || 'alphabetical'}
+                            />
+                        </>
                     )}
                     {form.type === 'formula' && (
                         <FormulaEditor
