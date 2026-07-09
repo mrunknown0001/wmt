@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 import Button from './Button';
 import Input from './Input';
@@ -136,11 +136,22 @@ function OptionEditor({ options, onChange, sortMode }) {
 
     const isManual = sortMode === 'manual';
 
+    // Build display order: alphabetical when not manual, original order when manual
+    const displayOrder = useMemo(() => {
+        const indices = options.map((_, i) => i);
+        if (!isManual) {
+            indices.sort((a, b) => (options[a].label || '').localeCompare(options[b].label || ''));
+        }
+        return indices;
+    }, [options, isManual]);
+
     return (
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Options</label>
             <div ref={listRef} className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                {options.map((opt, i) => (
+                {displayOrder.map((i) => {
+                    const opt = options[i];
+                    return (
                     <div
                         key={i}
                         draggable={isManual}
@@ -194,7 +205,8 @@ function OptionEditor({ options, onChange, sortMode }) {
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
-                ))}
+                    );
+                })}
             </div>
             <button
                 type="button"
