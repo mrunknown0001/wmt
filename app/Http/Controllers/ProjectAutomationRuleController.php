@@ -96,4 +96,24 @@ class ProjectAutomationRuleController extends Controller
 
         return response()->json(['rule' => $rule]);
     }
+
+    public function duplicate(Project $project, ProjectAutomationRule $rule): JsonResponse
+    {
+        $this->authorizeProject($project);
+        abort_if($rule->project_id !== $project->id, 404);
+
+        $newRule = $project->automationRules()->create([
+            'name' => "Copy of {$rule->name}",
+            'is_active' => false,
+            'trigger_type' => $rule->trigger_type,
+            'trigger_config' => $rule->trigger_config,
+            'conditions' => $rule->conditions,
+            'actions' => $rule->actions,
+            'created_by' => auth()->id(),
+        ]);
+
+        $newRule->load('creator:id,name');
+
+        return response()->json(['rule' => $newRule], 201);
+    }
 }

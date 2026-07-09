@@ -160,6 +160,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/projects/{project}/automation-rules/{rule}', [ProjectAutomationRuleController::class, 'update'])->name('projects.automation-rules.update');
     Route::delete('/projects/{project}/automation-rules/{rule}', [ProjectAutomationRuleController::class, 'destroy'])->name('projects.automation-rules.destroy');
     Route::patch('/projects/{project}/automation-rules/{rule}/toggle', [ProjectAutomationRuleController::class, 'toggle'])->name('projects.automation-rules.toggle');
+    Route::post('/projects/{project}/automation-rules/{rule}/duplicate', [ProjectAutomationRuleController::class, 'duplicate'])->name('projects.automation-rules.duplicate');
 
     // AI Chat
     Route::get('/api/ai/conversations', [AiChatController::class, 'index'])->name('ai.conversations.index');
