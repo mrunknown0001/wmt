@@ -551,7 +551,7 @@ function SortableColumnHeader({ id, children, width, onResize, sortConfig, onSor
                     : 'text-gray-500 dark:text-gray-400 cursor-grab hover:bg-gray-100 dark:hover:bg-gray-700/50'
                 }`}
         >
-            <div className="flex items-center gap-1.5 overflow-hidden">
+            <div className="flex items-center gap-1.5 pr-5">
                 <svg className="h-3 w-3 shrink-0 opacity-0 group-hover/col:opacity-40 transition-opacity" fill="currentColor" viewBox="0 0 24 24">
                     <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
                     <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
@@ -563,6 +563,8 @@ function SortableColumnHeader({ id, children, width, onResize, sortConfig, onSor
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortConfig.direction === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'} />
                     </svg>
                 )}
+            </div>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
                 <ColumnHeaderDropdown colId={id} sortConfig={sortConfig} onSort={onSort} onHide={onHide}
                     onEdit={onEditField} onDelete={onDeleteField} isCustomField={isCustomField} />
             </div>
@@ -2554,13 +2556,15 @@ export default function Show() {
                                             className="group/col sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] relative overflow-hidden"
                                             style={columnWidths['title'] ? { width: columnWidths['title'], minWidth: 60, maxWidth: columnWidths['title'] } : { width: 300, minWidth: 60 }}
                                         >
-                                            <div className="flex items-center gap-1.5 overflow-hidden">
+                                            <div className="flex items-center gap-1.5 pr-5">
                                                 <span className="truncate">Title</span>
                                                 {sortConfig?.key === 'title' && (
                                                     <svg className="h-3 w-3 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortConfig.direction === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'} />
                                                     </svg>
                                                 )}
+                                            </div>
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
                                                 <ColumnHeaderDropdown colId="title" sortConfig={sortConfig} onSort={handleSortColumn} />
                                             </div>
                                             <ColumnResizeHandle onResize={(w) => handleColumnResize('title', w)} />
