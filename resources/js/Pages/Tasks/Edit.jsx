@@ -13,7 +13,7 @@ import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
-import { formatLabel, apiFetch, taskEditUrl } from '../../utils';
+import { formatLabel, formatDate, apiFetch, taskEditUrl } from '../../utils';
 import echo from '../../echo';
 
 function timeAgo(dateString) {
@@ -254,6 +254,8 @@ export default function Edit() {
     // Subtask state (only for parent tasks)
     const [localSubtasks, setLocalSubtasks] = useState(initialSubtasks);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    const [newSubtaskAssignee, setNewSubtaskAssignee] = useState('');
+    const [newSubtaskDueDate, setNewSubtaskDueDate] = useState('');
     const [addingSubtask, setAddingSubtask] = useState(false);
     const [showSubtaskInput, setShowSubtaskInput] = useState(false);
 
@@ -268,12 +270,16 @@ export default function Edit() {
                     parent_id: task.id,
                     status: 'to_do',
                     priority: 'medium',
+                    assigned_to: newSubtaskAssignee || null,
+                    due_date: newSubtaskDueDate || null,
                 }),
             });
             if (res.ok) {
                 const created = await res.json();
                 setLocalSubtasks(prev => [...prev, created.task || created]);
                 setNewSubtaskTitle('');
+                setNewSubtaskAssignee('');
+                setNewSubtaskDueDate('');
             }
         } catch (e) {
             console.error('Failed to add subtask', e);
@@ -661,6 +667,11 @@ export default function Edit() {
                                         >
                                             {st.title}
                                         </Link>
+                                        {st.due_date && (
+                                            <span className={`text-xs whitespace-nowrap ${new Date(st.due_date) < new Date() && st.status !== 'done' ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                                                {formatDate(st.due_date)}
+                                            </span>
+                                        )}
                                         {st.assignee && <Avatar name={st.assignee.name} size="sm" />}
                                         <button
                                             type="button"
@@ -677,7 +688,7 @@ export default function Edit() {
 
                             {/* Add subtask input */}
                             {showSubtaskInput ? (
-                                <div className="flex items-center gap-2 mt-2">
+                                <div className="mt-2 space-y-2">
                                     <input
                                         autoFocus
                                         type="text"
@@ -685,21 +696,41 @@ export default function Edit() {
                                         onChange={(e) => setNewSubtaskTitle(e.target.value)}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); }
-                                            if (e.key === 'Escape') { setShowSubtaskInput(false); setNewSubtaskTitle(''); }
+                                            if (e.key === 'Escape') { setShowSubtaskInput(false); setNewSubtaskTitle(''); setNewSubtaskAssignee(''); setNewSubtaskDueDate(''); }
                                         }}
                                         placeholder="Subtask title..."
-                                        className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                                     />
-                                    <Button size="sm" onClick={handleAddSubtask} processing={addingSubtask} processingText="Adding...">Add</Button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowSubtaskInput(false); setNewSubtaskTitle(''); }}
-                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                                    >
-                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            value={newSubtaskAssignee}
+                                            onChange={(e) => setNewSubtaskAssignee(e.target.value)}
+                                            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                                        >
+                                            <option value="">Unassigned</option>
+                                            {users.map(u => (
+                                                <option key={u.id} value={u.id}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="date"
+                                            value={newSubtaskDueDate}
+                                            onChange={(e) => setNewSubtaskDueDate(e.target.value)}
+                                            className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button size="sm" onClick={handleAddSubtask} processing={addingSubtask} processingText="Adding...">Add</Button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowSubtaskInput(false); setNewSubtaskTitle(''); setNewSubtaskAssignee(''); setNewSubtaskDueDate(''); }}
+                                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                        >
+                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <button

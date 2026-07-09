@@ -129,6 +129,8 @@ class TaskController extends Controller
             'parent_id' => ['required', 'exists:tasks,id'],
             'status' => ['sometimes', 'string'],
             'priority' => ['sometimes', 'string'],
+            'assigned_to' => ['nullable', 'exists:users,id'],
+            'due_date' => ['nullable', 'date'],
         ]);
 
         $parent = Task::where('id', $validated['parent_id'])
@@ -146,6 +148,8 @@ class TaskController extends Controller
             'parent_id' => $parent->id,
             'status' => $status,
             'priority' => $validated['priority'] ?? 'medium',
+            'assigned_to' => $validated['assigned_to'] ?? null,
+            'due_date' => $validated['due_date'] ?? null,
             'created_by' => $request->user()->id,
             'position' => $maxPosition + 1,
         ]);

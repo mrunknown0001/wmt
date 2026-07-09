@@ -43,6 +43,8 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     const [submittingComment, setSubmittingComment] = useState(false);
     const [visible, setVisible] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    const [newSubtaskAssignee, setNewSubtaskAssignee] = useState('');
+    const [newSubtaskDueDate, setNewSubtaskDueDate] = useState('');
     const [addingSubtask, setAddingSubtask] = useState(false);
     const [showSubtaskInput, setShowSubtaskInput] = useState(false);
     const panelRef = useRef(null);
@@ -100,12 +102,16 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                     parent_id: taskId,
                     status: 'to_do',
                     priority: 'medium',
+                    assigned_to: newSubtaskAssignee || null,
+                    due_date: newSubtaskDueDate || null,
                 }),
             });
             if (res.ok) {
                 const data = await res.json();
                 setSubtasks(prev => [...prev, data.task]);
                 setNewSubtaskTitle('');
+                setNewSubtaskAssignee('');
+                setNewSubtaskDueDate('');
                 setTaskData(prev => ({
                     ...prev,
                     subtasks_count: (prev.subtasks_count || 0) + 1,
@@ -476,6 +482,11 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                             >
                                                 {st.title}
                                             </Link>
+                                            {st.due_date && (
+                                                <span className={`text-xs whitespace-nowrap ${new Date(st.due_date) < new Date() && st.status !== 'done' ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                                                    {formatDate(st.due_date)}
+                                                </span>
+                                            )}
                                             {st.assignee && <Avatar name={st.assignee.name} size="sm" />}
                                         </div>
                                     ))}
@@ -483,7 +494,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
 
                                 {/* Add subtask input */}
                                 {showSubtaskInput ? (
-                                    <div className="flex items-center gap-2 mt-2">
+                                    <div className="mt-2 space-y-2">
                                         <input
                                             autoFocus
                                             type="text"
@@ -491,26 +502,46 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                             onChange={(e) => setNewSubtaskTitle(e.target.value)}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); }
-                                                if (e.key === 'Escape') { setShowSubtaskInput(false); setNewSubtaskTitle(''); }
+                                                if (e.key === 'Escape') { setShowSubtaskInput(false); setNewSubtaskTitle(''); setNewSubtaskAssignee(''); setNewSubtaskDueDate(''); }
                                             }}
                                             placeholder="Subtask title..."
-                                            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                                            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                                         />
-                                        <button
-                                            onClick={handleAddSubtask}
-                                            disabled={addingSubtask}
-                                            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium disabled:opacity-50"
-                                        >
-                                            {addingSubtask ? '...' : 'Add'}
-                                        </button>
-                                        <button
-                                            onClick={() => { setShowSubtaskInput(false); setNewSubtaskTitle(''); }}
-                                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                        >
-                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                value={newSubtaskAssignee}
+                                                onChange={(e) => setNewSubtaskAssignee(e.target.value)}
+                                                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                                            >
+                                                <option value="">Unassigned</option>
+                                                {users.map(u => (
+                                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                                ))}
+                                            </select>
+                                            <input
+                                                type="date"
+                                                value={newSubtaskDueDate}
+                                                onChange={(e) => setNewSubtaskDueDate(e.target.value)}
+                                                className="rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1 text-xs dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={handleAddSubtask}
+                                                disabled={addingSubtask}
+                                                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium disabled:opacity-50"
+                                            >
+                                                {addingSubtask ? '...' : 'Add'}
+                                            </button>
+                                            <button
+                                                onClick={() => { setShowSubtaskInput(false); setNewSubtaskTitle(''); setNewSubtaskAssignee(''); setNewSubtaskDueDate(''); }}
+                                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            >
+                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <button
