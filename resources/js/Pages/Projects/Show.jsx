@@ -3226,6 +3226,18 @@ export default function Show() {
                     onTaskUpdate={(taskId, field, value) => {
                         handleInlineUpdate(taskId, field, value);
                     }}
+                    onSubtaskCreated={(parentId, newSubtask) => {
+                        setLocalTasks(prev => prev.map(t => {
+                            if (t.id !== parentId) return t;
+                            const updatedSubs = [...(t.subtasks || []), newSubtask];
+                            return {
+                                ...t,
+                                subtasks: updatedSubs,
+                                subtasks_count: updatedSubs.length,
+                                completed_subtasks_count: updatedSubs.filter(s => s.status === 'done').length,
+                            };
+                        }));
+                    }}
                     users={users}
                 />
             )}

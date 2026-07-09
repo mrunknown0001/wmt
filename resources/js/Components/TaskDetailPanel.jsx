@@ -27,7 +27,7 @@ function fieldLabel(field) {
     return labels[field] || field;
 }
 
-export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpdate, users = [] }) {
+export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpdate, onSubtaskCreated, users = [] }) {
     const { auth } = usePage().props;
     const [loading, setLoading] = useState(true);
     const [taskData, setTaskData] = useState(null);
@@ -117,7 +117,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                     ...prev,
                     subtasks_count: (prev.subtasks_count || 0) + 1,
                 }));
-                onTaskUpdate?.();
+                onSubtaskCreated?.(taskId, data.task);
             }
         } catch (e) {
             console.error('Failed to add subtask', e);
