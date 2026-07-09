@@ -42,6 +42,9 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     const [commentFiles, setCommentFiles] = useState([]);
     const [submittingComment, setSubmittingComment] = useState(false);
     const [visible, setVisible] = useState(false);
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    const [addingSubtask, setAddingSubtask] = useState(false);
+    const [showSubtaskInput, setShowSubtaskInput] = useState(false);
     const panelRef = useRef(null);
     const fileInputRef = useRef(null);
 
@@ -82,6 +85,60 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     const handleClose = () => {
         setVisible(false);
         setTimeout(onClose, 300);
+    };
+
+    const isParentTask = taskData && !taskData.parent_id;
+
+    const handleAddSubtask = async () => {
+        if (!newSubtaskTitle.trim() || addingSubtask) return;
+        setAddingSubtask(true);
+        try {
+            const res = await apiFetch(`/projects/${projectId}/tasks/quick`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: newSubtaskTitle.trim(),
+                    parent_id: taskId,
+                    status: 'to_do',
+                    priority: 'medium',
+                }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSubtasks(prev => [...prev, data.task]);
+                setNewSubtaskTitle('');
+                setTaskData(prev => ({
+                    ...prev,
+                    subtasks_count: (prev.subtasks_count || 0) + 1,
+                }));
+                onTaskUpdate?.();
+            }
+        } catch (e) {
+            console.error('Failed to add subtask', e);
+        } finally {
+            setAddingSubtask(false);
+        }
+    };
+
+    const handleToggleSubtaskDone = async (subtask) => {
+        const newStatus = subtask.status === 'done' ? 'to_do' : 'done';
+        setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: newStatus } : s));
+        setTaskData(prev => ({
+            ...prev,
+            completed_subtasks_count: prev.completed_subtasks_count + (newStatus === 'done' ? 1 : -1),
+        }));
+        try {
+            await apiFetch(`/projects/${projectId}/tasks/${subtask.id}/patch`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: newStatus }),
+            });
+            onTaskUpdate?.();
+        } catch (e) {
+            setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: subtask.status } : s));
+            setTaskData(prev => ({
+                ...prev,
+                completed_subtasks_count: prev.completed_subtasks_count + (newStatus === 'done' ? -1 : 1),
+            }));
+        }
     };
 
     const handleFieldUpdate = async (field, value) => {
@@ -373,28 +430,96 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                         </div>
 
                         {/* Subtasks */}
-                        {subtasks.length > 0 && (
+                        {isParentTask && (
                             <div className="px-6 pb-4 border-t border-gray-100 dark:border-gray-800 pt-4">
                                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                                    Subtasks ({taskData.completed_subtasks_count}/{taskData.subtasks_count})
+                                    Subtasks
+                                    {subtasks.length > 0 && (
+                                        <span className="ml-1">({taskData.completed_subtasks_count}/{subtasks.length})</span>
+                                    )}
                                 </label>
+
+                                {/* Progress bar */}
+                                {subtasks.length > 0 && (
+                                    <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mb-2 overflow-hidden">
+                                        <div
+                                            className="h-full bg-green-500 rounded-full transition-all duration-300"
+                                            style={{ width: `${(subtasks.filter(s => s.status === 'done').length / subtasks.length) * 100}%` }}
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="space-y-1">
                                     {subtasks.map(st => (
-                                        <div key={st.id} className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                            <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${st.status === 'done' ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 dark:border-gray-500'}`}>
+                                        <div key={st.id} className="flex items-center gap-2 py-1.5 px-2 rounded-md group hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                            <button
+                                                onClick={() => handleToggleSubtaskDone(st)}
+                                                className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                                                    st.status === 'done'
+                                                        ? 'bg-green-500 border-green-500 text-white'
+                                                        : 'border-gray-300 dark:border-gray-500 hover:border-green-400'
+                                                }`}
+                                            >
                                                 {st.status === 'done' && (
                                                     <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                     </svg>
                                                 )}
-                                            </div>
-                                            <span className={`text-sm flex-1 truncate ${st.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                                            </button>
+                                            <Link
+                                                href={taskEditUrl(st)}
+                                                className={`text-sm flex-1 truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${
+                                                    st.status === 'done'
+                                                        ? 'text-gray-400 line-through'
+                                                        : 'text-gray-700 dark:text-gray-300'
+                                                }`}
+                                            >
                                                 {st.title}
-                                            </span>
+                                            </Link>
                                             {st.assignee && <Avatar name={st.assignee.name} size="sm" />}
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* Add subtask input */}
+                                {showSubtaskInput ? (
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            value={newSubtaskTitle}
+                                            onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); }
+                                                if (e.key === 'Escape') { setShowSubtaskInput(false); setNewSubtaskTitle(''); }
+                                            }}
+                                            placeholder="Subtask title..."
+                                            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                                        />
+                                        <button
+                                            onClick={handleAddSubtask}
+                                            disabled={addingSubtask}
+                                            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium disabled:opacity-50"
+                                        >
+                                            {addingSubtask ? '...' : 'Add'}
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowSubtaskInput(false); setNewSubtaskTitle(''); }}
+                                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setShowSubtaskInput(true)}
+                                        className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                                    >
+                                        + Add subtask
+                                    </button>
+                                )}
                             </div>
                         )}
 

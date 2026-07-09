@@ -214,7 +214,7 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone }) {
 
 
 export default function Edit() {
-    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {} } = usePage().props;
+    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -250,6 +250,60 @@ export default function Edit() {
     const [posting, setPosting] = useState(false);
     const [attachments, setAttachments] = useState([]);
     const [attachmentError, setAttachmentError] = useState('');
+
+    // Subtask state (only for parent tasks)
+    const [localSubtasks, setLocalSubtasks] = useState(initialSubtasks);
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    const [addingSubtask, setAddingSubtask] = useState(false);
+    const [showSubtaskInput, setShowSubtaskInput] = useState(false);
+
+    const handleAddSubtask = async () => {
+        if (!newSubtaskTitle.trim() || addingSubtask) return;
+        setAddingSubtask(true);
+        try {
+            const res = await apiFetch(`/projects/${project.id}/tasks/quick`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: newSubtaskTitle.trim(),
+                    parent_id: task.id,
+                    status: 'to_do',
+                    priority: 'medium',
+                }),
+            });
+            if (res.ok) {
+                const created = await res.json();
+                setLocalSubtasks(prev => [...prev, created.task || created]);
+                setNewSubtaskTitle('');
+            }
+        } catch (e) {
+            console.error('Failed to add subtask', e);
+        } finally {
+            setAddingSubtask(false);
+        }
+    };
+
+    const handleToggleSubtaskDone = async (subtask) => {
+        const newStatus = subtask.status === 'done' ? 'to_do' : 'done';
+        setLocalSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: newStatus } : s));
+        try {
+            await apiFetch(`/projects/${project.id}/tasks/${subtask.id}/patch`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: newStatus }),
+            });
+        } catch (e) {
+            setLocalSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: subtask.status } : s));
+        }
+    };
+
+    const handleDeleteSubtask = async (subtask) => {
+        if (!confirm(`Delete subtask "${subtask.title}"?`)) return;
+        setLocalSubtasks(prev => prev.filter(s => s.id !== subtask.id));
+        try {
+            await apiFetch(`/projects/${project.id}/tasks/${subtask.id}`, { method: 'DELETE' });
+        } catch (e) {
+            setLocalSubtasks(prev => [...prev, subtask]);
+        }
+    };
 
     const maxUploadSize = settings?.max_upload_size || 10;
 
@@ -553,6 +607,111 @@ export default function Edit() {
                             </div>
                         </form>
                     </Card>
+
+                    {/* Subtasks — only for parent tasks */}
+                    {!task.parent_id && (
+                        <Card className="mt-6">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    Subtasks
+                                    {localSubtasks.length > 0 && (
+                                        <span className="ml-2 text-xs font-normal text-gray-400">
+                                            {localSubtasks.filter(s => s.status === 'done').length}/{localSubtasks.length}
+                                        </span>
+                                    )}
+                                </h4>
+                            </div>
+
+                            {/* Progress bar */}
+                            {localSubtasks.length > 0 && (
+                                <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mb-3 overflow-hidden">
+                                    <div
+                                        className="h-full bg-green-500 rounded-full transition-all duration-300"
+                                        style={{ width: `${(localSubtasks.filter(s => s.status === 'done').length / localSubtasks.length) * 100}%` }}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Subtask list */}
+                            <div className="space-y-1">
+                                {localSubtasks.map(st => (
+                                    <div key={st.id} className="flex items-center gap-2 py-1.5 px-2 rounded-md group hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggleSubtaskDone(st)}
+                                            className={`h-4.5 w-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                                st.status === 'done'
+                                                    ? 'bg-green-500 border-green-500 text-white'
+                                                    : 'border-gray-300 dark:border-gray-500 hover:border-green-400'
+                                            }`}
+                                        >
+                                            {st.status === 'done' && (
+                                                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                        <Link
+                                            href={taskEditUrl(st)}
+                                            className={`text-sm flex-1 truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors ${
+                                                st.status === 'done'
+                                                    ? 'text-gray-400 line-through'
+                                                    : 'text-gray-700 dark:text-gray-300'
+                                            }`}
+                                        >
+                                            {st.title}
+                                        </Link>
+                                        {st.assignee && <Avatar name={st.assignee.name} size="sm" />}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteSubtask(st)}
+                                            className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-red-500 transition-all shrink-0"
+                                        >
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Add subtask input */}
+                            {showSubtaskInput ? (
+                                <div className="flex items-center gap-2 mt-2">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={newSubtaskTitle}
+                                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); }
+                                            if (e.key === 'Escape') { setShowSubtaskInput(false); setNewSubtaskTitle(''); }
+                                        }}
+                                        placeholder="Subtask title..."
+                                        className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                                    />
+                                    <Button size="sm" onClick={handleAddSubtask} processing={addingSubtask} processingText="Adding...">Add</Button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowSubtaskInput(false); setNewSubtaskTitle(''); }}
+                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSubtaskInput(true)}
+                                    className="mt-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                                >
+                                    + Add subtask
+                                </button>
+                            )}
+                        </Card>
+                    )}
                 </div>
 
                 {/* Activity & Comments */}

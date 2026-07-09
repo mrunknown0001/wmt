@@ -99,6 +99,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/projects/{project}/export', [ExportController::class, 'projectTasks'])->name('projects.export');
     Route::patch('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
     Route::post('/projects/{project}/duplicate', [ProjectController::class, 'duplicate'])->name('projects.duplicate');
+    Route::post('/projects/{project}/tasks/quick', [TaskController::class, 'quickStore'])->name('projects.tasks.quick');
     Route::post('/projects/{project}/tasks/reorder', [TaskController::class, 'reorder'])->name('projects.tasks.reorder');
     Route::post('/projects/{project}/tasks/bulk', [TaskController::class, 'bulkAction'])->name('projects.tasks.bulk');
     Route::post('/projects/{project}/tasks/{task}/duplicate', [TaskController::class, 'duplicate'])->name('projects.tasks.duplicate');

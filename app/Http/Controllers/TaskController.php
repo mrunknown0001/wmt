@@ -115,6 +115,53 @@ class TaskController extends Controller
             ->with('success', 'Task created successfully.');
     }
 
+    /**
+     * Quick inline store — returns JSON (used for adding subtasks inline).
+     */
+    public function quickStore(Request $request, Project $project): JsonResponse
+    {
+        if (!$request->user()->can('manage-tasks') && $project->owner_id !== $request->user()->id && !$project->isProjectAdmin($request->user())) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'parent_id' => ['required', 'exists:tasks,id'],
+            'status' => ['sometimes', 'string'],
+            'priority' => ['sometimes', 'string'],
+        ]);
+
+        $parent = Task::where('id', $validated['parent_id'])
+            ->where('project_id', $project->id)
+            ->whereNull('parent_id')
+            ->firstOrFail();
+
+        $status = $validated['status'] ?? 'to_do';
+        $maxPosition = Task::where('parent_id', $parent->id)
+            ->where('status', $status)
+            ->max('position') ?? -1;
+
+        $task = $project->tasks()->create([
+            'title' => $validated['title'],
+            'parent_id' => $parent->id,
+            'status' => $status,
+            'priority' => $validated['priority'] ?? 'medium',
+            'created_by' => $request->user()->id,
+            'position' => $maxPosition + 1,
+        ]);
+
+        TaskActivityLogger::logCreated($task, $request->user());
+        ActivityLogger::logCreated($task, $request->user());
+        AutomationRuleEngine::evaluate($task, 'task_created');
+
+        $task->load('assignee');
+        $task->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
+
+        broadcast(new TaskUpdated($project->id, $task->toArray(), 'created', $request->user()->id))->toOthers();
+
+        return response()->json(['task' => $task], 201);
+    }
+
     public function duplicate(Request $request, Project $project, Task $task): JsonResponse
     {
         if (!$request->user()->can('manage-tasks') && $project->owner_id !== $request->user()->id && !$project->isProjectAdmin($request->user())) {
@@ -171,7 +218,7 @@ class TaskController extends Controller
         $this->authorize('update', $task);
 
         $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'attachments');
-        $task->loadCount('subtasks');
+        $task->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
 
         $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [
             'id' => $c->id,
@@ -262,6 +309,12 @@ class TaskController extends Controller
         $customFields = $project->customFields()->with('options')->get();
         $customFieldValues = $task->customFieldValues()->get()->keyBy('custom_field_id');
 
+        // Load subtasks for parent tasks
+        $subtasks = $task->parent_id ? [] : $task->subtasks()
+            ->with('assignee')
+            ->orderBy('position')
+            ->get(['id', 'title', 'status', 'priority', 'assigned_to', 'due_date', 'parent_id', 'project_id']);
+
         return Inertia::render('Tasks/Edit', [
             'project' => $project,
             'task' => $task,
@@ -277,6 +330,7 @@ class TaskController extends Controller
             'canManageTaskDetails' => $canManageTaskDetails,
             'customFields' => $customFields,
             'customFieldValues' => $customFieldValues,
+            'subtasks' => $subtasks,
         ]);
     }
 
