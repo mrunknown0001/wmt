@@ -24,12 +24,14 @@ class TaskSectionController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'color' => 'nullable|string|max:7',
         ]);
 
         $maxPosition = $project->sections()->max('position') ?? -1;
 
         $section = $project->sections()->create([
             'name' => $validated['name'],
+            'color' => $validated['color'] ?? null,
             'position' => $maxPosition + 1,
         ]);
 
@@ -47,10 +49,11 @@ class TaskSectionController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'sometimes|required|string|max:255',
+            'color' => 'nullable|string|max:7',
         ]);
 
-        $oldValues = $section->only(['name']);
+        $oldValues = $section->only(['name', 'color']);
 
         $section->update($validated);
 

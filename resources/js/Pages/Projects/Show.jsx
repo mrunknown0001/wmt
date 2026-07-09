@@ -737,7 +737,29 @@ function SectionDropZone({ sectionId, minHeight = false }) {
 }
 
 // Draggable section header row
-function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditing, editingName, onEditName, onStartEditing, onRename, onCancelEditing, onAddTask, onDelete, canManage, projectId, taskCount }) {
+const SECTION_COLORS = [
+    null, // no color (default)
+    '#ef4444', // red
+    '#f97316', // orange
+    '#f59e0b', // amber
+    '#eab308', // yellow
+    '#84cc16', // lime
+    '#22c55e', // green
+    '#14b8a6', // teal
+    '#06b6d4', // cyan
+    '#3b82f6', // blue
+    '#6366f1', // indigo
+    '#8b5cf6', // violet
+    '#a855f7', // purple
+    '#d946ef', // fuchsia
+    '#ec4899', // pink
+    '#f43f5e', // rose
+];
+
+function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditing, editingName, onEditName, onStartEditing, onRename, onCancelEditing, onAddTask, onDelete, onColorChange, canManage, projectId, taskCount }) {
+    const [showColorPicker, setShowColorPicker] = useState(false);
+    const colorPickerRef = useRef(null);
+
     const {
         attributes,
         listeners,
@@ -747,14 +769,27 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
         isDragging,
     } = useSortable({ id: `section-header-${section.id}` });
 
+    useEffect(() => {
+        if (!showColorPicker) return;
+        const handler = (e) => {
+            if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+                setShowColorPicker(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showColorPicker]);
+
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.4 : 1,
     };
 
+    const sectionColor = section.color;
+
     return (
-        <tr ref={setNodeRef} style={style} className="bg-gray-100 dark:bg-gray-800/80">
+        <tr ref={setNodeRef} style={{ ...style, ...(sectionColor ? { borderLeft: `3px solid ${sectionColor}` } : {}) }} className="bg-gray-100 dark:bg-gray-800/80">
             <td colSpan={99} className="px-0 py-2">
                 <div className="sticky left-0 flex items-center gap-2 px-4 w-fit">
                     {canManage && (
@@ -778,6 +813,42 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
+                    {/* Color indicator + picker */}
+                    {canManage ? (
+                        <div className="relative" ref={colorPickerRef}>
+                            <Tooltip content="Section color">
+                                <button
+                                    onClick={() => setShowColorPicker(!showColorPicker)}
+                                    className="w-3 h-3 rounded-full border border-gray-300 dark:border-gray-500 shrink-0 transition-colors hover:ring-2 hover:ring-primary-300"
+                                    style={{ backgroundColor: sectionColor || '#d1d5db' }}
+                                />
+                            </Tooltip>
+                            {showColorPicker && (
+                                <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 grid grid-cols-4 gap-1.5 w-[120px]">
+                                    {SECTION_COLORS.map((color) => (
+                                        <button
+                                            key={color ?? 'none'}
+                                            type="button"
+                                            onClick={() => { onColorChange(color); setShowColorPicker(false); }}
+                                            className={`w-6 h-6 rounded-full border-2 transition-all hover:scale-110 ${
+                                                sectionColor === color ? 'ring-2 ring-primary-500 ring-offset-1 dark:ring-offset-gray-800' : ''
+                                            } ${!color ? 'border-gray-300 dark:border-gray-500' : 'border-transparent'}`}
+                                            style={{ backgroundColor: color || '#d1d5db' }}
+                                            title={color ? color : 'No color'}
+                                        >
+                                            {!color && (
+                                                <svg className="w-full h-full text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" d="M4 4l16 16" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        sectionColor && <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: sectionColor }} />
+                    )}
                     {isEditing ? (
                         <input
                             autoFocus
@@ -793,6 +864,7 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
                     ) : (
                         <span
                             className="text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400"
+                            style={sectionColor ? { color: sectionColor } : undefined}
                             onClick={onStartEditing}
                         >
                             {section.name}
@@ -1093,7 +1165,7 @@ export default function Show() {
         // Then each section in order
         localSections.forEach((s) => {
             const sectionTasks = filteredTasks.filter((t) => t.section_id === s.id);
-            groups.push({ id: s.id, name: s.name, tasks: sectionTasks });
+            groups.push({ id: s.id, name: s.name, color: s.color, tasks: sectionTasks });
         });
         return groups;
     }, [filteredTasks, localSections]);
@@ -1223,6 +1295,18 @@ export default function Show() {
             await apiFetch(`/projects/${project.id}/sections/${sectionId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ name: name.trim() }),
+            });
+        } catch {
+            setLocalSections(serverSections);
+        }
+    }, [project.id, serverSections]);
+
+    const handleUpdateSectionColor = useCallback(async (sectionId, color) => {
+        setLocalSections((prev) => prev.map((s) => s.id === sectionId ? { ...s, color } : s));
+        try {
+            await apiFetch(`/projects/${project.id}/sections/${sectionId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ color }),
             });
         } catch {
             setLocalSections(serverSections);
@@ -2163,7 +2247,7 @@ export default function Show() {
                                                     {/* Section header — skip for unsectioned */}
                                                     {group.id !== null && (
                                                         <SortableSectionHeader
-                                                            section={{ id: group.id, name: group.name }}
+                                                            section={{ id: group.id, name: group.name, color: group.color }}
                                                             isCollapsed={collapsedSections.has(group.id)}
                                                             onToggleCollapse={() => toggleSectionCollapse(group.id)}
                                                             isEditing={editingSectionId === group.id}
@@ -2174,6 +2258,7 @@ export default function Show() {
                                                             onCancelEditing={() => setEditingSectionId(null)}
                                                             onAddTask={() => {}}
                                                             onDelete={() => handleDeleteSection(group.id, group.name)}
+                                                            onColorChange={(color) => handleUpdateSectionColor(group.id, color)}
                                                             canManage={canManageTasks}
                                                             projectId={project.id}
                                                             taskCount={group.tasks.length}

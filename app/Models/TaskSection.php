@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TaskSection extends Model
 {
-    protected $fillable = ['project_id', 'name', 'position'];
+    protected $fillable = ['project_id', 'name', 'color', 'position'];
 
     public function project(): BelongsTo
     {

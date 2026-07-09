@@ -338,6 +338,7 @@ class ProjectController extends Controller
             foreach ($project->sections()->orderBy('position')->get() as $oldSection) {
                 $newSection = $newProject->sections()->create([
                     'name' => $oldSection->name,
+                    'color' => $oldSection->color,
                     'position' => $oldSection->position,
                 ]);
                 $sectionMap[$oldSection->id] = $newSection->id;
