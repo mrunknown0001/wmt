@@ -22,6 +22,7 @@ export default function Create() {
         team_id: '',
         position: '',
         is_active: true,
+        can_create_rules: false,
         role: 'user',
     });
 
@@ -97,6 +98,7 @@ export default function Create() {
                         />
 
                         <Checkbox label="Active" id="is_active" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />
+                        <Checkbox label="Can Create Automation Rules" id="can_create_rules" checked={data.can_create_rules} onChange={(e) => setData('can_create_rules', e.target.checked)} />
 
                         <div className="flex justify-end gap-3 pt-4">
                             <LinkButton href="/users" variant="secondary">Cancel</LinkButton>

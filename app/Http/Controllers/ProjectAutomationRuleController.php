@@ -17,6 +17,13 @@ class ProjectAutomationRuleController extends Controller
         }
     }
 
+    private function authorizeRuleManagement(): void
+    {
+        if (!auth()->user()->can_create_rules) {
+            abort(403, 'You do not have permission to manage automation rules.');
+        }
+    }
+
     private function ruleValidationRules(): array
     {
         return [
@@ -50,6 +57,7 @@ class ProjectAutomationRuleController extends Controller
     public function store(Request $request, Project $project): JsonResponse
     {
         $this->authorizeProject($project);
+        $this->authorizeRuleManagement();
 
         $validated = $request->validate($this->ruleValidationRules());
 
@@ -67,6 +75,7 @@ class ProjectAutomationRuleController extends Controller
     public function update(Request $request, Project $project, ProjectAutomationRule $rule): JsonResponse
     {
         $this->authorizeProject($project);
+        $this->authorizeRuleManagement();
         abort_if($rule->project_id !== $project->id, 404);
 
         $validated = $request->validate($this->ruleValidationRules());
@@ -80,6 +89,7 @@ class ProjectAutomationRuleController extends Controller
     public function destroy(Project $project, ProjectAutomationRule $rule): JsonResponse
     {
         $this->authorizeProject($project);
+        $this->authorizeRuleManagement();
         abort_if($rule->project_id !== $project->id, 404);
 
         $rule->delete();
@@ -90,6 +100,7 @@ class ProjectAutomationRuleController extends Controller
     public function toggle(Project $project, ProjectAutomationRule $rule): JsonResponse
     {
         $this->authorizeProject($project);
+        $this->authorizeRuleManagement();
         abort_if($rule->project_id !== $project->id, 404);
 
         $rule->update(['is_active' => !$rule->is_active]);
@@ -100,6 +111,7 @@ class ProjectAutomationRuleController extends Controller
     public function duplicate(Project $project, ProjectAutomationRule $rule): JsonResponse
     {
         $this->authorizeProject($project);
+        $this->authorizeRuleManagement();
         abort_if($rule->project_id !== $project->id, 404);
 
         $newRule = $project->automationRules()->create([

@@ -422,7 +422,7 @@ const emptyRule = () => ({
     actions: [{ type: 'change_status', params: {} }],
 });
 
-export default function AutomationRuleBuilder({ projectId, rules: initialRules, users, sections, customFields = [] }) {
+export default function AutomationRuleBuilder({ projectId, rules: initialRules, users, sections, customFields = [], canCreateRules = false }) {
     const [rules, setRules] = useState(initialRules || []);
     const [showForm, setShowForm] = useState(false);
     const [editingRule, setEditingRule] = useState(null);
@@ -617,7 +617,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     Automation Rules ({rules.length})
                 </h3>
-                <Button size="sm" onClick={openCreate}>Add Rule</Button>
+{canCreateRules && <Button size="sm" onClick={openCreate}>Add Rule</Button>}
             </div>
 
             {rules.length > 0 ? (
@@ -650,6 +650,8 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     </span>
                                 </div>
                             </div>
+                            {canCreateRules && (
+                            <>
                             <Tooltip content="Edit">
                                 <button onClick={() => openEdit(rule)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1">
                                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -671,6 +673,8 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     </svg>
                                 </button>
                             </Tooltip>
+                            </>
+                            )}
                         </div>
                     ))}
                 </div>

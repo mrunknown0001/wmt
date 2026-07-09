@@ -73,6 +73,7 @@ class UserController extends Controller
             'team_id' => $request->team_id,
             'position' => $request->position,
             'is_active' => $request->boolean('is_active', true),
+            'can_create_rules' => $request->boolean('can_create_rules', false),
         ]);
 
         $user->assignRole($request->role);
@@ -100,7 +101,7 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
-        $oldValues = $user->only(['name', 'email', 'position', 'department_id', 'team_id', 'is_active']);
+        $oldValues = $user->only(['name', 'email', 'position', 'department_id', 'team_id', 'is_active', 'can_create_rules']);
 
         $data = [
             'name' => $request->name,
@@ -109,6 +110,7 @@ class UserController extends Controller
             'team_id' => $request->team_id,
             'position' => $request->position,
             'is_active' => $request->boolean('is_active', true),
+            'can_create_rules' => $request->boolean('can_create_rules', false),
         ];
 
         if ($request->filled('password')) {

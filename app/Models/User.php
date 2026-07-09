@@ -35,6 +35,7 @@ class User extends Authenticatable
         'department_id',
         'team_id',
         'is_active',
+        'can_create_rules',
         'dashboard_preferences',
     ];
 
@@ -49,6 +50,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'can_create_rules' => 'boolean',
             'dashboard_preferences' => 'array',
         ];
     }

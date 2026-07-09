@@ -47,6 +47,7 @@ class HandleInertiaRequests extends Middleware
                     'position' => $request->user()->position,
                     'roles' => $request->user()->getRoleNames(),
                     'permissions' => $request->user()->getAllPermissions()->pluck('name'),
+                    'can_create_rules' => $request->user()->can_create_rules,
                 ] : null,
             ],
             'settings' => fn () => \App\Models\Setting::current(),

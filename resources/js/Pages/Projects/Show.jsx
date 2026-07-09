@@ -2349,6 +2349,7 @@ export default function Show() {
                         users={users}
                         sections={localSections}
                         customFields={localCustomFields}
+                        canCreateRules={!!auth.user?.can_create_rules}
                     />
                 </Card>
             )}

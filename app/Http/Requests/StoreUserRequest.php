@@ -23,6 +23,7 @@ class StoreUserRequest extends FormRequest
             'team_id' => ['nullable', 'exists:teams,id'],
             'position' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
+            'can_create_rules' => ['boolean'],
             'role' => ['required', 'string', 'exists:roles,name'],
         ];
     }
