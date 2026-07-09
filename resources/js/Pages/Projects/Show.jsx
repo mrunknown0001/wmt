@@ -403,9 +403,142 @@ function ColumnResizeHandle({ onResize }) {
     );
 }
 
+// Column header dropdown menu (sort, hide, edit, delete)
+function ColumnHeaderDropdown({ colId, sortConfig, onSort, onHide, onEdit, onDelete, isCustomField }) {
+    const [open, setOpen] = useState(false);
+    const btnRef = useRef(null);
+    const menuRef = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0 });
+
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
+
+    const handleOpen = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const rect = btnRef.current.getBoundingClientRect();
+        setPos({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 180) });
+        setOpen(v => !v);
+    };
+
+    const isAsc = sortConfig?.key === colId && sortConfig?.direction === 'asc';
+    const isDesc = sortConfig?.key === colId && sortConfig?.direction === 'desc';
+
+    const menuItem = (label, icon, onClick, danger) => (
+        <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); setOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${danger ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'} transition-colors`}>
+            {icon}
+            <span>{label}</span>
+        </button>
+    );
+
+    const sortAscIcon = <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>;
+    const sortDescIcon = <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"/></svg>;
+    const hideIcon = <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>;
+    const editIcon = <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>;
+    const deleteIcon = <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>;
+
+    return (
+        <>
+            <button ref={btnRef} type="button" onClick={handleOpen} onPointerDown={(e) => e.stopPropagation()}
+                className={`shrink-0 p-0.5 rounded transition-all ${open ? 'opacity-100 text-primary-600 dark:text-primary-400' : 'opacity-0 group-hover/col:opacity-60 hover:!opacity-100'} hover:text-gray-700 dark:hover:text-gray-300`}>
+                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+            {open && createPortal(
+                <div ref={menuRef} className="fixed z-[9999] py-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 min-w-[160px]"
+                    style={{ top: pos.top, left: pos.left }}>
+                    {menuItem(`Sort ascending${isAsc ? ' ✓' : ''}`, sortAscIcon, () => onSort(colId, 'asc'))}
+                    {menuItem(`Sort descending${isDesc ? ' ✓' : ''}`, sortDescIcon, () => onSort(colId, 'desc'))}
+                    {onHide && (
+                        <>
+                            <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                            {menuItem('Hide column', hideIcon, () => onHide(colId))}
+                        </>
+                    )}
+                    {isCustomField && onEdit && (
+                        <>
+                            <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                            {menuItem('Edit field', editIcon, () => onEdit(colId))}
+                            {menuItem('Delete field', deleteIcon, () => onDelete(colId), true)}
+                        </>
+                    )}
+                </div>,
+                document.body
+            )}
+        </>
+    );
+}
+
+// Button to reveal hidden columns
+function HiddenColumnsMenu({ hiddenColumns, getColumnLabel, onShowColumn }) {
+    const [open, setOpen] = useState(false);
+    const btnRef = useRef(null);
+    const menuRef = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0 });
+
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
+
+    const handleOpen = (e) => {
+        e.stopPropagation();
+        const rect = btnRef.current.getBoundingClientRect();
+        setPos({ top: rect.bottom + 4, left: Math.max(0, rect.right - 180) });
+        setOpen(v => !v);
+    };
+
+    const cols = [...hiddenColumns];
+
+    return (
+        <>
+            <button ref={btnRef} type="button" onClick={handleOpen} title="Show hidden columns"
+                className="p-0.5 rounded text-primary-500 hover:text-primary-700 dark:hover:text-primary-300 transition-colors">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+            </button>
+            {open && createPortal(
+                <div ref={menuRef} className="fixed z-[9999] py-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 min-w-[160px]"
+                    style={{ top: pos.top, left: pos.left }}>
+                    <div className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hidden Columns</div>
+                    {cols.map(colId => (
+                        <button key={colId} type="button" onClick={() => { onShowColumn(colId); if (hiddenColumns.size <= 1) setOpen(false); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                            <svg className="h-3.5 w-3.5 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <span>{getColumnLabel(colId)}</span>
+                        </button>
+                    ))}
+                </div>,
+                document.body
+            )}
+        </>
+    );
+}
+
 // Draggable column header for list view
-function SortableColumnHeader({ id, children, width, onResize }) {
+function SortableColumnHeader({ id, children, width, onResize, sortConfig, onSort, onHide, onEditField, onDeleteField }) {
     const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id });
+    const isCustomField = id.startsWith('cf-');
+    const isSorted = sortConfig?.key === id;
     return (
         <th
             ref={setNodeRef}
@@ -425,6 +558,13 @@ function SortableColumnHeader({ id, children, width, onResize }) {
                     <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
                 </svg>
                 <span className="truncate">{children}</span>
+                {isSorted && (
+                    <svg className="h-3 w-3 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortConfig.direction === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'} />
+                    </svg>
+                )}
+                <ColumnHeaderDropdown colId={id} sortConfig={sortConfig} onSort={onSort} onHide={onHide}
+                    onEdit={onEditField} onDelete={onDeleteField} isCustomField={isCustomField} />
             </div>
             {onResize && <ColumnResizeHandle onResize={onResize} />}
         </th>
@@ -1089,6 +1229,60 @@ export default function Show() {
         });
     }, [project.id]);
 
+    // Hidden columns (persisted per project)
+    const [hiddenColumns, setHiddenColumns] = useState(() => {
+        try {
+            const saved = localStorage.getItem(`wmt-col-hidden-${project.id}`);
+            if (saved) return new Set(JSON.parse(saved));
+        } catch {}
+        return new Set();
+    });
+
+    // Sort config { key, direction }
+    const [sortConfig, setSortConfig] = useState(null);
+
+    // Custom field manager ref for edit/delete from column dropdown
+    const cfManagerRef = useRef(null);
+
+    const handleSortColumn = useCallback((colId, direction) => {
+        setSortConfig(prev => {
+            if (prev?.key === colId && prev?.direction === direction) return null; // toggle off
+            return { key: colId, direction };
+        });
+    }, []);
+
+    const handleHideColumn = useCallback((colId) => {
+        setHiddenColumns(prev => {
+            const next = new Set(prev);
+            next.add(colId);
+            try { localStorage.setItem(`wmt-col-hidden-${project.id}`, JSON.stringify([...next])); } catch {}
+            return next;
+        });
+    }, [project.id]);
+
+    const handleShowColumn = useCallback((colId) => {
+        setHiddenColumns(prev => {
+            const next = new Set(prev);
+            next.delete(colId);
+            try { localStorage.setItem(`wmt-col-hidden-${project.id}`, JSON.stringify([...next])); } catch {}
+            return next;
+        });
+    }, [project.id]);
+
+    const handleEditColumnField = useCallback((colId) => {
+        if (colId.startsWith('cf-')) {
+            const cfId = Number(colId.replace('cf-', ''));
+            cfManagerRef.current?.editField(cfId);
+        }
+    }, []);
+
+    const handleDeleteColumnField = useCallback((colId) => {
+        if (colId.startsWith('cf-')) {
+            const cfId = Number(colId.replace('cf-', ''));
+            cfManagerRef.current?.deleteField(cfId);
+        }
+    }, []);
+
     const effectiveColumnOrder = useMemo(() => {
         const cfIds = localCustomFields.map(cf => `cf-${cf.id}`);
         const allIds = [...DEFAULT_COLUMN_IDS, ...cfIds];
@@ -1097,6 +1291,11 @@ export default function Show() {
         const missing = allIds.filter(id => !valid.includes(id));
         return [...valid, ...missing];
     }, [columnOrder, localCustomFields]);
+
+    // Visible column order (filtered by hidden)
+    const visibleColumnOrder = useMemo(() => {
+        return effectiveColumnOrder.filter(id => !hiddenColumns.has(id));
+    }, [effectiveColumnOrder, hiddenColumns]);
 
     const columnSensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -1116,6 +1315,46 @@ export default function Show() {
                 return colId;
         }
     }, [localCustomFields]);
+
+    // Sort comparator for tasks
+    const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3 };
+    const STATUS_ORDER = { backlog: 0, to_do: 1, in_progress: 2, in_review: 3, done: 4, cancelled: 5 };
+
+    const getTaskSortValue = useCallback((task, key) => {
+        switch (key) {
+            case 'title': return task.title?.toLowerCase() || '';
+            case 'status': return STATUS_ORDER[task.status] ?? 99;
+            case 'priority': return PRIORITY_ORDER[task.priority] ?? 99;
+            case 'assignee': return task.assigned_user?.name?.toLowerCase() || '\uffff';
+            case 'dates': return task.due_date || '\uffff';
+            default:
+                if (key.startsWith('cf-')) {
+                    const cfId = Number(key.replace('cf-', ''));
+                    const cf = localCustomFields.find(f => f.id === cfId);
+                    const cfv = task.custom_field_values?.find(v => v.custom_field_id === cfId);
+                    if (!cf || !cfv) return '\uffff';
+                    if (cf.type === 'number') return cfv.value_number ?? Infinity;
+                    if (cf.type === 'date') return cfv.value_date || '\uffff';
+                    if (cf.type === 'single_select') return cfv.selected_option?.label?.toLowerCase() || '\uffff';
+                    if (cf.type === 'text' || cf.type === 'textarea') return cfv.value_text?.toLowerCase() || '\uffff';
+                    return '\uffff';
+                }
+                return '\uffff';
+        }
+    }, [localCustomFields]);
+
+    const sortTasks = useCallback((tasks) => {
+        if (!sortConfig) return tasks;
+        const { key, direction } = sortConfig;
+        const sorted = [...tasks].sort((a, b) => {
+            const av = getTaskSortValue(a, key);
+            const bv = getTaskSortValue(b, key);
+            if (av < bv) return direction === 'asc' ? -1 : 1;
+            if (av > bv) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return sorted;
+    }, [sortConfig, getTaskSortValue]);
 
     // Pre-compute formula field values for all tasks
     const formulaResults = useMemo(() => {
@@ -1231,8 +1470,9 @@ export default function Show() {
     }, [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate]);
 
     const filteredTasks = useMemo(() => {
-        return localTasks.filter(matchesFilters);
-    }, [localTasks, matchesFilters]);
+        const filtered = localTasks.filter(matchesFilters);
+        return sortTasks(filtered);
+    }, [localTasks, matchesFilters, sortTasks]);
 
     // Group filtered tasks by status for board view
     const tasksByStatus = useMemo(() => {
@@ -1250,14 +1490,14 @@ export default function Show() {
         const groups = [];
         // Unsectioned tasks first
         const unsectioned = filteredTasks.filter((t) => !t.section_id);
-        groups.push({ id: null, name: 'Unsectioned', tasks: unsectioned });
+        groups.push({ id: null, name: 'Unsectioned', tasks: sortTasks(unsectioned) });
         // Then each section in order
         localSections.forEach((s) => {
             const sectionTasks = filteredTasks.filter((t) => t.section_id === s.id);
-            groups.push({ id: s.id, name: s.name, color: s.color, tasks: sectionTasks });
+            groups.push({ id: s.id, name: s.name, color: s.color, tasks: sortTasks(sectionTasks) });
         });
         return groups;
-    }, [filteredTasks, localSections]);
+    }, [filteredTasks, localSections, sortTasks]);
 
     // Dashboard statistics computed from all tasks (unfiltered)
     const dashboardStats = useMemo(() => {
@@ -2079,6 +2319,7 @@ export default function Show() {
             {showCustomFields && (
                 <Card className="mb-6">
                     <CustomFieldManager
+                        ref={cfManagerRef}
                         projectId={project.id}
                         initialFields={localCustomFields}
                         onFieldsChange={setLocalCustomFields}
@@ -2313,17 +2554,34 @@ export default function Show() {
                                             className="group/col sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] relative overflow-hidden"
                                             style={columnWidths['title'] ? { width: columnWidths['title'], minWidth: 60, maxWidth: columnWidths['title'] } : { width: 300, minWidth: 60 }}
                                         >
-                                            <span className="truncate">Title</span>
+                                            <div className="flex items-center gap-1.5 overflow-hidden">
+                                                <span className="truncate">Title</span>
+                                                {sortConfig?.key === 'title' && (
+                                                    <svg className="h-3 w-3 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortConfig.direction === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'} />
+                                                    </svg>
+                                                )}
+                                                <ColumnHeaderDropdown colId="title" sortConfig={sortConfig} onSort={handleSortColumn} />
+                                            </div>
                                             <ColumnResizeHandle onResize={(w) => handleColumnResize('title', w)} />
                                         </th>
-                                        <SortableContext items={effectiveColumnOrder} strategy={horizontalListSortingStrategy}>
-                                            {effectiveColumnOrder.map(colId => (
-                                                <SortableColumnHeader key={colId} id={colId} width={getColumnWidth(colId)} onResize={(w) => handleColumnResize(colId, w)}>
+                                        <SortableContext items={visibleColumnOrder} strategy={horizontalListSortingStrategy}>
+                                            {visibleColumnOrder.map(colId => (
+                                                <SortableColumnHeader key={colId} id={colId} width={getColumnWidth(colId)} onResize={(w) => handleColumnResize(colId, w)}
+                                                    sortConfig={sortConfig} onSort={handleSortColumn} onHide={handleHideColumn}
+                                                    onEditField={handleEditColumnField} onDeleteField={handleDeleteColumnField}>
                                                     {getColumnLabel(colId)}
                                                 </SortableColumnHeader>
                                             ))}
                                         </SortableContext>
-                                        <th className="sticky right-0 z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.08)]" style={{ width: 100 }}>Actions</th>
+                                        <th className="sticky right-0 z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.08)]" style={{ width: 100 }}>
+                                            <div className="flex items-center justify-end gap-1">
+                                                <span>Actions</span>
+                                                {hiddenColumns.size > 0 && (
+                                                    <HiddenColumnsMenu hiddenColumns={hiddenColumns} getColumnLabel={getColumnLabel} onShowColumn={handleShowColumn} />
+                                                )}
+                                            </div>
+                                        </th>
                                     </tr>
                                     <DragOverlay>
                                         {activeColumnId ? (
@@ -2385,7 +2643,7 @@ export default function Show() {
                                                                         isSelected={selectedTasks.has(task.id)}
                                                                         onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                                                         customFields={localCustomFields}
-                                                                        columnOrder={effectiveColumnOrder}
+                                                                        columnOrder={visibleColumnOrder}
                                                                         onContextMenu={handleContextMenu}
                                                                         onOpenDetail={setDetailTaskId}
                                                                         formulaResults={formulaResults}
@@ -2412,7 +2670,7 @@ export default function Show() {
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
                                                                                         onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                                         customFields={localCustomFields}
-                                                                                        columnOrder={effectiveColumnOrder}
+                                                                                        columnOrder={visibleColumnOrder}
                                                                                         onContextMenu={handleContextMenu}
                                                                                         onOpenDetail={setDetailTaskId}
                                                                                         formulaResults={formulaResults}
@@ -2495,7 +2753,7 @@ export default function Show() {
                                                             isSelected={selectedTasks.has(task.id)}
                                                             onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
                                                             customFields={localCustomFields}
-                                                            columnOrder={effectiveColumnOrder}
+                                                            columnOrder={visibleColumnOrder}
                                                             onContextMenu={handleContextMenu}
                                                             onOpenDetail={setDetailTaskId}
                                                             formulaResults={formulaResults}
@@ -2522,7 +2780,7 @@ export default function Show() {
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
                                                                             onCustomFieldUpdate={handleCustomFieldUpdate}
                                                                             customFields={localCustomFields}
-                                                                            columnOrder={effectiveColumnOrder}
+                                                                            columnOrder={visibleColumnOrder}
                                                                             onContextMenu={handleContextMenu}
                                                                             onOpenDetail={setDetailTaskId}
                                                                             formulaResults={formulaResults}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 import Button from './Button';
 import Input from './Input';
@@ -290,7 +290,7 @@ function FormulaEditor({ config, onChange, availableFields }) {
     );
 }
 
-export default function CustomFieldManager({ projectId, initialFields = [], onFieldsChange }) {
+export default forwardRef(function CustomFieldManager({ projectId, initialFields = [], onFieldsChange }, ref) {
     const [fields, setFieldsInternal] = useState(initialFields);
 
     // Wrap setFields to also notify parent
@@ -341,6 +341,17 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
         });
         setShowModal(true);
     };
+
+    useImperativeHandle(ref, () => ({
+        editField: (fieldId) => {
+            const field = fields.find(f => f.id === fieldId);
+            if (field) openEdit(field);
+        },
+        deleteField: (fieldId) => {
+            const field = fields.find(f => f.id === fieldId);
+            if (field) setDeleteField(field);
+        },
+    }), [fields]);
 
     const handleSave = useCallback(async () => {
         setSaving(true);
@@ -572,4 +583,4 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
             />
         </div>
     );
-}
+});
