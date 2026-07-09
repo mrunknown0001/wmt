@@ -165,7 +165,7 @@ function renderCustomFieldValue(task, customField) {
 }
 
 // Sortable subtask row
-function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {}, columnWidths = {} }) {
+function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, isSelected, onSelect, isFocused, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {}, columnWidths = {} }) {
     const {
         attributes,
         listeners,
@@ -300,7 +300,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     };
 
     return (
-        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} onContextMenu={(e) => onContextMenu?.(e, task)} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''}`}>
+        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} data-task-id={task.id} onClick={(e) => { if (e.target.closest('button, input, select, [role="listbox"], [data-no-select]')) return; if (onSelect) { e.preventDefault(); onSelect(task.id, e); } }} onContextMenu={(e) => onContextMenu?.(e, task)} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''} ${isFocused ? 'ring-2 ring-inset ring-primary-400' : ''}`}>
             <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-3 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <Tooltip content={isDone ? 'Mark incomplete' : 'Mark complete'}>
@@ -574,7 +574,7 @@ function SortableColumnHeader({ id, children, width, onResize, sortConfig, onSor
 }
 
 // Sortable table row for list view drag-and-drop
-function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onToggleSelect, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {}, columnWidths = {} }) {
+function SortableRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, users, onTaskUpdate, onCustomFieldUpdate, onToggleComplete, isExpanded, onToggleExpand, isSelected, onSelect, isFocused, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {}, columnWidths = {} }) {
     const {
         attributes,
         listeners,
@@ -728,9 +728,13 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             style={style}
             {...attributes}
             {...listeners}
-            onClick={(e) => { if ((e.ctrlKey || e.metaKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id); } }}
+            data-task-id={task.id}
+            onClick={(e) => {
+                if (e.target.closest('button, input, select, [role="listbox"], [data-no-select]')) return;
+                if (onSelect) { e.preventDefault(); onSelect(task.id, e); }
+            }}
             onContextMenu={(e) => onContextMenu?.(e, task)}
-            className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
+            className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''} ${isFocused ? 'ring-2 ring-inset ring-primary-400' : ''}`}
         >
             <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-4 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1198,6 +1202,8 @@ export default function Show() {
         return { month: now.getMonth() + 1, year: now.getFullYear() };
     });
     const [selectedTasks, setSelectedTasks] = useState(new Set());
+    const [focusedTaskId, setFocusedTaskId] = useState(null);
+    const [lastClickedTaskId, setLastClickedTaskId] = useState(null);
     const [bulkDropdown, setBulkDropdown] = useState(null); // 'status' | 'priority' | 'assign' | null
     const [localSections, setLocalSections] = useState(serverSections);
     const [collapsedSections, setCollapsedSections] = useState(new Set());
@@ -1511,6 +1517,27 @@ export default function Show() {
         });
         return groups;
     }, [filteredTasks, localSections, sortTasks]);
+
+    // Flat ordered list of visible task IDs (for shift+click range & arrow key nav)
+    const flatVisibleTaskIds = useMemo(() => {
+        if (view !== 'list') return [];
+        const ids = [];
+        const pushTask = (t) => {
+            ids.push(t.id);
+            if (expandedTasks.has(t.id) && t.subtasks?.length > 0) {
+                t.subtasks.forEach(st => ids.push(st.id));
+            }
+        };
+        if (tasksBySection) {
+            tasksBySection.forEach(group => {
+                if (group.id !== null && collapsedSections.has(group.id)) return;
+                group.tasks.forEach(pushTask);
+            });
+        } else {
+            filteredTasks.forEach(pushTask);
+        }
+        return ids;
+    }, [view, tasksBySection, filteredTasks, collapsedSections, expandedTasks]);
 
     // Dashboard statistics computed from all tasks (unfiltered)
     const dashboardStats = useMemo(() => {
@@ -2178,14 +2205,36 @@ export default function Show() {
     }, [project.id]);
 
     // --- Selection helpers ---
-    const toggleTaskSelection = useCallback((taskId) => {
-        setSelectedTasks((prev) => {
-            const next = new Set(prev);
-            if (next.has(taskId)) next.delete(taskId);
-            else next.add(taskId);
-            return next;
-        });
-    }, []);
+    const handleTaskSelect = useCallback((taskId, event) => {
+        if (event?.shiftKey && lastClickedTaskId) {
+            // Range select
+            const startIdx = flatVisibleTaskIds.indexOf(lastClickedTaskId);
+            const endIdx = flatVisibleTaskIds.indexOf(taskId);
+            if (startIdx !== -1 && endIdx !== -1) {
+                const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+                const rangeIds = flatVisibleTaskIds.slice(from, to + 1);
+                setSelectedTasks(prev => {
+                    const next = new Set(prev);
+                    rangeIds.forEach(id => next.add(id));
+                    return next;
+                });
+            }
+        } else if (event?.ctrlKey || event?.metaKey) {
+            // Toggle individual
+            setSelectedTasks(prev => {
+                const next = new Set(prev);
+                if (next.has(taskId)) next.delete(taskId);
+                else next.add(taskId);
+                return next;
+            });
+            setLastClickedTaskId(taskId);
+        } else {
+            // Single select
+            setSelectedTasks(new Set([taskId]));
+            setLastClickedTaskId(taskId);
+        }
+        setFocusedTaskId(taskId);
+    }, [lastClickedTaskId, flatVisibleTaskIds]);
 
     const clearSelection = useCallback(() => {
         setSelectedTasks(new Set());
@@ -2195,7 +2244,52 @@ export default function Show() {
     // Clear selection when filters change
     useEffect(() => {
         setSelectedTasks(new Set());
+        setFocusedTaskId(null);
+        setLastClickedTaskId(null);
     }, [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate]);
+
+    // Keyboard navigation for list view (Arrow keys, Escape, Ctrl+A)
+    useEffect(() => {
+        if (view !== 'list') return;
+        const handleKeyDown = (e) => {
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+            if (e.target.isContentEditable) return;
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const currentIdx = focusedTaskId ? flatVisibleTaskIds.indexOf(focusedTaskId) : -1;
+                let nextIdx;
+                if (currentIdx === -1) {
+                    nextIdx = e.key === 'ArrowDown' ? 0 : flatVisibleTaskIds.length - 1;
+                } else {
+                    nextIdx = e.key === 'ArrowDown'
+                        ? Math.min(currentIdx + 1, flatVisibleTaskIds.length - 1)
+                        : Math.max(currentIdx - 1, 0);
+                }
+                if (nextIdx < 0 || nextIdx >= flatVisibleTaskIds.length) return;
+                const nextId = flatVisibleTaskIds[nextIdx];
+                setFocusedTaskId(nextId);
+                if (e.shiftKey) {
+                    setSelectedTasks(prev => { const next = new Set(prev); next.add(nextId); return next; });
+                } else {
+                    setSelectedTasks(new Set([nextId]));
+                    setLastClickedTaskId(nextId);
+                }
+                document.querySelector(`[data-task-id="${nextId}"]`)?.scrollIntoView({ block: 'nearest' });
+            }
+            if (e.key === 'Escape') {
+                clearSelection();
+                setFocusedTaskId(null);
+                setLastClickedTaskId(null);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && flatVisibleTaskIds.length > 0) {
+                e.preventDefault();
+                setSelectedTasks(new Set(flatVisibleTaskIds));
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [view, flatVisibleTaskIds, focusedTaskId, clearSelection]);
 
     // Close bulk dropdown on outside click
     useEffect(() => {
@@ -2563,7 +2657,20 @@ export default function Show() {
                                         onDragCancel={() => setActiveColumnId(null)}
                                     >
                                     <tr>
-                                        <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 pl-6 pr-2 py-3 w-[52px] min-w-[52px]"></th>
+                                        <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 pl-6 pr-2 py-3 w-[52px] min-w-[52px]">
+                                            {canManageTasks && flatVisibleTaskIds.length > 0 && (
+                                                <input
+                                                    type="checkbox"
+                                                    ref={(el) => { if (el) el.indeterminate = selectedTasks.size > 0 && selectedTasks.size < flatVisibleTaskIds.length; }}
+                                                    checked={selectedTasks.size > 0 && selectedTasks.size === flatVisibleTaskIds.length}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedTasks(new Set(flatVisibleTaskIds));
+                                                        else clearSelection();
+                                                    }}
+                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700 cursor-pointer"
+                                                />
+                                            )}
+                                        </th>
                                         <th
                                             className="group/col sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] relative overflow-hidden"
                                             style={columnWidths['title'] ? { width: columnWidths['title'], minWidth: 60, maxWidth: columnWidths['title'] } : { width: 300, minWidth: 60 }}
@@ -2657,7 +2764,8 @@ export default function Show() {
                                                                         isExpanded={expandedTasks.has(task.id)}
                                                                         onToggleExpand={handleToggleExpand}
                                                                         isSelected={selectedTasks.has(task.id)}
-                                                                        onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                                                        onSelect={canManageTasks ? handleTaskSelect : undefined}
+                                                                        isFocused={focusedTaskId === task.id}
                                                                         customFields={localCustomFields}
                                                                         columnOrder={visibleColumnOrder}
                                                                         onContextMenu={handleContextMenu}
@@ -2685,6 +2793,9 @@ export default function Show() {
                                                                                         users={users}
                                                                                         onTaskUpdate={handleSubtaskInlineUpdate}
                                                                                         onCustomFieldUpdate={handleCustomFieldUpdate}
+                                                                                        isSelected={selectedTasks.has(sub.id)}
+                                                                                        onSelect={canManageTasks ? handleTaskSelect : undefined}
+                                                                                        isFocused={focusedTaskId === sub.id}
                                                                                         customFields={localCustomFields}
                                                                                         columnOrder={visibleColumnOrder}
                                                                                         onContextMenu={handleContextMenu}
@@ -2767,7 +2878,8 @@ export default function Show() {
                                                             isExpanded={expandedTasks.has(task.id)}
                                                             onToggleExpand={handleToggleExpand}
                                                             isSelected={selectedTasks.has(task.id)}
-                                                            onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                                            onSelect={canManageTasks ? handleTaskSelect : undefined}
+                                                            isFocused={focusedTaskId === task.id}
                                                             customFields={localCustomFields}
                                                             columnOrder={visibleColumnOrder}
                                                             onContextMenu={handleContextMenu}
@@ -2795,6 +2907,9 @@ export default function Show() {
                                                                             users={users}
                                                                             onTaskUpdate={handleSubtaskInlineUpdate}
                                                                             onCustomFieldUpdate={handleCustomFieldUpdate}
+                                                                            isSelected={selectedTasks.has(sub.id)}
+                                                                            onSelect={canManageTasks ? handleTaskSelect : undefined}
+                                                                            isFocused={focusedTaskId === sub.id}
                                                                             customFields={localCustomFields}
                                                                             columnOrder={visibleColumnOrder}
                                                                             onContextMenu={handleContextMenu}
@@ -2922,7 +3037,7 @@ export default function Show() {
                                             onDeleteTask={handleDeleteTask}
                                             onToggleComplete={handleToggleComplete}
                                             selectedTasks={selectedTasks}
-                                            onToggleSelect={canManageTasks ? toggleTaskSelection : undefined}
+                                            onToggleSelect={canManageTasks ? handleTaskSelect : undefined}
                                             onContextMenu={handleContextMenu}
                                             onOpenDetail={setDetailTaskId}
                                         />
