@@ -2315,8 +2315,8 @@ export default function Show() {
                 }
             />
 
-            {/* Custom Fields Panel */}
-            {showCustomFields && (
+            {/* Custom Fields Panel — always mounted so column header edit/delete works via ref */}
+            <div className={showCustomFields ? '' : 'hidden'}>
                 <Card className="mb-6">
                     <CustomFieldManager
                         ref={cfManagerRef}
@@ -2325,7 +2325,7 @@ export default function Show() {
                         onFieldsChange={setLocalCustomFields}
                     />
                 </Card>
-            )}
+            </div>
 
             {/* Automation Rules Panel */}
             {showAutomation && canManageTasks && (
