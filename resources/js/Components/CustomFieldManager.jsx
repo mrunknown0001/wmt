@@ -358,7 +358,7 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
                 name: form.name,
                 type: form.type,
                 options: ['single_select', 'multi_select'].includes(form.type) ? form.options : undefined,
-                config: form.type === 'formula' ? form.config : undefined,
+                config: (form.type === 'formula' || form.type === 'number') ? form.config : undefined,
             };
 
             let result;
@@ -536,6 +536,16 @@ export default function CustomFieldManager({ projectId, initialFields = [], onFi
                         options={FIELD_TYPES}
                         disabled={!!editingField}
                     />
+                    {form.type === 'number' && (
+                        <div className="w-32">
+                            <Input label="Decimal Places" id="cf-number-decimals" type="number"
+                                value={form.config.decimal_places ?? ''}
+                                onChange={(e) => setForm(prev => ({ ...prev, config: { ...prev.config, decimal_places: e.target.value === '' ? null : Number(e.target.value) } }))}
+                                min={0} max={10}
+                                placeholder="Auto"
+                            />
+                        </div>
+                    )}
                     {['single_select', 'multi_select'].includes(form.type) && (
                         <OptionEditor
                             options={form.options}

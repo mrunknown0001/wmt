@@ -176,7 +176,10 @@ function DisplayValue({ customField, cfv, formatDate }) {
         case 'textarea':
             return <Tooltip content={cfv.value_text || undefined}><span className={customField.type === 'textarea' ? 'line-clamp-2' : 'truncate block max-w-xs'}>{cfv.value_text || '—'}</span></Tooltip>;
         case 'number':
-            return <span>{cfv.value_number != null ? cfv.value_number : '—'}</span>;
+            if (cfv.value_number == null) return <span>—</span>;
+            return <span>{customField.config?.decimal_places != null
+                ? Number(cfv.value_number).toFixed(customField.config.decimal_places)
+                : cfv.value_number}</span>;
         case 'date':
             return <span>{cfv.value_date ? formatDate(cfv.value_date) : '—'}</span>;
         case 'single_select': {

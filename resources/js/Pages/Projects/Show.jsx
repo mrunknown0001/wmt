@@ -120,7 +120,10 @@ function renderCustomFieldValue(task, customField) {
         case 'textarea':
             return cfv.value_text || '—';
         case 'number':
-            return cfv.value_number != null ? cfv.value_number : '—';
+            if (cfv.value_number == null) return '—';
+            return customField.config?.decimal_places != null
+                ? Number(cfv.value_number).toFixed(customField.config.decimal_places)
+                : cfv.value_number;
         case 'date':
             return cfv.value_date ? formatDate(cfv.value_date) : '—';
         case 'single_select': {

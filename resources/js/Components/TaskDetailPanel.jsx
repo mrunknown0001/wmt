@@ -329,7 +329,13 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                             const cfv = customFieldValues[cf.id];
                                             if (cfv) {
                                                 if (cf.type === 'text') displayValue = cfv.value_text || '—';
-                                                else if (cf.type === 'number') displayValue = cfv.value_number ?? '—';
+                                                else if (cf.type === 'number') {
+                                                    if (cfv.value_number != null && cf.config?.decimal_places != null) {
+                                                        displayValue = Number(cfv.value_number).toFixed(cf.config.decimal_places);
+                                                    } else {
+                                                        displayValue = cfv.value_number ?? '—';
+                                                    }
+                                                }
                                                 else if (cf.type === 'date') displayValue = cfv.value_date ? formatDate(cfv.value_date) : '—';
                                                 else if (cf.type === 'single_select') {
                                                     const opt = cf.options?.find(o => o.id === cfv.selected_option_id);
