@@ -416,11 +416,20 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 }
             }
 
+            let config;
+            if (form.type === 'formula') {
+                config = { formula: form.config.formula, result_type: form.config.result_type, decimal_places: form.config.decimal_places };
+            } else if (['single_select', 'multi_select'].includes(form.type)) {
+                config = { sort_mode: form.config.sort_mode };
+            } else if (form.type === 'number') {
+                config = { decimal_places: form.config.decimal_places };
+            }
+
             const payload = {
                 name: form.name,
                 type: form.type,
                 options: ['single_select', 'multi_select'].includes(form.type) ? form.options : undefined,
-                config: (form.type === 'formula' || form.type === 'number' || ['single_select', 'multi_select'].includes(form.type)) ? form.config : undefined,
+                config,
             };
 
             let result;
