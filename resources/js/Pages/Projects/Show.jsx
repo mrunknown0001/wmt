@@ -986,125 +986,132 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
 
     const sectionColor = section.color;
 
+    const activeSectionColor = sectionColor || '#6b7280'; // gray-500 default
+
     return (
-        <tr ref={setNodeRef} style={{ ...style, ...(sectionColor ? { borderLeft: `3px solid ${sectionColor}` } : {}) }} className="bg-gray-100 dark:bg-gray-800/80">
-            <td colSpan={99} className="px-0 py-2">
-                <div className="sticky left-0 flex items-center gap-2 px-4 w-fit">
-                    {canManage && (
-                        <Tooltip content="Drag to reorder section">
+        <tr ref={setNodeRef} style={style} className="group/section">
+            <td colSpan={99} className="px-0 py-0">
+                <div className="flex items-center" style={{ borderLeft: `4px solid ${activeSectionColor}` }}>
+                    {/* Color bar indicator — clickable for managers */}
+                    <div className="sticky left-0 flex items-center gap-1.5 px-3 py-2 w-fit">
+                        {canManage && (
                             <button
                                 {...attributes}
                                 {...listeners}
-                                className="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                                className="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors opacity-0 group-hover/section:opacity-100"
                             >
                                 <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8-16a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
                                 </svg>
                             </button>
-                        </Tooltip>
-                    )}
-                    <button
-                        onClick={onToggleCollapse}
-                        className="p-0.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                    >
-                        <svg className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                    {/* Color indicator + picker */}
-                    {canManage ? (
-                        <>
-                            <Tooltip content="Section color">
-                                <button
-                                    ref={colorBtnRef}
-                                    onClick={() => {
-                                        if (!showColorPicker && colorBtnRef.current) {
-                                            const rect = colorBtnRef.current.getBoundingClientRect();
-                                            setPickerPos({ top: rect.bottom + 4, left: rect.left });
-                                        }
-                                        setShowColorPicker(!showColorPicker);
-                                    }}
-                                    className="w-3 h-3 rounded-full border border-gray-300 dark:border-gray-500 shrink-0 transition-colors hover:ring-2 hover:ring-primary-300"
-                                    style={{ backgroundColor: sectionColor || '#d1d5db' }}
-                                />
-                            </Tooltip>
-                            {showColorPicker && createPortal(
-                                <div
-                                    ref={colorPickerRef}
-                                    className="fixed z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 grid grid-cols-4 gap-1.5 w-[120px]"
-                                    style={{ top: pickerPos.top, left: pickerPos.left }}
-                                >
-                                    {SECTION_COLORS.map((color) => (
-                                        <button
-                                            key={color ?? 'none'}
-                                            type="button"
-                                            onClick={() => { onColorChange(color); setShowColorPicker(false); }}
-                                            className={`w-6 h-6 rounded-full border-2 transition-all hover:scale-110 ${
-                                                sectionColor === color ? 'ring-2 ring-primary-500 ring-offset-1 dark:ring-offset-gray-800' : ''
-                                            } ${!color ? 'border-gray-300 dark:border-gray-500' : 'border-transparent'}`}
-                                            style={{ backgroundColor: color || '#d1d5db' }}
-                                            title={color ? color : 'No color'}
-                                        >
-                                            {!color && (
-                                                <svg className="w-full h-full text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" d="M4 4l16 16" />
-                                                </svg>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>,
-                                document.body
-                            )}
-                        </>
-                    ) : (
-                        sectionColor && <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: sectionColor }} />
-                    )}
-                    {isEditing ? (
-                        <input
-                            autoFocus
-                            className="text-sm font-semibold bg-white dark:bg-gray-700 border border-primary-300 dark:border-primary-600 rounded px-2 py-0.5 text-gray-900 dark:text-gray-100 outline-none"
-                            value={editingName}
-                            onChange={(e) => onEditName(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') onRename();
-                                if (e.key === 'Escape') onCancelEditing();
-                            }}
-                            onBlur={onRename}
-                        />
-                    ) : (
-                        <span
-                            className="text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400"
-                            style={sectionColor ? { color: sectionColor } : undefined}
-                            onClick={onStartEditing}
+                        )}
+                        <button
+                            onClick={onToggleCollapse}
+                            className="p-0.5 transition-colors"
+                            style={{ color: activeSectionColor }}
                         >
-                            {section.name}
-                        </span>
-                    )}
-                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">{taskCount}</span>
-                    {canManage && (
-                        <>
-                            <Tooltip content="Add task to section">
-                                <Link
-                                    href={`/projects/${projectId}/tasks/create?section_id=${section.id}`}
-                                    className="ml-auto text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                                >
-                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                </Link>
-                            </Tooltip>
-                            <Tooltip content="Delete section">
-                                <button
-                                    onClick={onDelete}
-                                    className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                                >
-                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </Tooltip>
-                        </>
-                    )}
+                            <svg className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                        {/* Color indicator + picker */}
+                        {canManage ? (
+                            <>
+                                <Tooltip content="Section color">
+                                    <button
+                                        ref={colorBtnRef}
+                                        onClick={() => {
+                                            if (!showColorPicker && colorBtnRef.current) {
+                                                const rect = colorBtnRef.current.getBoundingClientRect();
+                                                setPickerPos({ top: rect.bottom + 4, left: rect.left });
+                                            }
+                                            setShowColorPicker(!showColorPicker);
+                                        }}
+                                        className="w-4 h-4 rounded shrink-0 transition-all hover:scale-110 hover:shadow-sm"
+                                        style={{ backgroundColor: activeSectionColor }}
+                                    />
+                                </Tooltip>
+                                {showColorPicker && createPortal(
+                                    <div
+                                        ref={colorPickerRef}
+                                        className="fixed z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3"
+                                        style={{ top: pickerPos.top, left: pickerPos.left }}
+                                    >
+                                        <div className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-2 px-0.5">Section color</div>
+                                        <div className="grid grid-cols-8 gap-1.5">
+                                            {SECTION_COLORS.map((color) => (
+                                                <button
+                                                    key={color ?? 'none'}
+                                                    type="button"
+                                                    onClick={() => { onColorChange(color); setShowColorPicker(false); }}
+                                                    className={`w-6 h-6 rounded-md transition-all hover:scale-110 ${
+                                                        sectionColor === color ? 'ring-2 ring-offset-1 ring-primary-500 dark:ring-offset-gray-800' : ''
+                                                    } ${!color ? 'border border-gray-300 dark:border-gray-500' : ''}`}
+                                                    style={{ backgroundColor: color || '#e5e7eb' }}
+                                                    title={color ? color : 'Default'}
+                                                >
+                                                    {!color && (
+                                                        <svg className="w-full h-full text-gray-400 p-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" d="M4 4l16 16" />
+                                                        </svg>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>,
+                                    document.body
+                                )}
+                            </>
+                        ) : (
+                            <span className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: activeSectionColor }} />
+                        )}
+                        {isEditing ? (
+                            <input
+                                autoFocus
+                                className="text-sm font-bold bg-white dark:bg-gray-700 border border-primary-300 dark:border-primary-600 rounded px-2 py-0.5 text-gray-900 dark:text-gray-100 outline-none"
+                                value={editingName}
+                                onChange={(e) => onEditName(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') onRename();
+                                    if (e.key === 'Escape') onCancelEditing();
+                                }}
+                                onBlur={onRename}
+                            />
+                        ) : (
+                            <span
+                                className="text-sm font-bold cursor-pointer hover:opacity-80 transition-opacity"
+                                style={{ color: activeSectionColor }}
+                                onClick={onStartEditing}
+                            >
+                                {section.name}
+                            </span>
+                        )}
+                        <span className="text-xs font-medium ml-0.5" style={{ color: activeSectionColor, opacity: 0.6 }}>({taskCount})</span>
+                        {canManage && (
+                            <div className="flex items-center gap-1 ml-2 opacity-0 group-hover/section:opacity-100 transition-opacity">
+                                <Tooltip content="Add task">
+                                    <Link
+                                        href={`/projects/${projectId}/tasks/create?section_id=${section.id}`}
+                                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                    >
+                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                    </Link>
+                                </Tooltip>
+                                <Tooltip content="Delete section">
+                                    <button
+                                        onClick={onDelete}
+                                        className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                    >
+                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </Tooltip>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </td>
         </tr>
