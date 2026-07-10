@@ -2299,6 +2299,14 @@ export default function Show() {
                         <Button
                             variant="secondary"
                             size="sm"
+                            onClick={() => setShowDetails(v => !v)}
+                        >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            {showDetails ? 'Hide Details' : 'Details'}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => window.location.href = `/projects/${project.id}/export`}
                         >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -2331,33 +2339,17 @@ export default function Show() {
                 }
             />
 
-            {/* Project Info Toggle */}
-            <Card className="mb-6">
-                <button
-                    type="button"
-                    onClick={() => setShowDetails((v) => !v)}
-                    className="flex w-full items-center justify-between text-left"
-                >
-                    <div className="flex items-center gap-3">
-                        <StatusBadge status={project.status} type="project" />
-                        {project.due_date && (
-                            <span className="text-sm text-gray-500 dark:text-gray-400">Due {formatDate(project.due_date)}</span>
-                        )}
-                        {project.owner && !showDetails && (
-                            <span className="text-sm text-gray-400 dark:text-gray-500">· {project.owner.name}</span>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-sm text-gray-400 dark:text-gray-500">
-                        <span>{showDetails ? 'Hide Details' : 'View Details'}</span>
-                        <svg className={`h-4 w-4 transition-transform ${showDetails ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                </button>
-
-                {showDetails && (
-                    <div className="mt-4 flex flex-wrap items-start gap-6 border-t border-gray-100 dark:border-gray-700 pt-4">
+            {/* Project Details (hidden by default, toggled via Details button) */}
+            {showDetails && (
+                <Card className="mb-6">
+                    <div className="flex flex-wrap items-start gap-6">
                         <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-3">
+                                <StatusBadge status={project.status} type="project" />
+                                {project.due_date && (
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">Due {formatDate(project.due_date)}</span>
+                                )}
+                            </div>
                             {project.description && (
                                 <div className="text-sm text-gray-600 dark:text-gray-300 rich-text" dangerouslySetInnerHTML={{ __html: project.description }} />
                             )}
@@ -2387,8 +2379,8 @@ export default function Show() {
                             )}
                         </div>
                     </div>
-                )}
-            </Card>
+                </Card>
+            )}
 
             {/* View Toggle + Filters + Add Task */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
