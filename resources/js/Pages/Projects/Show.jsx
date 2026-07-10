@@ -821,100 +821,54 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     );
 }
 
-// Board view wrapper with custom horizontal slider
-function BoardScrollWrapper({ children }) {
-    const scrollRef = useRef(null);
-    const trackRef = useRef(null);
-    const draggingRef = useRef(false);
-    const [thumb, setThumb] = useState({ width: 0, left: 0, visible: false });
-
-    const updateThumb = useCallback(() => {
-        const el = scrollRef.current;
-        const track = trackRef.current;
-        if (!el || !track) return;
-        const { scrollWidth, clientWidth, scrollLeft } = el;
-        if (scrollWidth <= clientWidth) {
-            setThumb({ width: 0, left: 0, visible: false });
-            return;
-        }
-        const trackW = track.clientWidth;
-        const tw = Math.max((clientWidth / scrollWidth) * trackW, 40);
-        const maxLeft = trackW - tw;
-        const ratio = scrollLeft / (scrollWidth - clientWidth);
-        setThumb({ width: tw, left: ratio * maxLeft, visible: true });
-    }, []);
+// Sticky horizontal scrollbar that mirrors a scroll container
+function StickyScrollbar({ scrollRef }) {
+    const stickyRef = useRef(null);
+    const innerRef = useRef(null);
+    const syncingRef = useRef(null);
 
     useEffect(() => {
-        const el = scrollRef.current;
-        if (!el) return;
-        updateThumb();
-        el.addEventListener('scroll', updateThumb, { passive: true });
-        const ro = new ResizeObserver(updateThumb);
-        ro.observe(el);
-        // Also observe the inner content for size changes
-        if (el.firstElementChild) ro.observe(el.firstElementChild);
-        return () => { el.removeEventListener('scroll', updateThumb); ro.disconnect(); };
-    }, [updateThumb]);
+        const scrollEl = scrollRef.current;
+        const stickyEl = stickyRef.current;
+        const innerEl = innerRef.current;
+        if (!scrollEl || !stickyEl || !innerEl) return;
 
-    const handleThumbPointerDown = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const track = trackRef.current;
-        const el = scrollRef.current;
-        if (!track || !el) return;
-        draggingRef.current = true;
-        const startX = e.clientX;
-        const startLeft = thumb.left;
-        const trackW = track.clientWidth;
-        const maxThumbLeft = trackW - thumb.width;
-        const maxScroll = el.scrollWidth - el.clientWidth;
-
-        const onMove = (ev) => {
-            const dx = ev.clientX - startX;
-            const newLeft = Math.max(0, Math.min(maxThumbLeft, startLeft + dx));
-            el.scrollLeft = maxThumbLeft > 0 ? (newLeft / maxThumbLeft) * maxScroll : 0;
+        const syncWidth = () => {
+            innerEl.style.width = scrollEl.scrollWidth + 'px';
+            stickyEl.style.display = scrollEl.scrollWidth > scrollEl.clientWidth ? '' : 'none';
         };
-        const onUp = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup', onUp);
-            setTimeout(() => { draggingRef.current = false; }, 0);
-        };
-        document.addEventListener('pointermove', onMove);
-        document.addEventListener('pointerup', onUp);
-    };
 
-    const handleTrackClick = (e) => {
-        if (draggingRef.current) return;
-        const track = trackRef.current;
-        const el = scrollRef.current;
-        if (!track || !el) return;
-        const rect = track.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const maxThumbLeft = track.clientWidth - thumb.width;
-        const targetCenter = clickX - thumb.width / 2;
-        const ratio = Math.max(0, Math.min(1, targetCenter / maxThumbLeft));
-        el.scrollTo({ left: ratio * (el.scrollWidth - el.clientWidth), behavior: 'smooth' });
-    };
+        const onMainScroll = () => {
+            if (syncingRef.current === 'sticky') return;
+            syncingRef.current = 'main';
+            stickyEl.scrollLeft = scrollEl.scrollLeft;
+            requestAnimationFrame(() => { syncingRef.current = null; });
+        };
+
+        const onStickyScroll = () => {
+            if (syncingRef.current === 'main') return;
+            syncingRef.current = 'sticky';
+            scrollEl.scrollLeft = stickyEl.scrollLeft;
+            requestAnimationFrame(() => { syncingRef.current = null; });
+        };
+
+        syncWidth();
+        const ro = new ResizeObserver(syncWidth);
+        ro.observe(scrollEl);
+        if (scrollEl.firstElementChild) ro.observe(scrollEl.firstElementChild);
+        scrollEl.addEventListener('scroll', onMainScroll);
+        stickyEl.addEventListener('scroll', onStickyScroll);
+
+        return () => {
+            ro.disconnect();
+            scrollEl.removeEventListener('scroll', onMainScroll);
+            stickyEl.removeEventListener('scroll', onStickyScroll);
+        };
+    }, [scrollRef]);
 
     return (
-        <div>
-            <style>{`.board-no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
-            {children(scrollRef)}
-            {thumb.visible && (
-                <div className="mt-2 px-1">
-                    <div
-                        ref={trackRef}
-                        onClick={handleTrackClick}
-                        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer"
-                    >
-                        <div
-                            onPointerDown={handleThumbPointerDown}
-                            className="absolute top-0 h-2 rounded-full bg-gray-400 dark:bg-gray-500 hover:bg-gray-500 dark:hover:bg-gray-400 active:bg-blue-500 dark:active:bg-blue-400 transition-colors cursor-grab active:cursor-grabbing"
-                            style={{ width: `${thumb.width}px`, left: `${thumb.left}px` }}
-                        />
-                    </div>
-                </div>
-            )}
+        <div ref={stickyRef} className="overflow-x-auto sticky bottom-0 z-10 styled-scrollbar-x" style={{ height: 12 }}>
+            <div ref={innerRef} style={{ height: 1 }} />
         </div>
     );
 }
@@ -1264,50 +1218,10 @@ export default function Show() {
     // Custom field manager ref for edit/delete from column dropdown
     const cfManagerRef = useRef(null);
 
-    // Sticky scrollbar for list view
+    // Scroll refs for sticky scrollbar
     const listScrollRef = useRef(null);
-    const stickyScrollRef = useRef(null);
-    const stickyScrollInnerRef = useRef(null);
-    const syncingScroll = useRef(null);
-
-    useEffect(() => {
-        const listEl = listScrollRef.current;
-        const stickyEl = stickyScrollRef.current;
-        const innerEl = stickyScrollInnerRef.current;
-        if (!listEl || !stickyEl || !innerEl) return;
-
-        const syncWidth = () => {
-            innerEl.style.width = listEl.scrollWidth + 'px';
-            // Hide sticky bar if no overflow
-            stickyEl.style.display = listEl.scrollWidth > listEl.clientWidth ? '' : 'none';
-        };
-
-        const onListScroll = () => {
-            if (syncingScroll.current === 'sticky') return;
-            syncingScroll.current = 'list';
-            stickyEl.scrollLeft = listEl.scrollLeft;
-            requestAnimationFrame(() => { syncingScroll.current = null; });
-        };
-
-        const onStickyScroll = () => {
-            if (syncingScroll.current === 'list') return;
-            syncingScroll.current = 'sticky';
-            listEl.scrollLeft = stickyEl.scrollLeft;
-            requestAnimationFrame(() => { syncingScroll.current = null; });
-        };
-
-        syncWidth();
-        const ro = new ResizeObserver(syncWidth);
-        ro.observe(listEl);
-        listEl.addEventListener('scroll', onListScroll);
-        stickyEl.addEventListener('scroll', onStickyScroll);
-
-        return () => {
-            ro.disconnect();
-            listEl.removeEventListener('scroll', onListScroll);
-            stickyEl.removeEventListener('scroll', onStickyScroll);
-        };
-    }, [view]);
+    const boardScrollRef = useRef(null);
+    const ganttScrollRef = useRef(null);
 
     const handleSortColumn = useCallback((colId, direction) => {
         setSortConfig(prev => {
@@ -2701,7 +2615,7 @@ export default function Show() {
                             onDragOver={handleListDragOver}
                             onDragEnd={handleListDragEnd}
                         >
-                            <div ref={listScrollRef} className="overflow-x-auto styled-scrollbar-x">
+                            <div ref={listScrollRef} className="overflow-x-auto no-scrollbar">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed' }}>
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <DndContext
@@ -3026,9 +2940,7 @@ export default function Show() {
                                 </tbody>
                             </table>
                             </div>
-                            <div ref={stickyScrollRef} className="overflow-x-auto sticky bottom-0 z-10 styled-scrollbar-x" style={{ height: 12 }}>
-                                <div ref={stickyScrollInnerRef} style={{ height: 1 }} />
-                            </div>
+                            <StickyScrollbar scrollRef={listScrollRef} />
                             <DragOverlay>
                                 {activeTask ? (
                                     <table className="min-w-full">
@@ -3074,58 +2986,57 @@ export default function Show() {
 
             {/* Board View */}
             {view === 'board' && (
-                <BoardScrollWrapper>
-                    {(boardScrollRef) => (
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCorners}
-                            onDragStart={handleDragStart}
-                            onDragEnd={handleBoardDragEnd}
-                        >
-                            <div ref={boardScrollRef} className="overflow-x-auto pb-2 board-no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
-                                <div className="inline-flex gap-4 min-w-full">
-                                    {TASK_STATUSES.map((status) => (
-                                        <KanbanColumn
-                                            key={status}
-                                            status={status}
-                                            tasks={tasksByStatus[status]}
-                                            projectId={project.id}
-                                            canManageTasks={canManageTasks}
-                                            auth={auth}
-                                            onDeleteTask={handleDeleteTask}
-                                            onToggleComplete={handleToggleComplete}
-                                            selectedTasks={selectedTasks}
-                                            onToggleSelect={canManageTasks ? handleTaskSelect : undefined}
-                                            onContextMenu={handleContextMenu}
-                                            onOpenDetail={setDetailTaskId}
-                                        />
-                                    ))}
-                                </div>
+                <div>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCorners}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleBoardDragEnd}
+                    >
+                        <div ref={boardScrollRef} className="overflow-x-auto pb-2 no-scrollbar">
+                            <div className="inline-flex gap-4 min-w-full">
+                                {TASK_STATUSES.map((status) => (
+                                    <KanbanColumn
+                                        key={status}
+                                        status={status}
+                                        tasks={tasksByStatus[status]}
+                                        projectId={project.id}
+                                        canManageTasks={canManageTasks}
+                                        auth={auth}
+                                        onDeleteTask={handleDeleteTask}
+                                        onToggleComplete={handleToggleComplete}
+                                        selectedTasks={selectedTasks}
+                                        onToggleSelect={canManageTasks ? handleTaskSelect : undefined}
+                                        onContextMenu={handleContextMenu}
+                                        onOpenDetail={setDetailTaskId}
+                                    />
+                                ))}
                             </div>
-                            <DragOverlay>
-                                {activeTask ? (
-                                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg w-65 rotate-2">
-                                        <div className="flex items-center gap-1.5 mb-2">
-                                            <PriorityBadge priority={activeTask.priority} />
-                                        </div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 line-clamp-2">{activeTask.title}</p>
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-1.5">
-                                                {activeTask.assignee && <Avatar name={activeTask.assignee.name} size="sm" />}
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{activeTask.assignee?.name || 'Unassigned'}</span>
-                                            </div>
-                                            {(activeTask.start_date || activeTask.due_date) && (
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {activeTask.start_date && activeTask.due_date ? `${formatDate(activeTask.start_date)} → ${formatDate(activeTask.due_date)}` : formatDate(activeTask.due_date) || formatDate(activeTask.start_date)}
-                                                </span>
-                                            )}
-                                        </div>
+                        </div>
+                        <StickyScrollbar scrollRef={boardScrollRef} />
+                        <DragOverlay>
+                            {activeTask ? (
+                                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg w-65 rotate-2">
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                        <PriorityBadge priority={activeTask.priority} />
                                     </div>
-                                ) : null}
-                            </DragOverlay>
-                        </DndContext>
-                    )}
-                </BoardScrollWrapper>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 line-clamp-2">{activeTask.title}</p>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            {activeTask.assignee && <Avatar name={activeTask.assignee.name} size="sm" />}
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">{activeTask.assignee?.name || 'Unassigned'}</span>
+                                        </div>
+                                        {(activeTask.start_date || activeTask.due_date) && (
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                {activeTask.start_date && activeTask.due_date ? `${formatDate(activeTask.start_date)} → ${formatDate(activeTask.due_date)}` : formatDate(activeTask.due_date) || formatDate(activeTask.start_date)}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : null}
+                        </DragOverlay>
+                    </DndContext>
+                </div>
             )}
 
             {/* Calendar View */}
@@ -3367,7 +3278,7 @@ export default function Show() {
                             />
                         ) : (
                             <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                <div className="overflow-x-auto styled-scrollbar-x">
+                                <div ref={ganttScrollRef} className="overflow-x-auto no-scrollbar">
                                     <div style={{ minWidth: `${240 + totalWidth}px` }}>
                                         {/* Header: month row */}
                                         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -3496,6 +3407,7 @@ export default function Show() {
                                         )}
                                     </div>
                                 </div>
+                                <StickyScrollbar scrollRef={ganttScrollRef} />
                             </div>
                         )}
 

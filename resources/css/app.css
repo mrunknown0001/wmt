@@ -109,6 +109,9 @@ html.dark, html.dark body {
 }
 /* Legacy class aliases */
 .scrollbar-thin, .styled-scrollbar, .styled-scrollbar-x {}
+/* Hide scrollbar but keep scroll functionality */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* AI Chat panel slide-up animation */
 @keyframes slide-up {
