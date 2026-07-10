@@ -105,14 +105,21 @@ class PublicFormController extends Controller
 
             $key = "fields.{$field->id}";
 
-            if ($field->type === 'attachment') {
+            if (in_array($field->type, ['attachment', 'capture_photo', 'capture_video'])) {
+                $maxFiles = $field->type === 'capture_video' ? 1 : 5;
+                $mimes = match ($field->type) {
+                    'capture_photo' => 'jpg,jpeg,png,webp',
+                    'capture_video' => 'mp4,webm,mov',
+                    default => 'jpg,jpeg,png,gif,bmp,webp,mp4,mov,avi,webm,xlsx,xls,csv',
+                };
+                $maxSize = $field->type === 'capture_video' ? 102400 : 51200;
+
                 if ($field->is_required) {
-                    $rules[$key] = ['required', 'array', 'max:5'];
-                    $rules["{$key}.*"] = ['file', 'mimes:jpg,jpeg,png,gif,bmp,webp,mp4,mov,avi,webm,xlsx,xls,csv', 'max:51200'];
+                    $rules[$key] = ['required', 'array', 'max:' . $maxFiles];
                 } else {
-                    $rules[$key] = ['nullable', 'array', 'max:5'];
-                    $rules["{$key}.*"] = ['file', 'mimes:jpg,jpeg,png,gif,bmp,webp,mp4,mov,avi,webm,xlsx,xls,csv', 'max:51200'];
+                    $rules[$key] = ['nullable', 'array', 'max:' . $maxFiles];
                 }
+                $rules["{$key}.*"] = ['file', "mimes:{$mimes}", "max:{$maxSize}"];
                 continue;
             }
 
@@ -164,7 +171,7 @@ class PublicFormController extends Controller
 
         // Merge default values for hidden fields
         foreach ($form->fields as $field) {
-            if (in_array($field->type, ['heading', 'description', 'attachment'])) {
+            if (in_array($field->type, ['heading', 'description', 'attachment', 'capture_photo', 'capture_video'])) {
                 continue;
             }
             if (!$field->is_visible && $field->default_value !== null) {
@@ -210,7 +217,7 @@ class PublicFormController extends Controller
         $customFieldMappings = [];
 
         foreach ($form->fields as $field) {
-            if (in_array($field->type, ['heading', 'description', 'attachment'])) {
+            if (in_array($field->type, ['heading', 'description', 'attachment', 'capture_photo', 'capture_video'])) {
                 continue;
             }
 
@@ -273,7 +280,7 @@ class PublicFormController extends Controller
 
         // Handle file attachments
         foreach ($form->fields as $field) {
-            if ($field->type !== 'attachment') {
+            if (!in_array($field->type, ['attachment', 'capture_photo', 'capture_video'])) {
                 continue;
             }
 

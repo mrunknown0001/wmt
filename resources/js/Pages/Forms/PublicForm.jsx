@@ -4,6 +4,7 @@ import Input from '../../Components/Input';
 import Textarea from '../../Components/Textarea';
 import Select from '../../Components/Select';
 import Button from '../../Components/Button';
+import CameraCapture from '../../Components/CameraCapture';
 import TurnstileWidget from '../../Components/TurnstileWidget';
 import ThemeToggle from '../../Components/ThemeToggle';
 
@@ -69,7 +70,7 @@ export default function PublicForm() {
     // Build initial field values with defaults
     const initialValues = {};
     visibleFields.forEach(field => {
-        if (['heading', 'description', 'attachment'].includes(field.type)) return;
+        if (['heading', 'description', 'attachment', 'capture_photo', 'capture_video'].includes(field.type)) return;
         if (field.type === 'multi_select') {
             initialValues[field.id] = field.default_value ? [field.default_value] : [];
         } else {
@@ -363,6 +364,62 @@ export default function PublicForm() {
                         {fileErrors.map((err, i) => (
                             <p key={i} className="mt-1 text-sm text-red-600 dark:text-red-400">{err}</p>
                         ))}
+                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                    </div>
+                );
+            }
+
+            case 'capture_photo': {
+                const files = attachments[field.id] || [];
+                return (
+                    <div key={field.id}>
+                        <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                            {field.label}{field.is_required ? ' *' : ''}
+                        </label>
+                        <CameraCapture
+                            mode="photo"
+                            maxPhotos={5}
+                            existingFiles={files}
+                            onCapture={(file) => {
+                                setAttachments(prev => {
+                                    const existing = prev[field.id] || [];
+                                    if (existing.length >= 5) return prev;
+                                    return { ...prev, [field.id]: [...existing, file] };
+                                });
+                            }}
+                            onRemove={(index) => removeFile(field.id, index)}
+                        />
+                        {fieldError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{fieldError}</p>}
+                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                    </div>
+                );
+            }
+
+            case 'capture_video': {
+                const files = attachments[field.id] || [];
+                return (
+                    <div key={field.id}>
+                        <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                            {field.label}{field.is_required ? ' *' : ''}
+                        </label>
+                        <CameraCapture
+                            mode="video"
+                            maxVideoDuration={60}
+                            existingFiles={files}
+                            onCapture={(file) => {
+                                setAttachments(prev => ({
+                                    ...prev,
+                                    [field.id]: [file],
+                                }));
+                            }}
+                            onRemove={() => {
+                                setAttachments(prev => ({
+                                    ...prev,
+                                    [field.id]: [],
+                                }));
+                            }}
+                        />
+                        {fieldError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{fieldError}</p>}
                         {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );

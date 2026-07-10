@@ -31,11 +31,14 @@ const FIELD_TYPES = [
     { value: 'select', label: 'Dropdown', icon: 'v' },
     { value: 'multi_select', label: 'Multi Select', icon: 'M' },
     { value: 'attachment', label: 'Attachment', icon: '📎' },
+    { value: 'capture_photo', label: 'Camera Photo', icon: '📷' },
+    { value: 'capture_video', label: 'Camera Video', icon: '🎥' },
     { value: 'heading', label: 'Heading', icon: 'H' },
     { value: 'description', label: 'Description', icon: 'i' },
 ];
 
 const STATIC_TYPES = ['heading', 'description'];
+const FILE_TYPES = ['attachment', 'capture_photo', 'capture_video'];
 
 const CUSTOM_FIELD_TYPE_MAP = {
     'text': 'text',
@@ -184,7 +187,7 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                         placeholder={isStatic ? 'Heading text...' : 'Field label'}
                     />
 
-                    {!isStatic && field.type !== 'attachment' && (
+                    {!isStatic && !FILE_TYPES.includes(field.type) && (
                         <Input
                             label="Help Text"
                             id={`field-${fieldIndex}-help`}
@@ -199,8 +202,18 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                             Accepts images, videos, and Excel files. Max 5 files, 50MB each.
                         </p>
                     )}
+                    {field.type === 'capture_photo' && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Opens device camera. User can capture up to 5 photos.
+                        </p>
+                    )}
+                    {field.type === 'capture_video' && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Opens device camera. User can record 1 video, max 1 minute.
+                        </p>
+                    )}
 
-                    {!isStatic && field.type !== 'attachment' && (
+                    {!isStatic && !FILE_TYPES.includes(field.type) && (
                         <DefaultValueInput field={field} fieldIndex={fieldIndex} onChange={update} customFields={customFields} />
                     )}
 
@@ -263,7 +276,7 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                     )}
 
                     {/* Maps To for non-custom-field items */}
-                    {!isStatic && !isCustomFieldMapped && field.type !== 'attachment' && (
+                    {!isStatic && !isCustomFieldMapped && !FILE_TYPES.includes(field.type) && (
                         <Select
                             label="Maps To"
                             id={`field-${fieldIndex}-maps`}
@@ -555,7 +568,7 @@ function FieldConditionsEditor({ field, fieldIndex, allFields, customFields = []
     }).filter((f, i) => {
         if (i === fieldIndex) return false;
         if (STATIC_TYPES.includes(f.type)) return false;
-        if (f.type === 'attachment') return false;
+        if (FILE_TYPES.includes(f.type)) return false;
         return true;
     });
 
@@ -777,7 +790,7 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
     const titleDropdownRef = useRef(null);
     const [titlePos, setTitlePos] = useState({ top: 0, left: 0, width: 0 });
 
-    const nonStaticFields = fields.filter(f => !STATIC_TYPES.includes(f.type) && f.type !== 'attachment');
+    const nonStaticFields = fields.filter(f => !STATIC_TYPES.includes(f.type) && !FILE_TYPES.includes(f.type));
     const titleFieldIds = taskDefaults?.title_field_ids || [];
 
     const toggleTitleField = (position) => {
