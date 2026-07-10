@@ -36,7 +36,7 @@ import CustomFieldManager from '../../Components/CustomFieldManager';
 import StatusPicker from '../../Components/StatusPicker';
 import PriorityPicker from '../../Components/PriorityPicker';
 import AssigneePicker from '../../Components/AssigneePicker';
-import InlineDatePicker from '../../Components/InlineDatePicker';
+import InlineDatePicker, { CalendarGrid } from '../../Components/InlineDatePicker';
 import CelebrationEffect from '../../Components/CelebrationEffect';
 import InlineCustomFieldEditor from '../../Components/InlineCustomFieldEditor';
 import TaskContextMenu from '../../Components/TaskContextMenu';
@@ -3761,19 +3761,12 @@ export default function Show() {
                     <div className="relative">
                         <button onClick={() => setBulkDropdown(bulkDropdown === 'due_date' ? null : 'due_date')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Due Date</button>
                         {bulkDropdown === 'due_date' && (
-                            <>
-                                <input
-                                    type="date"
-                                    ref={(el) => { if (el) requestAnimationFrame(() => { try { el.showPicker(); } catch {} }); }}
-                                    className="sr-only"
-                                    onChange={(e) => { if (e.target.value) handleBulkAction('update_due_date', e.target.value); }}
-                                />
-                                <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600">
-                                    <button onClick={() => handleBulkAction('update_due_date', null)} className="w-full text-left px-3 py-2 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg italic whitespace-nowrap">
-                                        Clear due date
-                                    </button>
-                                </div>
-                            </>
+                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 p-3">
+                                <CalendarGrid selectedDate={null} onSelect={(date) => handleBulkAction('update_due_date', date)} />
+                                <button onClick={() => handleBulkAction('update_due_date', null)} className="mt-2 w-full text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors text-center">
+                                    Clear due date
+                                </button>
+                            </div>
                         )}
                     </div>
 
@@ -3781,19 +3774,12 @@ export default function Show() {
                     <div className="relative">
                         <button onClick={() => setBulkDropdown(bulkDropdown === 'start_date' ? null : 'start_date')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Start Date</button>
                         {bulkDropdown === 'start_date' && (
-                            <>
-                                <input
-                                    type="date"
-                                    ref={(el) => { if (el) requestAnimationFrame(() => { try { el.showPicker(); } catch {} }); }}
-                                    className="sr-only"
-                                    onChange={(e) => { if (e.target.value) handleBulkAction('update_start_date', e.target.value); }}
-                                />
-                                <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600">
-                                    <button onClick={() => handleBulkAction('update_start_date', null)} className="w-full text-left px-3 py-2 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg italic whitespace-nowrap">
-                                        Clear start date
-                                    </button>
-                                </div>
-                            </>
+                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 p-3">
+                                <CalendarGrid selectedDate={null} onSelect={(date) => handleBulkAction('update_start_date', date)} />
+                                <button onClick={() => handleBulkAction('update_start_date', null)} className="mt-2 w-full text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors text-center">
+                                    Clear start date
+                                </button>
+                            </div>
                         )}
                     </div>
 
