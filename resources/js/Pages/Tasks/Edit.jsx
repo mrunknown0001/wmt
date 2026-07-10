@@ -44,7 +44,8 @@ function fieldLabel(field) {
 }
 
 function ActivityItem({ item }) {
-    const userName = item.user?.name || (item.description?.includes('via form') ? 'Public Form' : 'System');
+    const isFormSubmission = !item.user && item.description?.includes('via form');
+    const userName = item.user?.name || 'System';
 
     if (item.description) {
         return (
@@ -58,8 +59,11 @@ function ActivityItem({ item }) {
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-700 dark:text-gray-300">
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{userName}</span>{' '}
-                        {item.description}
+                        {isFormSubmission ? (
+                            <span className="capitalize">{item.description}</span>
+                        ) : (
+                            <><span className="font-medium text-gray-900 dark:text-gray-100">{userName}</span>{' '}{item.description}</>
+                        )}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">{timeAgo(item.created_at)}</p>
                 </div>
