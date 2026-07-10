@@ -7,7 +7,7 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
     const timerRef = useRef(null);
     const chunksRef = useRef([]);
 
-    const [stream, setStream] = useState(null);
+    const streamRef = useRef(null);
     const [cameraActive, setCameraActive] = useState(false);
     const [permissionDenied, setPermissionDenied] = useState(false);
     const [facingMode, setFacingMode] = useState('environment');
@@ -46,14 +46,31 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             try { mediaRecorderRef.current.stop(); } catch {}
         }
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
         }
-        setStream(null);
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
+        }
         setCameraActive(false);
         setRecording(false);
         setElapsedSeconds(0);
-    }, [stream]);
+    }, []);
+
+    const attachStream = (mediaStream) => {
+        streamRef.current = mediaStream;
+        setCameraActive(true);
+        setPermissionDenied(false);
+    };
+
+    // Attach stream to video element when camera becomes active
+    useEffect(() => {
+        if (cameraActive && videoRef.current && streamRef.current) {
+            videoRef.current.srcObject = streamRef.current;
+            videoRef.current.play().catch(() => {});
+        }
+    }, [cameraActive]);
 
     const startCamera = async () => {
         try {
@@ -61,15 +78,7 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
                 video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
                 audio: mode === 'video',
             });
-            setStream(mediaStream);
-            setCameraActive(true);
-            setPermissionDenied(false);
-            // Attach stream to video element after state update
-            setTimeout(() => {
-                if (videoRef.current) {
-                    videoRef.current.srcObject = mediaStream;
-                }
-            }, 0);
+            attachStream(mediaStream);
         } catch (err) {
             if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
                 setPermissionDenied(true);
@@ -82,24 +91,15 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
         stopCamera();
         const newFacing = facingMode === 'environment' ? 'user' : 'environment';
         setFacingMode(newFacing);
-        // Restart with new facing mode after a tick
-        setTimeout(async () => {
-            try {
-                const mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: newFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
-                    audio: mode === 'video',
-                });
-                setStream(mediaStream);
-                setCameraActive(true);
-                setTimeout(() => {
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = mediaStream;
-                    }
-                }, 0);
-            } catch (err) {
-                console.error('Camera flip error:', err);
-            }
-        }, 100);
+        try {
+            const mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: newFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: mode === 'video',
+            });
+            attachStream(mediaStream);
+        } catch (err) {
+            console.error('Camera flip error:', err);
+        }
     };
 
     const capturePhoto = () => {
@@ -119,7 +119,8 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
     };
 
     const startRecording = () => {
-        if (!stream) return;
+        if (!streamRef.current) return;
+        const stream = streamRef.current;
 
         const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
             ? 'video/webm;codecs=vp9'
@@ -301,7 +302,7 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    muted={mode === 'photo'}
+                    muted
                     className="w-full"
                     style={{ maxHeight: '400px', objectFit: 'contain' }}
                 />
