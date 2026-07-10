@@ -2377,10 +2377,10 @@ export default function Show() {
     const activeTask = activeId ? localTasks.find((t) => t.id === activeId) : null;
 
     return (
-        <AuthenticatedLayout title={project.name}>
-          <div className="flex flex-col h-full min-h-0 overflow-hidden">
+        <AuthenticatedLayout title={project.name} contained>
+          <div className="flex flex-col h-full min-h-0">
             {/* Pinned header area */}
-            <div className="shrink-0">
+            <div className="shrink-0 pt-6">
             <PageHeader
                 title={project.name}
                 breadcrumbs={[
@@ -2614,7 +2614,7 @@ export default function Show() {
             </div>
 
             {/* Scrollable task area */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto pb-6">
 
             {/* Custom Fields Panel — always mounted so column header edit/delete works via ref */}
             <div className={showCustomFields ? '' : 'hidden'}>

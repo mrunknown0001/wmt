@@ -99,7 +99,7 @@ const SettingsIcon = () => (
     </svg>
 );
 
-export default function AuthenticatedLayout({ children, title }) {
+export default function AuthenticatedLayout({ children, title, contained = false }) {
     const { auth, flash, settings, unreadNotificationsCount } = usePage().props;
     const currentUrl = usePage().url;
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -341,7 +341,7 @@ export default function AuthenticatedLayout({ children, title }) {
                     </div>
 
                     {/* Content */}
-                    <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+                    <main className={`flex-1 min-h-0 px-4 sm:px-6 lg:px-8 ${contained ? 'overflow-hidden' : 'overflow-y-auto py-6'}`}>
                         {children}
                     </main>
                 </div>
