@@ -2378,6 +2378,9 @@ export default function Show() {
 
     return (
         <AuthenticatedLayout title={project.name}>
+          <div className="flex flex-col h-full min-h-0 overflow-hidden">
+            {/* Pinned header area */}
+            <div className="shrink-0">
             <PageHeader
                 title={project.name}
                 breadcrumbs={[
@@ -2421,32 +2424,6 @@ export default function Show() {
                     </div>
                 }
             />
-
-            {/* Custom Fields Panel — always mounted so column header edit/delete works via ref */}
-            <div className={showCustomFields ? '' : 'hidden'}>
-                <Card className="mb-6">
-                    <CustomFieldManager
-                        ref={cfManagerRef}
-                        projectId={project.id}
-                        initialFields={localCustomFields}
-                        onFieldsChange={setLocalCustomFields}
-                    />
-                </Card>
-            </div>
-
-            {/* Automation Rules Panel */}
-            {showAutomation && canManageTasks && (
-                <Card className="mb-6">
-                    <AutomationRuleBuilder
-                        projectId={project.id}
-                        rules={automationRules || []}
-                        users={users}
-                        sections={localSections}
-                        customFields={localCustomFields}
-                        canCreateRules={!!auth.user?.can_create_rules}
-                    />
-                </Card>
-            )}
 
             {/* Project Info Toggle */}
             <Card className="mb-6">
@@ -2634,6 +2611,36 @@ export default function Show() {
                     )}
                 </div>
             </div>
+            </div>
+
+            {/* Scrollable task area */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+
+            {/* Custom Fields Panel — always mounted so column header edit/delete works via ref */}
+            <div className={showCustomFields ? '' : 'hidden'}>
+                <Card className="mb-6">
+                    <CustomFieldManager
+                        ref={cfManagerRef}
+                        projectId={project.id}
+                        initialFields={localCustomFields}
+                        onFieldsChange={setLocalCustomFields}
+                    />
+                </Card>
+            </div>
+
+            {/* Automation Rules Panel */}
+            {showAutomation && canManageTasks && (
+                <Card className="mb-6">
+                    <AutomationRuleBuilder
+                        projectId={project.id}
+                        rules={automationRules || []}
+                        users={users}
+                        sections={localSections}
+                        customFields={localCustomFields}
+                        canCreateRules={!!auth.user?.can_create_rules}
+                    />
+                </Card>
+            )}
 
             {/* List View */}
             {view === 'list' && (
@@ -3671,6 +3678,9 @@ export default function Show() {
                     </div>
                 );
             })()}
+
+            </div>
+          </div>
 
             {/* Bulk Actions Toolbar */}
             {selectedTasks.size > 0 && canManageTasks && (

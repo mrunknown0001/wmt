@@ -283,7 +283,7 @@ export default function AuthenticatedLayout({ children, title }) {
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 bg-pattern flex">
+            <div className="h-screen bg-gray-50 dark:bg-gray-900 bg-pattern flex overflow-hidden">
                 {/* Mobile backdrop */}
                 {sidebarOpen && (
                     <div
@@ -303,7 +303,7 @@ export default function AuthenticatedLayout({ children, title }) {
 
                 {/* Sidebar — desktop (collapsible) */}
                 <aside
-                    className={`hidden lg:block bg-linear-to-b from-gray-900 to-gray-950 dark:from-gray-950 dark:to-black transition-all duration-200 shrink-0 sticky top-0 h-screen ${
+                    className={`hidden lg:block bg-linear-to-b from-gray-900 to-gray-950 dark:from-gray-950 dark:to-black transition-all duration-200 shrink-0 h-full ${
                         sidebarCollapsed ? 'w-16' : 'w-64'
                     }`}
                 >
@@ -311,9 +311,9 @@ export default function AuthenticatedLayout({ children, title }) {
                 </aside>
 
                 {/* Main area */}
-                <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     {/* Top header bar */}
-                    <div className="sticky top-0 z-30 flex items-center gap-3 px-4 lg:px-8 py-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
+                    <div className="z-30 shrink-0 flex items-center gap-3 px-4 lg:px-8 py-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
                         {/* Mobile hamburger — opens sidebar overlay */}
                         <button
                             onClick={() => setSidebarOpen(true)}
@@ -343,7 +343,7 @@ export default function AuthenticatedLayout({ children, title }) {
                     </div>
 
                     {/* Content */}
-                    <main className="flex-1 px-4 sm:px-6 lg:px-8 pt-6">
+                    <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
                         {children}
                     </main>
                 </div>
