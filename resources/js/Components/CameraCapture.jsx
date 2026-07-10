@@ -8,6 +8,7 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
     const chunksRef = useRef([]);
 
     const streamRef = useRef(null);
+    const locationRef = useRef(null);
     const [cameraActive, setCameraActive] = useState(false);
     const [permissionDenied, setPermissionDenied] = useState(false);
     const [facingMode, setFacingMode] = useState('environment');
@@ -72,6 +73,23 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
         }
     }, [cameraActive]);
 
+    // Request geolocation when component mounts (for photo mode)
+    useEffect(() => {
+        if (mode === 'photo' && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    locationRef.current = {
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude,
+                        accuracy: pos.coords.accuracy,
+                    };
+                },
+                () => { locationRef.current = null; },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+    }, [mode]);
+
     const startCamera = async () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -79,6 +97,20 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
                 audio: mode === 'video',
             });
             attachStream(mediaStream);
+            // Refresh geolocation on each camera open
+            if (mode === 'photo' && navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        locationRef.current = {
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            accuracy: pos.coords.accuracy,
+                        };
+                    },
+                    () => {},
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
         } catch (err) {
             if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
                 setPermissionDenied(true);
@@ -102,6 +134,15 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
         }
     };
 
+    const formatCoord = (deg, isLat) => {
+        const dir = isLat ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W');
+        const abs = Math.abs(deg);
+        const d = Math.floor(abs);
+        const m = Math.floor((abs - d) * 60);
+        const s = ((abs - d - m / 60) * 3600).toFixed(1);
+        return `${d}°${m}'${s}"${dir}`;
+    };
+
     const capturePhoto = () => {
         if (!videoRef.current || existingFiles.length >= maxPhotos) return;
 
@@ -109,7 +150,52 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
         const canvas = canvasRef.current;
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+
+        // Draw timestamp and geolocation overlay
+        const now = new Date();
+        const timestamp = now.toLocaleString('en-US', {
+            year: 'numeric', month: 'short', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
+        });
+
+        const lines = [timestamp];
+        const loc = locationRef.current;
+        if (loc) {
+            lines.push(`${formatCoord(loc.lat, true)} ${formatCoord(loc.lng, false)}`);
+        }
+
+        // Scale font size relative to image dimensions
+        const fontSize = Math.max(14, Math.round(canvas.width * 0.018));
+        const padding = Math.round(fontSize * 0.6);
+        const lineHeight = Math.round(fontSize * 1.4);
+        ctx.font = `${fontSize}px monospace`;
+
+        // Measure text width for background
+        const maxTextWidth = Math.max(...lines.map(l => ctx.measureText(l).width));
+        const bgHeight = lines.length * lineHeight + padding * 2;
+        const bgWidth = maxTextWidth + padding * 2;
+        const bgX = canvas.width - bgWidth - padding;
+        const bgY = canvas.height - bgHeight - padding;
+
+        // Semi-transparent background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 4);
+            ctx.fill();
+        } else {
+            ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+        }
+
+        // Draw text
+        ctx.fillStyle = '#FFD700';
+        ctx.textBaseline = 'top';
+        lines.forEach((line, i) => {
+            ctx.fillText(line, bgX + padding, bgY + padding + i * lineHeight);
+        });
+
         canvas.toBlob((blob) => {
             if (blob) {
                 const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
@@ -265,7 +351,7 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
                                     <button
                                         type="button"
                                         onClick={() => onRemove(i)}
-                                        className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center shadow"
                                     >
                                         x
                                     </button>
@@ -411,7 +497,7 @@ export default function CameraCapture({ mode = 'photo', maxPhotos = 5, maxVideoD
                             <button
                                 type="button"
                                 onClick={() => onRemove(i)}
-                                className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center shadow"
                             >
                                 x
                             </button>
