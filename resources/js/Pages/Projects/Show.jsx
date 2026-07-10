@@ -1094,19 +1094,6 @@ export default function Show() {
     const [dynamicFilters, setDynamicFilters] = useState([]); // [{id, fieldId, operator, value}]
     const nextFilterIdRef = useRef(1);
 
-    const filterableFields = useMemo(() => {
-        const builtIn = [
-            { id: 'status', name: 'Status', fieldType: 'select', options: TASK_STATUSES.map(s => ({ id: s, label: formatLabel(s) })) },
-            { id: 'priority', name: 'Priority', fieldType: 'select', options: ['urgent', 'high', 'medium', 'low'].map(p => ({ id: p, label: formatLabel(p) })) },
-            { id: 'assignee', name: 'Assignee', fieldType: 'select', options: assignees.map(a => ({ id: String(a.id), label: a.name })) },
-            { id: 'due_date', name: 'Due Date', fieldType: 'date' },
-        ];
-        const custom = localCustomFields.filter(cf => cf.type !== 'formula').map(cf => ({
-            id: `cf_${cf.id}`, name: cf.name, fieldType: cf.type, options: cf.options, config: cf.config, cfId: cf.id,
-        }));
-        return [...builtIn, ...custom];
-    }, [localCustomFields, assignees]);
-
     const getOperatorsForType = (fieldType) => {
         switch (fieldType) {
             case 'select': case 'single_select':
@@ -1417,6 +1404,19 @@ export default function Show() {
         });
         return Array.from(map, ([id, name]) => ({ id, name }));
     }, [localTasks]);
+
+    const filterableFields = useMemo(() => {
+        const builtIn = [
+            { id: 'status', name: 'Status', fieldType: 'select', options: TASK_STATUSES.map(s => ({ id: s, label: formatLabel(s) })) },
+            { id: 'priority', name: 'Priority', fieldType: 'select', options: ['urgent', 'high', 'medium', 'low'].map(p => ({ id: p, label: formatLabel(p) })) },
+            { id: 'assignee', name: 'Assignee', fieldType: 'select', options: assignees.map(a => ({ id: String(a.id), label: a.name })) },
+            { id: 'due_date', name: 'Due Date', fieldType: 'date' },
+        ];
+        const custom = localCustomFields.filter(cf => cf.type !== 'formula').map(cf => ({
+            id: `cf_${cf.id}`, name: cf.name, fieldType: cf.type, options: cf.options, config: cf.config, cfId: cf.id,
+        }));
+        return [...builtIn, ...custom];
+    }, [localCustomFields, assignees]);
 
     // Filter tasks
     const matchesFilters = useCallback((t) => {
