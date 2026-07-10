@@ -2347,9 +2347,12 @@ export default function Show() {
                             <span className="text-sm text-gray-400 dark:text-gray-500">· {project.owner.name}</span>
                         )}
                     </div>
-                    <svg className={`h-4 w-4 text-gray-400 transition-transform ${showDetails ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <div className="flex items-center gap-1.5 text-sm text-gray-400 dark:text-gray-500">
+                        <span>{showDetails ? 'Hide Details' : 'View Details'}</span>
+                        <svg className={`h-4 w-4 transition-transform ${showDetails ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
                 </button>
 
                 {showDetails && (
