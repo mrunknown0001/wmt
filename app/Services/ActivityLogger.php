@@ -32,7 +32,7 @@ class ActivityLogger
         'task_section' => ['name'],
     ];
 
-    public static function logCreated(Model $entity, User $user): void
+    public static function logCreated(Model $entity, ?User $user, ?string $description = null): void
     {
         $meta = self::getMeta($entity);
         if (!$meta) return;
@@ -40,12 +40,12 @@ class ActivityLogger
         $name = $entity->{$meta['name_field']} ?? '(unnamed)';
 
         ActivityLog::create([
-            'user_id'     => $user->id,
+            'user_id'     => $user?->id,
             'entity_type' => $meta['type'],
             'entity_id'   => $entity->id,
             'entity_name' => $name,
             'action'      => 'created',
-            'description' => "created {$meta['type']} \"{$name}\"",
+            'description' => $description ?? "created {$meta['type']} \"{$name}\"",
         ]);
     }
 

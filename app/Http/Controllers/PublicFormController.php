@@ -8,6 +8,8 @@ use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\TaskCustomFieldValue;
 use App\Rules\Turnstile;
+use App\Services\ActivityLogger;
+use App\Services\TaskActivityLogger;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -244,6 +246,12 @@ class PublicFormController extends Controller
 
         // Create the task
         $task = Task::create($taskData);
+
+        // Log activity for form submission
+        $submittedAt = now()->format('M d, Y h:i A');
+        $formDescription = "submitted via form \"{$form->name}\" on {$submittedAt}";
+        TaskActivityLogger::logCreated($task, null, $formDescription);
+        ActivityLogger::logCreated($task, null, $formDescription);
 
         // Create custom field values
         foreach ($customFieldMappings as $fieldId => $value) {

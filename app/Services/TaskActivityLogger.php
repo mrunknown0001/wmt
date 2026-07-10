@@ -10,12 +10,12 @@ class TaskActivityLogger
 {
     private const TRACKED_FIELDS = ['title', 'description', 'status', 'priority', 'assigned_to', 'due_date'];
 
-    public static function logCreated(Task $task, User $user): void
+    public static function logCreated(Task $task, ?User $user, ?string $description = null): void
     {
         TaskActivity::create([
             'task_id' => $task->id,
-            'user_id' => $user->id,
-            'description' => 'created the task',
+            'user_id' => $user?->id,
+            'description' => $description ?? 'created the task',
         ]);
     }
 

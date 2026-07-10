@@ -44,7 +44,7 @@ function fieldLabel(field) {
 }
 
 function ActivityItem({ item }) {
-    const userName = item.user?.name || 'Someone';
+    const userName = item.user?.name || (item.description?.includes('via form') ? 'Public Form' : 'System');
 
     if (item.description) {
         return (
