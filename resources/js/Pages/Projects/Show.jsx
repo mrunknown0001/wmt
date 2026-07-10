@@ -1094,6 +1094,8 @@ export default function Show() {
     const [filterAssignee, setFilterAssignee] = useState('');
     const [filterSearch, setFilterSearch] = useState('');
     const [filterDueDate, setFilterDueDate] = useState('');
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [customFieldFilters, setCustomFieldFilters] = useState({});
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [duplicateTarget, setDuplicateTarget] = useState(null);
     const [localTasks, setLocalTasks] = useState(serverTasks);
@@ -1389,8 +1391,42 @@ export default function Show() {
                 case 'no_date': if (dueDate) return false; break;
             }
         }
+        // Custom field filters
+        const cfvs = t.custom_field_values || [];
+        for (const [cfIdStr, filterVal] of Object.entries(customFieldFilters)) {
+            if (filterVal === '' || filterVal === null || filterVal === undefined) continue;
+            if (Array.isArray(filterVal) && filterVal.length === 0) continue;
+            const cfId = Number(cfIdStr);
+            const cf = localCustomFields.find(f => f.id === cfId);
+            if (!cf) continue;
+            const cfv = cfvs.find(v => v.custom_field_id === cfId);
+            if (cf.type === 'single_select') {
+                if (!cfv || String(cfv.value_option_id) !== String(filterVal)) return false;
+            } else if (cf.type === 'multi_select') {
+                const taskVals = cfv?.value_json || [];
+                const filterArr = Array.isArray(filterVal) ? filterVal : [filterVal];
+                if (!filterArr.every(fv => taskVals.map(String).includes(String(fv)))) return false;
+            } else if (cf.type === 'text' || cf.type === 'textarea') {
+                const textVal = cfv?.value_text || '';
+                if (!textVal.toLowerCase().includes(String(filterVal).toLowerCase())) return false;
+            } else if (cf.type === 'number') {
+                const numVal = cfv?.value_number;
+                if (numVal === null || numVal === undefined) return false;
+                if (typeof filterVal === 'object' && filterVal !== null) {
+                    if (filterVal.min !== '' && filterVal.min !== undefined && Number(numVal) < Number(filterVal.min)) return false;
+                    if (filterVal.max !== '' && filterVal.max !== undefined && Number(numVal) > Number(filterVal.max)) return false;
+                }
+            } else if (cf.type === 'date') {
+                const dateVal = cfv?.value_date;
+                if (!dateVal) return false;
+                if (typeof filterVal === 'object' && filterVal !== null) {
+                    if (filterVal.from && dateVal < filterVal.from) return false;
+                    if (filterVal.to && dateVal > filterVal.to) return false;
+                } else if (dateVal !== filterVal) return false;
+            }
+        }
         return true;
-    }, [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate]);
+    }, [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate, customFieldFilters, localCustomFields]);
 
     const filteredTasks = useMemo(() => {
         const filtered = localTasks.filter(matchesFilters);
@@ -2277,8 +2313,14 @@ export default function Show() {
         setConfirmDelete(null);
     };
 
-    const hasActiveFilters = filterStatus || filterPriority || filterAssignee || filterSearch || filterDueDate;
-    const activeFilterCount = [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate].filter(Boolean).length;
+    const activeCfFilterCount = Object.values(customFieldFilters).filter(v => {
+        if (v === '' || v === null || v === undefined) return false;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'object') return Object.values(v).some(x => x !== '' && x !== undefined);
+        return true;
+    }).length;
+    const hasActiveFilters = filterStatus || filterPriority || filterAssignee || filterSearch || filterDueDate || activeCfFilterCount > 0;
+    const activeFilterCount = [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate].filter(Boolean).length + activeCfFilterCount;
 
     const activeTask = activeId ? localTasks.find((t) => t.id === activeId) : null;
 
@@ -2493,9 +2535,28 @@ export default function Show() {
                         <option value="this_week">This Week</option>
                         <option value="no_date">No Due Date</option>
                     </select>
+                    {localCustomFields.filter(cf => cf.type !== 'formula').length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setShowAdvancedFilters(v => !v)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border transition-colors ${
+                                showAdvancedFilters || activeCfFilterCount > 0
+                                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-600'
+                                    : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                        >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            Filters
+                            {activeCfFilterCount > 0 && (
+                                <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-xs font-medium bg-primary-500 text-white rounded-full">{activeCfFilterCount}</span>
+                            )}
+                        </button>
+                    )}
                     {hasActiveFilters && (
                         <button
-                            onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterSearch(''); setFilterDueDate(''); }}
+                            onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterSearch(''); setFilterDueDate(''); setCustomFieldFilters({}); }}
                             className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
                         >
                             Clear ({activeFilterCount})
@@ -2512,6 +2573,123 @@ export default function Show() {
                     )}
                 </div>
             </div>
+
+            {/* Advanced Custom Field Filters Panel */}
+            {showAdvancedFilters && localCustomFields.filter(cf => cf.type !== 'formula').length > 0 && (
+                <Card className="mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Custom Field Filters</h3>
+                        {activeCfFilterCount > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setCustomFieldFilters({})}
+                                className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
+                            >
+                                Clear custom filters
+                            </button>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {localCustomFields.filter(cf => cf.type !== 'formula').map((cf) => {
+                            const filterVal = customFieldFilters[cf.id];
+                            const inputCls = "w-full rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500";
+                            const updateCfFilter = (val) => setCustomFieldFilters(prev => ({ ...prev, [cf.id]: val }));
+
+                            return (
+                                <div key={cf.id}>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{cf.name}</label>
+                                    {cf.type === 'single_select' && (
+                                        <select value={filterVal || ''} onChange={(e) => updateCfFilter(e.target.value)} className={inputCls}>
+                                            <option value="">Any</option>
+                                            {(cf.options || []).slice().sort((a, b) => {
+                                                const sortMode = cf.config?.sort_mode || 'manual';
+                                                if (sortMode === 'alphabetical') return a.label.localeCompare(b.label);
+                                                return (a.position ?? 0) - (b.position ?? 0);
+                                            }).map((opt) => (
+                                                <option key={opt.id} value={opt.id}>{opt.label}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    {cf.type === 'multi_select' && (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {(cf.options || []).slice().sort((a, b) => {
+                                                const sortMode = cf.config?.sort_mode || 'manual';
+                                                if (sortMode === 'alphabetical') return a.label.localeCompare(b.label);
+                                                return (a.position ?? 0) - (b.position ?? 0);
+                                            }).map((opt) => {
+                                                const selected = Array.isArray(filterVal) && filterVal.includes(String(opt.id));
+                                                return (
+                                                    <button
+                                                        key={opt.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const current = Array.isArray(filterVal) ? filterVal : [];
+                                                            const optId = String(opt.id);
+                                                            updateCfFilter(selected ? current.filter(v => v !== optId) : [...current, optId]);
+                                                        }}
+                                                        className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                                                            selected
+                                                                ? 'bg-primary-100 border-primary-400 text-primary-700 dark:bg-primary-900/40 dark:border-primary-600 dark:text-primary-300'
+                                                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-600'
+                                                        }`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {(cf.type === 'text' || cf.type === 'textarea') && (
+                                        <input
+                                            type="text"
+                                            value={filterVal || ''}
+                                            onChange={(e) => updateCfFilter(e.target.value)}
+                                            placeholder={`Filter by ${cf.name}...`}
+                                            className={inputCls}
+                                        />
+                                    )}
+                                    {cf.type === 'number' && (
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                type="number"
+                                                value={filterVal?.min ?? ''}
+                                                onChange={(e) => updateCfFilter({ ...(filterVal || {}), min: e.target.value })}
+                                                placeholder="Min"
+                                                className={inputCls}
+                                            />
+                                            <span className="text-gray-400 text-xs">-</span>
+                                            <input
+                                                type="number"
+                                                value={filterVal?.max ?? ''}
+                                                onChange={(e) => updateCfFilter({ ...(filterVal || {}), max: e.target.value })}
+                                                placeholder="Max"
+                                                className={inputCls}
+                                            />
+                                        </div>
+                                    )}
+                                    {cf.type === 'date' && (
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                type="date"
+                                                value={filterVal?.from ?? ''}
+                                                onChange={(e) => updateCfFilter({ ...(filterVal || {}), from: e.target.value })}
+                                                className={inputCls}
+                                            />
+                                            <span className="text-gray-400 text-xs">to</span>
+                                            <input
+                                                type="date"
+                                                value={filterVal?.to ?? ''}
+                                                onChange={(e) => updateCfFilter({ ...(filterVal || {}), to: e.target.value })}
+                                                className={inputCls}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Card>
+            )}
 
             {/* Custom Fields Panel — always mounted so column header edit/delete works via ref */}
             <div className={showCustomFields ? 'shrink-0 max-h-64 overflow-y-auto' : 'hidden'}>
