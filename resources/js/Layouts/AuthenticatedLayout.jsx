@@ -167,29 +167,27 @@ export default function AuthenticatedLayout({ children, title }) {
                 {!collapsed && <span className="text-lg font-semibold text-white tracking-tight">{appName}</span>}
             </div>
 
-            {/* Top navigation — pinned */}
-            <div className={`${collapsed ? 'px-2' : 'px-3'} pt-4 pb-2 space-y-0.5`}>
-                <NavLink href="/dashboard" icon={<HomeIcon />} active={isActive('/dashboard')} collapsed={collapsed}>
-                    Dashboard
-                </NavLink>
-                <NavLink href="/inbox" icon={<InboxIcon />} active={isActive('/inbox')} badge={unreadNotificationsCount || null} collapsed={collapsed}>
-                    Inbox
-                </NavLink>
-                <NavLink href="/my-tasks" icon={<ChecklistIcon />} active={isActive('/my-tasks')} collapsed={collapsed}>
-                    My Tasks
-                </NavLink>
-                <NavLink href="/calendar" icon={<CalendarIcon />} active={isActive('/calendar')} collapsed={collapsed}>
-                    Calendar
-                </NavLink>
-                {(hasRole('admin') || hasRole('executive')) && (
-                    <NavLink href="/executive-dashboard" icon={<ChartBarIcon />} active={isActive('/executive-dashboard')} collapsed={collapsed}>
-                        Executive Dashboard
-                    </NavLink>
-                )}
-            </div>
-
             {/* Scrollable navigation */}
-            <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-3'} py-2 space-y-6 overflow-y-auto scrollbar-thin`}>
+            <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-3'} pt-4 pb-2 space-y-6 overflow-y-auto scrollbar-thin`}>
+                <div className="space-y-0.5">
+                    <NavLink href="/dashboard" icon={<HomeIcon />} active={isActive('/dashboard')} collapsed={collapsed}>
+                        Dashboard
+                    </NavLink>
+                    <NavLink href="/inbox" icon={<InboxIcon />} active={isActive('/inbox')} badge={unreadNotificationsCount || null} collapsed={collapsed}>
+                        Inbox
+                    </NavLink>
+                    <NavLink href="/my-tasks" icon={<ChecklistIcon />} active={isActive('/my-tasks')} collapsed={collapsed}>
+                        My Tasks
+                    </NavLink>
+                    <NavLink href="/calendar" icon={<CalendarIcon />} active={isActive('/calendar')} collapsed={collapsed}>
+                        Calendar
+                    </NavLink>
+                    {(hasRole('admin') || hasRole('executive')) && (
+                        <NavLink href="/executive-dashboard" icon={<ChartBarIcon />} active={isActive('/executive-dashboard')} collapsed={collapsed}>
+                            Executive Dashboard
+                        </NavLink>
+                    )}
+                </div>
                 {hasPermission('view-projects') && (
                     <div className="space-y-0.5">
                         <NavLink href="/projects" icon={<FolderIcon />} active={currentUrl === '/projects' || (currentUrl.startsWith('/projects') && !currentUrl.startsWith('/projects/archived'))} collapsed={collapsed}>
