@@ -821,58 +821,6 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     );
 }
 
-// Sticky horizontal scrollbar that mirrors a scroll container
-function StickyScrollbar({ scrollRef }) {
-    const stickyRef = useRef(null);
-    const innerRef = useRef(null);
-    const syncingRef = useRef(null);
-
-    useEffect(() => {
-        const scrollEl = scrollRef.current;
-        const stickyEl = stickyRef.current;
-        const innerEl = innerRef.current;
-        if (!scrollEl || !stickyEl || !innerEl) return;
-
-        const syncWidth = () => {
-            innerEl.style.width = scrollEl.scrollWidth + 'px';
-            stickyEl.style.display = scrollEl.scrollWidth > scrollEl.clientWidth ? '' : 'none';
-        };
-
-        const onMainScroll = () => {
-            if (syncingRef.current === 'sticky') return;
-            syncingRef.current = 'main';
-            stickyEl.scrollLeft = scrollEl.scrollLeft;
-            requestAnimationFrame(() => { syncingRef.current = null; });
-        };
-
-        const onStickyScroll = () => {
-            if (syncingRef.current === 'main') return;
-            syncingRef.current = 'sticky';
-            scrollEl.scrollLeft = stickyEl.scrollLeft;
-            requestAnimationFrame(() => { syncingRef.current = null; });
-        };
-
-        syncWidth();
-        const ro = new ResizeObserver(syncWidth);
-        ro.observe(scrollEl);
-        if (scrollEl.firstElementChild) ro.observe(scrollEl.firstElementChild);
-        scrollEl.addEventListener('scroll', onMainScroll);
-        stickyEl.addEventListener('scroll', onStickyScroll);
-
-        return () => {
-            ro.disconnect();
-            scrollEl.removeEventListener('scroll', onMainScroll);
-            stickyEl.removeEventListener('scroll', onStickyScroll);
-        };
-    }, [scrollRef]);
-
-    return (
-        <div ref={stickyRef} className="overflow-x-auto sticky bottom-0 z-10 styled-scrollbar-x" style={{ height: 12 }}>
-            <div ref={innerRef} style={{ height: 1 }} />
-        </div>
-    );
-}
-
 // Droppable zone for sections (allows dropping tasks into/between sections)
 function SectionDropZone({ sectionId, minHeight = false }) {
     const { setNodeRef, isOver } = useDroppable({ id: `section-${sectionId ?? 'null'}` });
@@ -1218,10 +1166,6 @@ export default function Show() {
     // Custom field manager ref for edit/delete from column dropdown
     const cfManagerRef = useRef(null);
 
-    // Scroll refs for sticky scrollbar
-    const listScrollRef = useRef(null);
-    const boardScrollRef = useRef(null);
-    const ganttScrollRef = useRef(null);
 
     const handleSortColumn = useCallback((colId, direction) => {
         setSortConfig(prev => {
@@ -2573,14 +2517,10 @@ export default function Show() {
                     )}
                 </div>
             </div>
-            </div>
-
-            {/* Scrollable task area */}
-            <div className="flex-1 min-h-0 overflow-y-auto pb-6">
 
             {/* Custom Fields Panel — always mounted so column header edit/delete works via ref */}
-            <div className={showCustomFields ? '' : 'hidden'}>
-                <Card className="mb-6">
+            <div className={showCustomFields ? 'shrink-0 max-h-64 overflow-y-auto' : 'hidden'}>
+                <Card className="mb-4">
                     <CustomFieldManager
                         ref={cfManagerRef}
                         projectId={project.id}
@@ -2592,21 +2532,27 @@ export default function Show() {
 
             {/* Automation Rules Panel */}
             {showAutomation && canManageTasks && (
-                <Card className="mb-6">
-                    <AutomationRuleBuilder
-                        projectId={project.id}
-                        rules={automationRules || []}
-                        users={users}
-                        sections={localSections}
-                        customFields={localCustomFields}
-                        canCreateRules={!!auth.user?.can_create_rules}
-                    />
-                </Card>
+                <div className="shrink-0 max-h-64 overflow-y-auto">
+                    <Card className="mb-4">
+                        <AutomationRuleBuilder
+                            projectId={project.id}
+                            rules={automationRules || []}
+                            users={users}
+                            sections={localSections}
+                            customFields={localCustomFields}
+                            canCreateRules={!!auth.user?.can_create_rules}
+                        />
+                    </Card>
+                </div>
             )}
+            </div>
+
+            {/* View area — each view handles its own scrolling */}
+            <div className="flex-1 min-h-0 pb-6">
 
             {/* List View */}
             {view === 'list' && (
-                <Card padding={false}>
+                <Card padding={false} className="h-full flex flex-col min-h-0">
                     {filteredTasks.length > 0 ? (
                         <DndContext
                             sensors={sensors}
@@ -2615,9 +2561,9 @@ export default function Show() {
                             onDragOver={handleListDragOver}
                             onDragEnd={handleListDragEnd}
                         >
-                            <div ref={listScrollRef} className="overflow-x-auto no-scrollbar">
+                            <div className="overflow-auto flex-1 min-h-0">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed' }}>
-                                <thead className="bg-gray-50 dark:bg-gray-800/50">
+                                <thead className="bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-30">
                                     <DndContext
                                         sensors={columnSensors}
                                         collisionDetection={closestCorners}
@@ -2940,7 +2886,6 @@ export default function Show() {
                                 </tbody>
                             </table>
                             </div>
-                            <StickyScrollbar scrollRef={listScrollRef} />
                             <DragOverlay>
                                 {activeTask ? (
                                     <table className="min-w-full">
@@ -2986,14 +2931,14 @@ export default function Show() {
 
             {/* Board View */}
             {view === 'board' && (
-                <div>
+                <div className="h-full flex flex-col min-h-0">
                     <DndContext
                         sensors={sensors}
                         collisionDetection={closestCorners}
                         onDragStart={handleDragStart}
                         onDragEnd={handleBoardDragEnd}
                     >
-                        <div ref={boardScrollRef} className="overflow-x-auto pb-2 no-scrollbar">
+                        <div className="overflow-auto flex-1 min-h-0 pb-2">
                             <div className="inline-flex gap-4 min-w-full">
                                 {TASK_STATUSES.map((status) => (
                                     <KanbanColumn
@@ -3013,7 +2958,6 @@ export default function Show() {
                                 ))}
                             </div>
                         </div>
-                        <StickyScrollbar scrollRef={boardScrollRef} />
                         <DragOverlay>
                             {activeTask ? (
                                 <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg w-65 rotate-2">
@@ -3097,7 +3041,7 @@ export default function Show() {
                 for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
                 return (
-                    <div>
+                    <div className="h-full overflow-auto">
                         {/* Month navigation */}
                         <div className="flex items-center gap-2 mb-4">
                             <button
@@ -3270,15 +3214,15 @@ export default function Show() {
                 };
 
                 return (
-                    <div>
+                    <div className="h-full flex flex-col min-h-0">
                         {tasksWithDate.length === 0 && tasksNoDate.length === 0 ? (
                             <EmptyState
                                 title="No tasks to display"
                                 description="Add tasks with due dates to see them on the Gantt chart."
                             />
                         ) : (
-                            <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                <div ref={ganttScrollRef} className="overflow-x-auto no-scrollbar">
+                            <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex-1 min-h-0 flex flex-col">
+                                <div className="overflow-auto flex-1 min-h-0">
                                     <div style={{ minWidth: `${240 + totalWidth}px` }}>
                                         {/* Header: month row */}
                                         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -3407,7 +3351,6 @@ export default function Show() {
                                         )}
                                     </div>
                                 </div>
-                                <StickyScrollbar scrollRef={ganttScrollRef} />
                             </div>
                         )}
 
@@ -3445,7 +3388,7 @@ export default function Show() {
                 const stats = dashboardStats;
 
                 return (
-                    <div className="space-y-6">
+                    <div className="h-full overflow-auto space-y-6">
                         {/* Summary Cards */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                             {/* Total Tasks */}
