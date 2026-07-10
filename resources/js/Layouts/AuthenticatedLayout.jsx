@@ -247,12 +247,12 @@ export default function AuthenticatedLayout({ children, title, contained = false
             </nav>
 
             {/* To-Do Widget */}
-            <div className="border-t border-gray-700/50">
+            <div className="shrink-0 border-t border-gray-700/50">
                 <SidebarTodoWidget collapsed={collapsed} />
             </div>
 
             {/* User area */}
-            <div className="border-t border-gray-700/50 px-4 py-3">
+            <div className="shrink-0 border-t border-gray-700/50 px-4 py-3">
                 <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
                     <Avatar name={auth.user?.name} size="md" />
                     {!collapsed && (
