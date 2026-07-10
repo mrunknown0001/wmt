@@ -2601,8 +2601,12 @@ export default function Show() {
                     <button
                         type="button"
                         onClick={() => {
-                            if (!showAdvancedFilters && dynamicFilters.length === 0) addDynamicFilter();
-                            setShowAdvancedFilters(v => !v);
+                            if (!showAdvancedFilters) {
+                                if (dynamicFilters.length === 0) addDynamicFilter();
+                                else setShowAdvancedFilters(true);
+                            } else {
+                                setShowAdvancedFilters(false);
+                            }
                         }}
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border transition-colors ${
                             showAdvancedFilters || dynamicFilters.length > 0
