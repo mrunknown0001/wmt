@@ -598,7 +598,7 @@ class TaskController extends Controller
         $validated = $request->validate([
             'task_ids' => 'required|array|min:1',
             'task_ids.*' => 'required|integer',
-            'action' => 'required|string|in:update_status,update_priority,assign,delete',
+            'action' => 'required|string|in:update_status,update_priority,assign,update_due_date,update_start_date,delete',
             'value' => 'nullable',
         ]);
 
@@ -681,6 +681,30 @@ class TaskController extends Controller
                         $task->load('project');
                         $task->assignee->notify(new TaskAssignedNotification($task, $user));
                     }
+                }
+                break;
+
+            case 'update_due_date':
+                $dueDate = $validated['value'] ?: null;
+                foreach ($tasks as $task) {
+                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+                    $oldValues['start_date'] = $task->start_date?->toDateString();
+                    $oldValues['due_date'] = $task->due_date?->toDateString();
+                    $task->update(['due_date' => $dueDate]);
+                    TaskActivityLogger::logChanges($task, $oldValues, $user);
+                    ActivityLogger::logChanges($task, $oldValues, $user);
+                }
+                break;
+
+            case 'update_start_date':
+                $startDate = $validated['value'] ?: null;
+                foreach ($tasks as $task) {
+                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+                    $oldValues['start_date'] = $task->start_date?->toDateString();
+                    $oldValues['due_date'] = $task->due_date?->toDateString();
+                    $task->update(['start_date' => $startDate]);
+                    TaskActivityLogger::logChanges($task, $oldValues, $user);
+                    ActivityLogger::logChanges($task, $oldValues, $user);
                 }
                 break;
 
