@@ -1089,13 +1089,57 @@ export default function Show() {
     const [localCustomFields, setLocalCustomFields] = useState(initialCustomFields);
     const [showDetails, setShowDetails] = useState(false);
     const [view, setView] = useState('list');
-    const [filterStatus, setFilterStatus] = useState('');
-    const [filterPriority, setFilterPriority] = useState('');
-    const [filterAssignee, setFilterAssignee] = useState('');
     const [filterSearch, setFilterSearch] = useState('');
-    const [filterDueDate, setFilterDueDate] = useState('');
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-    const [customFieldFilters, setCustomFieldFilters] = useState({});
+    const [dynamicFilters, setDynamicFilters] = useState([]); // [{id, fieldId, operator, value}]
+    const nextFilterIdRef = useRef(1);
+
+    const filterableFields = useMemo(() => {
+        const builtIn = [
+            { id: 'status', name: 'Status', fieldType: 'select', options: TASK_STATUSES.map(s => ({ id: s, label: formatLabel(s) })) },
+            { id: 'priority', name: 'Priority', fieldType: 'select', options: ['urgent', 'high', 'medium', 'low'].map(p => ({ id: p, label: formatLabel(p) })) },
+            { id: 'assignee', name: 'Assignee', fieldType: 'select', options: assignees.map(a => ({ id: String(a.id), label: a.name })) },
+            { id: 'due_date', name: 'Due Date', fieldType: 'date' },
+        ];
+        const custom = localCustomFields.filter(cf => cf.type !== 'formula').map(cf => ({
+            id: `cf_${cf.id}`, name: cf.name, fieldType: cf.type, options: cf.options, config: cf.config, cfId: cf.id,
+        }));
+        return [...builtIn, ...custom];
+    }, [localCustomFields, assignees]);
+
+    const getOperatorsForType = (fieldType) => {
+        switch (fieldType) {
+            case 'select': case 'single_select':
+                return [{ value: 'is', label: 'is' }, { value: 'is_not', label: 'is not' }, { value: 'is_empty', label: 'is empty' }, { value: 'is_not_empty', label: 'is not empty' }];
+            case 'multi_select':
+                return [{ value: 'includes_any', label: 'has any of' }, { value: 'includes_all', label: 'has all of' }, { value: 'is_empty', label: 'is empty' }, { value: 'is_not_empty', label: 'is not empty' }];
+            case 'text': case 'textarea':
+                return [{ value: 'contains', label: 'contains' }, { value: 'not_contains', label: 'does not contain' }, { value: 'equals', label: 'is' }, { value: 'is_empty', label: 'is empty' }, { value: 'is_not_empty', label: 'is not empty' }];
+            case 'number':
+                return [{ value: 'eq', label: '=' }, { value: 'neq', label: '\u2260' }, { value: 'gt', label: '>' }, { value: 'gte', label: '\u2265' }, { value: 'lt', label: '<' }, { value: 'lte', label: '\u2264' }, { value: 'between', label: 'between' }];
+            case 'date':
+                return [{ value: 'is', label: 'is' }, { value: 'before', label: 'before' }, { value: 'after', label: 'after' }, { value: 'between', label: 'between' }, { value: 'is_empty', label: 'is empty' }, { value: 'is_not_empty', label: 'is not empty' }];
+            default:
+                return [{ value: 'is', label: 'is' }];
+        }
+    };
+
+    const addDynamicFilter = () => {
+        setDynamicFilters(prev => [...prev, { id: nextFilterIdRef.current++, fieldId: '', operator: 'is', value: '' }]);
+        setShowAdvancedFilters(true);
+    };
+
+    const updateDynamicFilter = (filterId, updates) => {
+        setDynamicFilters(prev => prev.map(f => f.id === filterId ? { ...f, ...updates } : f));
+    };
+
+    const removeDynamicFilter = (filterId) => {
+        setDynamicFilters(prev => {
+            const next = prev.filter(f => f.id !== filterId);
+            if (next.length === 0) setShowAdvancedFilters(false);
+            return next;
+        });
+    };
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [duplicateTarget, setDuplicateTarget] = useState(null);
     const [localTasks, setLocalTasks] = useState(serverTasks);
@@ -1376,57 +1420,116 @@ export default function Show() {
 
     // Filter tasks
     const matchesFilters = useCallback((t) => {
-        if (filterStatus && t.status !== filterStatus) return false;
-        if (filterPriority && t.priority !== filterPriority) return false;
-        if (filterAssignee && String(t.assigned_to) !== filterAssignee) return false;
         if (filterSearch && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false;
-        if (filterDueDate) {
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            const dueDate = t.due_date ? new Date(t.due_date) : null;
-            if (dueDate) dueDate.setHours(0, 0, 0, 0);
-            switch (filterDueDate) {
-                case 'overdue': if (!dueDate || dueDate >= today) return false; break;
-                case 'today': if (!dueDate || dueDate.getTime() !== today.getTime()) return false; break;
-                case 'this_week': { const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() + 7); if (!dueDate || dueDate < today || dueDate > weekEnd) return false; break; }
-                case 'no_date': if (dueDate) return false; break;
+
+        // Dynamic filters
+        for (const filter of dynamicFilters) {
+            if (!filter.fieldId) continue;
+            const { operator, value } = filter;
+            const noValueNeeded = ['is_empty', 'is_not_empty'].includes(operator);
+            if (!noValueNeeded && (value === '' || value === null || value === undefined)) continue;
+            if (!noValueNeeded && Array.isArray(value) && value.length === 0) continue;
+
+            const fieldDef = filterableFields.find(f => f.id === filter.fieldId);
+            if (!fieldDef) continue;
+
+            // Built-in fields
+            if (filter.fieldId === 'status') {
+                if (operator === 'is' && t.status !== value) return false;
+                if (operator === 'is_not' && t.status === value) return false;
+                if (operator === 'is_empty' && t.status) return false;
+                if (operator === 'is_not_empty' && !t.status) return false;
+                continue;
             }
-        }
-        // Custom field filters
-        const cfvs = t.custom_field_values || [];
-        for (const [cfIdStr, filterVal] of Object.entries(customFieldFilters)) {
-            if (filterVal === '' || filterVal === null || filterVal === undefined) continue;
-            if (Array.isArray(filterVal) && filterVal.length === 0) continue;
-            const cfId = Number(cfIdStr);
-            const cf = localCustomFields.find(f => f.id === cfId);
-            if (!cf) continue;
-            const cfv = cfvs.find(v => v.custom_field_id === cfId);
-            if (cf.type === 'single_select') {
-                if (!cfv || String(cfv.value_option_id) !== String(filterVal)) return false;
-            } else if (cf.type === 'multi_select') {
-                const taskVals = cfv?.value_json || [];
-                const filterArr = Array.isArray(filterVal) ? filterVal : [filterVal];
-                if (!filterArr.every(fv => taskVals.map(String).includes(String(fv)))) return false;
-            } else if (cf.type === 'text' || cf.type === 'textarea') {
-                const textVal = cfv?.value_text || '';
-                if (!textVal.toLowerCase().includes(String(filterVal).toLowerCase())) return false;
-            } else if (cf.type === 'number') {
-                const numVal = cfv?.value_number;
-                if (numVal === null || numVal === undefined) return false;
-                if (typeof filterVal === 'object' && filterVal !== null) {
-                    if (filterVal.min !== '' && filterVal.min !== undefined && Number(numVal) < Number(filterVal.min)) return false;
-                    if (filterVal.max !== '' && filterVal.max !== undefined && Number(numVal) > Number(filterVal.max)) return false;
+            if (filter.fieldId === 'priority') {
+                if (operator === 'is' && t.priority !== value) return false;
+                if (operator === 'is_not' && t.priority === value) return false;
+                if (operator === 'is_empty' && t.priority) return false;
+                if (operator === 'is_not_empty' && !t.priority) return false;
+                continue;
+            }
+            if (filter.fieldId === 'assignee') {
+                if (operator === 'is' && String(t.assigned_to || '') !== value) return false;
+                if (operator === 'is_not' && String(t.assigned_to || '') === value) return false;
+                if (operator === 'is_empty' && t.assigned_to) return false;
+                if (operator === 'is_not_empty' && !t.assigned_to) return false;
+                continue;
+            }
+            if (filter.fieldId === 'due_date') {
+                const dateVal = t.due_date || '';
+                if (operator === 'is' && dateVal !== value) return false;
+                if (operator === 'before' && (!dateVal || dateVal >= value)) return false;
+                if (operator === 'after' && (!dateVal || dateVal <= value)) return false;
+                if (operator === 'between') {
+                    if (!dateVal) return false;
+                    if (value?.from && dateVal < value.from) return false;
+                    if (value?.to && dateVal > value.to) return false;
                 }
-            } else if (cf.type === 'date') {
-                const dateVal = cfv?.value_date;
-                if (!dateVal) return false;
-                if (typeof filterVal === 'object' && filterVal !== null) {
-                    if (filterVal.from && dateVal < filterVal.from) return false;
-                    if (filterVal.to && dateVal > filterVal.to) return false;
-                } else if (dateVal !== filterVal) return false;
+                if (operator === 'is_empty' && dateVal) return false;
+                if (operator === 'is_not_empty' && !dateVal) return false;
+                continue;
+            }
+
+            // Custom fields
+            const cfId = fieldDef.cfId;
+            if (!cfId) continue;
+            const cfvs = t.custom_field_values || [];
+            const cfv = cfvs.find(v => v.custom_field_id === cfId);
+
+            if (fieldDef.fieldType === 'single_select') {
+                if (operator === 'is') { if (!cfv || String(cfv.value_option_id) !== String(value)) return false; }
+                else if (operator === 'is_not') { if (cfv && String(cfv.value_option_id) === String(value)) return false; }
+                else if (operator === 'is_empty') { if (cfv && cfv.value_option_id) return false; }
+                else if (operator === 'is_not_empty') { if (!cfv || !cfv.value_option_id) return false; }
+            } else if (fieldDef.fieldType === 'multi_select') {
+                const taskVals = (cfv?.value_json || []).map(String);
+                if (operator === 'is_empty') { if (taskVals.length > 0) return false; }
+                else if (operator === 'is_not_empty') { if (taskVals.length === 0) return false; }
+                else {
+                    const filterArr = Array.isArray(value) ? value : [value];
+                    if (filterArr.length === 0) continue;
+                    if (operator === 'includes_all') { if (!filterArr.every(fv => taskVals.includes(String(fv)))) return false; }
+                    else { if (!filterArr.some(fv => taskVals.includes(String(fv)))) return false; }
+                }
+            } else if (fieldDef.fieldType === 'text' || fieldDef.fieldType === 'textarea') {
+                const textVal = cfv?.value_text || '';
+                if (operator === 'contains') { if (!textVal.toLowerCase().includes(String(value).toLowerCase())) return false; }
+                else if (operator === 'not_contains') { if (textVal.toLowerCase().includes(String(value).toLowerCase())) return false; }
+                else if (operator === 'equals') { if (textVal !== value) return false; }
+                else if (operator === 'is_empty') { if (textVal !== '') return false; }
+                else if (operator === 'is_not_empty') { if (textVal === '') return false; }
+            } else if (fieldDef.fieldType === 'number') {
+                const numVal = cfv?.value_number;
+                if (operator === 'between') {
+                    if (numVal === null || numVal === undefined) return false;
+                    if (value?.min !== '' && value?.min !== undefined && Number(numVal) < Number(value.min)) return false;
+                    if (value?.max !== '' && value?.max !== undefined && Number(numVal) > Number(value.max)) return false;
+                } else {
+                    if (numVal === null || numVal === undefined) return false;
+                    const n = Number(numVal), target = Number(value);
+                    if (operator === 'eq' && n !== target) return false;
+                    if (operator === 'neq' && n === target) return false;
+                    if (operator === 'gt' && n <= target) return false;
+                    if (operator === 'gte' && n < target) return false;
+                    if (operator === 'lt' && n >= target) return false;
+                    if (operator === 'lte' && n > target) return false;
+                }
+            } else if (fieldDef.fieldType === 'date') {
+                const dateVal = cfv?.value_date || '';
+                if (operator === 'is' && dateVal !== value) return false;
+                if (operator === 'before' && (!dateVal || dateVal >= value)) return false;
+                if (operator === 'after' && (!dateVal || dateVal <= value)) return false;
+                if (operator === 'between') {
+                    if (!dateVal) return false;
+                    if (value?.from && dateVal < value.from) return false;
+                    if (value?.to && dateVal > value.to) return false;
+                }
+                if (operator === 'is_empty' && dateVal) return false;
+                if (operator === 'is_not_empty' && !dateVal) return false;
             }
         }
         return true;
-    }, [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate, customFieldFilters, localCustomFields]);
+    }, [filterSearch, dynamicFilters, filterableFields]);
 
     const filteredTasks = useMemo(() => {
         const filtered = localTasks.filter(matchesFilters);
@@ -2186,7 +2289,7 @@ export default function Show() {
         setSelectedTasks(new Set());
         setFocusedTaskId(null);
         setLastClickedTaskId(null);
-    }, [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate]);
+    }, [filterSearch, dynamicFilters]);
 
     // Keyboard navigation for list view (Arrow keys, Escape, Ctrl+A)
     useEffect(() => {
@@ -2313,14 +2416,15 @@ export default function Show() {
         setConfirmDelete(null);
     };
 
-    const activeCfFilterCount = Object.values(customFieldFilters).filter(v => {
-        if (v === '' || v === null || v === undefined) return false;
-        if (Array.isArray(v)) return v.length > 0;
-        if (typeof v === 'object') return Object.values(v).some(x => x !== '' && x !== undefined);
+    const activeFilterCount = dynamicFilters.filter(f => {
+        if (!f.fieldId) return false;
+        if (['is_empty', 'is_not_empty'].includes(f.operator)) return true;
+        if (f.value === '' || f.value === null || f.value === undefined) return false;
+        if (Array.isArray(f.value)) return f.value.length > 0;
+        if (typeof f.value === 'object' && f.value !== null) return Object.values(f.value).some(x => x !== '' && x !== undefined);
         return true;
-    }).length;
-    const hasActiveFilters = filterStatus || filterPriority || filterAssignee || filterSearch || filterDueDate || activeCfFilterCount > 0;
-    const activeFilterCount = [filterStatus, filterPriority, filterAssignee, filterSearch, filterDueDate].filter(Boolean).length + activeCfFilterCount;
+    }).length + (filterSearch ? 1 : 0);
+    const hasActiveFilters = filterSearch || activeFilterCount > 0;
 
     const activeTask = activeId ? localTasks.find((t) => t.id === activeId) : null;
 
@@ -2494,69 +2598,29 @@ export default function Show() {
                             className="pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-36 sm:w-44"
                         />
                     </div>
-                    <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (!showAdvancedFilters && dynamicFilters.length === 0) addDynamicFilter();
+                            setShowAdvancedFilters(v => !v);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border transition-colors ${
+                            showAdvancedFilters || dynamicFilters.length > 0
+                                ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-600'
+                                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
                     >
-                        <option value="">All Statuses</option>
-                        {TASK_STATUSES.map((s) => (
-                            <option key={s} value={s}>{formatLabel(s)}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={filterPriority}
-                        onChange={(e) => setFilterPriority(e.target.value)}
-                        className="hidden sm:block rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                        <option value="">All Priorities</option>
-                        {['low', 'medium', 'high', 'urgent'].map((p) => (
-                            <option key={p} value={p}>{formatLabel(p)}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={filterAssignee}
-                        onChange={(e) => setFilterAssignee(e.target.value)}
-                        className="hidden md:block rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                        <option value="">All Assignees</option>
-                        {assignees.map((a) => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={filterDueDate}
-                        onChange={(e) => setFilterDueDate(e.target.value)}
-                        className="hidden md:block rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                        <option value="">All Dates</option>
-                        <option value="overdue">Overdue</option>
-                        <option value="today">Due Today</option>
-                        <option value="this_week">This Week</option>
-                        <option value="no_date">No Due Date</option>
-                    </select>
-                    {localCustomFields.filter(cf => cf.type !== 'formula').length > 0 && (
-                        <button
-                            type="button"
-                            onClick={() => setShowAdvancedFilters(v => !v)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border transition-colors ${
-                                showAdvancedFilters || activeCfFilterCount > 0
-                                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-600'
-                                    : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                            }`}
-                        >
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                            </svg>
-                            Filters
-                            {activeCfFilterCount > 0 && (
-                                <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-xs font-medium bg-primary-500 text-white rounded-full">{activeCfFilterCount}</span>
-                            )}
-                        </button>
-                    )}
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                        Filter
+                        {activeFilterCount > 0 && (
+                            <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-xs font-medium bg-primary-500 text-white rounded-full">{activeFilterCount}</span>
+                        )}
+                    </button>
                     {hasActiveFilters && (
                         <button
-                            onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterSearch(''); setFilterDueDate(''); setCustomFieldFilters({}); }}
+                            onClick={() => { setFilterSearch(''); setDynamicFilters([]); setShowAdvancedFilters(false); }}
                             className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
                         >
                             Clear ({activeFilterCount})
@@ -2574,120 +2638,157 @@ export default function Show() {
                 </div>
             </div>
 
-            {/* Advanced Custom Field Filters Panel */}
-            {showAdvancedFilters && localCustomFields.filter(cf => cf.type !== 'formula').length > 0 && (
+            {/* Dynamic Filters Panel */}
+            {showAdvancedFilters && (
                 <Card className="mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Custom Field Filters</h3>
-                        {activeCfFilterCount > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => setCustomFieldFilters({})}
-                                className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
-                            >
-                                Clear custom filters
-                            </button>
-                        )}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {localCustomFields.filter(cf => cf.type !== 'formula').map((cf) => {
-                            const filterVal = customFieldFilters[cf.id];
-                            const inputCls = "w-full rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500";
-                            const updateCfFilter = (val) => setCustomFieldFilters(prev => ({ ...prev, [cf.id]: val }));
+                    <div className="space-y-2">
+                        {dynamicFilters.map((filter, idx) => {
+                            const fieldDef = filter.fieldId ? filterableFields.find(f => f.id === filter.fieldId) : null;
+                            const operators = fieldDef ? getOperatorsForType(fieldDef.fieldType) : [];
+                            const noValueNeeded = ['is_empty', 'is_not_empty'].includes(filter.operator);
+                            const sortedOptions = (fieldDef?.options || []).slice().sort((a, b) => {
+                                const sortMode = fieldDef?.config?.sort_mode || 'manual';
+                                if (sortMode === 'alphabetical') return (a.label || '').localeCompare(b.label || '');
+                                return (a.position ?? 0) - (b.position ?? 0);
+                            });
+                            const inputCls = "rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500";
 
                             return (
-                                <div key={cf.id}>
-                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{cf.name}</label>
-                                    {cf.type === 'single_select' && (
-                                        <select value={filterVal || ''} onChange={(e) => updateCfFilter(e.target.value)} className={inputCls}>
-                                            <option value="">Any</option>
-                                            {(cf.options || []).slice().sort((a, b) => {
-                                                const sortMode = cf.config?.sort_mode || 'manual';
-                                                if (sortMode === 'alphabetical') return a.label.localeCompare(b.label);
-                                                return (a.position ?? 0) - (b.position ?? 0);
-                                            }).map((opt) => (
-                                                <option key={opt.id} value={opt.id}>{opt.label}</option>
+                                <div key={filter.id} className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs text-gray-400 dark:text-gray-500 w-12 shrink-0 text-right">{idx === 0 ? 'Where' : 'and'}</span>
+                                    {/* Field selector */}
+                                    <select
+                                        value={filter.fieldId}
+                                        onChange={(e) => {
+                                            const newField = filterableFields.find(f => f.id === e.target.value);
+                                            const defaultOp = newField ? getOperatorsForType(newField.fieldType)[0]?.value || 'is' : 'is';
+                                            updateDynamicFilter(filter.id, { fieldId: e.target.value, operator: defaultOp, value: newField?.fieldType === 'multi_select' ? [] : '' });
+                                        }}
+                                        className={inputCls + ' min-w-[140px]'}
+                                    >
+                                        <option value="">Select field...</option>
+                                        <optgroup label="Task Fields">
+                                            {filterableFields.filter(f => !f.cfId).map(f => (
+                                                <option key={f.id} value={f.id}>{f.name}</option>
+                                            ))}
+                                        </optgroup>
+                                        {filterableFields.some(f => f.cfId) && (
+                                            <optgroup label="Custom Fields">
+                                                {filterableFields.filter(f => f.cfId).map(f => (
+                                                    <option key={f.id} value={f.id}>{f.name}</option>
+                                                ))}
+                                            </optgroup>
+                                        )}
+                                    </select>
+                                    {/* Operator selector */}
+                                    {fieldDef && operators.length > 0 && (
+                                        <select
+                                            value={filter.operator}
+                                            onChange={(e) => {
+                                                const newOp = e.target.value;
+                                                let resetValue = '';
+                                                if (['is_empty', 'is_not_empty'].includes(newOp)) resetValue = '';
+                                                else if (newOp === 'between') resetValue = {};
+                                                else if (['includes_any', 'includes_all'].includes(newOp)) resetValue = Array.isArray(filter.value) ? filter.value : [];
+                                                else if (Array.isArray(filter.value)) resetValue = '';
+                                                else resetValue = typeof filter.value === 'object' ? '' : filter.value;
+                                                updateDynamicFilter(filter.id, { operator: newOp, value: resetValue });
+                                            }}
+                                            className={inputCls + ' min-w-[120px]'}
+                                        >
+                                            {operators.map(op => (
+                                                <option key={op.value} value={op.value}>{op.label}</option>
                                             ))}
                                         </select>
                                     )}
-                                    {cf.type === 'multi_select' && (
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {(cf.options || []).slice().sort((a, b) => {
-                                                const sortMode = cf.config?.sort_mode || 'manual';
-                                                if (sortMode === 'alphabetical') return a.label.localeCompare(b.label);
-                                                return (a.position ?? 0) - (b.position ?? 0);
-                                            }).map((opt) => {
-                                                const selected = Array.isArray(filterVal) && filterVal.includes(String(opt.id));
-                                                return (
-                                                    <button
-                                                        key={opt.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const current = Array.isArray(filterVal) ? filterVal : [];
-                                                            const optId = String(opt.id);
-                                                            updateCfFilter(selected ? current.filter(v => v !== optId) : [...current, optId]);
-                                                        }}
-                                                        className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
-                                                            selected
-                                                                ? 'bg-primary-100 border-primary-400 text-primary-700 dark:bg-primary-900/40 dark:border-primary-600 dark:text-primary-300'
-                                                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-600'
-                                                        }`}
-                                                    >
-                                                        {opt.label}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
+                                    {/* Value input */}
+                                    {fieldDef && !noValueNeeded && (
+                                        <>
+                                            {/* Select / Single Select */}
+                                            {(fieldDef.fieldType === 'select' || fieldDef.fieldType === 'single_select') && (
+                                                <select value={filter.value || ''} onChange={(e) => updateDynamicFilter(filter.id, { value: e.target.value })} className={inputCls + ' min-w-[140px]'}>
+                                                    <option value="">Select...</option>
+                                                    {sortedOptions.map(opt => (
+                                                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                            {/* Multi Select */}
+                                            {fieldDef.fieldType === 'multi_select' && (
+                                                <div className="flex flex-wrap gap-1.5 items-center">
+                                                    {sortedOptions.map(opt => {
+                                                        const sel = Array.isArray(filter.value) && filter.value.includes(String(opt.id));
+                                                        return (
+                                                            <button
+                                                                key={opt.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const current = Array.isArray(filter.value) ? filter.value : [];
+                                                                    const optId = String(opt.id);
+                                                                    updateDynamicFilter(filter.id, { value: sel ? current.filter(v => v !== optId) : [...current, optId] });
+                                                                }}
+                                                                className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                                                                    sel
+                                                                        ? 'bg-primary-100 border-primary-400 text-primary-700 dark:bg-primary-900/40 dark:border-primary-600 dark:text-primary-300'
+                                                                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-600'
+                                                                }`}
+                                                            >
+                                                                {opt.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            {/* Text / Textarea */}
+                                            {(fieldDef.fieldType === 'text' || fieldDef.fieldType === 'textarea') && (
+                                                <input type="text" value={filter.value || ''} onChange={(e) => updateDynamicFilter(filter.id, { value: e.target.value })} placeholder="Value..." className={inputCls + ' min-w-[140px]'} />
+                                            )}
+                                            {/* Number (non-between) */}
+                                            {fieldDef.fieldType === 'number' && filter.operator !== 'between' && (
+                                                <input type="number" value={filter.value || ''} onChange={(e) => updateDynamicFilter(filter.id, { value: e.target.value })} placeholder="Value..." className={inputCls + ' w-28'} />
+                                            )}
+                                            {/* Number (between) */}
+                                            {fieldDef.fieldType === 'number' && filter.operator === 'between' && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <input type="number" value={filter.value?.min ?? ''} onChange={(e) => updateDynamicFilter(filter.id, { value: { ...(filter.value || {}), min: e.target.value } })} placeholder="Min" className={inputCls + ' w-24'} />
+                                                    <span className="text-gray-400 text-xs">-</span>
+                                                    <input type="number" value={filter.value?.max ?? ''} onChange={(e) => updateDynamicFilter(filter.id, { value: { ...(filter.value || {}), max: e.target.value } })} placeholder="Max" className={inputCls + ' w-24'} />
+                                                </div>
+                                            )}
+                                            {/* Date (non-between) */}
+                                            {fieldDef.fieldType === 'date' && filter.operator !== 'between' && (
+                                                <input type="date" value={filter.value || ''} onChange={(e) => updateDynamicFilter(filter.id, { value: e.target.value })} className={inputCls + ' min-w-[140px]'} />
+                                            )}
+                                            {/* Date (between) */}
+                                            {fieldDef.fieldType === 'date' && filter.operator === 'between' && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <input type="date" value={filter.value?.from ?? ''} onChange={(e) => updateDynamicFilter(filter.id, { value: { ...(filter.value || {}), from: e.target.value } })} className={inputCls + ' w-36'} />
+                                                    <span className="text-gray-400 text-xs">to</span>
+                                                    <input type="date" value={filter.value?.to ?? ''} onChange={(e) => updateDynamicFilter(filter.id, { value: { ...(filter.value || {}), to: e.target.value } })} className={inputCls + ' w-36'} />
+                                                </div>
+                                            )}
+                                        </>
                                     )}
-                                    {(cf.type === 'text' || cf.type === 'textarea') && (
-                                        <input
-                                            type="text"
-                                            value={filterVal || ''}
-                                            onChange={(e) => updateCfFilter(e.target.value)}
-                                            placeholder={`Filter by ${cf.name}...`}
-                                            className={inputCls}
-                                        />
-                                    )}
-                                    {cf.type === 'number' && (
-                                        <div className="flex items-center gap-1.5">
-                                            <input
-                                                type="number"
-                                                value={filterVal?.min ?? ''}
-                                                onChange={(e) => updateCfFilter({ ...(filterVal || {}), min: e.target.value })}
-                                                placeholder="Min"
-                                                className={inputCls}
-                                            />
-                                            <span className="text-gray-400 text-xs">-</span>
-                                            <input
-                                                type="number"
-                                                value={filterVal?.max ?? ''}
-                                                onChange={(e) => updateCfFilter({ ...(filterVal || {}), max: e.target.value })}
-                                                placeholder="Max"
-                                                className={inputCls}
-                                            />
-                                        </div>
-                                    )}
-                                    {cf.type === 'date' && (
-                                        <div className="flex items-center gap-1.5">
-                                            <input
-                                                type="date"
-                                                value={filterVal?.from ?? ''}
-                                                onChange={(e) => updateCfFilter({ ...(filterVal || {}), from: e.target.value })}
-                                                className={inputCls}
-                                            />
-                                            <span className="text-gray-400 text-xs">to</span>
-                                            <input
-                                                type="date"
-                                                value={filterVal?.to ?? ''}
-                                                onChange={(e) => updateCfFilter({ ...(filterVal || {}), to: e.target.value })}
-                                                className={inputCls}
-                                            />
-                                        </div>
-                                    )}
+                                    {/* Remove button */}
+                                    <button type="button" onClick={() => removeDynamicFilter(filter.id)} className="p-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors shrink-0">
+                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
                                 </div>
                             );
                         })}
                     </div>
+                    <button
+                        type="button"
+                        onClick={addDynamicFilter}
+                        className="mt-2 inline-flex items-center gap-1 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+                    >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add filter
+                    </button>
                 </Card>
             )}
 
