@@ -3693,7 +3693,9 @@ export default function Show() {
 
                     {/* Status dropdown */}
                     <div className="relative">
-                        <button onClick={() => setBulkDropdown(bulkDropdown === 'status' ? null : 'status')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Status</button>
+                        <Tooltip content="Status"><button onClick={() => setBulkDropdown(bulkDropdown === 'status' ? null : 'status')} className="p-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </button></Tooltip>
                         {bulkDropdown === 'status' && (
                             <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 py-1 min-w-[140px]">
                                 {TASK_STATUSES.map((s) => (
@@ -3707,7 +3709,9 @@ export default function Show() {
 
                     {/* Priority dropdown */}
                     <div className="relative">
-                        <button onClick={() => setBulkDropdown(bulkDropdown === 'priority' ? null : 'priority')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Priority</button>
+                        <Tooltip content="Priority"><button onClick={() => setBulkDropdown(bulkDropdown === 'priority' ? null : 'priority')} className="p-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2z" /></svg>
+                            </button></Tooltip>
                         {bulkDropdown === 'priority' && (
                             <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 py-1 min-w-[120px]">
                                 {['low', 'medium', 'high', 'urgent'].map((p) => (
@@ -3761,7 +3765,9 @@ export default function Show() {
 
                     {/* Due Date picker */}
                     <div className="relative">
-                        <button onClick={() => setBulkDropdown(bulkDropdown === 'due_date' ? null : 'due_date')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Due Date</button>
+                        <Tooltip content="Due Date"><button onClick={() => setBulkDropdown(bulkDropdown === 'due_date' ? null : 'due_date')} className="p-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            </button></Tooltip>
                         {bulkDropdown === 'due_date' && (
                             <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 p-3">
                                 <CalendarGrid selectedDate={null} onSelect={(date) => handleBulkAction('update_due_date', date)} />
@@ -3774,7 +3780,9 @@ export default function Show() {
 
                     {/* Start Date picker */}
                     <div className="relative">
-                        <button onClick={() => setBulkDropdown(bulkDropdown === 'start_date' ? null : 'start_date')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Start Date</button>
+                        <Tooltip content="Start Date"><button onClick={() => setBulkDropdown(bulkDropdown === 'start_date' ? null : 'start_date')} className="p-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </button></Tooltip>
                         {bulkDropdown === 'start_date' && (
                             <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 p-3">
                                 <CalendarGrid selectedDate={null} onSelect={(date) => handleBulkAction('update_start_date', date)} />
