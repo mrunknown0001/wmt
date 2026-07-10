@@ -3761,17 +3761,19 @@ export default function Show() {
                     <div className="relative">
                         <button onClick={() => setBulkDropdown(bulkDropdown === 'due_date' ? null : 'due_date')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Due Date</button>
                         {bulkDropdown === 'due_date' && (
-                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 p-3 min-w-[200px]">
+                            <>
                                 <input
                                     type="date"
                                     ref={(el) => { if (el) requestAnimationFrame(() => { try { el.showPicker(); } catch {} }); }}
-                                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="sr-only"
                                     onChange={(e) => { if (e.target.value) handleBulkAction('update_due_date', e.target.value); }}
                                 />
-                                <button onClick={() => handleBulkAction('update_due_date', null)} className="w-full text-left mt-2 px-3 py-1.5 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded italic">
-                                    Clear due date
-                                </button>
-                            </div>
+                                <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600">
+                                    <button onClick={() => handleBulkAction('update_due_date', null)} className="w-full text-left px-3 py-2 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg italic whitespace-nowrap">
+                                        Clear due date
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
 
@@ -3779,17 +3781,19 @@ export default function Show() {
                     <div className="relative">
                         <button onClick={() => setBulkDropdown(bulkDropdown === 'start_date' ? null : 'start_date')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Start Date</button>
                         {bulkDropdown === 'start_date' && (
-                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 p-3 min-w-[200px]">
+                            <>
                                 <input
                                     type="date"
                                     ref={(el) => { if (el) requestAnimationFrame(() => { try { el.showPicker(); } catch {} }); }}
-                                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="sr-only"
                                     onChange={(e) => { if (e.target.value) handleBulkAction('update_start_date', e.target.value); }}
                                 />
-                                <button onClick={() => handleBulkAction('update_start_date', null)} className="w-full text-left mt-2 px-3 py-1.5 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded italic">
-                                    Clear start date
-                                </button>
-                            </div>
+                                <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600">
+                                    <button onClick={() => handleBulkAction('update_start_date', null)} className="w-full text-left px-3 py-2 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg italic whitespace-nowrap">
+                                        Clear start date
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
 
