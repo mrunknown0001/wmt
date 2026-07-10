@@ -63,89 +63,43 @@ html.dark, html.dark body {
     color: #93c5fd;
 }
 
-/* Thin scrollbar for sidebar */
-.scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
-}
-.scrollbar-thin::-webkit-scrollbar {
-    width: 4px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: rgba(156, 163, 175, 0.3);
-    border-radius: 9999px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(156, 163, 175, 0.5);
-}
-
-/* Styled scrollbar for modals and dropdowns */
-.styled-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
-}
-.styled-scrollbar::-webkit-scrollbar {
-    width: 6px;
-}
-.styled-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-    margin: 4px 0;
-}
-.styled-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(156, 163, 175, 0.4);
-    border-radius: 9999px;
-}
-.styled-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(156, 163, 175, 0.6);
-}
-.dark .styled-scrollbar {
-    scrollbar-color: rgba(107, 114, 128, 0.4) transparent;
-}
-.dark .styled-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(107, 114, 128, 0.4);
-}
-.dark .styled-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(107, 114, 128, 0.6);
-}
-
-/* Styled horizontal scrollbar for tables and overflow containers */
-.styled-scrollbar-x {
+/* Global styled scrollbar — applies to all scrollable elements */
+* {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
 }
-.styled-scrollbar-x:hover {
-    scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+*:hover {
+    scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
 }
-.styled-scrollbar-x::-webkit-scrollbar {
+*::-webkit-scrollbar {
+    width: 6px;
     height: 6px;
 }
-.styled-scrollbar-x::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
     background: transparent;
-    margin: 0 4px;
 }
-.styled-scrollbar-x::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
     background-color: transparent;
     border-radius: 9999px;
     transition: background-color 0.2s;
 }
-.styled-scrollbar-x:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(156, 163, 175, 0.4);
+*:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.3);
 }
-.styled-scrollbar-x::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(156, 163, 175, 0.6);
+*::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.5);
 }
-.dark .styled-scrollbar-x:hover {
-    scrollbar-color: rgba(107, 114, 128, 0.4) transparent;
+.dark *:hover {
+    scrollbar-color: rgba(107, 114, 128, 0.3) transparent;
 }
-.dark .styled-scrollbar-x:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(107, 114, 128, 0.4);
+.dark *:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.3);
 }
-.dark .styled-scrollbar-x::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(107, 114, 128, 0.6);
+.dark *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.5);
 }
+/* Keep legacy classes as no-ops for compatibility */
+.scrollbar-thin, .styled-scrollbar, .styled-scrollbar-x {}
 
 /* AI Chat panel slide-up animation */
 @keyframes slide-up {
