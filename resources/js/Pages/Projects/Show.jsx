@@ -1205,6 +1205,7 @@ export default function Show() {
     const [focusedTaskId, setFocusedTaskId] = useState(null);
     const [lastClickedTaskId, setLastClickedTaskId] = useState(null);
     const [bulkDropdown, setBulkDropdown] = useState(null); // 'status' | 'priority' | 'assign' | 'due_date' | 'start_date' | null
+    const [bulkAssignSearch, setBulkAssignSearch] = useState('');
     const [localSections, setLocalSections] = useState(serverSections);
     const [collapsedSections, setCollapsedSections] = useState(new Set());
     const [editingSectionId, setEditingSectionId] = useState(null);
@@ -3720,17 +3721,38 @@ export default function Show() {
 
                     {/* Assign dropdown */}
                     <div className="relative">
-                        <button onClick={() => setBulkDropdown(bulkDropdown === 'assign' ? null : 'assign')} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Assign</button>
+                        <button onClick={() => { setBulkDropdown(bulkDropdown === 'assign' ? null : 'assign'); setBulkAssignSearch(''); }} className="text-sm px-3 py-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Assign</button>
                         {bulkDropdown === 'assign' && (
-                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 py-1 min-w-[160px] max-h-48 overflow-y-auto">
-                                <button onClick={() => handleBulkAction('assign', null)} className="w-full text-left px-3 py-1.5 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 italic">
-                                    Unassign
-                                </button>
-                                {users.map((u) => (
-                                    <button key={u.id} onClick={() => handleBulkAction('assign', u.id)} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                        {u.name}
+                            <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 min-w-[220px]">
+                                <div className="p-2 border-b border-gray-200 dark:border-gray-600">
+                                    <input
+                                        type="text"
+                                        autoFocus
+                                        placeholder="Search users..."
+                                        value={bulkAssignSearch}
+                                        onChange={(e) => setBulkAssignSearch(e.target.value)}
+                                        className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    />
+                                </div>
+                                <div className="py-1 max-h-48 overflow-y-auto">
+                                    <button onClick={() => handleBulkAction('assign', null)} className="w-full text-left px-3 py-2 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 italic">
+                                        <div className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                                            <svg className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                        </div>
+                                        Unassign
                                     </button>
-                                ))}
+                                    {users
+                                        .filter((u) => u.name.toLowerCase().includes(bulkAssignSearch.toLowerCase()))
+                                        .map((u) => (
+                                        <button key={u.id} onClick={() => handleBulkAction('assign', u.id)} className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5">
+                                            <Avatar name={u.name} size="xs" />
+                                            {u.name}
+                                        </button>
+                                    ))}
+                                    {users.filter((u) => u.name.toLowerCase().includes(bulkAssignSearch.toLowerCase())).length === 0 && (
+                                        <div className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500 text-center">No users found</div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
