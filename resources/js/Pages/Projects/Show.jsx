@@ -1264,6 +1264,51 @@ export default function Show() {
     // Custom field manager ref for edit/delete from column dropdown
     const cfManagerRef = useRef(null);
 
+    // Sticky scrollbar for list view
+    const listScrollRef = useRef(null);
+    const stickyScrollRef = useRef(null);
+    const stickyScrollInnerRef = useRef(null);
+    const syncingScroll = useRef(null);
+
+    useEffect(() => {
+        const listEl = listScrollRef.current;
+        const stickyEl = stickyScrollRef.current;
+        const innerEl = stickyScrollInnerRef.current;
+        if (!listEl || !stickyEl || !innerEl) return;
+
+        const syncWidth = () => {
+            innerEl.style.width = listEl.scrollWidth + 'px';
+            // Hide sticky bar if no overflow
+            stickyEl.style.display = listEl.scrollWidth > listEl.clientWidth ? '' : 'none';
+        };
+
+        const onListScroll = () => {
+            if (syncingScroll.current === 'sticky') return;
+            syncingScroll.current = 'list';
+            stickyEl.scrollLeft = listEl.scrollLeft;
+            requestAnimationFrame(() => { syncingScroll.current = null; });
+        };
+
+        const onStickyScroll = () => {
+            if (syncingScroll.current === 'list') return;
+            syncingScroll.current = 'sticky';
+            listEl.scrollLeft = stickyEl.scrollLeft;
+            requestAnimationFrame(() => { syncingScroll.current = null; });
+        };
+
+        syncWidth();
+        const ro = new ResizeObserver(syncWidth);
+        ro.observe(listEl);
+        listEl.addEventListener('scroll', onListScroll);
+        stickyEl.addEventListener('scroll', onStickyScroll);
+
+        return () => {
+            ro.disconnect();
+            listEl.removeEventListener('scroll', onListScroll);
+            stickyEl.removeEventListener('scroll', onStickyScroll);
+        };
+    }, [view]);
+
     const handleSortColumn = useCallback((colId, direction) => {
         setSortConfig(prev => {
             if (prev?.key === colId && prev?.direction === direction) return null; // toggle off
@@ -2656,7 +2701,7 @@ export default function Show() {
                             onDragOver={handleListDragOver}
                             onDragEnd={handleListDragEnd}
                         >
-                            <div className="overflow-x-auto styled-scrollbar-x">
+                            <div ref={listScrollRef} className="overflow-x-auto styled-scrollbar-x">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed' }}>
                                 <thead className="bg-gray-50 dark:bg-gray-800/50">
                                     <DndContext
@@ -2980,6 +3025,9 @@ export default function Show() {
                                     )}
                                 </tbody>
                             </table>
+                            </div>
+                            <div ref={stickyScrollRef} className="overflow-x-auto sticky bottom-0 z-10 styled-scrollbar-x" style={{ height: 12 }}>
+                                <div ref={stickyScrollInnerRef} style={{ height: 1 }} />
                             </div>
                             <DragOverlay>
                                 {activeTask ? (
