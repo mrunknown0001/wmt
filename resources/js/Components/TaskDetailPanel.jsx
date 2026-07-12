@@ -27,6 +27,111 @@ function fieldLabel(field) {
     return labels[field] || field;
 }
 
+function CollaboratorEditor({ collaborators, users, assigneeId, onUpdate }) {
+    const [search, setSearch] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handler = (e) => {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setIsOpen(false);
+                setSearch('');
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [isOpen]);
+
+    const collabIds = new Set(collaborators.map((c) => c.id));
+    const available = users.filter((u) => {
+        if (collabIds.has(u.id)) return false;
+        if (u.id === assigneeId) return false;
+        if (!search) return true;
+        return u.name.toLowerCase().includes(search.toLowerCase());
+    });
+
+    const handleAdd = (userId) => {
+        const newIds = [...collaborators.map((c) => c.id), userId];
+        onUpdate(newIds);
+        setSearch('');
+        setIsOpen(false);
+    };
+
+    const handleRemove = (userId) => {
+        const newIds = collaborators.filter((c) => c.id !== userId).map((c) => c.id);
+        onUpdate(newIds);
+    };
+
+    return (
+        <div className="px-6 pb-4" ref={containerRef}>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Collaborators</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+                {collaborators.map((c) => (
+                    <div key={c.id} className="flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 group">
+                        <Avatar name={c.name} size="sm" />
+                        <span className="text-xs text-gray-700 dark:text-gray-300">{c.name}</span>
+                        <button
+                            type="button"
+                            onClick={() => handleRemove(c.id)}
+                            className="ml-0.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                        >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                ))}
+            </div>
+            <div className="relative">
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(true)}
+                    className={`flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors ${isOpen ? 'hidden' : ''}`}
+                >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add collaborator
+                </button>
+                {isOpen && (
+                    <div>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search people..."
+                            autoFocus
+                            className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                        />
+                        {available.length > 0 && (
+                            <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-36 overflow-y-auto">
+                                {available.slice(0, 8).map((user) => (
+                                    <button
+                                        key={user.id}
+                                        type="button"
+                                        onClick={() => handleAdd(user.id)}
+                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                    >
+                                        <Avatar name={user.name} size="sm" />
+                                        <span className="text-gray-900 dark:text-gray-100 truncate">{user.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {search && available.length === 0 && (
+                            <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg px-3 py-2 text-xs text-gray-500">
+                                No users found.
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpdate, onSubtaskCreated, users = [] }) {
     const { auth } = usePage().props;
     const [loading, setLoading] = useState(true);
@@ -350,19 +455,12 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                         </div>
 
                         {/* Collaborators */}
-                        {taskData.collaborators?.length > 0 && (
-                            <div className="px-6 pb-4">
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Collaborators</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {taskData.collaborators.map(c => (
-                                        <div key={c.id} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
-                                            <Avatar name={c.name} size="sm" />
-                                            <span className="text-xs text-gray-700 dark:text-gray-300">{c.name}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        <CollaboratorEditor
+                            collaborators={taskData.collaborators || []}
+                            users={users}
+                            assigneeId={taskData.assigned_to}
+                            onUpdate={(ids) => handleFieldUpdate('collaborator_ids', ids)}
+                        />
 
                         {/* Custom Fields */}
                         {customFields.length > 0 && (

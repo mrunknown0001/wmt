@@ -494,7 +494,16 @@ class TaskController extends Controller
         $oldValues['due_date'] = $task->due_date?->toDateString();
         $oldAssignee = $task->assigned_to;
 
-        $task->update($request->validated());
+        $validated = $request->validated();
+        $collaboratorIds = $validated['collaborator_ids'] ?? null;
+        unset($validated['collaborator_ids']);
+
+        $task->update($validated);
+
+        if ($collaboratorIds !== null) {
+            $task->collaborators()->sync($collaboratorIds);
+        }
+
         $task->load('assignee');
 
         TaskActivityLogger::logChanges($task, $oldValues, $request->user());

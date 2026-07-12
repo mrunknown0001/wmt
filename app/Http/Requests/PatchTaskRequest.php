@@ -32,6 +32,8 @@ class PatchTaskRequest extends FormRequest
             'start_date' => ['sometimes', 'nullable', 'date'],
             'due_date' => ['sometimes', 'nullable', 'date'],
             'section_id' => ['sometimes', 'nullable', 'exists:task_sections,id'],
+            'collaborator_ids' => ['sometimes', 'array'],
+            'collaborator_ids.*' => ['integer', 'exists:users,id'],
         ];
     }
 
