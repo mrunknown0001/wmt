@@ -17,6 +17,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\ProjectAutomationRuleController;
+use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingController;
@@ -110,6 +111,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
     Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download'])->name('tasks.comments.attachments.download');
     Route::get('/projects/{project}/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
+
+    // Project Members
+    Route::post('/projects/{project}/members', [ProjectMemberController::class, 'store'])->name('projects.members.store');
+    Route::put('/projects/{project}/members/{user}', [ProjectMemberController::class, 'update'])->name('projects.members.update');
+    Route::delete('/projects/{project}/members/{user}', [ProjectMemberController::class, 'destroy'])->name('projects.members.destroy');
 
     // Task Sections
     Route::post('/projects/{project}/sections', [TaskSectionController::class, 'store'])->name('projects.sections.store');

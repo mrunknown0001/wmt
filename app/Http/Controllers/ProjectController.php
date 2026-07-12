@@ -234,7 +234,7 @@ class ProjectController extends Controller
             'project' => $project,
             'tasks' => $tasks,
             'sections' => $sections,
-            'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
             'canManageProject' => $canManageProject,
             'canManageTasks' => $canManageTasks,
             'automationRules' => $automationRules,
