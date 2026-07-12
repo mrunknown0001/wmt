@@ -308,19 +308,13 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                             {/* Assignee */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assignee</label>
-                                <div className="flex items-center gap-2">
-                                    {taskData.assignee && <Avatar name={taskData.assignee.name} size="sm" />}
-                                    <select
-                                        value={taskData.assigned_to || ''}
-                                        onChange={(e) => handleFieldUpdate('assigned_to', e.target.value || null)}
-                                        className="flex-1 text-sm rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5"
-                                    >
-                                        <option value="">Unassigned</option>
-                                        {users.map(u => (
-                                            <option key={u.id} value={u.id}>{u.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <SearchableSelect
+                                    value={taskData.assigned_to || ''}
+                                    onChange={(val) => handleFieldUpdate('assigned_to', val || null)}
+                                    options={users.map(u => ({ value: u.id, label: u.name }))}
+                                    placeholder="Unassigned"
+                                    showAvatar
+                                />
                             </div>
 
                             {/* Due Date */}
