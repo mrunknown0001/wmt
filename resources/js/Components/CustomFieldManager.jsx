@@ -538,7 +538,7 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                             onDragOver={(e) => handleDragOver(e, index)}
                             onDrop={(e) => handleDrop(e, index)}
                             onDragEnd={handleDragEnd}
-                            className={`flex items-center justify-between p-3 rounded-lg border bg-gray-50 dark:bg-gray-800/50 transition-all ${
+                            className={`flex items-center justify-between p-3 rounded-lg border bg-gray-50 dark:bg-gray-800/50 transition-all hover:bg-gray-100 dark:hover:bg-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600 ${
                                 dragOverIndex === index && dragIndex !== index
                                     ? 'border-primary-400 dark:border-primary-500 ring-1 ring-primary-400/30'
                                     : 'border-gray-200 dark:border-gray-700'

@@ -623,7 +623,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
             {rules.length > 0 ? (
                 <div className="space-y-2">
                     {rules.map((rule) => (
-                        <div key={rule.id} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div key={rule.id} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40 hover:border-gray-300 dark:hover:border-gray-600">
                             <button
                                 onClick={() => handleToggle(rule)}
                                 className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
