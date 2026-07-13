@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
@@ -19,9 +20,17 @@ const COLOR_LABELS = {
 export default function Edit() {
     const { settings, colorPalettes, notificationChannelDefaults } = usePage().props;
 
-    const { data, setData, put, processing, errors } = useForm({
+    const [logoPreview, setLogoPreview] = useState(settings.logo_path ? `/storage/${settings.logo_path}` : null);
+    const [faviconPreview, setFaviconPreview] = useState(settings.favicon_path ? `/storage/${settings.favicon_path}` : null);
+
+    const { data, setData, post, processing, errors } = useForm({
+        _method: 'PUT',
         app_name: settings.app_name || '',
         primary_color: settings.primary_color || 'blue',
+        logo: null,
+        favicon: null,
+        remove_logo: false,
+        remove_favicon: false,
         max_upload_size: settings.max_upload_size || 10,
         attachment_retention_enabled: settings.attachment_retention_enabled ?? false,
         attachment_retention_days: settings.attachment_retention_days || 90,
@@ -94,9 +103,21 @@ export default function Edit() {
         });
     };
 
+    const handleBrandingFile = (key, file, setPreview) => {
+        if (!file) return;
+        setData((prev) => ({ ...prev, [key]: file, [`remove_${key}`]: false }));
+        setPreview(URL.createObjectURL(file));
+    };
+
+    const removeBrandingFile = (key, setPreview) => {
+        setData((prev) => ({ ...prev, [key]: null, [`remove_${key}`]: true }));
+        setPreview(null);
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        put('/settings', {
+        post('/settings', {
+            forceFormData: true,
             onSuccess: () => applyColorPalette(data.primary_color),
         });
     };
@@ -121,6 +142,66 @@ export default function Edit() {
                             onChange={(e) => setData('app_name', e.target.value)}
                             error={errors.app_name}
                         />
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                                    Logo
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                    Shown next to the application name in the sidebar and login page.
+                                </p>
+                                {logoPreview && (
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <img src={logoPreview} alt="Logo preview" className="h-12 w-12 rounded-lg object-contain border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-1" />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeBrandingFile('logo', setLogoPreview)}
+                                            className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png,.gif,.webp,.svg"
+                                    onChange={(e) => handleBrandingFile('logo', e.target.files[0], setLogoPreview)}
+                                    className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 dark:file:bg-primary-900/30 dark:file:text-primary-300 hover:file:bg-primary-100 file:cursor-pointer"
+                                />
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">PNG, JPG, SVG, WebP or GIF — max 2 MB.</p>
+                                {errors.logo && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.logo}</p>}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                                    Favicon
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                    Shown in the browser tab. Square images work best.
+                                </p>
+                                {faviconPreview && (
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <img src={faviconPreview} alt="Favicon preview" className="h-8 w-8 object-contain border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900 p-0.5" />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeBrandingFile('favicon', setFaviconPreview)}
+                                            className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".ico,.png,.svg"
+                                    onChange={(e) => handleBrandingFile('favicon', e.target.files[0], setFaviconPreview)}
+                                    className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 dark:file:bg-primary-900/30 dark:file:text-primary-300 hover:file:bg-primary-100 file:cursor-pointer"
+                                />
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">ICO, PNG or SVG — max 1 MB.</p>
+                                {errors.favicon && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.favicon}</p>}
+                            </div>
+                        </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">

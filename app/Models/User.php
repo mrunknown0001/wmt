@@ -25,6 +25,7 @@ class User extends Authenticatable
         'showDueToday'     => true,
         'showQuickActions' => true,
         'showTeamWorkload' => true,
+        'showTopPerformers' => true,
     ];
 
     protected $fillable = [

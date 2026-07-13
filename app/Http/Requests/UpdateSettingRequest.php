@@ -19,6 +19,10 @@ class UpdateSettingRequest extends FormRequest
         $rules = [
             'app_name' => ['required', 'string', 'max:255'],
             'primary_color' => ['required', 'string', 'in:blue,indigo,violet,teal,green,red,orange,rose'],
+            'logo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp,svg', 'max:2048'],
+            'favicon' => ['nullable', 'file', 'mimes:ico,png,svg', 'max:1024'],
+            'remove_logo' => ['sometimes', 'boolean'],
+            'remove_favicon' => ['sometimes', 'boolean'],
             'max_upload_size' => ['required', 'integer', 'min:1', 'max:100'],
             'attachment_retention_enabled' => ['required', 'boolean'],
             'attachment_retention_days' => ['required_if:attachment_retention_enabled,true', 'integer', 'min:1', 'max:365'],

@@ -9,6 +9,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title inertia>{{ $appSettings->app_name }}</title>
+    <link rel="icon" href="{{ $appSettings->favicon_path ? asset('storage/'.$appSettings->favicon_path) : asset('favicon.ico') }}">
+    @if ($appSettings->favicon_path && str_ends_with($appSettings->favicon_path, '.png'))
+        <link rel="apple-touch-icon" href="{{ asset('storage/'.$appSettings->favicon_path) }}">
+    @endif
     <style>
         :root {
             --primary-50: {{ $palette['50'] }};

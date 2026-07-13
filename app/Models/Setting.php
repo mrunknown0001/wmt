@@ -25,7 +25,7 @@ class Setting extends Model
         'email_task_escalated'    => true,
     ];
 
-    protected $fillable = ['app_name', 'primary_color', 'max_upload_size', 'attachment_retention_enabled', 'attachment_retention_days', 'task_reminder_days', 'task_reminders_enabled', 'escalation_enabled', 'escalation_tiers', 'notification_channels'];
+    protected $fillable = ['app_name', 'primary_color', 'logo_path', 'favicon_path', 'max_upload_size', 'attachment_retention_enabled', 'attachment_retention_days', 'task_reminder_days', 'task_reminders_enabled', 'escalation_enabled', 'escalation_tiers', 'notification_channels'];
 
     protected function casts(): array
     {

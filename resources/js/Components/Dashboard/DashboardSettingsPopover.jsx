@@ -11,6 +11,7 @@ const WIDGET_LABELS = {
     showDueToday: 'Due Today / Overdue',
     showQuickActions: 'Quick Actions',
     showTeamWorkload: 'Team Workload',
+    showTopPerformers: 'Top Teams & Departments',
 };
 
 export default function DashboardSettingsPopover({ preferences, onUpdate, isAdmin }) {

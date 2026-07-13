@@ -152,6 +152,7 @@ export default function AuthenticatedLayout({ children, title, contained = false
     };
 
     const appName = settings?.app_name || 'WMT';
+    const logoUrl = settings?.logo_path ? `/storage/${settings.logo_path}` : null;
 
     const isActive = (path) => {
         if (path === '/dashboard') return currentUrl === '/dashboard';
@@ -167,9 +168,13 @@ export default function AuthenticatedLayout({ children, title, contained = false
         <div className="flex flex-col h-full">
             {/* Brand */}
             <div className={`flex items-center gap-2 ${collapsed ? 'justify-center px-2' : 'px-5'} py-5 border-b border-gray-700/50`}>
-                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
-                    <span className="text-white font-bold text-sm">{appName.charAt(0).toUpperCase()}</span>
-                </div>
+                {logoUrl ? (
+                    <img src={logoUrl} alt={`${appName} logo`} className="h-8 w-8 rounded-lg object-contain shrink-0" />
+                ) : (
+                    <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
+                        <span className="text-white font-bold text-sm">{appName.charAt(0).toUpperCase()}</span>
+                    </div>
+                )}
                 {!collapsed && <span className="text-lg font-semibold text-white tracking-tight">{appName}</span>}
             </div>
 
