@@ -28,6 +28,8 @@ class RolePermissionSeeder extends Seeder
             'view-projects',
             'manage-tasks',
             'view-tasks',
+            'manage-links',
+            'view-links',
         ];
 
         foreach ($permissions as $permission) {
@@ -46,6 +48,7 @@ class RolePermissionSeeder extends Seeder
             'view-teams',
             'view-projects',
             'view-tasks',
+            'view-links',
         ]);
 
         $divisionHead = Role::firstOrCreate(['name' => 'division_head']);

@@ -28,6 +28,7 @@ use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FormController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\TaskCustomFieldValueController;
+use App\Http\Controllers\LinkController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -174,6 +175,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/ai/conversations/{conversation}', [AiChatController::class, 'show'])->name('ai.conversations.show');
     Route::delete('/api/ai/conversations/{conversation}', [AiChatController::class, 'destroy'])->name('ai.conversations.destroy');
     Route::post('/api/ai/conversations/{conversation}/messages', [AiChatController::class, 'sendMessage'])->name('ai.conversations.sendMessage');
+
+    // Links & URLs
+    Route::resource('links', LinkController::class)->except(['show']);
 
     // Organization structure
     Route::resource('divisions', DivisionController::class)->except(['show']);

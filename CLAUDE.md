@@ -52,6 +52,12 @@ Division → Department → Team → Users (fixed hierarchy)
 - `status` (backlog/to_do/in_progress/in_review/done/cancelled), `priority` (low/medium/high/urgent)
 - `assigned_to` (FK → users, nullable), `created_by` (FK → users, nullable), `due_date`, `position`
 
+### Links
+- `title` (string), `description` (text, nullable), `url` (string 2048, nullable)
+- `user_id` (FK → users, cascadeOnDelete) — assigned user
+- `created_by` (FK → users, nullable, nullOnDelete) — admin who created it
+- Admins manage all links; users see only their own assigned links
+
 ### Permissions
 - `manage-users`, `view-users`, `manage-roles`
 - `manage-divisions`, `view-divisions`
@@ -59,6 +65,7 @@ Division → Department → Team → Users (fixed hierarchy)
 - `manage-teams`, `view-teams`
 - `manage-projects`, `view-projects`
 - `manage-tasks`, `view-tasks`
+- `manage-links`, `view-links`
 
 ## Key Decisions
 - Public registration is disabled; new users are created by admins/privileged users via user management UI
@@ -141,6 +148,17 @@ Division → Department → Team → Users (fixed hierarchy)
 - Custom Fields panel on Project Show page
 - No new permissions (inherits project-level authorization)
 
+### Phase 5: Links & URLs — COMPLETE
+- Link model with user assignment (title, description, URL per record)
+- 1 migration (links table)
+- 2 new permissions (manage-links, view-links)
+- Admin gets manage-links + view-links; executive gets view-links
+- LinkPolicy: admins can CRUD all links; users can only view their own
+- LinkController with full CRUD, admin user filter, search
+- Frontend: Links Index/Create/Edit pages
+- URLs rendered as clickable links opening in new tabs
+- Sidebar "Links & URLs" nav item visible to all authenticated users
+
 ## Running
 ```bash
 # Docker
@@ -168,6 +186,7 @@ app/
 │   │   ├── DepartmentController.php
 │   │   ├── DivisionController.php
 │   │   ├── CustomFieldController.php
+│   │   ├── LinkController.php
 │   │   ├── FormController.php
 │   │   ├── PublicFormController.php
 │   │   ├── TaskCustomFieldValueController.php
@@ -181,8 +200,8 @@ app/
 │       ├── Auth/
 │       │   ├── LoginRequest.php
 │       │   └── RegisterRequest.php
-│       ├── Store{Division,Department,Team,User,Project,Task,CustomField,Form}Request.php
-│       └── Update{Division,Department,Team,User,Project,Task,CustomField,Form}Request.php
+│       ├── Store{Division,Department,Team,User,Project,Task,CustomField,Form,Link}Request.php
+│       └── Update{Division,Department,Team,User,Project,Task,CustomField,Form,Link}Request.php
 ├── Models/
 │   ├── CustomField.php
 │   ├── CustomFieldOption.php
@@ -190,6 +209,7 @@ app/
 │   ├── Division.php
 │   ├── Form.php
 │   ├── FormField.php
+│   ├── Link.php
 │   ├── Project.php
 │   ├── Task.php
 │   ├── TaskCustomFieldValue.php
@@ -198,6 +218,7 @@ app/
 ├── Policies/
 │   ├── DepartmentPolicy.php
 │   ├── DivisionPolicy.php
+│   ├── LinkPolicy.php
 │   ├── ProjectPolicy.php
 │   ├── TaskPolicy.php
 │   ├── TeamPolicy.php
@@ -222,6 +243,8 @@ resources/js/
 │   │   ├── Create.jsx, Edit.jsx
 │   ├── Forms/
 │   │   ├── Index.jsx, Create.jsx, Edit.jsx, PublicForm.jsx, PublicFormSuccess.jsx
+│   ├── Links/
+│   │   ├── Index.jsx, Create.jsx, Edit.jsx
 │   ├── Teams/
 │   │   ├── Index.jsx, Create.jsx, Edit.jsx
 │   └── Users/
@@ -240,7 +263,8 @@ database/
 │   ├── ...create_custom_field_options_table.php
 │   ├── ...create_task_custom_field_values_table.php
 │   ├── ...create_forms_table.php
-│   └── ...create_form_fields_table.php
+│   ├── ...create_form_fields_table.php
+│   └── ...create_links_table.php
 ├── seeders/
 │   ├── DatabaseSeeder.php
 │   ├── OrganizationSeeder.php

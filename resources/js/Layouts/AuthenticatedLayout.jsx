@@ -86,6 +86,12 @@ const ChartBarIcon = () => (
     </svg>
 );
 
+const LinkIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.343 8.81" />
+    </svg>
+);
+
 const LockIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -181,6 +187,9 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     </NavLink>
                     <NavLink href="/calendar" icon={<CalendarIcon />} active={isActive('/calendar')} collapsed={collapsed}>
                         Calendar
+                    </NavLink>
+                    <NavLink href="/links" icon={<LinkIcon />} active={isActive('/links')} collapsed={collapsed}>
+                        Links & URLs
                     </NavLink>
                     {(hasRole('admin') || hasRole('executive')) && (
                         <NavLink href="/executive-dashboard" icon={<ChartBarIcon />} active={isActive('/executive-dashboard')} collapsed={collapsed}>
