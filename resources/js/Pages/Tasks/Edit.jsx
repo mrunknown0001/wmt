@@ -490,7 +490,7 @@ export default function Edit() {
                                 {task.subtasks_count} subtask{task.subtasks_count !== 1 ? 's' : ''}
                             </div>
                         )}
-                        <form onSubmit={handleSubmit} className="space-y-5">
+                        <form id="task-edit-form" onSubmit={handleSubmit} className="space-y-5">
                             <Input label="Title" id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} error={errors.title} />
                             <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
@@ -611,12 +611,15 @@ export default function Edit() {
                                 </div>
                             )}
 
-                            <div className="flex justify-end gap-3 pt-4">
-                                <LinkButton href={isStandalone ? '/my-tasks' : `/projects/${project.id}`} variant="secondary">Cancel</LinkButton>
-                                <Button type="submit" processing={processing} processingText="Saving...">Save Changes</Button>
-                            </div>
+                            <div className="h-16" />
                         </form>
                     </Card>
+                    <div className="sticky bottom-0 z-20 -mx-px">
+                        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 px-6 py-3 flex justify-end gap-3 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_-2px_8px_rgba(0,0,0,0.2)]">
+                            <LinkButton href={isStandalone ? '/my-tasks' : `/projects/${project.id}`} variant="secondary">Cancel</LinkButton>
+                            <Button type="submit" form="task-edit-form" processing={processing} processingText="Saving...">Save Changes</Button>
+                        </div>
+                    </div>
 
                     {/* Subtasks — only for parent tasks */}
                     {!task.parent_id && (
