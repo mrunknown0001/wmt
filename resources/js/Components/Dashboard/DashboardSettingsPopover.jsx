@@ -14,7 +14,7 @@ const WIDGET_LABELS = {
     showTopPerformers: 'Top Teams & Departments',
 };
 
-export default function DashboardSettingsPopover({ preferences, onUpdate, isAdmin }) {
+export default function DashboardSettingsPopover({ preferences, onUpdate, isAdmin, isExecutive }) {
     const [isOpen, setIsOpen] = useState(false);
     const anchorRef = useRef(null);
 
@@ -27,9 +27,11 @@ export default function DashboardSettingsPopover({ preferences, onUpdate, isAdmi
         });
     };
 
-    const entries = Object.entries(WIDGET_LABELS).filter(
-        ([key]) => key !== 'showTeamWorkload' || isAdmin
-    );
+    const entries = Object.entries(WIDGET_LABELS).filter(([key]) => {
+        if (key === 'showTeamWorkload') return isAdmin;
+        if (key === 'showTopPerformers') return isExecutive;
+        return true;
+    });
 
     return (
         <>

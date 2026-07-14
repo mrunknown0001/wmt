@@ -176,8 +176,8 @@ class DashboardController extends Controller
                 ->get();
         }
 
-        // Top 5 Teams & Departments leaderboard
-        if ($prefs['showTopPerformers']) {
+        // Top 5 Teams & Departments leaderboard (executive only)
+        if ($prefs['showTopPerformers'] && $user->hasRole('executive')) {
             $data['topTeams'] = $this->rankUnits(
                 Team::with('department:id,name')
                     ->withCount(['members' => fn ($q) => $q->where('is_active', true)])
