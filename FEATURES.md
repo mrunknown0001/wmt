@@ -124,30 +124,39 @@
 
 ## Form Builder & Public Forms
 - **Asana-style two-tab layout** — Questions tab and Settings tab
-- **9 field types**: text, textarea, number, date, select, multi select, attachment, heading, description
+- **12 field types**: text, textarea, number, date, email, select, multi select, attachment, camera photo, camera video, heading, description
 - **Drag-and-drop field reordering** via @dnd-kit with visual feedback
 - **Expandable field configuration**: label, help text, default value, required, visible on form, maps-to
 - **Default values** per field — type-appropriate inputs (text, number, date picker, select dropdown)
 - **Visibility toggle** — hidden fields use default values silently when form is submitted
-- **Conditional visibility** — form fields support conditional display rules based on other field values
+- **Conditional visibility** — form fields support conditional display rules based on other field values (equals, not equals, contains, is empty, is not empty; all/any logic)
 - **"Add from Custom Fields" modal** — browse project custom fields with type icons, option previews, and checkbox selection
+- **Email field modes**:
+  - Plain — validates email format only
+  - Registered user — must match an active registered user's email
 - **Settings tab**:
   - Section selector — assign submitted tasks to a project section
   - Task title field selector — multi-select dropdown to compose task titles from multiple form fields
-- Form fields mappable to task description or custom fields
+  - Built-in **Assignee** title option (shown at the top of the dropdown) — prepends the resolved assignee's name to the task title; silently skipped if the task ends up unassigned
+- Form fields mappable to task description, task assignee (registered-user email fields only — auto-assigns the matching user), or custom fields
 - Select/multi select fields inherit options from mapped custom fields (displayed read-only)
 - Static options editor for unmapped select fields
 - **Attachment field type** — images, videos, Excel files; up to 5 files per submission, 50MB per file
+- **Camera photo field** — opens device camera; up to 5 captured photos per submission
+- **Camera video field** — opens device camera; 1 recorded video, max 1 minute
+- **Form branding** — uploadable logo (with left/center/right positioning) and banner image
 - Portal-based floating dropdowns with dynamic up/down positioning based on viewport space
 - Public form URLs via UUID — no authentication required
 - Turnstile (CAPTCHA) protection on public form submissions
 - Rate limiting on submissions (throttle:10,1)
 - Form active/inactive toggle — inactive forms return 404
 - Public form submissions create tasks with:
-  - Custom title composed from selected fields
+  - Custom title composed from selected fields (assignee name prepended when the Assignee title option is enabled)
+  - Status, priority, assignee, and section from form task defaults
+  - Auto-assignment from a registered-user email field mapped to assignee
   - Custom field values populated
-  - File attachments linked to task
-  - Section assignment from form defaults
+  - File attachments (uploads and camera captures) linked to task
+  - Activity log entry recording the form submission
 - Configurable submit button text and success message
 - Styled scrollbars on modals and dropdown lists
 

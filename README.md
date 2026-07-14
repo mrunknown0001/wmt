@@ -59,7 +59,7 @@ Default admin login: `admin@wmt.com` / `password`
 - **Customizable Dashboard** — 7 togglable widgets, persisted per user
 - **Activity Log** — Centralized audit trail across all projects
 - **Custom Fields** — 5 types (text, number, date, single select, multi select) per project with inline editing
-- **Form Builder** — Asana-style form designer with drag-and-drop, custom field mapping, conditional visibility, file attachments, and public form links
+- **Form Builder** — Asana-style form designer with drag-and-drop, 12 field types (incl. email, attachments, camera photo/video capture), custom field mapping, conditional visibility, auto-assignment via registered-user email fields, composable task titles (form fields + assignee name), form branding (logo/banner), and public form links
 - **Calendar** — Monthly grid view with priority-colored task pills
 - **My Tasks** — Personal task view grouped by due date urgency
 - **Personal To-Do List** — Sidebar widget with drag-and-drop reordering and completion animations
@@ -67,7 +67,7 @@ Default admin login: `admin@wmt.com` / `password`
 - **Dark Mode** — Full dark/light theme support with customizable primary color
 - **UI/UX Polish** — ClickUp-inspired micro-interactions, animations, and hover feedback
 
-See [FEATURES.md](FEATURES.md) for the complete feature list.
+See [FEATURES.md](FEATURES.md) for the complete feature list. These documents serve as the feature reference for the mobile app — the API is token-authenticated via Laravel Sanctum, and push notifications reach mobile devices through FCM (device tokens tracked per platform).
 
 ## Roles
 
