@@ -193,9 +193,11 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     <NavLink href="/calendar" icon={<CalendarIcon />} active={isActive('/calendar')} collapsed={collapsed}>
                         Calendar
                     </NavLink>
-                    <NavLink href="/links" icon={<LinkIcon />} active={isActive('/links')} collapsed={collapsed}>
-                        Links & URLs
-                    </NavLink>
+                    {hasPermission('view-links') && (
+                        <NavLink href="/links" icon={<LinkIcon />} active={isActive('/links')} collapsed={collapsed}>
+                            Links & URLs
+                        </NavLink>
+                    )}
                     {(hasRole('admin') || hasRole('executive')) && (
                         <NavLink href="/executive-dashboard" icon={<ChartBarIcon />} active={isActive('/executive-dashboard')} collapsed={collapsed}>
                             Executive Dashboard

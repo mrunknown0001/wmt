@@ -58,7 +58,7 @@ Division → Department → Team → Users (fixed hierarchy)
 - `title` (string), `description` (text, nullable), `url` (string 2048, nullable)
 - `user_id` (FK → users, cascadeOnDelete) — assigned user
 - `created_by` (FK → users, nullable, nullOnDelete) — admin who created it
-- Admins manage all links; users see only their own assigned links
+- Links are restricted to admins and executives: admins manage all links; executives see only their own assigned links; normal users have no access
 
 ### Permissions
 - `manage-users`, `view-users`, `manage-roles`
@@ -155,11 +155,11 @@ Division → Department → Team → Users (fixed hierarchy)
 - 1 migration (links table)
 - 2 new permissions (manage-links, view-links)
 - Admin gets manage-links + view-links; executive gets view-links
-- LinkPolicy: admins can CRUD all links; users can only view their own
+- LinkPolicy: requires view-links to access; admins (manage-links) can CRUD all links; executives (view-links) view only their own
 - LinkController with full CRUD, admin user filter, search
 - Frontend: Links Index/Create/Edit pages
 - URLs rendered as clickable links opening in new tabs
-- Sidebar "Links & URLs" nav item visible to all authenticated users
+- Sidebar "Links & URLs" nav item visible only to users with view-links (admin, executive)
 
 ## Running
 ```bash

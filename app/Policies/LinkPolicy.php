@@ -9,12 +9,13 @@ class LinkPolicy
 {
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view-links');
     }
 
     public function view(User $user, Link $link): bool
     {
-        return $user->hasPermissionTo('manage-links') || $link->user_id === $user->id;
+        return $user->hasPermissionTo('manage-links')
+            || ($user->hasPermissionTo('view-links') && $link->user_id === $user->id);
     }
 
     public function create(User $user): bool

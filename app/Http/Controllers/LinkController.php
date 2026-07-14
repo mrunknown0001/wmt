@@ -16,6 +16,8 @@ class LinkController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorize('viewAny', Link::class);
+
         $user = $request->user();
         $canManage = $user->hasPermissionTo('manage-links');
 
