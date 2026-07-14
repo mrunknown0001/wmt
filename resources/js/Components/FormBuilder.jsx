@@ -880,6 +880,21 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
                             className="fixed z-9999 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto styled-scrollbar animate-slide-down"
                             style={{ top: titlePos.top, left: titlePos.left, width: titlePos.width }}
                         >
+                            <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer text-sm text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-gray-700">
+                                <input
+                                    type="checkbox"
+                                    checked={titleFieldIds.includes('assignee')}
+                                    onChange={() => toggleTitleField('assignee')}
+                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
+                                />
+                                <span className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
+                                    @
+                                </span>
+                                <span className="flex-1">
+                                    Assignee
+                                    <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">(blank if unassigned)</span>
+                                </span>
+                            </label>
                             {nonStaticFields.length === 0 ? (
                                 <p className="text-sm text-gray-500 dark:text-gray-400 p-3 text-center">No fields available</p>
                             ) : (
@@ -901,21 +916,6 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
                                     </label>
                                 ))
                             )}
-                            <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer text-sm text-gray-700 dark:text-gray-300 border-t border-gray-100 dark:border-gray-700">
-                                <input
-                                    type="checkbox"
-                                    checked={titleFieldIds.includes('assignee')}
-                                    onChange={() => toggleTitleField('assignee')}
-                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
-                                />
-                                <span className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
-                                    @
-                                </span>
-                                <span className="flex-1">
-                                    Assignee
-                                    <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">(blank if unassigned)</span>
-                                </span>
-                            </label>
                         </div>,
                         document.body
                     )}
