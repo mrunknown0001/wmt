@@ -1413,6 +1413,18 @@ export default function Show() {
             }
         });
 
+        // Comment/attachment count updates for the list indicators
+        channel.listen('.task.meta', (e) => {
+            const counts = { comments_count: e.comments_count, attachments_count: e.attachments_count };
+            setLocalTasks((prev) => prev.map((t) => {
+                if (t.id === e.task_id) return { ...t, ...counts };
+                if (e.parent_id && t.id === e.parent_id && t.subtasks?.some((s) => s.id === e.task_id)) {
+                    return { ...t, subtasks: t.subtasks.map((s) => (s.id === e.task_id ? { ...s, ...counts } : s)) };
+                }
+                return t;
+            }));
+        });
+
         channel.listen('.automation.executed', (e) => {
             const id = `auto-${Date.now()}-${Math.random()}`;
             const actionLabels = (e.actions || []).map(a => a.replace(/_/g, ' ')).join(', ');

@@ -4,7 +4,7 @@ import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import Mention from '@tiptap/extension-mention';
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useRef } from 'react';
 import tippy from 'tippy.js';
 import MentionList from './MentionList';
 import Tooltip from './Tooltip';
@@ -71,7 +71,10 @@ function Toolbar({ editor }) {
     );
 }
 
-export default function RichTextEditor({ label, id, value, onChange, error, placeholder, className = '', minimal = false, users = [] }) {
+export default function RichTextEditor({ label, id, value, onChange, error, placeholder, className = '', minimal = false, users = [], onSubmit }) {
+    // Keep the latest onSubmit for the ProseMirror handler (editorProps are captured at editor creation)
+    const onSubmitRef = useRef(onSubmit);
+    onSubmitRef.current = onSubmit;
     const suggestion = useMemo(() => ({
         items: ({ query }) => {
             return users
@@ -169,6 +172,15 @@ export default function RichTextEditor({ label, id, value, onChange, error, plac
         editorProps: {
             attributes: {
                 class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[60px] px-3 py-2',
+            },
+            // Ctrl/Cmd+Enter submits (runs before StarterKit's Mod-Enter hard-break keymap)
+            handleKeyDown: (view, event) => {
+                if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && onSubmitRef.current) {
+                    event.preventDefault();
+                    onSubmitRef.current();
+                    return true;
+                }
+                return false;
             },
         },
     });

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\TaskMetaUpdated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,6 +15,18 @@ class TaskAttachment extends Model
         'file_type',
         'file_size',
     ];
+
+    protected static function booted(): void
+    {
+        $broadcastMeta = function (self $attachment): void {
+            if ($attachment->task?->project_id) {
+                broadcast(new TaskMetaUpdated($attachment->task));
+            }
+        };
+
+        static::created($broadcastMeta);
+        static::deleted($broadcastMeta);
+    }
 
     protected function casts(): array
     {

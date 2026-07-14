@@ -423,7 +423,8 @@ export default function Edit() {
     };
 
     const handleComment = (e) => {
-        e.preventDefault();
+        e?.preventDefault();
+        if (posting) return;
         const hasBody = commentBody && commentBody !== '<p></p>';
         if (!hasBody && attachments.length === 0) return;
 
@@ -799,6 +800,7 @@ export default function Edit() {
                                         placeholder="Leave a comment... Use @ to mention someone"
                                         minimal
                                         users={users}
+                                        onSubmit={handleComment}
                                     />
 
                                     {attachments.length > 0 && (
@@ -858,7 +860,7 @@ export default function Edit() {
                                                 </svg>
                                             </label>
                                         </Tooltip>
-                                        <Button type="submit" size="sm" processing={posting} processingText="Posting..." disabled={(!commentBody || commentBody === '<p></p>') && attachments.length === 0}>
+                                        <Button type="submit" size="sm" title="Ctrl+Enter" processing={posting} processingText="Posting..." disabled={(!commentBody || commentBody === '<p></p>') && attachments.length === 0}>
                                             Comment
                                         </Button>
                                     </div>

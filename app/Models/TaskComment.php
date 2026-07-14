@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\TaskMetaUpdated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +14,18 @@ class TaskComment extends Model
         'user_id',
         'body',
     ];
+
+    protected static function booted(): void
+    {
+        $broadcastMeta = function (self $comment): void {
+            if ($comment->task?->project_id) {
+                broadcast(new TaskMetaUpdated($comment->task));
+            }
+        };
+
+        static::created($broadcastMeta);
+        static::deleted($broadcastMeta);
+    }
 
     public function task(): BelongsTo
     {

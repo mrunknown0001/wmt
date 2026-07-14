@@ -270,6 +270,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     };
 
     const handleSubmitComment = async () => {
+        if (submittingComment) return;
         if (!commentBody.trim() && commentFiles.length === 0) return;
         setSubmittingComment(true);
         try {
@@ -716,6 +717,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                                     placeholder="Write a comment..."
                                                     minimal
                                                     users={users}
+                                                    onSubmit={handleSubmitComment}
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between mt-2">
@@ -744,6 +746,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                                 <button
                                                     onClick={handleSubmitComment}
                                                     disabled={submittingComment || (!commentBody.trim() && commentFiles.length === 0)}
+                                                    title="Ctrl+Enter"
                                                     className="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md disabled:opacity-50 transition-colors"
                                                 >
                                                     {submittingComment ? 'Sending...' : 'Comment'}
