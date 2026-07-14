@@ -15,7 +15,6 @@ import DonutChart from '../Components/Dashboard/DonutChart';
 import BarChart from '../Components/Dashboard/BarChart';
 import TrendLineChart from '../Components/Dashboard/TrendLineChart';
 import TeamWorkload from '../Components/Dashboard/TeamWorkload';
-import TopPerformers from '../Components/Dashboard/TopPerformers';
 import { formatDate, taskEditUrl } from '../utils';
 
 function StatCard({ label, value, icon, color = 'blue', href }) {
@@ -59,8 +58,6 @@ export default function Dashboard() {
         charts,
         urgentItems,
         teamWorkload,
-        topTeams,
-        topDepartments,
     } = usePage().props;
 
     const [preferences, setPreferences] = useState(dashboardPreferences || {});
@@ -78,7 +75,6 @@ export default function Dashboard() {
     }, []);
 
     const isAdmin = auth.user?.roles?.some((r) => ['admin', 'supervisor'].includes(r));
-    const isExecutive = auth.user?.roles?.includes('executive');
 
     const handlePreferencesUpdate = (newPrefs) => {
         setPreferences(newPrefs);
@@ -119,7 +115,6 @@ export default function Dashboard() {
                         <DashboardSettingsPopover
                             preferences={preferences}
                             isAdmin={isAdmin}
-                            isExecutive={isExecutive}
                             onUpdate={handlePreferencesUpdate}
                         />
                     </div>
@@ -391,14 +386,6 @@ export default function Dashboard() {
                 {preferences.showActivityFeed && activityFeed?.length > 0 && (
                     <div className="mb-6">
                         <ActivityFeed activities={activityFeed} />
-                    </div>
-                )}
-
-                {/* Top 5 Teams & Departments — executive only */}
-                {preferences.showTopPerformers && isExecutive && (topTeams?.length > 0 || topDepartments?.length > 0) && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                        <TopPerformers title="Top 5 Teams" units={topTeams} contextKey="department" />
-                        <TopPerformers title="Top 5 Departments" units={topDepartments} contextKey="division" />
                     </div>
                 )}
 
