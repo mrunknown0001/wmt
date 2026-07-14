@@ -804,7 +804,7 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
         .filter(f => titleFieldIds.includes(f.position))
         .map(f => f.label || 'Untitled');
     if (titleFieldIds.includes('assignee')) {
-        titleLabelParts.push('Assignee');
+        titleLabelParts.unshift('Assignee');
     }
     const titleLabel = titleLabelParts.length > 0 ? titleLabelParts.join(', ') : 'Form name (default)';
 

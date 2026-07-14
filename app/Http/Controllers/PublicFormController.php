@@ -241,11 +241,11 @@ class PublicFormController extends Controller
                 }
             }
 
-            // Append the assignee's name when selected; skip if the task has no assignee
+            // Prepend the assignee's name when selected; skip if the task has no assignee
             if (in_array('assignee', $titleFieldIds, true) && $taskData['assigned_to']) {
                 $assignee = \App\Models\User::find($taskData['assigned_to']);
                 if ($assignee) {
-                    $titleParts[] = $assignee->name;
+                    array_unshift($titleParts, $assignee->name);
                 }
             }
 
