@@ -13,6 +13,7 @@ import ProjectProgressBar from '../Components/Dashboard/ProjectProgressBar';
 import ActivityFeed from '../Components/Dashboard/ActivityFeed';
 import DonutChart from '../Components/Dashboard/DonutChart';
 import BarChart from '../Components/Dashboard/BarChart';
+import TrendLineChart from '../Components/Dashboard/TrendLineChart';
 import TeamWorkload from '../Components/Dashboard/TeamWorkload';
 import TopPerformers from '../Components/Dashboard/TopPerformers';
 import { formatDate, taskEditUrl } from '../utils';
@@ -371,12 +372,17 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* Charts — two-column */}
+                {/* Charts */}
                 {preferences.showCharts && charts && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                        <DonutChart data={charts.tasksByStatus} title="Tasks by Status" />
-                        <BarChart data={charts.tasksByPriority} title="Tasks by Priority" />
-                    </div>
+                    <>
+                        <div className="mb-6">
+                            <TrendLineChart data={charts.completionTrend} title="Task Trend — Created vs Completed" />
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <DonutChart data={charts.tasksByStatus} title="Tasks by Status" />
+                            <BarChart data={charts.tasksByPriority} title="Tasks by Priority" />
+                        </div>
+                    </>
                 )}
 
                 {/* Activity Feed */}

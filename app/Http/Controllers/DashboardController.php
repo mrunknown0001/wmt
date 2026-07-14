@@ -131,6 +131,21 @@ class DashboardController extends Controller
 
         // Charts
         if ($prefs['showCharts']) {
+            $weeks = collect(range(7, 0))->map(fn ($i) => now()->startOfWeek()->subWeeks($i));
+            $trendStart = $weeks->first();
+
+            $createdByWeek = Task::where('created_at', '>=', $trendStart)
+                ->selectRaw('YEARWEEK(created_at, 3) as yearweek, count(*) as count')
+                ->groupBy('yearweek')
+                ->pluck('count', 'yearweek');
+
+            $completedByWeek = Task::where('status', 'done')
+                ->whereNotNull('completed_at')
+                ->where('completed_at', '>=', $trendStart)
+                ->selectRaw('YEARWEEK(completed_at, 3) as yearweek, count(*) as count')
+                ->groupBy('yearweek')
+                ->pluck('count', 'yearweek');
+
             $data['charts'] = [
                 'tasksByStatus' => Task::selectRaw('status, count(*) as count')
                     ->groupBy('status')
@@ -138,6 +153,11 @@ class DashboardController extends Controller
                 'tasksByPriority' => Task::selectRaw('priority, count(*) as count')
                     ->groupBy('priority')
                     ->pluck('count', 'priority'),
+                'completionTrend' => $weeks->map(fn ($week) => [
+                    'label' => $week->format('M j'),
+                    'created' => (int) ($createdByWeek[$week->format('oW')] ?? 0),
+                    'completed' => (int) ($completedByWeek[$week->format('oW')] ?? 0),
+                ])->values(),
             ];
         }
 
