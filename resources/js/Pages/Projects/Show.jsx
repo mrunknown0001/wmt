@@ -1296,7 +1296,7 @@ export default function Show() {
             case 'status': return 'Status';
             case 'priority': return 'Priority';
             case 'assignee': return 'Assignee';
-            case 'dates': return 'Dates';
+            case 'dates': return 'Due date';
             default:
                 if (colId.startsWith('cf-')) {
                     const cfId = Number(colId.replace('cf-', ''));

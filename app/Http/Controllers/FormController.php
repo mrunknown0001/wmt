@@ -60,7 +60,7 @@ class FormController extends Controller
     {
         $this->authorizeProject($project);
 
-        $validated = $request->validated();
+        $validated = $this->normalizeTaskDefaults($request->validated());
         $fields = $validated['fields'];
         unset($validated['fields'], $validated['logo'], $validated['banner'], $validated['remove_logo'], $validated['remove_banner']);
 
@@ -110,12 +110,26 @@ class FormController extends Controller
         ]);
     }
 
+    // FormData submissions stringify numeric field positions; store them as ints
+    // so checkbox state and title concatenation compare consistently
+    private function normalizeTaskDefaults(array $validated): array
+    {
+        if (isset($validated['task_defaults']['title_field_ids'])) {
+            $validated['task_defaults']['title_field_ids'] = array_values(array_map(
+                fn ($v) => $v === 'assignee' ? 'assignee' : (int) $v,
+                $validated['task_defaults']['title_field_ids']
+            ));
+        }
+
+        return $validated;
+    }
+
     public function update(UpdateFormRequest $request, Project $project, Form $form): RedirectResponse
     {
         $this->authorizeProject($project);
         abort_if($form->project_id !== $project->id, 404);
 
-        $validated = $request->validated();
+        $validated = $this->normalizeTaskDefaults($request->validated());
         $fields = $validated['fields'];
         $removeLogo = $validated['remove_logo'] ?? false;
         $removeBanner = $validated['remove_banner'] ?? false;

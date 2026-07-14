@@ -224,11 +224,15 @@ class PublicFormController extends Controller
         }
 
         // Build task title from selected fields (after mapping, so the assignee is resolved)
-        $titleFieldIds = $defaults['title_field_ids'] ?? [];
+        // Positions may be stored as strings (FormData submissions); normalize to ints
+        $titleFieldIds = array_map(
+            fn ($v) => $v === 'assignee' ? 'assignee' : (int) $v,
+            $defaults['title_field_ids'] ?? []
+        );
         if (!empty($titleFieldIds)) {
             $titleParts = [];
             foreach ($form->fields as $field) {
-                if (in_array($field->position, $titleFieldIds)) {
+                if (in_array((int) $field->position, $titleFieldIds, true)) {
                     $val = $fieldValues[$field->id] ?? null;
                     if ($val === null || $val === '') continue;
 

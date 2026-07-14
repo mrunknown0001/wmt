@@ -27,9 +27,13 @@ export default function FormsEdit() {
         banner: null,
         remove_logo: false,
         remove_banner: false,
-        task_defaults: initialForm.task_defaults || {
+        task_defaults: {
             section_id: null,
-            title_field_ids: [],
+            ...(initialForm.task_defaults || {}),
+            // Normalize positions saved as strings (FormData stringifies numbers)
+            title_field_ids: (initialForm.task_defaults?.title_field_ids || []).map(
+                (v) => (v === 'assignee' ? v : Number(v))
+            ),
         },
         fields: (initialForm.fields || []).map(f => ({
             id: f.id,
