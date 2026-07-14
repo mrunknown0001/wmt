@@ -91,6 +91,7 @@ class StandaloneTaskController extends Controller
                 'is_video' => str_starts_with($a->file_type, 'video/'),
             ]),
             'created_at' => $c->created_at->toIso8601String(),
+            'updated_at' => $c->updated_at?->toIso8601String(),
         ]);
 
         $activities = $task->activities()->with('user')->latest()->take(10)->get()->map(fn ($a) => [
@@ -298,6 +299,8 @@ class StandaloneTaskController extends Controller
                     'is_video' => str_starts_with($a->file_type, 'video/'),
                 ]),
                 'created_at' => $c->created_at->toIso8601String(),
+                'updated_at' => $c->updated_at?->toIso8601String(),
+            'updated_at' => $c->updated_at?->toIso8601String(),
             ]);
         } else {
             $items = $task->activities()->with('user')->latest()->skip($offset)->take($limit)->get()->map(fn ($a) => [

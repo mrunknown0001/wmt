@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\TaskCommentCreated;
 use App\Events\TaskCommentDeleted;
+use App\Events\TaskCommentUpdated;
 use App\Http\Requests\StoreTaskCommentRequest;
 use App\Models\Project;
 use App\Models\Task;
@@ -132,8 +133,39 @@ class TaskCommentController extends Controller
         return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 
+    public function update(Request $request, Project $project, Task $task, TaskComment $comment): RedirectResponse
+    {
+        if ($comment->task_id !== $task->id) {
+            abort(404);
+        }
+
+        if ($comment->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $request->validate([
+            'body' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $comment->update(['body' => $request->body]);
+
+        broadcast(new TaskCommentUpdated(
+            $task->id,
+            $comment->id,
+            $comment->body,
+            $comment->updated_at->toIso8601String(),
+            $request->user()->id,
+        ))->toOthers();
+
+        return back()->with('success', 'Comment updated.');
+    }
+
     public function destroy(Request $request, Project $project, Task $task, TaskComment $comment): RedirectResponse
     {
+        if ($comment->task_id !== $task->id) {
+            abort(404);
+        }
+
         if ($comment->user_id !== $request->user()->id && ! $request->user()->hasRole('admin')) {
             abort(403);
         }
@@ -208,8 +240,39 @@ class TaskCommentController extends Controller
         return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 
+    public function updateStandalone(Request $request, Task $task, TaskComment $comment): RedirectResponse
+    {
+        if ($comment->task_id !== $task->id) {
+            abort(404);
+        }
+
+        if ($comment->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $request->validate([
+            'body' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $comment->update(['body' => $request->body]);
+
+        broadcast(new TaskCommentUpdated(
+            $task->id,
+            $comment->id,
+            $comment->body,
+            $comment->updated_at->toIso8601String(),
+            $request->user()->id,
+        ))->toOthers();
+
+        return back()->with('success', 'Comment updated.');
+    }
+
     public function destroyStandalone(Request $request, Task $task, TaskComment $comment): RedirectResponse
     {
+        if ($comment->task_id !== $task->id) {
+            abort(404);
+        }
+
         if ($comment->user_id !== $request->user()->id && ! $request->user()->hasRole('admin')) {
             abort(403);
         }

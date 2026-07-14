@@ -109,20 +109,42 @@ function formatFileSize(bytes) {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function CommentItem({ item, currentUserId, projectId, taskId, isStandalone }) {
+function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, users }) {
     const [deleting, setDeleting] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [editBody, setEditBody] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const commentUrl = isStandalone
+        ? `/tasks/${taskId}/comments/${item.id}`
+        : `/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
 
     const handleDelete = () => {
         if (!confirm('Delete this comment?')) return;
         setDeleting(true);
-        const deleteUrl = isStandalone
-            ? `/tasks/${taskId}/comments/${item.id}`
-            : `/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
-        router.delete(deleteUrl, {
+        router.delete(commentUrl, {
             preserveScroll: true,
             onFinish: () => setDeleting(false),
         });
     };
+
+    const startEditing = () => {
+        setEditBody(item.body || '');
+        setEditing(true);
+    };
+
+    const handleSaveEdit = () => {
+        const hasBody = editBody && editBody !== '<p></p>';
+        if (!hasBody || saving) return;
+        setSaving(true);
+        router.put(commentUrl, { body: editBody }, {
+            preserveScroll: true,
+            onSuccess: () => setEditing(false),
+            onFinish: () => setSaving(false),
+        });
+    };
+
+    const isEdited = item.updated_at && item.updated_at !== item.created_at;
 
     return (
         <div className="flex gap-3 py-3">
@@ -135,17 +157,53 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone }) {
                         {item.user?.name || 'Unknown'}
                     </span>
                     <span className="text-xs text-gray-400">{timeAgo(item.created_at)}</span>
-                    {item.user?.id === currentUserId && (
-                        <button
-                            onClick={handleDelete}
-                            disabled={deleting}
-                            className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-auto"
-                        >
-                            Delete
-                        </button>
+                    {isEdited && <span className="text-xs text-gray-400 italic">(edited)</span>}
+                    {item.user?.id === currentUserId && !editing && (
+                        <span className="ml-auto flex items-center gap-2">
+                            <button
+                                onClick={startEditing}
+                                className="text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                                Delete
+                            </button>
+                        </span>
                     )}
                 </div>
-                {item.body && (isHtml(item.body) ? (
+                {editing ? (
+                    <div className="mt-2">
+                        <RichTextEditor
+                            value={editBody}
+                            onChange={setEditBody}
+                            placeholder="Edit your comment..."
+                            minimal
+                            users={users}
+                            onSubmit={handleSaveEdit}
+                        />
+                        <div className="flex items-center gap-2 mt-2">
+                            <button
+                                onClick={handleSaveEdit}
+                                disabled={saving || !editBody || editBody === '<p></p>'}
+                                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                            >
+                                {saving ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                                onClick={() => setEditing(false)}
+                                disabled={saving}
+                                className="px-3 py-1.5 text-xs font-medium rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                ) : item.body && (isHtml(item.body) ? (
                     <div className="text-sm text-gray-700 dark:text-gray-300 mt-1 rich-text" dangerouslySetInnerHTML={{ __html: item.body }} />
                 ) : (
                     <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{item.body}</p>
@@ -381,6 +439,12 @@ export default function Edit() {
                 if (prev.some((c) => c.id === e.comment.id)) return prev;
                 return [e.comment, ...prev];
             });
+        });
+
+        channel.listen('.comment.updated', (e) => {
+            setComments((prev) => prev.map((c) => (
+                c.id === e.comment_id ? { ...c, body: e.body, updated_at: e.updated_at } : c
+            )));
         });
 
         channel.listen('.comment.deleted', (e) => {
@@ -943,6 +1007,7 @@ export default function Edit() {
                                                 projectId={project?.id}
                                                 taskId={task.id}
                                                 isStandalone={isStandalone}
+                                                users={users}
                                             />
                                         ))
                                     ) : (

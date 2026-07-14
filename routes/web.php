@@ -82,6 +82,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/tasks/{task}/patch', [StandaloneTaskController::class, 'patchField'])->name('tasks.patch');
     Route::get('/tasks/{task}/timeline', [StandaloneTaskController::class, 'timeline'])->name('tasks.timeline');
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'storeStandalone'])->name('standalone-tasks.comments.store');
+    Route::put('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'updateStandalone'])->name('standalone-tasks.comments.update');
     Route::delete('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroyStandalone'])->name('standalone-tasks.comments.destroy');
     Route::get('/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'downloadStandalone'])->name('standalone-tasks.comments.attachments.download');
     Route::get('/tasks/{task}/attachments/{attachment}/download', [StandaloneTaskController::class, 'downloadAttachment'])->name('standalone-tasks.attachments.download');
@@ -109,6 +110,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/projects/{project}/tasks/{task}/patch', [TaskController::class, 'patchField'])->name('projects.tasks.patch');
     Route::get('/projects/{project}/tasks/{task}/timeline', [TaskController::class, 'timeline'])->name('projects.tasks.timeline');
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
+    Route::put('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'update'])->name('tasks.comments.update');
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
     Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download'])->name('tasks.comments.attachments.download');
     Route::get('/projects/{project}/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
