@@ -107,6 +107,35 @@ const TrashIcon = () => (
 );
 
 // Render a custom field value for a task row
+// Comment & attachment count indicators shown after the task title in list view
+function TaskMetaBadges({ task }) {
+    if (!task.comments_count && !task.attachments_count) return null;
+    return (
+        <span className="flex items-center gap-2 shrink-0 text-xs text-gray-400 dark:text-gray-500 font-normal" data-no-select>
+            {task.comments_count > 0 && (
+                <Tooltip content={`${task.comments_count} comment${task.comments_count === 1 ? '' : 's'}`}>
+                    <span className="flex items-center gap-0.5">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        {task.comments_count}
+                    </span>
+                </Tooltip>
+            )}
+            {task.attachments_count > 0 && (
+                <Tooltip content={`${task.attachments_count} attachment${task.attachments_count === 1 ? '' : 's'}`}>
+                    <span className="flex items-center gap-0.5">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        {task.attachments_count}
+                    </span>
+                </Tooltip>
+            )}
+        </span>
+    );
+}
+
 function renderCustomFieldValue(task, customField) {
     if (customField.type === 'formula') {
         const val = customField._formulaValue;
@@ -335,6 +364,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                             {task.title}
                         </button>
                     </Tooltip>
+                    <TaskMetaBadges task={task} />
                 </div>
             </td>
             {columnOrder.map(colId => renderCell(colId))}
@@ -780,6 +810,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             {task.title}
                         </button>
                     </Tooltip>
+                    <TaskMetaBadges task={task} />
                     {task.is_recurring && (
                         <Tooltip content="Recurring task">
                             <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

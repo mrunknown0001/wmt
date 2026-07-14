@@ -188,9 +188,15 @@ class ProjectController extends Controller
 
         if ($hasFullAccess) {
             $tasks = $taskQuery
-                ->with(['assignee', 'creator', 'collaborators', 'subtasks.assignee', 'subtasks.collaborators', 'customFieldValues.selectedOption', 'subtasks.customFieldValues.selectedOption'])
+                ->with([
+                    'assignee', 'creator', 'collaborators',
+                    'subtasks' => fn ($q) => $q->withCount(['comments', 'attachments']),
+                    'subtasks.assignee', 'subtasks.collaborators',
+                    'customFieldValues.selectedOption', 'subtasks.customFieldValues.selectedOption',
+                ])
                 ->withCount('subtasks')
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')])
+                ->withCount(['comments', 'attachments'])
                 ->orderBy('position')
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -204,13 +210,14 @@ class ProjectController extends Controller
                 })
                 ->with([
                     'assignee', 'creator', 'collaborators',
-                    'subtasks' => fn ($q) => $q->where('assigned_to', $userId),
+                    'subtasks' => fn ($q) => $q->where('assigned_to', $userId)->withCount(['comments', 'attachments']),
                     'subtasks.assignee', 'subtasks.collaborators',
                     'customFieldValues.selectedOption',
                     'subtasks.customFieldValues.selectedOption',
                 ])
                 ->withCount(['subtasks' => fn ($q) => $q->where('assigned_to', $userId)])
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('assigned_to', $userId)->where('status', 'done')])
+                ->withCount(['comments', 'attachments'])
                 ->orderBy('position')
                 ->orderBy('created_at', 'desc')
                 ->get();
