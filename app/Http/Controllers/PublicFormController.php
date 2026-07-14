@@ -191,28 +191,6 @@ class PublicFormController extends Controller
             'created_by' => null,
         ];
 
-        // Build task title from selected fields
-        $titleFieldIds = $defaults['title_field_ids'] ?? [];
-        if (!empty($titleFieldIds)) {
-            $titleParts = [];
-            foreach ($form->fields as $field) {
-                if (in_array($field->position, $titleFieldIds)) {
-                    $val = $fieldValues[$field->id] ?? null;
-                    if ($val === null || $val === '') continue;
-
-                    // Resolve option IDs to labels for select/multi_select fields
-                    if (in_array($field->type, ['select', 'multi_select'])) {
-                        $val = $this->resolveOptionLabels($field, $val);
-                    }
-
-                    $titleParts[] = is_array($val) ? implode(', ', $val) : $val;
-                }
-            }
-            if (!empty($titleParts)) {
-                $taskData['title'] = implode(', ', $titleParts);
-            }
-        }
-
         // Map form field values to task properties and custom fields
         $customFieldMappings = [];
 
@@ -242,6 +220,37 @@ class PublicFormController extends Controller
                 }
             } elseif ($field->maps_to === 'custom_field' && $field->custom_field_id) {
                 $customFieldMappings[$field->custom_field_id] = $value;
+            }
+        }
+
+        // Build task title from selected fields (after mapping, so the assignee is resolved)
+        $titleFieldIds = $defaults['title_field_ids'] ?? [];
+        if (!empty($titleFieldIds)) {
+            $titleParts = [];
+            foreach ($form->fields as $field) {
+                if (in_array($field->position, $titleFieldIds)) {
+                    $val = $fieldValues[$field->id] ?? null;
+                    if ($val === null || $val === '') continue;
+
+                    // Resolve option IDs to labels for select/multi_select fields
+                    if (in_array($field->type, ['select', 'multi_select'])) {
+                        $val = $this->resolveOptionLabels($field, $val);
+                    }
+
+                    $titleParts[] = is_array($val) ? implode(', ', $val) : $val;
+                }
+            }
+
+            // Append the assignee's name when selected; skip if the task has no assignee
+            if (in_array('assignee', $titleFieldIds, true) && $taskData['assigned_to']) {
+                $assignee = \App\Models\User::find($taskData['assigned_to']);
+                if ($assignee) {
+                    $titleParts[] = $assignee->name;
+                }
+            }
+
+            if (!empty($titleParts)) {
+                $taskData['title'] = implode(', ', $titleParts);
             }
         }
 

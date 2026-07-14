@@ -800,12 +800,13 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
         onTaskDefaultsChange({ ...taskDefaults, title_field_ids: next });
     };
 
-    const titleLabel = titleFieldIds.length > 0
-        ? nonStaticFields
-            .filter(f => titleFieldIds.includes(f.position))
-            .map(f => f.label || 'Untitled')
-            .join(', ')
-        : 'Form name (default)';
+    const titleLabelParts = nonStaticFields
+        .filter(f => titleFieldIds.includes(f.position))
+        .map(f => f.label || 'Untitled');
+    if (titleFieldIds.includes('assignee')) {
+        titleLabelParts.push('Assignee');
+    }
+    const titleLabel = titleLabelParts.length > 0 ? titleLabelParts.join(', ') : 'Form name (default)';
 
     const updateTitlePos = useCallback(() => {
         if (titleBtnRef.current) {
@@ -900,6 +901,21 @@ function SettingsTab({ fields, sections, taskDefaults, onTaskDefaultsChange }) {
                                     </label>
                                 ))
                             )}
+                            <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer text-sm text-gray-700 dark:text-gray-300 border-t border-gray-100 dark:border-gray-700">
+                                <input
+                                    type="checkbox"
+                                    checked={titleFieldIds.includes('assignee')}
+                                    onChange={() => toggleTitleField('assignee')}
+                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
+                                />
+                                <span className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
+                                    @
+                                </span>
+                                <span className="flex-1">
+                                    Assignee
+                                    <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">(blank if unassigned)</span>
+                                </span>
+                            </label>
                         </div>,
                         document.body
                     )}

@@ -28,7 +28,11 @@ class StoreFormRequest extends FormRequest
             'task_defaults' => ['nullable', 'array'],
             'task_defaults.section_id' => ['sometimes', 'nullable'],
             'task_defaults.title_field_ids' => ['sometimes', 'array'],
-            'task_defaults.title_field_ids.*' => ['integer'],
+            'task_defaults.title_field_ids.*' => [function ($attribute, $value, $fail) {
+                if ($value !== 'assignee' && filter_var($value, FILTER_VALIDATE_INT) === false) {
+                    $fail('Each title field must be a field position or "assignee".');
+                }
+            }],
             'fields' => ['required', 'array', 'min:1'],
             'fields.*.type' => ['required', 'string', 'in:' . implode(',', FormField::TYPES)],
             'fields.*.label' => ['required', 'string', 'max:255'],
