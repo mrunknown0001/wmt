@@ -9,11 +9,11 @@ export default function GuestLayout({ children, title }) {
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 relative">
-                <div className="absolute top-4 right-4">
+            <div className="h-screen overflow-y-auto flex bg-gray-50 dark:bg-gray-900 relative">
+                <div className="fixed top-4 right-4 z-10">
                     <ThemeToggle className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
                 </div>
-                <div className="w-full max-w-md px-4">
+                <div className="w-full max-w-md px-4 py-8 m-auto">
                     <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 px-8 py-8">
                         <div className="text-center mb-8">
                             {logoUrl && (
