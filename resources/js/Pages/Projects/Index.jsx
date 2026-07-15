@@ -124,6 +124,11 @@ export default function Index() {
         ? folderAncestors(folders, selectedFolder)
         : [];
 
+    // Creating a project while browsing a folder pre-selects that folder
+    const newProjectHref = view === 'folders' && selectedFolder !== 'root'
+        ? `/projects/create?folder=${selectedFolder}`
+        : '/projects/create';
+
     const tabClass = (active) =>
         `px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
             active
@@ -216,7 +221,7 @@ export default function Index() {
                                 ? 'Move projects here or create a new one.'
                                 : 'Create your first project to get started'
                     }
-                    action={!hasActiveFilters && view !== 'folders' && <LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
+                    action={!hasActiveFilters && <LinkButton href={newProjectHref} size="sm">New Project</LinkButton>}
                 />
             )}
         </Card>
@@ -231,7 +236,7 @@ export default function Index() {
                         { label: 'Dashboard', href: '/dashboard' },
                         { label: 'Projects' },
                     ]}
-                    actions={<LinkButton href="/projects/create">New Project</LinkButton>}
+                    actions={<LinkButton href={newProjectHref}>New Project</LinkButton>}
                 />
 
                 {/* View tabs + Filter Bar */}

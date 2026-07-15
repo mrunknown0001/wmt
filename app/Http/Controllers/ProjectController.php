@@ -202,14 +202,22 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         $this->authorize('create', Project::class);
 
-        $user = auth()->user();
+        $user = $request->user();
 
         $defaultFolderId = null;
-        if ($user->team_id) {
+
+        // Coming from the Folders view: default to the folder being browsed
+        $requestedFolderId = (int) $request->input('folder');
+        if ($requestedFolderId
+            && FolderService::visibleFolderIds($user)->contains($requestedFolderId)) {
+            $defaultFolderId = $requestedFolderId;
+        }
+
+        if (!$defaultFolderId && $user->team_id) {
             $defaultFolderId = Folder::where('source_type', Team::class)
                 ->where('source_id', $user->team_id)->value('id');
         }
