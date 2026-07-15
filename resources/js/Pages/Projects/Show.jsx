@@ -1117,7 +1117,7 @@ function AutomationToast({ toast, onDismiss }) {
 }
 
 export default function Show() {
-    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], auth, users } = usePage().props;
+    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], forms = [], auth, users } = usePage().props;
 
     const [localCustomFields, setLocalCustomFields] = useState(initialCustomFields);
     const [showDetails, setShowDetails] = useState(false);
@@ -2882,6 +2882,7 @@ export default function Show() {
                             users={users}
                             sections={localSections}
                             customFields={localCustomFields}
+                            forms={forms}
                             canCreateRules={!!auth.user?.can_create_rules}
                         />
                     </Card>

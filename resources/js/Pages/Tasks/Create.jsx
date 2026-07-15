@@ -16,6 +16,21 @@ import { formatLabel } from '../../utils';
 export default function Create() {
     const { project, parentTask, sections = [], defaultSectionId, users, statuses, priorities, recurrenceFrequencies, customFields = [] } = usePage().props;
 
+    // Prefill custom fields that have a default value configured
+    const defaultCustomFieldValues = () => {
+        const values = {};
+        customFields.forEach((f) => {
+            const dv = f.config?.default_value;
+            if (f.type === 'formula' || dv === undefined || dv === null || dv === '') return;
+            if (f.type === 'multi_select') {
+                values[f.id] = (Array.isArray(dv) ? dv : [dv]).map(Number);
+            } else {
+                values[f.id] = String(dv);
+            }
+        });
+        return values;
+    };
+
     const { data, setData, post, processing, errors } = useForm({
         title: '',
         description: '',
@@ -30,7 +45,7 @@ export default function Create() {
         is_recurring: false,
         recurrence_frequency: 'weekly',
         recurrence_interval: 1,
-        custom_field_values: {},
+        custom_field_values: defaultCustomFieldValues(),
     });
 
     const [showStartDate, setShowStartDate] = useState(false);

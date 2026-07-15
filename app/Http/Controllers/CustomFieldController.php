@@ -33,7 +33,8 @@ class CustomFieldController extends Controller
 
         $validated = $request->validated();
         $options = $validated['options'] ?? [];
-        unset($validated['options']);
+        $defaultOptionIndexes = $validated['default_option_indexes'] ?? null;
+        unset($validated['options'], $validated['default_option_indexes']);
 
         $validated['position'] = $validated['position']
             ?? ($project->customFields()->max('position') + 1);
@@ -55,6 +56,8 @@ class CustomFieldController extends Controller
             }
         }
 
+        $this->applySelectDefault($field, $defaultOptionIndexes);
+
         $field->load('options');
 
         return response()->json(['field' => $field], 201);
@@ -67,7 +70,8 @@ class CustomFieldController extends Controller
 
         $validated = $request->validated();
         $options = $validated['options'] ?? [];
-        unset($validated['options']);
+        $defaultOptionIndexes = $validated['default_option_indexes'] ?? null;
+        unset($validated['options'], $validated['default_option_indexes']);
 
         $customField->update($validated);
 
@@ -94,9 +98,43 @@ class CustomFieldController extends Controller
             $customField->options()->delete();
         }
 
+        $this->applySelectDefault($customField, $defaultOptionIndexes);
+
         $customField->load('options');
 
         return response()->json(['field' => $customField]);
+    }
+
+    /**
+     * Resolve select default option indexes (position in the submitted options
+     * array) to persisted option IDs and store them in config.default_value.
+     */
+    private function applySelectDefault(CustomField $field, ?array $indexes): void
+    {
+        if (!in_array($field->type, ['single_select', 'multi_select'])) {
+            return;
+        }
+
+        $config = $field->config ?? [];
+        unset($config['default_value']);
+
+        if (!empty($indexes)) {
+            $options = $field->options()->orderBy('position')->get()->values();
+            $ids = collect($indexes)
+                ->map(fn ($i) => $options[$i]->id ?? null)
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($ids->isNotEmpty()) {
+                $config['default_value'] = $field->type === 'single_select'
+                    ? $ids->first()
+                    : $ids->all();
+            }
+        }
+
+        $field->config = $config;
+        $field->save();
     }
 
     public function destroy(Project $project, CustomField $customField): JsonResponse

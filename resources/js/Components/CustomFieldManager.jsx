@@ -369,11 +369,12 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
         name: '',
         type: 'text',
         options: [],
+        default_value: '',
         config: { formula: '', result_type: 'number', decimal_places: 2, sort_mode: 'alphabetical' },
     });
 
     const resetForm = () => {
-        setForm({ name: '', type: 'text', options: [], config: { formula: '', result_type: 'number', decimal_places: 2, sort_mode: 'alphabetical' } });
+        setForm({ name: '', type: 'text', options: [], default_value: '', config: { formula: '', result_type: 'number', decimal_places: 2, sort_mode: 'alphabetical' } });
         setEditingField(null);
     };
 
@@ -384,10 +385,16 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
 
     const openEdit = (field) => {
         setEditingField(field);
+        const isSelect = ['single_select', 'multi_select'].includes(field.type);
+        const dv = field.config?.default_value;
+        const defaultIds = Array.isArray(dv) ? dv.map(Number) : (dv !== undefined && dv !== null && dv !== '' ? [Number(dv)] : []);
         setForm({
             name: field.name,
             type: field.type,
-            options: field.options || [],
+            options: isSelect
+                ? (field.options || []).map(o => ({ ...o, is_default: defaultIds.includes(o.id) }))
+                : (field.options || []),
+            default_value: isSelect ? '' : (dv ?? ''),
             config: { formula: '', result_type: 'number', decimal_places: 2, sort_mode: 'alphabetical', ...field.config },
         });
         setShowModal(true);
@@ -416,19 +423,30 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 }
             }
 
+            const isSelect = ['single_select', 'multi_select'].includes(form.type);
+
             let config;
             if (form.type === 'formula') {
                 config = { formula: form.config.formula, result_type: form.config.result_type, decimal_places: form.config.decimal_places };
-            } else if (['single_select', 'multi_select'].includes(form.type)) {
+            } else if (isSelect) {
                 config = { sort_mode: form.config.sort_mode };
             } else if (form.type === 'number') {
                 config = { decimal_places: form.config.decimal_places };
             }
 
+            // Optional default value (selects send option indexes instead —
+            // the server resolves them to option IDs after saving options)
+            if (!isSelect && form.type !== 'formula' && form.default_value !== '' && form.default_value != null) {
+                config = { ...(config || {}), default_value: form.type === 'number' ? Number(form.default_value) : form.default_value };
+            }
+
             const payload = {
                 name: form.name,
                 type: form.type,
-                options: ['single_select', 'multi_select'].includes(form.type) ? form.options : undefined,
+                options: isSelect ? form.options : undefined,
+                default_option_indexes: isSelect
+                    ? form.options.map((o, i) => (o.is_default ? i : -1)).filter(i => i >= 0)
+                    : undefined,
                 config,
             };
 
@@ -603,7 +621,7 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                         label="Type"
                         id="cf-type"
                         value={form.type}
-                        onChange={(e) => setForm(prev => ({ ...prev, type: e.target.value, options: [], config: { formula: '', result_type: 'number', decimal_places: 2 } }))}
+                        onChange={(e) => setForm(prev => ({ ...prev, type: e.target.value, options: [], default_value: '', config: { formula: '', result_type: 'number', decimal_places: 2 } }))}
                         options={FIELD_TYPES}
                         disabled={!!editingField}
                     />
@@ -616,6 +634,31 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                                 placeholder="Auto"
                             />
                         </div>
+                    )}
+                    {['text', 'textarea', 'number', 'date'].includes(form.type) && (
+                        form.type === 'textarea' ? (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                                    Default Value <span className="font-normal text-gray-400">(optional)</span>
+                                </label>
+                                <textarea
+                                    value={form.default_value ?? ''}
+                                    onChange={(e) => setForm(prev => ({ ...prev, default_value: e.target.value }))}
+                                    rows={2}
+                                    placeholder="Applied when a task is created without a value"
+                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                                />
+                            </div>
+                        ) : (
+                            <Input
+                                label="Default Value (optional)"
+                                id="cf-default-value"
+                                type={form.type === 'number' ? 'number' : form.type === 'date' ? 'date' : 'text'}
+                                value={form.default_value ?? ''}
+                                onChange={(e) => setForm(prev => ({ ...prev, default_value: e.target.value }))}
+                                placeholder="Applied when a task is created without a value"
+                            />
+                        )
                     )}
                     {['single_select', 'multi_select'].includes(form.type) && (
                         <>
@@ -656,6 +699,49 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                                 onChange={(opts) => setForm(prev => ({ ...prev, options: opts }))}
                                 sortMode={form.config.sort_mode || 'alphabetical'}
                             />
+                            <div>
+                                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                                    Default {form.type === 'single_select' ? 'Option' : 'Options'} <span className="font-normal text-gray-400">(optional)</span>
+                                </label>
+                                {form.options.length === 0 ? (
+                                    <p className="text-xs text-gray-400 italic">Add options first.</p>
+                                ) : form.type === 'single_select' ? (
+                                    <select
+                                        value={String(form.options.findIndex(o => o.is_default))}
+                                        onChange={(e) => {
+                                            const idx = Number(e.target.value);
+                                            setForm(prev => ({ ...prev, options: prev.options.map((o, i) => ({ ...o, is_default: i === idx })) }));
+                                        }}
+                                        className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                                    >
+                                        <option value="-1">No default</option>
+                                        {form.options.map((opt, i) => (
+                                            <option key={i} value={i}>{opt.label || `Option ${i + 1}`}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                                        {form.options.map((opt, i) => (
+                                            <label key={i} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!opt.is_default}
+                                                    onChange={() => setForm(prev => ({
+                                                        ...prev,
+                                                        options: prev.options.map((o, j) => j === i ? { ...o, is_default: !o.is_default } : o),
+                                                    }))}
+                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
+                                                />
+                                                {opt.color && <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: opt.color }} />}
+                                                {opt.label || `Option ${i + 1}`}
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                    Applied when a task is created without a value for this field.
+                                </p>
+                            </div>
                         </>
                     )}
                     {form.type === 'formula' && (

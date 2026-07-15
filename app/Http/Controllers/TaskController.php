@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\ActivityLogger;
 use App\Services\AutomationRuleEngine;
+use App\Services\CustomFieldDefaults;
 use App\Services\RecurringTaskService;
 use App\Services\TaskActivityLogger;
 use Illuminate\Http\JsonResponse;
@@ -98,6 +99,10 @@ class TaskController extends Controller
             $cfv->save();
         }
 
+        // Fields the form submitted (even cleared ones) keep the user's choice;
+        // everything else falls back to the field's default value
+        CustomFieldDefaults::apply($task, array_keys($customFieldValues));
+
         TaskActivityLogger::logCreated($task, $request->user());
         ActivityLogger::logCreated($task, $request->user());
 
@@ -153,6 +158,8 @@ class TaskController extends Controller
             'created_by' => $request->user()->id,
             'position' => $maxPosition + 1,
         ]);
+
+        CustomFieldDefaults::apply($task);
 
         TaskActivityLogger::logCreated($task, $request->user());
         ActivityLogger::logCreated($task, $request->user());

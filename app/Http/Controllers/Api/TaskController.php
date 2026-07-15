@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\ActivityLogger;
 use App\Services\AutomationRuleEngine;
+use App\Services\CustomFieldDefaults;
 use App\Services\RecurringTaskService;
 use App\Services\TaskActivityLogger;
 use Illuminate\Http\JsonResponse;
@@ -241,6 +242,8 @@ class TaskController extends Controller
         if (!empty($collaboratorIds)) {
             $task->collaborators()->sync($collaboratorIds);
         }
+
+        CustomFieldDefaults::apply($task);
 
         TaskActivityLogger::logCreated($task, $request->user());
         ActivityLogger::logCreated($task, $request->user());

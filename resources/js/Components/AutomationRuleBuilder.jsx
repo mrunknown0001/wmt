@@ -14,6 +14,7 @@ const TRIGGER_TYPES = [
     { value: 'task_assigned', label: 'Task Assigned' },
     { value: 'task_completed', label: 'Task Completed' },
     { value: 'custom_field_changed', label: 'Custom Field Changed' },
+    { value: 'form_submitted', label: 'Form Submitted' },
 ];
 
 const CONDITION_FIELDS = [
@@ -103,6 +104,7 @@ function triggerColor(type) {
         case 'task_assigned': return 'yellow';
         case 'task_completed': return 'green';
         case 'custom_field_changed': return 'cyan';
+        case 'form_submitted': return 'indigo';
         default: return 'gray';
     }
 }
@@ -422,7 +424,7 @@ const emptyRule = () => ({
     actions: [{ type: 'change_status', params: {} }],
 });
 
-export default function AutomationRuleBuilder({ projectId, rules: initialRules, users, sections, customFields = [], canCreateRules = false }) {
+export default function AutomationRuleBuilder({ projectId, rules: initialRules, users, sections, customFields = [], forms = [], canCreateRules = false }) {
     const [rules, setRules] = useState(initialRules || []);
     const [showForm, setShowForm] = useState(false);
     const [editingRule, setEditingRule] = useState(null);
@@ -490,6 +492,10 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
             const cf = customFields.find(c => c.id === Number(form.trigger_config.custom_field_id));
             if (!cf) errors.push('Selected trigger custom field no longer exists.');
         }
+        if (form.trigger_type === 'form_submitted' && form.trigger_config?.form_id) {
+            const f = forms.find(x => x.id === Number(form.trigger_config.form_id));
+            if (!f) errors.push('Selected trigger form no longer exists.');
+        }
 
         // Validate conditions
         form.conditions.forEach((cond, i) => {
@@ -531,7 +537,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
         });
 
         return errors;
-    }, [form, customFields]);
+    }, [form, customFields, forms]);
 
     const handleSave = useCallback(async () => {
         const errors = validateRule();
@@ -644,6 +650,9 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                         {rule.trigger_type === 'custom_field_changed' && rule.trigger_config?.custom_field_id && (
                                             <> &middot; {customFields.find(cf => cf.id === rule.trigger_config.custom_field_id)?.name || 'Unknown'}</>
                                         )}
+                                        {rule.trigger_type === 'form_submitted' && rule.trigger_config?.form_id && (
+                                            <> &middot; {forms.find(f => f.id === rule.trigger_config.form_id)?.name || 'Unknown'}</>
+                                        )}
                                     </Badge>
                                     <span className="text-xs text-gray-400">
                                         {rule.conditions?.length || 0} condition{(rule.conditions?.length || 0) !== 1 ? 's' : ''}, {rule.actions?.length || 0} action{(rule.actions?.length || 0) !== 1 ? 's' : ''}
@@ -734,7 +743,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
 
                     <div>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Trigger</label>
-                        <div className={`grid gap-2 ${form.trigger_type === 'custom_field_changed' ? 'grid-cols-2' : ''}`}>
+                        <div className={`grid gap-2 ${['custom_field_changed', 'form_submitted'].includes(form.trigger_type) ? 'grid-cols-2' : ''}`}>
                             <select
                                 value={form.trigger_type}
                                 onChange={(e) => setForm(prev => ({ ...prev, trigger_type: e.target.value, trigger_config: null }))}
@@ -754,6 +763,21 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     <option value="">Any custom field</option>
                                     {customFields.map(cf => (
                                         <option key={cf.id} value={cf.id}>{cf.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                            {form.trigger_type === 'form_submitted' && (
+                                <select
+                                    value={form.trigger_config?.form_id || ''}
+                                    onChange={(e) => setForm(prev => ({
+                                        ...prev,
+                                        trigger_config: e.target.value ? { form_id: Number(e.target.value) } : null,
+                                    }))}
+                                    className={selectClass}
+                                >
+                                    <option value="">Any form</option>
+                                    {forms.map(f => (
+                                        <option key={f.id} value={f.id}>{f.name}</option>
                                     ))}
                                 </select>
                             )}

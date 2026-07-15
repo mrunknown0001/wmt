@@ -246,6 +246,7 @@ class ProjectController extends Controller
             'canManageTasks' => $canManageTasks,
             'automationRules' => $automationRules,
             'customFields' => $customFields,
+            'forms' => $project->forms()->orderBy('name')->get(['id', 'name']),
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
         ]);

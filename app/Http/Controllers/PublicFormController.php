@@ -9,6 +9,8 @@ use App\Models\TaskAttachment;
 use App\Models\TaskCustomFieldValue;
 use App\Rules\Turnstile;
 use App\Services\ActivityLogger;
+use App\Services\AutomationRuleEngine;
+use App\Services\CustomFieldDefaults;
 use App\Services\TaskActivityLogger;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -291,6 +293,9 @@ class PublicFormController extends Controller
             $cfv->save();
         }
 
+        // Fill defaults for custom fields the form didn't map or left empty
+        CustomFieldDefaults::apply($task);
+
         // Handle file attachments
         foreach ($form->fields as $field) {
             if (!in_array($field->type, ['attachment', 'capture_photo', 'capture_video'])) {
@@ -318,6 +323,10 @@ class PublicFormController extends Controller
                 ]);
             }
         }
+
+        // Run form-submitted automation rules after all field values and
+        // attachments are saved so conditions can read the submitted data
+        AutomationRuleEngine::evaluate($task, 'form_submitted', [], [], ['form_id' => $form->id]);
 
         return Inertia::render('Forms/PublicFormSuccess', [
             'form' => [
