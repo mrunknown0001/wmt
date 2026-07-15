@@ -132,6 +132,143 @@ function CollaboratorEditor({ collaborators, users, assigneeId, onUpdate }) {
     );
 }
 
+function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpdated, onDeleted }) {
+    const [deleting, setDeleting] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [editBody, setEditBody] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const commentUrl = `/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
+
+    const handleDelete = async () => {
+        if (!confirm('Delete this comment?')) return;
+        setDeleting(true);
+        try {
+            const res = await apiFetch(commentUrl, { method: 'DELETE' });
+            if (res.ok) onDeleted(item.id);
+        } catch (e) {
+            console.error('Failed to delete comment:', e);
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const startEditing = () => {
+        setEditBody(item.body || '');
+        setEditing(true);
+    };
+
+    const handleSaveEdit = async () => {
+        const hasBody = editBody && editBody !== '<p></p>';
+        if (!hasBody || saving) return;
+        setSaving(true);
+        try {
+            const res = await apiFetch(commentUrl, {
+                method: 'PUT',
+                body: JSON.stringify({ body: editBody }),
+            });
+            if (res.ok) {
+                onUpdated(item.id, editBody);
+                setEditing(false);
+            }
+        } catch (e) {
+            console.error('Failed to update comment:', e);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const isEdited = item.updated_at && item.updated_at !== item.created_at;
+
+    return (
+        <div className="flex gap-3 py-3">
+            <Avatar name={item.user?.name} size="sm" className="shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.user?.name || 'Unknown'}</span>
+                    <span className="text-xs text-gray-400">{timeAgo(item.created_at)}</span>
+                    {isEdited && <span className="text-xs text-gray-400 italic">(edited)</span>}
+                    {item.user?.id === currentUserId && !editing && (
+                        <span className="ml-auto flex items-center gap-1">
+                            <Tooltip content="Edit">
+                                <button
+                                    onClick={startEditing}
+                                    className="p-1 rounded-md text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487z" />
+                                    </svg>
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Delete">
+                                <button
+                                    onClick={handleDelete}
+                                    disabled={deleting}
+                                    className="p-1 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                    </svg>
+                                </button>
+                            </Tooltip>
+                        </span>
+                    )}
+                </div>
+                {editing ? (
+                    <div className="mt-2">
+                        <RichTextEditor
+                            value={editBody}
+                            onChange={setEditBody}
+                            placeholder="Edit your comment..."
+                            minimal
+                            users={users}
+                            onSubmit={handleSaveEdit}
+                        />
+                        <div className="flex items-center gap-2 mt-2">
+                            <button
+                                onClick={handleSaveEdit}
+                                disabled={saving || !editBody || editBody === '<p></p>'}
+                                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                            >
+                                {saving ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                                onClick={() => setEditing(false)}
+                                disabled={saving}
+                                className="px-3 py-1.5 text-xs font-medium rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                ) : item.body && (isHtml(item.body) ? (
+                    <div className="text-sm text-gray-700 dark:text-gray-300 mt-1 rich-text" dangerouslySetInnerHTML={{ __html: item.body }} />
+                ) : (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{item.body}</p>
+                ))}
+                {item.attachments?.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {item.attachments.map(att => (
+                            <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                                {att.is_image ? (
+                                    <img src={att.url} alt={att.file_name} className="h-16 w-16 rounded-lg object-cover border border-gray-200 dark:border-gray-600" />
+                                ) : (
+                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs">
+                                        <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                        </svg>
+                                        <span className="truncate max-w-20">{att.file_name}</span>
+                                    </div>
+                                )}
+                            </a>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpdate, onSubtaskCreated, users = [] }) {
     const { auth } = usePage().props;
     const [loading, setLoading] = useState(true);
@@ -302,6 +439,18 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
         } finally {
             setSubmittingComment(false);
         }
+    };
+
+    const handleCommentUpdated = (commentId, body) => {
+        const updatedAt = new Date().toISOString();
+        setTimeline(prev => prev.map(i => (
+            i.type === 'comment' && i.id === commentId ? { ...i, body, updated_at: updatedAt } : i
+        )));
+    };
+
+    const handleCommentDeleted = (commentId) => {
+        setTimeline(prev => prev.filter(i => !(i.type === 'comment' && i.id === commentId)));
+        setTotalComments(prev => Math.max(0, prev - 1));
     };
 
     const handleLoadMore = async (type) => {
@@ -771,38 +920,16 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                         {/* Comment list */}
                                         <div className="divide-y divide-gray-100 dark:divide-gray-800">
                                             {comments.map(item => (
-                                                <div key={`c-${item.id}`} className="flex gap-3 py-3">
-                                                    <Avatar name={item.user?.name} size="sm" className="shrink-0 mt-0.5" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.user?.name || 'Unknown'}</span>
-                                                            <span className="text-xs text-gray-400">{timeAgo(item.created_at)}</span>
-                                                        </div>
-                                                        {item.body && (isHtml(item.body) ? (
-                                                            <div className="text-sm text-gray-700 dark:text-gray-300 mt-1 rich-text" dangerouslySetInnerHTML={{ __html: item.body }} />
-                                                        ) : (
-                                                            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{item.body}</p>
-                                                        ))}
-                                                        {item.attachments?.length > 0 && (
-                                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                                {item.attachments.map(att => (
-                                                                    <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
-                                                                        {att.is_image ? (
-                                                                            <img src={att.url} alt={att.file_name} className="h-16 w-16 rounded-lg object-cover border border-gray-200 dark:border-gray-600" />
-                                                                        ) : (
-                                                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs">
-                                                                                <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                                                                                </svg>
-                                                                                <span className="truncate max-w-20">{att.file_name}</span>
-                                                                            </div>
-                                                                        )}
-                                                                    </a>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                <PanelCommentItem
+                                                    key={`c-${item.id}`}
+                                                    item={item}
+                                                    currentUserId={auth?.user?.id}
+                                                    projectId={projectId}
+                                                    taskId={taskId}
+                                                    users={users}
+                                                    onUpdated={handleCommentUpdated}
+                                                    onDeleted={handleCommentDeleted}
+                                                />
                                             ))}
                                         </div>
                                         {comments.length < totalComments && (
