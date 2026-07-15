@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Tooltip from './Tooltip';
 
-export default function ProjectContextMenu({ project, isArchived, onEdit, onCopyLink, onDuplicate, onArchive, onDelete }) {
+export default function ProjectContextMenu({ project, isArchived, onEdit, onCopyLink, onDuplicate, onArchive, onDelete, align = 'right' }) {
     const [isOpen, setIsOpen] = useState(false);
     const buttonRef = useRef(null);
     const menuRef = useRef(null);
@@ -20,7 +20,8 @@ export default function ProjectContextMenu({ project, isArchived, onEdit, onCopy
         const openAbove = spaceBelow < menuRect.height + 8 && rect.top > menuRect.height + 8;
 
         const viewportWidth = document.documentElement.clientWidth;
-        const left = Math.min(rect.right - menuRect.width, viewportWidth - menuRect.width - 8);
+        const preferred = align === 'left' ? rect.left : rect.right - menuRect.width;
+        const left = Math.min(preferred, viewportWidth - menuRect.width - 8);
 
         setPosition({
             top: openAbove ? rect.top - menuRect.height - 4 : rect.bottom + 4,
@@ -87,7 +88,7 @@ export default function ProjectContextMenu({ project, isArchived, onEdit, onCopy
                 <div
                     ref={menuRef}
                     style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 9999, visibility: positioned ? 'visible' : 'hidden' }}
-                    className="min-w-[200px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1"
+                    className="min-w-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <button className={itemClass} onClick={() => { setIsOpen(false); onEdit(); }}>

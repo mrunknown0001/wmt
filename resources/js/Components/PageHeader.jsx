@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 
-export default function PageHeader({ title, breadcrumbs = [], actions }) {
+export default function PageHeader({ title, titleExtra, breadcrumbs = [], actions }) {
     return (
         <div className="mb-6">
             {breadcrumbs.length > 0 && (
@@ -24,7 +24,10 @@ export default function PageHeader({ title, breadcrumbs = [], actions }) {
                 </nav>
             )}
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{title}</h1>
+                <div className="flex items-center gap-1 min-w-0">
+                    <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 truncate">{title}</h1>
+                    {titleExtra}
+                </div>
                 {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
             </div>
         </div>

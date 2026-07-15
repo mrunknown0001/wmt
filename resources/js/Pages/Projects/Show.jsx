@@ -2648,6 +2648,17 @@ export default function Show() {
             <div className="shrink-0 pt-6">
             <PageHeader
                 title={project.name}
+                titleExtra={canManageProject && (
+                    <ProjectContextMenu
+                        align="left"
+                        project={project}
+                        isArchived={project.status === 'archived'}
+                        onEdit={() => router.visit(`/projects/${project.id}/edit`)}
+                        onDuplicate={() => setDuplicateTarget(project)}
+                        onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
+                        onDelete={handleDeleteProject}
+                    />
+                )}
                 breadcrumbs={[
                     { label: 'Dashboard', href: '/dashboard' },
                     { label: 'Projects', href: '/projects' },
@@ -2702,14 +2713,6 @@ export default function Show() {
                                     <AutomationIcon /> Automation
                                 </Button>
                             )}
-                            <ProjectContextMenu
-                                project={project}
-                                isArchived={project.status === 'archived'}
-                                onEdit={() => router.visit(`/projects/${project.id}/edit`)}
-                                onDuplicate={() => setDuplicateTarget(project)}
-                                onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
-                                onDelete={handleDeleteProject}
-                            />
                             </>
                         )}
                     </div>
