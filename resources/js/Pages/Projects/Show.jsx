@@ -176,7 +176,7 @@ function renderCustomFieldValue(task, customField) {
             if (!selectedIds.length) return '—';
             const options = (customField.options || []).filter(o => selectedIds.map(String).includes(String(o.id)));
             return (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap justify-center gap-1">
                     {options.map(opt => (
                         <span
                             key={opt.id}
@@ -335,7 +335,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
         switch (colId) {
             case 'status':
                 return (
-                    <td key="status" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
+                    <td key="status" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
                         {canEditTask ? (
                             <StatusPicker currentStatus={task.status} isOpen={openPopover === 'status'} onToggle={togglePopover('status')} onSelect={(status) => handleFieldUpdate('status', status)} />
                         ) : (
@@ -345,7 +345,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                 );
             case 'priority':
                 return (
-                    <td key="priority" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
+                    <td key="priority" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
                         {canEditTask ? (
                             <PriorityPicker currentPriority={task.priority} isOpen={openPopover === 'priority'} onToggle={togglePopover('priority')} onSelect={(priority) => handleFieldUpdate('priority', priority)} />
                         ) : (
@@ -355,11 +355,11 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                 );
             case 'assignee':
                 return (
-                    <td key="assignee" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
+                    <td key="assignee" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
                         {canManageTaskDetails ? (
                             <AssigneePicker currentAssignee={task.assignee} users={users} isOpen={openPopover === 'assignee'} onToggle={togglePopover('assignee')} onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)} />
                         ) : (
-                            <div className="flex items-center gap-2 overflow-hidden">
+                            <div className="flex items-center justify-center gap-2 overflow-hidden">
                                 {task.assignee ? (
                                     <>
                                         <Avatar name={task.assignee.name} size="sm" />
@@ -374,8 +374,8 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                 );
             case 'dates':
                 return (
-                    <td key="dates" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
-                        <div className="flex items-center gap-1 overflow-hidden">
+                    <td key="dates" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
+                        <div className="flex items-center justify-center gap-1 overflow-hidden">
                             {canManageTaskDetails ? (
                                 <>
                                     {task.start_date && (
@@ -409,7 +409,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     if (!cf) return null;
                     const cfDisplay = cf.type === 'formula' ? { ...cf, _formulaValue: formulaResults[task.id]?.[cf.id] ?? null } : cf;
                     return (
-                        <td key={colId} className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 overflow-hidden" style={cStyle}>
+                        <td key={colId} className="px-6 py-3 text-sm text-center text-gray-700 dark:text-gray-300 overflow-hidden" style={cStyle}>
                             <div className="truncate">
                             {canEditTask && cf.type !== 'formula' ? (
                                 <InlineCustomFieldEditor task={task} customField={cfDisplay} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
@@ -671,13 +671,13 @@ function SortableColumnHeader({ id, children, width, onResize, sortConfig, onSor
             {...attributes}
             {...listeners}
             style={width ? { width, minWidth: width, maxWidth: width } : undefined}
-            className={`group/col relative px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap select-none transition-colors overflow-hidden text-ellipsis
+            className={`group/col relative px-6 py-3 text-center text-xs font-medium uppercase tracking-wider whitespace-nowrap select-none transition-colors overflow-hidden text-ellipsis
                 ${isDragging
                     ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 cursor-grabbing opacity-50'
                     : 'text-gray-500 dark:text-gray-400 cursor-grab hover:bg-gray-100 dark:hover:bg-gray-700/50'
                 }`}
         >
-            <div className="flex items-center gap-1.5 pr-5">
+            <div className="flex items-center justify-center gap-1.5 pr-5">
                 <svg className="h-3 w-3 shrink-0 opacity-0 group-hover/col:opacity-40 transition-opacity" fill="currentColor" viewBox="0 0 24 24">
                     <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
                     <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
@@ -747,7 +747,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
         switch (colId) {
             case 'status':
                 return (
-                    <td key="status" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
+                    <td key="status" className="px-6 py-4 text-sm text-center overflow-hidden" style={cStyle}>
                         {canEditTask ? (
                             <StatusPicker currentStatus={task.status} isOpen={openPopover === 'status'} onToggle={togglePopover('status')} onSelect={(status) => handleFieldUpdate('status', status)} />
                         ) : (
@@ -757,7 +757,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 );
             case 'priority':
                 return (
-                    <td key="priority" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
+                    <td key="priority" className="px-6 py-4 text-sm text-center overflow-hidden" style={cStyle}>
                         {canEditTask ? (
                             <PriorityPicker currentPriority={task.priority} isOpen={openPopover === 'priority'} onToggle={togglePopover('priority')} onSelect={(priority) => handleFieldUpdate('priority', priority)} />
                         ) : (
@@ -767,8 +767,8 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 );
             case 'assignee':
                 return (
-                    <td key="assignee" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
-                        <div className="flex items-center gap-2 overflow-hidden">
+                    <td key="assignee" className="px-6 py-4 text-sm text-center overflow-hidden" style={cStyle}>
+                        <div className="flex items-center justify-center gap-2 overflow-hidden">
                             {canManageTaskDetails ? (
                                 <AssigneePicker currentAssignee={task.assignee} users={users} isOpen={openPopover === 'assignee'} onToggle={togglePopover('assignee')} onSelect={(user) => handleFieldUpdate('assigned_to', user ? user.id : null)} />
                             ) : (
@@ -798,8 +798,8 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 );
             case 'dates':
                 return (
-                    <td key="dates" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
-                        <div className="flex items-center gap-1 overflow-hidden">
+                    <td key="dates" className="px-6 py-4 text-sm text-center overflow-hidden" style={cStyle}>
+                        <div className="flex items-center justify-center gap-1 overflow-hidden">
                             {canManageTaskDetails ? (
                                 <>
                                     {task.start_date && (
@@ -833,7 +833,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     if (!cf) return null;
                     const cfDisplay = cf.type === 'formula' ? { ...cf, _formulaValue: formulaResults[task.id]?.[cf.id] ?? null } : cf;
                     return (
-                        <td key={colId} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 overflow-hidden" style={cStyle}>
+                        <td key={colId} className="px-6 py-4 text-sm text-center text-gray-700 dark:text-gray-300 overflow-hidden" style={cStyle}>
                             <div className="truncate">
                             {canEditTask && cf.type !== 'formula' ? (
                                 <InlineCustomFieldEditor task={task} customField={cfDisplay} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
@@ -3022,7 +3022,7 @@ export default function Show() {
             {/* List View */}
             {view === 'list' && (
                 <Card padding={false} className="h-full flex flex-col min-h-0">
-                    {filteredTasks.length > 0 ? (
+                    {(filteredTasks.length > 0 || (!hasActiveFilters && (localSections.length > 0 || addingSectionName !== null))) ? (
                         <DndContext
                             sensors={sensors}
                             collisionDetection={closestCorners}
@@ -3388,9 +3388,14 @@ export default function Show() {
                             description={hasActiveFilters ? 'Try adjusting your filters.' : 'Get started by adding the first task to this project.'}
                             action={
                                 !hasActiveFilters && canManageTasks && (
-                                    <LinkButton href={`/projects/${project.id}/tasks/create`} size="sm">
-                                        + Add Task
-                                    </LinkButton>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <LinkButton href={`/projects/${project.id}/tasks/create`} size="sm">
+                                            + Add Task
+                                        </LinkButton>
+                                        <Button variant="secondary" size="sm" onClick={() => setAddingSectionName('')}>
+                                            + Add Section
+                                        </Button>
+                                    </div>
                                 )
                             }
                         />

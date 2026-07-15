@@ -174,7 +174,7 @@ function DisplayValue({ customField, cfv, formatDate }) {
     switch (customField.type) {
         case 'text':
         case 'textarea':
-            return <Tooltip content={cfv.value_text || undefined}><span className={customField.type === 'textarea' ? 'line-clamp-2' : 'truncate block max-w-xs'}>{cfv.value_text || '—'}</span></Tooltip>;
+            return <Tooltip content={cfv.value_text || undefined}><span className={customField.type === 'textarea' ? 'line-clamp-2' : 'truncate block max-w-xs mx-auto'}>{cfv.value_text || '—'}</span></Tooltip>;
         case 'number':
             if (cfv.value_number == null) return <span>—</span>;
             return <span>{customField.config?.decimal_places != null
@@ -200,7 +200,7 @@ function DisplayValue({ customField, cfv, formatDate }) {
             if (!selectedIds.length) return <span className="text-gray-300 dark:text-gray-600">—</span>;
             const options = (customField.options || []).filter(o => selectedIds.map(String).includes(String(o.id)));
             return (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap justify-center gap-1">
                     {options.map(opt => (
                         <span
                             key={opt.id}
@@ -267,7 +267,7 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
                 ref={anchorRef}
                 onClick={(e) => { e.stopPropagation(); onToggle(); }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="cursor-pointer text-left w-full rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-700/60 transition-all"
+                className="cursor-pointer text-center w-full rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:ring-1 hover:ring-blue-200 dark:hover:ring-blue-700/60 transition-all"
             >
                 <DisplayValue customField={customField} cfv={cfv} formatDate={formatDateFn} />
             </button>
