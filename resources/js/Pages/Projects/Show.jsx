@@ -106,6 +106,15 @@ const TrashIcon = () => (
     </svg>
 );
 
+// Inline-editable fields that map to a bulk action (Asana-style multi-select editing)
+const BULK_FIELD_ACTIONS = {
+    status: 'update_status',
+    priority: 'update_priority',
+    assigned_to: 'assign',
+    due_date: 'update_due_date',
+    start_date: 'update_start_date',
+};
+
 // Render a custom field value for a task row
 // Comment & attachment count indicators shown after the task title in list view
 function TaskMetaBadges({ task }) {
@@ -2484,7 +2493,7 @@ export default function Show() {
     }, [bulkDropdown]);
 
     // --- Bulk action handler ---
-    const handleBulkAction = useCallback(async (action, value) => {
+    const handleBulkAction = useCallback(async (action, value, opts = {}) => {
         if (selectedTasks.size === 0) return;
         const taskIds = Array.from(selectedTasks);
         setBulkDropdown(null);
@@ -2541,7 +2550,7 @@ export default function Show() {
             return updated;
         }));
 
-        clearSelection();
+        if (!opts.keepSelection) clearSelection();
 
         try {
             const body = action === 'update_custom_field'
@@ -2561,6 +2570,35 @@ export default function Show() {
             router.reload({ only: ['tasks'] });
         }
     }, [selectedTasks, project.id, users, clearSelection, localCustomFields]);
+
+    // Asana-style multi-select editing: changing a value on any selected task
+    // applies it to every selected task (selection is kept for further edits)
+    const editAppliesToSelection = useCallback((taskId) =>
+        selectedTasks.size > 1 && selectedTasks.has(taskId), [selectedTasks]);
+
+    const handleRowInlineUpdate = useCallback((taskId, field, value) => {
+        if (editAppliesToSelection(taskId) && BULK_FIELD_ACTIONS[field]) {
+            handleBulkAction(BULK_FIELD_ACTIONS[field], value, { keepSelection: true });
+            return;
+        }
+        handleInlineUpdate(taskId, field, value);
+    }, [editAppliesToSelection, handleBulkAction, handleInlineUpdate]);
+
+    const handleSubtaskRowInlineUpdate = useCallback((taskId, field, value) => {
+        if (editAppliesToSelection(taskId) && BULK_FIELD_ACTIONS[field]) {
+            handleBulkAction(BULK_FIELD_ACTIONS[field], value, { keepSelection: true });
+            return;
+        }
+        handleSubtaskInlineUpdate(taskId, field, value);
+    }, [editAppliesToSelection, handleBulkAction, handleSubtaskInlineUpdate]);
+
+    const handleRowCustomFieldUpdate = useCallback((taskId, fieldId, fieldType, value) => {
+        if (editAppliesToSelection(taskId)) {
+            handleBulkAction('update_custom_field', { field_id: fieldId, value }, { keepSelection: true });
+            return;
+        }
+        handleCustomFieldUpdate(taskId, fieldId, fieldType, value);
+    }, [editAppliesToSelection, handleBulkAction, handleCustomFieldUpdate]);
 
     // Handle bulk delete confirmation
     const handleConfirmDelete = () => {
@@ -3142,8 +3180,8 @@ export default function Show() {
                                                                         canManageTaskDetails={canManageTasks}
                                                                         handleDeleteTask={handleDeleteTask}
                                                                         users={users}
-                                                                        onTaskUpdate={handleInlineUpdate}
-                                                                        onCustomFieldUpdate={handleCustomFieldUpdate}
+                                                                        onTaskUpdate={handleRowInlineUpdate}
+                                                                        onCustomFieldUpdate={handleRowCustomFieldUpdate}
                                                                         onToggleComplete={handleToggleComplete}
                                                                         isExpanded={expandedTasks.has(task.id)}
                                                                         onToggleExpand={handleToggleExpand}
@@ -3175,8 +3213,8 @@ export default function Show() {
                                                                                         handleDeleteTask={handleDeleteTask}
                                                                                         onToggleComplete={handleToggleComplete}
                                                                                         users={users}
-                                                                                        onTaskUpdate={handleSubtaskInlineUpdate}
-                                                                                        onCustomFieldUpdate={handleCustomFieldUpdate}
+                                                                                        onTaskUpdate={handleSubtaskRowInlineUpdate}
+                                                                                        onCustomFieldUpdate={handleRowCustomFieldUpdate}
                                                                                         isSelected={selectedTasks.has(sub.id)}
                                                                                         onSelect={canManageTasks ? handleTaskSelect : undefined}
                                                                                         isFocused={focusedTaskId === sub.id}
@@ -3256,8 +3294,8 @@ export default function Show() {
                                                             canManageTaskDetails={canManageTasks}
                                                             handleDeleteTask={handleDeleteTask}
                                                             users={users}
-                                                            onTaskUpdate={handleInlineUpdate}
-                                                            onCustomFieldUpdate={handleCustomFieldUpdate}
+                                                            onTaskUpdate={handleRowInlineUpdate}
+                                                            onCustomFieldUpdate={handleRowCustomFieldUpdate}
                                                             onToggleComplete={handleToggleComplete}
                                                             isExpanded={expandedTasks.has(task.id)}
                                                             onToggleExpand={handleToggleExpand}
@@ -3289,8 +3327,8 @@ export default function Show() {
                                                                             handleDeleteTask={handleDeleteTask}
                                                                             onToggleComplete={handleToggleComplete}
                                                                             users={users}
-                                                                            onTaskUpdate={handleSubtaskInlineUpdate}
-                                                                            onCustomFieldUpdate={handleCustomFieldUpdate}
+                                                                            onTaskUpdate={handleSubtaskRowInlineUpdate}
+                                                                            onCustomFieldUpdate={handleRowCustomFieldUpdate}
                                                                             isSelected={selectedTasks.has(sub.id)}
                                                                             onSelect={canManageTasks ? handleTaskSelect : undefined}
                                                                             isFocused={focusedTaskId === sub.id}
