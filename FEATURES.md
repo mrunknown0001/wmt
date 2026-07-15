@@ -50,11 +50,12 @@
 - Create, rename, reorder, and delete sections
 - Drag-and-drop section reordering
 - Tasks organized within sections on the board
+- Sections can be created before any tasks exist — "+ Add Section" available from the empty state, and existing sections stay visible in a project with no tasks
 
 ### Project Views (Projects/Show)
 - 5 view modes: List, Board (Kanban), Calendar, Gantt, Dashboard
 - Drag-and-drop cards between columns and within columns (@dnd-kit)
-- Inline field editing: status, priority, assignee, due date — all via PATCH endpoint
+- Inline field editing: status, priority, assignee, start date, due date, and custom fields — all optimistic with server rollback
 - Toggle complete button (circle checkbox) on each card
 - Delete task with confirmation modal
 - Subtask progress indicator (completed/total)
@@ -62,6 +63,20 @@
 - Priority and status badges
 - Sticky header for scrollable boards
 - Collapsible project details panel
+- List view columns: drag-to-reorder headers, drag-to-resize, hide/show columns (persisted per project via localStorage)
+- List view column content centered for readability; Title column stays left-aligned
+
+### Multi-Select & Bulk Editing (List View)
+- Select tasks with click, Ctrl/Cmd+click (toggle), Shift+click (range), or Ctrl/Cmd+A (all visible)
+- Arrow-key navigation with focus ring; Escape or clicking away clears the selection (focus ring cleared with it)
+- Works on both parent tasks and subtasks
+- Floating bulk actions toolbar: status, priority, assignee, due date, start date, custom field, delete
+- Bulk custom field editor supports every editable field type (text, textarea, number, date, single select, multi select) with clear-value support; formula fields excluded (read-only)
+- **Asana-style inline bulk editing** — changing any value inline on a selected task (including custom fields) applies it to every selected task; the selection is kept so edits can be chained
+- Editing a task outside the selection only changes that task
+- Optimistic UI updates across all selected rows with server reload on failure
+- Bulk changes run the same pipeline as single edits: activity logging, automation rules, assignment notifications, and recurring-task generation
+- Real-time sync — other viewers' lists refresh via WebSocket broadcast
 
 ### Project Dashboard View
 - Summary cards: Total Tasks (with completion progress bar), Completed, In Progress, Overdue
@@ -113,11 +128,13 @@
 - Guards against duplicate generation
 
 ## Custom Fields
-- 5 field types: text, number, date, single select, multi select
+- 7 field types: text, textarea, number, date, single select, multi select, formula
+- Formula fields are read-only computed values (number/date result types, configurable decimal places), evaluated client-side in the list view
 - Per-project field definitions with position-based ordering
-- Single/multi select fields support colored options with scrollable list
+- Single/multi select fields support colored options with scrollable list (alphabetical or manual option sorting)
 - Custom field values stored per task with typed columns (text, number, date, option ID, JSON)
-- Inline editing of all field types directly in the task list view
+- Inline editing of all editable field types directly in the task list view
+- Bulk custom field updates across multi-selected tasks (toolbar or Asana-style inline edit)
 - Custom field columns displayed in list view with sortable headers
 - Auto-focus and scroll-to-new-option when adding select options
 - Styled scrollbars on option lists
@@ -159,6 +176,13 @@
   - Activity log entry recording the form submission
 - Configurable submit button text and success message
 - Styled scrollbars on modals and dropdown lists
+
+## Links & URLs
+- Admin-curated link records (title, description, URL) assigned to a user
+- Admins (manage-links) create, edit, and delete all links with user filter and search
+- Executives (view-links) see only their own assigned links
+- URLs rendered as clickable links opening in new tabs
+- Sidebar "Links & URLs" nav item visible only to users with view-links
 
 ## Global Search
 - Search across projects, tasks, and users from any page

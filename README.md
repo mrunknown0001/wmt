@@ -45,7 +45,8 @@ Default admin login: `admin@wmt.com` / `password`
 - **Organization Hierarchy** — Divisions → Departments → Teams → Users
 - **Project Management** — Full CRUD with owner/admin roles, member management, archived projects view
 - **Kanban Board** — Drag-and-drop task cards with inline editing and 5 views (list/board/calendar/gantt/dashboard)
-- **Task Sections** — Asana-style grouping within projects
+- **Multi-Select & Bulk Editing** — Asana-style: select tasks via click/Ctrl/Shift/Ctrl+A, then edit via the bulk toolbar or inline — any change (status, priority, assignee, dates, custom fields) applies to every selected task
+- **Task Sections** — Asana-style grouping within projects (creatable even before the first task)
 - **Subtasks** — Hierarchical parent-child tasks with progress tracking
 - **Recurring Tasks** — Daily/weekly/monthly/yearly with auto-generation
 - **Task Attachments** — Direct file uploads on tasks and comments
@@ -58,8 +59,9 @@ Default admin login: `admin@wmt.com` / `password`
 - **Executive Dashboard** — Org-wide stats with hierarchical drill-down
 - **Customizable Dashboard** — 7 togglable widgets, persisted per user
 - **Activity Log** — Centralized audit trail across all projects
-- **Custom Fields** — 5 types (text, number, date, single select, multi select) per project with inline editing
+- **Custom Fields** — 7 types (text, textarea, number, date, single select, multi select, formula) per project with inline and bulk editing
 - **Form Builder** — Asana-style form designer with drag-and-drop, 12 field types (incl. email, attachments, camera photo/video capture), custom field mapping, conditional visibility, auto-assignment via registered-user email fields, composable task titles (form fields + assignee name), form branding (logo/banner), and public form links
+- **Links & URLs** — Admin-curated links assigned to executives, with role-scoped visibility
 - **Calendar** — Monthly grid view with priority-colored task pills
 - **My Tasks** — Personal task view grouped by due date urgency
 - **Personal To-Do List** — Sidebar widget with drag-and-drop reordering and completion animations
