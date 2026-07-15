@@ -146,9 +146,7 @@ export default function Index() {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-                                {view === 'all' && (
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">Folder</th>
-                                )}
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">Folder</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Owner</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Tasks</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Due Date</th>
@@ -168,16 +166,14 @@ export default function Index() {
                                     <td className="px-6 py-4 text-sm">
                                         <StatusBadge status={project.status} type="project" />
                                     </td>
-                                    {view === 'all' && (
-                                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden lg:table-cell">
-                                            {project.folder ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-xs text-gray-600 dark:text-gray-300">
-                                                    <FolderIcon folder={folders.find((f) => f.id === project.folder.id) || { is_system: false }} className="h-3.5 w-3.5" />
-                                                    {project.folder.name}
-                                                </span>
-                                            ) : '—'}
-                                        </td>
-                                    )}
+                                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden lg:table-cell">
+                                        {project.folder ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-xs text-gray-600 dark:text-gray-300">
+                                                <FolderIcon folder={folders.find((f) => f.id === project.folder.id) || { is_system: false }} className="h-3.5 w-3.5" />
+                                                {project.folder.name}
+                                            </span>
+                                        ) : '—'}
+                                    </td>
                                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
                                         <div className="flex items-center gap-2">
                                             {project.owner && <Avatar name={project.owner.name} size="sm" />}

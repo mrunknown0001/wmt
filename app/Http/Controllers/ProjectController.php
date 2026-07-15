@@ -49,10 +49,12 @@ class ProjectController extends Controller
             });
         }
 
-        // Folders view shows only the selected folder's direct projects (root = unfiled)
+        // Folders view shows the selected folder's whole subtree (root = unfiled),
+        // e.g. a division folder includes its departments' and teams' projects
         if ($view === 'folders') {
-            if ($folderId && $folderId !== 'root') {
-                $query->where('folder_id', $folderId);
+            $selected = $folderId && $folderId !== 'root' ? Folder::find($folderId) : null;
+            if ($selected) {
+                $query->whereIn('folder_id', Folder::where('path', 'like', $selected->path . '%')->select('id'));
             } else {
                 $query->whereNull('folder_id');
             }
