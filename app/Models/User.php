@@ -27,6 +27,14 @@ class User extends Authenticatable
         'showTeamWorkload' => true,
     ];
 
+    public const NOTIFICATION_DEFAULTS = [
+        'task_assigned'  => true,
+        'task_comments'  => true,
+        'mentions'       => true,
+        'due_reminders'  => true,
+        'task_escalated' => true,
+    ];
+
     protected $fillable = [
         'name',
         'email',
@@ -37,6 +45,7 @@ class User extends Authenticatable
         'is_active',
         'can_create_rules',
         'dashboard_preferences',
+        'notification_preferences',
     ];
 
     protected $hidden = [
@@ -52,12 +61,18 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'can_create_rules' => 'boolean',
             'dashboard_preferences' => 'array',
+            'notification_preferences' => 'array',
         ];
     }
 
     public function getDashboardPreferences(): array
     {
         return array_merge(self::DASHBOARD_DEFAULTS, $this->dashboard_preferences ?? []);
+    }
+
+    public function getNotificationPreferences(): array
+    {
+        return array_merge(self::NOTIFICATION_DEFAULTS, $this->notification_preferences ?? []);
     }
 
     public function department(): BelongsTo
