@@ -17,6 +17,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\ProjectAutomationRuleController;
+use App\Http\Controllers\ProjectChartController;
 use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\SearchController;
@@ -158,6 +159,11 @@ Route::middleware('auth')->group(function () {
     Route::put('/projects/{project}/custom-fields/{customField}', [CustomFieldController::class, 'update'])->name('projects.custom-fields.update');
     Route::delete('/projects/{project}/custom-fields/{customField}', [CustomFieldController::class, 'destroy'])->name('projects.custom-fields.destroy');
     Route::post('/projects/{project}/custom-fields/reorder', [CustomFieldController::class, 'reorder'])->name('projects.custom-fields.reorder');
+
+    // Project Dashboard Charts
+    Route::post('/projects/{project}/charts', [ProjectChartController::class, 'store'])->name('projects.charts.store');
+    Route::put('/projects/{project}/charts/{chart}', [ProjectChartController::class, 'update'])->name('projects.charts.update');
+    Route::delete('/projects/{project}/charts/{chart}', [ProjectChartController::class, 'destroy'])->name('projects.charts.destroy');
 
     // Task Custom Field Values
     Route::patch('/projects/{project}/tasks/{task}/custom-field-values', [TaskCustomFieldValueController::class, 'update'])->name('projects.tasks.custom-field-values.update');

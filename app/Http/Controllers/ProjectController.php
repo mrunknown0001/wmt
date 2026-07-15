@@ -37,9 +37,9 @@ class ProjectController extends Controller
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
 
-        // Non-admin users only see projects they own, are members of, have assigned
+        // Non-admin, non-executive users only see projects they own, are members of, have assigned
         // tasks in, or that sit in an org folder they oversee (head/leader)
-        if (!$user->can('manage-projects')) {
+        if (!$user->can('manage-projects') && !$user->hasRole('executive')) {
             $overseenFolderIds = FolderService::overseenFolderIds($user);
             $query->where(function ($q) use ($userId, $overseenFolderIds) {
                 $q->where('owner_id', $userId)
@@ -113,7 +113,7 @@ class ProjectController extends Controller
     {
         $countQuery = Project::where('status', '!=', 'archived')->whereNotNull('folder_id');
 
-        if (!$user->can('manage-projects')) {
+        if (!$user->can('manage-projects') && !$user->hasRole('executive')) {
             $overseenFolderIds = FolderService::overseenFolderIds($user);
             $countQuery->where(function ($q) use ($user, $overseenFolderIds) {
                 $q->where('owner_id', $user->id)
@@ -157,9 +157,9 @@ class ProjectController extends Controller
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
 
-        // Non-admin users only see projects they own, are members of, have assigned
+        // Non-admin, non-executive users only see projects they own, are members of, have assigned
         // tasks in, or that sit in an org folder they oversee (head/leader)
-        if (!$user->can('manage-projects')) {
+        if (!$user->can('manage-projects') && !$user->hasRole('executive')) {
             $overseenFolderIds = FolderService::overseenFolderIds($user);
             $query->where(function ($q) use ($userId, $overseenFolderIds) {
                 $q->where('owner_id', $userId)
@@ -272,7 +272,8 @@ class ProjectController extends Controller
         $isProjectAdmin = $project->isProjectAdmin($user);
         $overseesFolder = $project->folder_id
             && FolderService::overseenFolderIds($user)->contains($project->folder_id);
-        $hasFullAccess = $user->can('manage-projects') || $isOwner || $isMember || $overseesFolder;
+        $hasFullAccess = $user->can('manage-projects') || $user->hasRole('executive')
+            || $isOwner || $isMember || $overseesFolder;
 
         $sections = $project->sections()->orderBy('position')->get();
 
@@ -323,6 +324,12 @@ class ProjectController extends Controller
             || $project->owner_id === auth()->id()
             || $isProjectAdmin;
 
+        // Dashboard charts: admins, executives (all projects), project owner,
+        // and project admin members can add/edit/remove charts
+        $canManageCharts = $canManageProject
+            || $user->hasRole('admin')
+            || $user->hasRole('executive');
+
         $automationRules = $canManageTasks
             ? $project->automationRules()->with('creator:id,name')->orderBy('created_at', 'desc')->get()
             : [];
@@ -336,6 +343,8 @@ class ProjectController extends Controller
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
             'canManageProject' => $canManageProject,
             'canManageTasks' => $canManageTasks,
+            'canManageCharts' => $canManageCharts,
+            'charts' => $project->charts()->get(),
             'automationRules' => $automationRules,
             'customFields' => $customFields,
             'forms' => $project->forms()->orderBy('name')->get(['id', 'name']),

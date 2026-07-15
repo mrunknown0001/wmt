@@ -74,4 +74,9 @@ class Project extends Model
     {
         return $this->hasMany(Form::class);
     }
+
+    public function charts(): HasMany
+    {
+        return $this->hasMany(ProjectChart::class)->orderBy('position')->orderBy('id');
+    }
 }

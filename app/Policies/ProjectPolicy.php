@@ -19,6 +19,11 @@ class ProjectPolicy
             return true;
         }
 
+        // Executives have read access across all projects
+        if ($user->hasRole('executive')) {
+            return true;
+        }
+
         // Owner or member can view
         if ($project->owner_id === $user->id
             || $project->members()->where('users.id', $user->id)->exists()) {

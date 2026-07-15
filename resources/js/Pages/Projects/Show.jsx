@@ -46,6 +46,7 @@ import DuplicateProjectModal from '../../Components/DuplicateProjectModal';
 import ShareProjectModal from '../../Components/ShareProjectModal';
 import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
+import ProjectCharts from '../../Components/ProjectCharts';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import echo from '../../echo';
@@ -1220,7 +1221,7 @@ function AutomationToast({ toast, onDismiss }) {
 }
 
 export default function Show() {
-    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, automationRules, customFields: initialCustomFields = [], forms = [], auth, users } = usePage().props;
+    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, canManageCharts = false, charts = [], automationRules, customFields: initialCustomFields = [], forms = [], auth, users } = usePage().props;
 
     const [localCustomFields, setLocalCustomFields] = useState(initialCustomFields);
     const [showDetails, setShowDetails] = useState(false);
@@ -4099,6 +4100,16 @@ export default function Show() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Custom Charts */}
+                        <ProjectCharts
+                            projectId={project.id}
+                            charts={charts}
+                            tasks={localTasks}
+                            sections={localSections}
+                            customFields={localCustomFields}
+                            canManage={canManageCharts}
+                        />
                     </div>
                 );
             })()}

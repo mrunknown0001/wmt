@@ -171,6 +171,16 @@ Division → Department → Team → Users (fixed hierarchy)
 - Frontend: FolderTree (expand/collapse persisted, hover actions, drag-drop targets), FolderNameModal, MoveToFolderModal, Projects Index tabs (All Projects | Folders) with tree pane + breadcrumb, Folder column chip in All view, folder picker on project Create/Edit
 - No new permissions (create folders: any user; manage: creator or manage-projects)
 
+### Project Dashboard Charts — COMPLETE
+- ProjectChart model + project_charts migration (title, chart_type, group_by, config JSON, position, created_by)
+- Chart types: bar (HTML horizontal bars), donut (SVG ring), line (SVG, weekly/monthly time buckets)
+- Dimensions: status, priority, assignee, section, single-select custom field (bar/donut); completed/created/due over time (line); scope filter (all/active/done)
+- ProjectChartController (JSON API: store/update/destroy) nested under projects
+- Chart management access: admins (manage-projects or admin role), executives (all projects), project owner, project admin members; charts visible to anyone who can view the dashboard
+- Executives granted read access across all projects (ProjectPolicy::view, project index/archived listings, full task visibility on show) so chart access works org-wide
+- Frontend: ProjectCharts component (chart cards + add/edit modal + delete confirm) rendered at the bottom of the project Show dashboard view; charts computed client-side from loaded tasks
+- Colorblind-safe categorical palette via CSS vars (light/dark); app status/priority colors reused for those dimensions
+
 ### Phase 5: Links & URLs — COMPLETE
 - Link model with user assignment (title, description, URL per record)
 - 1 migration (links table)
