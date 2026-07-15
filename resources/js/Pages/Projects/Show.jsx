@@ -2414,24 +2414,29 @@ export default function Show() {
             }
         } else if (event?.ctrlKey || event?.metaKey) {
             // Toggle individual
+            const removing = selectedTasks.has(taskId);
             setSelectedTasks(prev => {
                 const next = new Set(prev);
                 if (next.has(taskId)) next.delete(taskId);
                 else next.add(taskId);
                 return next;
             });
-            setLastClickedTaskId(taskId);
+            setLastClickedTaskId(removing ? null : taskId);
+            setFocusedTaskId(removing ? null : taskId);
+            return;
         } else {
             // Single select
             setSelectedTasks(new Set([taskId]));
             setLastClickedTaskId(taskId);
         }
         setFocusedTaskId(taskId);
-    }, [lastClickedTaskId, flatVisibleTaskIds]);
+    }, [lastClickedTaskId, flatVisibleTaskIds, selectedTasks]);
 
     const clearSelection = useCallback(() => {
         setSelectedTasks(new Set());
         setBulkDropdown(null);
+        setFocusedTaskId(null);
+        setLastClickedTaskId(null);
     }, []);
 
     // Clear selection when filters change
@@ -2472,8 +2477,6 @@ export default function Show() {
             }
             if (e.key === 'Escape') {
                 clearSelection();
-                setFocusedTaskId(null);
-                setLastClickedTaskId(null);
             }
             if ((e.ctrlKey || e.metaKey) && e.key === 'a' && flatVisibleTaskIds.length > 0) {
                 e.preventDefault();
