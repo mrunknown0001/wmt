@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Observers\DivisionObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
+#[ObservedBy(DivisionObserver::class)]
 class Division extends Model
 {
     use HasFactory;

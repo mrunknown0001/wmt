@@ -4,11 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
+use App\Models\Department;
+use App\Models\Folder;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskCustomFieldValue;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\FolderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,18 +29,33 @@ class ProjectController extends Controller
         $user = $request->user();
         $userId = $user->id;
 
-        $query = Project::with('owner')
+        $view = $request->input('view') === 'folders' ? 'folders' : 'all';
+        $folderId = $request->input('folder');
+
+        $query = Project::with('owner', 'folder:id,name')
             ->where('status', '!=', 'archived')
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
 
-        // Non-admin users only see projects they own, are members of, or have assigned tasks in
+        // Non-admin users only see projects they own, are members of, have assigned
+        // tasks in, or that sit in an org folder they oversee (head/leader)
         if (!$user->can('manage-projects')) {
-            $query->where(function ($q) use ($userId) {
+            $overseenFolderIds = FolderService::overseenFolderIds($user);
+            $query->where(function ($q) use ($userId, $overseenFolderIds) {
                 $q->where('owner_id', $userId)
                     ->orWhereHas('members', fn ($m) => $m->where('users.id', $userId))
-                    ->orWhereHas('tasks', fn ($t) => $t->where('assigned_to', $userId));
+                    ->orWhereHas('tasks', fn ($t) => $t->where('assigned_to', $userId))
+                    ->orWhereIn('folder_id', $overseenFolderIds);
             });
+        }
+
+        // Folders view shows only the selected folder's direct projects (root = unfiled)
+        if ($view === 'folders') {
+            if ($folderId && $folderId !== 'root') {
+                $query->where('folder_id', $folderId);
+            } else {
+                $query->whereNull('folder_id');
+            }
         }
 
         if ($search = $request->input('search')) {
@@ -74,10 +93,54 @@ class ProjectController extends Controller
                 'search' => $request->input('search', ''),
                 'status' => $request->input('status', ''),
                 'owner' => $request->input('owner', ''),
+                'view' => $view,
+                'folder' => $folderId ?: '',
             ],
             'owners' => User::whereHas('ownedProjects', fn ($q) => $q->where('status', '!=', 'archived'))
                 ->orderBy('name')->get(['id', 'name']),
+            'folders' => $this->folderTree($user),
         ]);
+    }
+
+    /**
+     * Flat folder list for the tree UI, scoped to what the user may see, with
+     * per-folder direct counts of visible projects. Recursive totals are
+     * summed client-side.
+     */
+    private function folderTree(User $user): array
+    {
+        $countQuery = Project::where('status', '!=', 'archived')->whereNotNull('folder_id');
+
+        if (!$user->can('manage-projects')) {
+            $overseenFolderIds = FolderService::overseenFolderIds($user);
+            $countQuery->where(function ($q) use ($user, $overseenFolderIds) {
+                $q->where('owner_id', $user->id)
+                    ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id))
+                    ->orWhereHas('tasks', fn ($t) => $t->where('assigned_to', $user->id))
+                    ->orWhereIn('folder_id', $overseenFolderIds);
+            });
+        }
+
+        $counts = $countQuery->groupBy('folder_id')
+            ->selectRaw('folder_id, COUNT(*) as total')
+            ->pluck('total', 'folder_id');
+
+        return Folder::whereIn('id', FolderService::visibleFolderIds($user))
+            ->orderBy('position')->orderBy('name')
+            ->get(['id', 'name', 'parent_id', 'depth', 'user_depth', 'source_type', 'created_by'])
+            ->map(fn ($f) => [
+                'id' => $f->id,
+                'name' => $f->name,
+                'parent_id' => $f->parent_id,
+                'depth' => $f->depth,
+                'user_depth' => $f->user_depth,
+                'is_system' => $f->source_type !== null,
+                'source_type' => $f->source_type ? class_basename($f->source_type) : null,
+                'created_by' => $f->created_by,
+                'project_count' => (int) ($counts[$f->id] ?? 0),
+            ])
+            ->values()
+            ->all();
     }
 
     public function archived(Request $request): Response
@@ -92,12 +155,15 @@ class ProjectController extends Controller
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
 
-        // Non-admin users only see projects they own, are members of, or have assigned tasks in
+        // Non-admin users only see projects they own, are members of, have assigned
+        // tasks in, or that sit in an org folder they oversee (head/leader)
         if (!$user->can('manage-projects')) {
-            $query->where(function ($q) use ($userId) {
+            $overseenFolderIds = FolderService::overseenFolderIds($user);
+            $query->where(function ($q) use ($userId, $overseenFolderIds) {
                 $q->where('owner_id', $userId)
                     ->orWhereHas('members', fn ($m) => $m->where('users.id', $userId))
-                    ->orWhereHas('tasks', fn ($t) => $t->where('assigned_to', $userId));
+                    ->orWhereHas('tasks', fn ($t) => $t->where('assigned_to', $userId))
+                    ->orWhereIn('folder_id', $overseenFolderIds);
             });
         }
 
@@ -140,10 +206,24 @@ class ProjectController extends Controller
     {
         $this->authorize('create', Project::class);
 
+        $user = auth()->user();
+
+        $defaultFolderId = null;
+        if ($user->team_id) {
+            $defaultFolderId = Folder::where('source_type', Team::class)
+                ->where('source_id', $user->team_id)->value('id');
+        }
+        if (!$defaultFolderId && $user->department_id) {
+            $defaultFolderId = Folder::where('source_type', Department::class)
+                ->where('source_id', $user->department_id)->value('id');
+        }
+
         return Inertia::render('Projects/Create', [
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['active', 'on_hold', 'completed', 'archived'],
             'memberRoles' => ['viewer', 'editor', 'admin'],
+            'folders' => $this->folderTree($user),
+            'defaultFolderId' => $defaultFolderId,
         ]);
     }
 
@@ -180,7 +260,9 @@ class ProjectController extends Controller
         $isOwner = $project->owner_id === $userId;
         $isMember = $project->members->contains('id', $userId);
         $isProjectAdmin = $project->isProjectAdmin($user);
-        $hasFullAccess = $user->can('manage-projects') || $isOwner || $isMember;
+        $overseesFolder = $project->folder_id
+            && FolderService::overseenFolderIds($user)->contains($project->folder_id);
+        $hasFullAccess = $user->can('manage-projects') || $isOwner || $isMember || $overseesFolder;
 
         $sections = $project->sections()->orderBy('position')->get();
 
@@ -263,6 +345,7 @@ class ProjectController extends Controller
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['active', 'on_hold', 'completed', 'archived'],
             'memberRoles' => ['viewer', 'editor', 'admin'],
+            'folders' => $this->folderTree(auth()->user()),
         ]);
     }
 
@@ -270,7 +353,7 @@ class ProjectController extends Controller
     {
         $validated = $request->validated();
 
-        $oldValues = $project->only(['name', 'description', 'status', 'owner_id', 'due_date']);
+        $oldValues = $project->only(['name', 'description', 'status', 'owner_id', 'folder_id', 'due_date']);
         $oldValues['due_date'] = $project->due_date?->toDateString();
 
         $project->update(collect($validated)->except('members')->toArray());
@@ -283,6 +366,29 @@ class ProjectController extends Controller
 
         return redirect("/projects/{$project->id}")
             ->with('success', 'Project updated successfully.');
+    }
+
+    public function moveToFolder(Request $request, Project $project): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        $validated = $request->validate([
+            'folder_id' => 'nullable|exists:folders,id',
+        ]);
+
+        $folderId = $validated['folder_id'] ?? null;
+
+        if ($folderId && !FolderService::visibleFolderIds($request->user())->contains((int) $folderId)) {
+            return back()->withErrors(['folder_id' => 'You do not have access to that folder.']);
+        }
+
+        $oldValues = ['folder_id' => $project->folder_id];
+
+        $project->update(['folder_id' => $folderId]);
+
+        ActivityLogger::logChanges($project, $oldValues, $request->user());
+
+        return back()->with('success', 'Project moved.');
     }
 
     public function archive(Project $project): RedirectResponse
@@ -324,6 +430,7 @@ class ProjectController extends Controller
                 'description' => $project->description,
                 'status' => 'active',
                 'owner_id' => $request->user()->id,
+                'folder_id' => $project->folder_id,
                 'due_date' => $copyDueDates ? $project->due_date : null,
             ]);
 

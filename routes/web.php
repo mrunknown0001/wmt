@@ -25,6 +25,7 @@ use App\Http\Controllers\TaskSectionController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\FolderController;
 use App\Http\Controllers\FormController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\TaskCustomFieldValueController;
@@ -114,6 +115,13 @@ Route::middleware('auth')->group(function () {
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
     Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download'])->name('tasks.comments.attachments.download');
     Route::get('/projects/{project}/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
+
+    // Folders
+    Route::post('/folders', [FolderController::class, 'store'])->name('folders.store');
+    Route::patch('/folders/{folder}', [FolderController::class, 'update'])->name('folders.update');
+    Route::patch('/folders/{folder}/move', [FolderController::class, 'move'])->name('folders.move');
+    Route::delete('/folders/{folder}', [FolderController::class, 'destroy'])->name('folders.destroy');
+    Route::patch('/projects/{project}/folder', [ProjectController::class, 'moveToFolder'])->name('projects.folder');
 
     // Project Members
     Route::post('/projects/{project}/members', [ProjectMemberController::class, 'store'])->name('projects.members.store');

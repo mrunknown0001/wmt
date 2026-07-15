@@ -9,19 +9,26 @@ import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import { flattenFolders } from '../../Components/FolderTree';
 import { formatLabel } from '../../utils';
 
 export default function Edit() {
-    const { project, users, statuses, memberRoles } = usePage().props;
+    const { project, users, statuses, memberRoles, folders = [] } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         name: project.name || '',
         description: project.description || '',
         status: project.status || 'active',
         owner_id: project.owner_id || '',
+        folder_id: project.folder_id || '',
         due_date: project.due_date ? project.due_date.split('T')[0] : '',
         members: (project.members || []).map((m) => ({ user_id: m.id, role: m.pivot.role })),
     });
+
+    const folderOptions = flattenFolders(folders).map((f) => ({
+        value: f.id,
+        label: `${' '.repeat(f.level * 3)}${f.name}`,
+    }));
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -63,7 +70,16 @@ export default function Edit() {
                             />
                         </div>
 
-                        <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <SearchableSelect
+                                label="Folder" id="folder_id" value={data.folder_id}
+                                onChange={(val) => setData('folder_id', val)}
+                                placeholder="— Unfiled —"
+                                options={folderOptions}
+                                error={errors.folder_id}
+                            />
+                            <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                        </div>
 
                         <UserMultiSelect
                             label="Members"

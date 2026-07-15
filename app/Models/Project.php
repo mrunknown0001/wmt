@@ -17,6 +17,7 @@ class Project extends Model
         'description',
         'status',
         'owner_id',
+        'folder_id',
         'due_date',
     ];
 
@@ -30,6 +31,11 @@ class Project extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(Folder::class);
     }
 
     public function tasks(): HasMany

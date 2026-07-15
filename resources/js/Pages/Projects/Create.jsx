@@ -9,19 +9,26 @@ import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import { flattenFolders } from '../../Components/FolderTree';
 import { formatLabel } from '../../utils';
 
 export default function Create() {
-    const { users, statuses, memberRoles, auth } = usePage().props;
+    const { users, statuses, memberRoles, auth, folders = [], defaultFolderId } = usePage().props;
 
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         description: '',
         status: 'active',
         owner_id: auth.user?.id || '',
+        folder_id: defaultFolderId || '',
         due_date: '',
         members: [],
     });
+
+    const folderOptions = flattenFolders(folders).map((f) => ({
+        value: f.id,
+        label: `${' '.repeat(f.level * 3)}${f.name}`,
+    }));
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -62,7 +69,16 @@ export default function Create() {
                             />
                         </div>
 
-                        <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <SearchableSelect
+                                label="Folder" id="folder_id" value={data.folder_id}
+                                onChange={(val) => setData('folder_id', val)}
+                                placeholder="— Unfiled —"
+                                options={folderOptions}
+                                error={errors.folder_id}
+                            />
+                            <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                        </div>
 
                         <UserMultiSelect
                             label="Members"

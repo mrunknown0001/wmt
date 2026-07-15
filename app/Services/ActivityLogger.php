@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ActivityLog;
 use App\Models\Department;
 use App\Models\Division;
+use App\Models\Folder;
 use App\Models\TaskSection;
 use App\Models\Team;
 use App\Models\User;
@@ -20,16 +21,18 @@ class ActivityLogger
         \App\Models\Department::class  => ['type' => 'department',   'name_field' => 'name'],
         \App\Models\Team::class        => ['type' => 'team',         'name_field' => 'name'],
         \App\Models\TaskSection::class => ['type' => 'task_section', 'name_field' => 'name'],
+        \App\Models\Folder::class      => ['type' => 'folder',       'name_field' => 'name'],
     ];
 
     private const TRACKED_FIELDS = [
-        'project'      => ['name', 'description', 'status', 'owner_id', 'due_date'],
+        'project'      => ['name', 'description', 'status', 'owner_id', 'folder_id', 'due_date'],
         'task'         => ['title', 'description', 'status', 'priority', 'assigned_to', 'due_date', 'start_date', 'section_id'],
         'user'         => ['name', 'email', 'position', 'department_id', 'team_id', 'is_active'],
         'division'     => ['name', 'description', 'head_id'],
         'department'   => ['name', 'description', 'division_id', 'head_id'],
         'team'         => ['name', 'description', 'department_id', 'leader_id'],
         'task_section' => ['name'],
+        'folder'       => ['name', 'parent_id'],
     ];
 
     public static function logCreated(Model $entity, ?User $user, ?string $description = null): void
@@ -140,6 +143,10 @@ class ActivityLogger
 
         if ($field === 'section_id') {
             return TaskSection::find($value)?->name ?? 'Unknown';
+        }
+
+        if (in_array($field, ['folder_id', 'parent_id'])) {
+            return Folder::find($value)?->name ?? 'Unknown';
         }
 
         if (in_array($field, ['status', 'priority'])) {

@@ -60,6 +60,17 @@ Division → Department → Team → Users (fixed hierarchy)
 - `created_by` (FK → users, nullable, nullOnDelete) — admin who created it
 - Links are restricted to admins and executives: admins manage all links; executives see only their own assigned links; normal users have no access
 
+### Folders
+- `name`, `parent_id` (FK → folders, nullable, cascadeOnDelete), `position`
+- `depth` (absolute level), `user_depth` (nullable; null = system folder, 0–4 = user folder nesting), `path` (materialized id path, e.g. `/1/5/13/`)
+- `source_type`/`source_id` (nullable morph → Division/Department/Team; set = system folder), `created_by` (FK → users, nullable)
+- `projects.folder_id` (FK → folders, nullable, nullOnDelete)
+- System folders auto-mirror the org tree via observers (division at root → department → team); renames/re-parents sync automatically; `php artisan folders:sync` backfills
+- Deleting an org entity or user folder promotes contained projects/subfolders to the parent folder (never deletes them)
+- User folders: max 5 levels (`user_depth` 0–4), nesting resets under each system folder; only creator or manage-projects can rename/move/delete
+- Visibility (FolderService): admins see all; others see their own org chain, subtrees they head/lead, folders they created, folders holding their visible projects (+ ancestors)
+- Heads/leaders get read access to projects filed in their org folder subtree (ProjectPolicy::view + project index queries)
+
 ### Permissions
 - `manage-users`, `view-users`, `manage-roles`
 - `manage-divisions`, `view-divisions`
@@ -149,6 +160,16 @@ Division → Department → Team → Users (fixed hierarchy)
 - Custom field values integrated into Task Create/Edit pages
 - Custom Fields panel on Project Show page
 - No new permissions (inherits project-level authorization)
+
+### Phase 6: Project Folders — COMPLETE
+- Folder model (materialized path tree) + folders migration + `projects.folder_id`
+- System folders auto-created/synced/removed by Division/Department/Team observers; `folders:sync` command backfills
+- FolderService: org sync, subtree promotion on delete, overseen/visible folder id resolution with per-request cache
+- FolderPolicy (system folders immutable via UI), FolderController (store/update/move/destroy with depth + cycle validation)
+- ProjectController: Folders view (`view=folders&folder=id|root`), folder tree prop with visible-project counts, moveToFolder endpoint, default folder = creator's team folder (fallback department)
+- Head/leader read visibility wired into index/archived/show/ProjectPolicy
+- Frontend: FolderTree (expand/collapse persisted, hover actions, drag-drop targets), FolderNameModal, MoveToFolderModal, Projects Index tabs (All Projects | Folders) with tree pane + breadcrumb, Folder column chip in All view, folder picker on project Create/Edit
+- No new permissions (create folders: any user; manage: creator or manage-projects)
 
 ### Phase 5: Links & URLs — COMPLETE
 - Link model with user assignment (title, description, URL per record)

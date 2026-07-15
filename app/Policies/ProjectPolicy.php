@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Project;
 use App\Models\User;
+use App\Services\FolderService;
 
 class ProjectPolicy
 {
@@ -21,6 +22,12 @@ class ProjectPolicy
         // Owner or member can view
         if ($project->owner_id === $user->id
             || $project->members()->where('users.id', $user->id)->exists()) {
+            return true;
+        }
+
+        // Heads/leaders can view projects filed in an org folder they oversee
+        if ($project->folder_id
+            && FolderService::overseenFolderIds($user)->contains($project->folder_id)) {
             return true;
         }
 
