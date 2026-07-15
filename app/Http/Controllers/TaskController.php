@@ -618,8 +618,9 @@ class TaskController extends Controller
         $validated = $request->validate([
             'task_ids' => 'required|array|min:1',
             'task_ids.*' => 'required|integer',
-            'action' => 'required|string|in:update_status,update_priority,assign,update_due_date,update_start_date,delete',
+            'action' => 'required|string|in:update_status,update_priority,assign,update_due_date,update_start_date,update_custom_field,delete',
             'value' => 'nullable',
+            'field_id' => 'required_if:action,update_custom_field|integer',
         ]);
 
         $tasks = Task::whereIn('id', $validated['task_ids'])
@@ -725,6 +726,24 @@ class TaskController extends Controller
                     $task->update(['start_date' => $startDate]);
                     TaskActivityLogger::logChanges($task, $oldValues, $user);
                     ActivityLogger::logChanges($task, $oldValues, $user);
+                }
+                break;
+
+            case 'update_custom_field':
+                $customField = CustomField::where('id', $validated['field_id'])
+                    ->where('project_id', $project->id)
+                    ->first();
+                if (!$customField || $customField->type === 'formula') {
+                    return response()->json(['success' => false, 'message' => 'Invalid custom field.'], 422);
+                }
+                foreach ($tasks as $task) {
+                    $cfv = TaskCustomFieldValue::updateOrCreate(
+                        ['task_id' => $task->id, 'custom_field_id' => $customField->id],
+                    );
+                    $cfv->setTypedValue($customField->type, $validated['value']);
+                    $cfv->save();
+                    $task->load('customFieldValues.customField');
+                    AutomationRuleEngine::evaluate($task, 'custom_field_changed', [], [$customField->id]);
                 }
                 break;
 

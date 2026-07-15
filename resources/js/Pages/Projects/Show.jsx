@@ -195,6 +195,100 @@ function renderCustomFieldValue(task, customField) {
     }
 }
 
+// Value editor for bulk-applying a custom field to all selected tasks
+function BulkCustomFieldEditor({ field, onApply }) {
+    const [draft, setDraft] = useState('');
+    const [multiDraft, setMultiDraft] = useState([]);
+
+    const sortedOptions = [...(field.options || [])].sort((a, b) =>
+        field.config?.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
+    );
+
+    if (field.type === 'date') {
+        return (
+            <div className="p-3">
+                <CalendarGrid selectedDate={null} onSelect={(date) => onApply(date)} />
+                <button onClick={() => onApply(null)} className="mt-2 w-full text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors text-center">
+                    Clear value
+                </button>
+            </div>
+        );
+    }
+
+    if (field.type === 'single_select') {
+        return (
+            <div className="py-1 max-h-60 overflow-y-auto scrollbar-thin">
+                <button onClick={() => onApply(null)} className="w-full text-left px-3 py-1.5 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors italic">
+                    Clear value
+                </button>
+                {sortedOptions.map((opt) => (
+                    <button key={opt.id} onClick={() => onApply(opt.id)} className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />}
+                        {opt.label}
+                    </button>
+                ))}
+            </div>
+        );
+    }
+
+    if (field.type === 'multi_select') {
+        const toggle = (id) => {
+            const idStr = String(id);
+            setMultiDraft((prev) => (prev.includes(idStr) ? prev.filter((x) => x !== idStr) : [...prev, idStr]));
+        };
+        return (
+            <div className="py-1">
+                <div className="max-h-52 overflow-y-auto scrollbar-thin">
+                    {sortedOptions.map((opt) => {
+                        const checked = multiDraft.includes(String(opt.id));
+                        return (
+                            <button key={opt.id} onClick={() => toggle(opt.id)} className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${checked ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 dark:border-gray-600'}`}>
+                                    {checked && (
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                    )}
+                                </span>
+                                {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />}
+                                {opt.label}
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="border-t border-gray-200 dark:border-gray-700 px-3 py-2 flex justify-between">
+                    <button onClick={() => onApply(null)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Clear value</button>
+                    <button onClick={() => onApply(multiDraft.length > 0 ? multiDraft.map(Number) : null)} className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">Apply</button>
+                </div>
+            </div>
+        );
+    }
+
+    // text / textarea / number
+    const inputClass = 'w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500';
+    const apply = () => onApply(draft === '' ? null : draft);
+    return (
+        <div className={`p-2 ${field.type === 'textarea' ? 'min-w-[260px]' : ''}`}>
+            {field.type === 'textarea' ? (
+                <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={10000} rows={3} className={`${inputClass} resize-y min-h-20`} placeholder="Enter text..." />
+            ) : (
+                <input
+                    autoFocus
+                    type={field.type === 'number' ? 'number' : 'text'}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') apply(); }}
+                    className={inputClass}
+                    placeholder={field.type === 'number' ? 'Enter number...' : 'Enter text...'}
+                    {...(field.type === 'number' ? { max: 99999999999, min: -99999999999 } : { maxLength: 255 })}
+                />
+            )}
+            <div className="flex justify-between gap-2 mt-2">
+                <button onClick={() => onApply(null)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Clear value</button>
+                <button onClick={apply} className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">Apply</button>
+            </div>
+        </div>
+    );
+}
+
 // Sortable subtask row
 function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canManageTaskDetails, handleDeleteTask, onToggleComplete, users, onTaskUpdate, onCustomFieldUpdate, isSelected, onSelect, isFocused, customFields = [], onContextMenu, onOpenDetail, columnOrder = [], formulaResults = {}, columnWidths = {} }) {
     const {
@@ -1173,8 +1267,9 @@ export default function Show() {
     const [selectedTasks, setSelectedTasks] = useState(new Set());
     const [focusedTaskId, setFocusedTaskId] = useState(null);
     const [lastClickedTaskId, setLastClickedTaskId] = useState(null);
-    const [bulkDropdown, setBulkDropdown] = useState(null); // 'status' | 'priority' | 'assign' | 'due_date' | 'start_date' | null
+    const [bulkDropdown, setBulkDropdown] = useState(null); // 'status' | 'priority' | 'assign' | 'due_date' | 'start_date' | 'custom_field' | null
     const [bulkAssignSearch, setBulkAssignSearch] = useState('');
+    const [bulkCustomField, setBulkCustomField] = useState(null); // custom field object being bulk-edited
     const [localSections, setLocalSections] = useState(serverSections);
     const [collapsedSections, setCollapsedSections] = useState(new Set());
     const [editingSectionId, setEditingSectionId] = useState(null);
@@ -2393,6 +2488,7 @@ export default function Show() {
         if (selectedTasks.size === 0) return;
         const taskIds = Array.from(selectedTasks);
         setBulkDropdown(null);
+        setBulkCustomField(null);
 
         if (action === 'delete') {
             setConfirmDelete({
@@ -2405,8 +2501,10 @@ export default function Show() {
         }
 
         // Optimistic update
-        setLocalTasks((prev) => prev.map((t) => {
-            if (!taskIds.includes(t.id)) return t;
+        const bulkField = action === 'update_custom_field'
+            ? localCustomFields.find((f) => f.id === value.field_id)
+            : null;
+        const applyChange = (t) => {
             if (action === 'update_status') return { ...t, status: value };
             if (action === 'update_priority') return { ...t, priority: value };
             if (action === 'assign') {
@@ -2415,15 +2513,43 @@ export default function Show() {
             }
             if (action === 'update_due_date') return { ...t, due_date: value || null };
             if (action === 'update_start_date') return { ...t, start_date: value || null };
+            if (action === 'update_custom_field' && bulkField) {
+                const values = [...(t.custom_field_values || [])];
+                const idx = values.findIndex((v) => v.custom_field_id === bulkField.id);
+                const entry = {
+                    custom_field_id: bulkField.id,
+                    value_text: (bulkField.type === 'text' || bulkField.type === 'textarea') ? value.value : null,
+                    value_number: bulkField.type === 'number' ? value.value : null,
+                    value_date: bulkField.type === 'date' ? value.value : null,
+                    value_option_id: bulkField.type === 'single_select' ? value.value : null,
+                    value_json: bulkField.type === 'multi_select' ? value.value : null,
+                    selected_option: bulkField.type === 'single_select' && value.value
+                        ? (bulkField.options || []).find((o) => o.id === Number(value.value)) || null
+                        : null,
+                };
+                if (idx >= 0) { values[idx] = { ...values[idx], ...entry }; }
+                else { values.push(entry); }
+                return { ...t, custom_field_values: values };
+            }
             return t;
+        };
+        setLocalTasks((prev) => prev.map((t) => {
+            let updated = taskIds.includes(t.id) ? applyChange(t) : t;
+            if (updated.subtasks?.some((s) => taskIds.includes(s.id))) {
+                updated = { ...updated, subtasks: updated.subtasks.map((s) => (taskIds.includes(s.id) ? applyChange(s) : s)) };
+            }
+            return updated;
         }));
 
         clearSelection();
 
         try {
+            const body = action === 'update_custom_field'
+                ? { task_ids: taskIds, action, field_id: value.field_id, value: value.value }
+                : { task_ids: taskIds, action, value };
             const res = await apiFetch(`/projects/${project.id}/tasks/bulk`, {
                 method: 'POST',
-                body: JSON.stringify({ task_ids: taskIds, action, value }),
+                body: JSON.stringify(body),
             });
             if (!res.ok) throw new Error('Bulk action failed');
             const data = await res.json();
@@ -2434,7 +2560,7 @@ export default function Show() {
             // Revert on failure — reload from server
             router.reload({ only: ['tasks'] });
         }
-    }, [selectedTasks, project.id, users, clearSelection]);
+    }, [selectedTasks, project.id, users, clearSelection, localCustomFields]);
 
     // Handle bulk delete confirmation
     const handleConfirmDelete = () => {
@@ -4038,6 +4164,44 @@ export default function Show() {
                             </div>
                         )}
                     </div>
+
+                    {/* Custom field editor */}
+                    {localCustomFields.some((cf) => cf.type !== 'formula') && (
+                        <div className="relative">
+                            <Tooltip content="Custom Field"><button onClick={() => { setBulkDropdown(bulkDropdown === 'custom_field' ? null : 'custom_field'); setBulkCustomField(null); }} className="p-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>
+                                </button></Tooltip>
+                            {bulkDropdown === 'custom_field' && (
+                                <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 min-w-[200px]">
+                                    {!bulkCustomField ? (
+                                        <div className="py-1 max-h-60 overflow-y-auto">
+                                            <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Set custom field</div>
+                                            {localCustomFields.filter((cf) => cf.type !== 'formula').map((cf) => (
+                                                <button key={cf.id} onClick={() => setBulkCustomField(cf)} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between gap-3">
+                                                    <span className="truncate">{cf.name}</span>
+                                                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatLabel(cf.type)}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-600">
+                                                <button onClick={() => setBulkCustomField(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                                                </button>
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{bulkCustomField.name}</span>
+                                            </div>
+                                            <BulkCustomFieldEditor
+                                                key={bulkCustomField.id}
+                                                field={bulkCustomField}
+                                                onApply={(val) => handleBulkAction('update_custom_field', { field_id: bulkCustomField.id, value: val })}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="w-px h-5 bg-gray-600" />
 
