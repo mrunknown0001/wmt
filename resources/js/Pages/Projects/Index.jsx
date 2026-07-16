@@ -153,7 +153,7 @@ export default function Index() {
         e.dataTransfer.dropEffect = 'move';
     };
 
-    const handleDropReorder = (e, targetProject) => {
+    const handleDropReorder = async (e, targetProject) => {
         e.preventDefault();
         if (!draggedProject || draggedProject.id === targetProject.id) return;
 
@@ -179,7 +179,25 @@ export default function Index() {
             ...unpinnedProjects.map((p, i) => ({ id: p.id, position: i })),
         ];
 
-        router.post('/projects/reorder', { projects: updates }, { preserveScroll: true, preserveState: true });
+        try {
+            const response = await fetch('/projects/reorder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ projects: updates }),
+            });
+
+            if (response.ok) {
+                showToast('Projects reordered');
+                router.reload({ preserveScroll: true });
+            } else {
+                showToast('Failed to reorder projects', 'error');
+            }
+        } catch (error) {
+            showToast('Error: ' + error.message, 'error');
+        }
     };
 
     const breadcrumbChain = view === 'folders' && selectedFolder !== 'root'
