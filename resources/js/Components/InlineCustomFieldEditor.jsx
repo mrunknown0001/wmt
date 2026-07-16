@@ -6,7 +6,7 @@ import { formatFormulaResult } from '../formulaEngine';
 
 function SelectOptions({ options, selectedId, onSelect }) {
     return (
-        <div className="py-1 min-w-[160px] max-h-60 overflow-y-auto scrollbar-thin">
+        <div className="py-1 min-w-[160px] max-w-xs max-h-60 overflow-y-auto scrollbar-thin">
             <button
                 onClick={() => onSelect(null)}
                 className="w-full text-left px-3 py-1.5 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -17,16 +17,18 @@ function SelectOptions({ options, selectedId, onSelect }) {
                 <button
                     key={opt.id}
                     onClick={() => onSelect(opt.id)}
-                    className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${
+                    className={`w-full text-left px-3 py-1.5 text-sm flex items-start gap-2 transition-colors ${
                         String(selectedId) === String(opt.id)
                             ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                             : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                 >
-                    {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />}
-                    {opt.label}
+                    {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: opt.color }} />}
+                    <span className="break-words whitespace-normal flex-1">
+                        {opt.label}
+                    </span>
                     {String(selectedId) === String(opt.id) && (
-                        <svg className="w-4 h-4 ml-auto text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                     )}
@@ -38,7 +40,7 @@ function SelectOptions({ options, selectedId, onSelect }) {
 
 function MultiSelectOptions({ options, selectedIds = [], onToggle, onDone }) {
     return (
-        <div className="py-1 min-w-[160px]">
+        <div className="py-1 min-w-[160px] max-w-xs">
             <div className="max-h-60 overflow-y-auto scrollbar-thin">
                 {options.map((opt) => {
                     const checked = selectedIds.map(String).includes(String(opt.id));
@@ -46,9 +48,9 @@ function MultiSelectOptions({ options, selectedIds = [], onToggle, onDone }) {
                         <button
                             key={opt.id}
                             onClick={() => onToggle(opt.id)}
-                            className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            className="w-full text-left px-3 py-1.5 text-sm flex items-start gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                         >
-                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
                                 checked
                                     ? 'bg-blue-600 border-blue-600 text-white'
                                     : 'border-gray-300 dark:border-gray-600'
@@ -59,8 +61,10 @@ function MultiSelectOptions({ options, selectedIds = [], onToggle, onDone }) {
                                     </svg>
                                 )}
                             </span>
-                            {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />}
-                            {opt.label}
+                            {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: opt.color }} />}
+                            <span className="break-words whitespace-normal flex-1">
+                                {opt.label}
+                            </span>
                         </button>
                     );
                 })}

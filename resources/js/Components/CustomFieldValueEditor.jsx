@@ -96,20 +96,22 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                         {[...(field.options || [])].sort((a, b) =>
                             field.config?.sort_mode === 'manual' ? (a.position ?? 0) - (b.position ?? 0) : a.label.localeCompare(b.label)
                         ).map(opt => (
-                            <label key={opt.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <label key={opt.id} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input
                                     type="checkbox"
                                     checked={selected.includes(String(opt.id))}
                                     onChange={() => toggleOption(opt.id)}
-                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
+                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700 mt-0.5 flex-shrink-0"
                                 />
                                 {opt.color && (
                                     <span
-                                        className="w-3 h-3 rounded-full inline-block"
+                                        className="w-3 h-3 rounded-full flex-shrink-0 mt-0.5"
                                         style={{ backgroundColor: opt.color }}
                                     />
                                 )}
-                                {opt.label}
+                                <span className="break-words whitespace-normal">
+                                    {opt.label}
+                                </span>
                             </label>
                         ))}
                     </div>
