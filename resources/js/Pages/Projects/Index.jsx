@@ -34,7 +34,9 @@ export default function Index() {
     const [status, setStatus] = useState(filters?.status || '');
     const [owner, setOwner] = useState(filters?.owner || '');
     const [draggedProject, setDraggedProject] = useState(null);
+    const [toast, setToast] = useState(null);
     const debounceRef = useRef(null);
+    const toastRef = useRef(null);
 
     const view = filters?.view === 'folders' ? 'folders' : 'all';
     const selectedFolder = filters?.folder || 'root';
@@ -121,8 +123,29 @@ export default function Index() {
         router.patch(`/projects/${projectId}/folder`, { folder_id: folderId }, { preserveScroll: true });
     };
 
-    const handleTogglePin = (project) => {
-        router.patch(`/projects/${project.id}/toggle-pin`, {}, { preserveScroll: true, preserveState: true });
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        if (toastRef.current) clearTimeout(toastRef.current);
+        toastRef.current = setTimeout(() => setToast(null), 3000);
+    };
+
+    const handleTogglePin = async (project) => {
+        try {
+            const response = await fetch(`/projects/${project.id}/toggle-pin`, {
+                method: 'PATCH',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                showToast(data.is_pinned ? 'Project pinned to top' : 'Project unpinned');
+                router.reload({ preserveScroll: true });
+            } else {
+                showToast('Failed to update project', 'error');
+            }
+        } catch (error) {
+            showToast('Error: ' + error.message, 'error');
+        }
     };
 
     const handleDragOver = (e) => {
@@ -458,6 +481,18 @@ export default function Index() {
                 processing={folderProcessing}
                 error={folderError}
             />
+
+            {toast && (
+                <div className="fixed bottom-4 right-4 z-50 animate-in fade-in slide-in-from-bottom-2">
+                    <div className={`rounded-lg px-4 py-3 shadow-lg text-sm font-medium ${
+                        toast.type === 'error'
+                            ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-200 border border-red-200 dark:border-red-800'
+                            : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-200 border border-green-200 dark:border-green-800'
+                    }`}>
+                        {toast.message}
+                    </div>
+                </div>
+            )}
         </AuthenticatedLayout>
     );
 }
