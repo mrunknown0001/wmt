@@ -436,14 +436,16 @@ class ProjectController extends Controller
             'copy_due_dates' => 'boolean',
             'copy_assignees' => 'boolean',
             'copy_subtasks' => 'boolean',
+            'copy_automation_rules' => 'boolean',
         ]);
 
         $includeTasks = $request->boolean('include_tasks', true);
         $copyDueDates = $request->boolean('copy_due_dates', true);
         $copyAssignees = $request->boolean('copy_assignees', true);
         $copySubtasks = $request->boolean('copy_subtasks', true);
+        $copyAutomationRules = $request->boolean('copy_automation_rules', true);
 
-        $newProject = DB::transaction(function () use ($project, $request, $includeTasks, $copyDueDates, $copyAssignees, $copySubtasks) {
+        $newProject = DB::transaction(function () use ($project, $request, $includeTasks, $copyDueDates, $copyAssignees, $copySubtasks, $copyAutomationRules) {
             $newProject = Project::create([
                 'name' => "Copy of {$project->name}",
                 'description' => $project->description,
@@ -463,7 +465,9 @@ class ProjectController extends Controller
             // Copy custom fields + options (build mapping)
             $customFieldMap = [];
             $optionMap = [];
+            $fieldTypeMap = [];
             foreach ($project->customFields()->with('options')->get() as $oldField) {
+                $fieldTypeMap[$oldField->id] = $oldField->type;
                 $newField = $newProject->customFields()->create([
                     'name' => $oldField->name,
                     'type' => $oldField->type,
@@ -491,6 +495,21 @@ class ProjectController extends Controller
                     'position' => $oldSection->position,
                 ]);
                 $sectionMap[$oldSection->id] = $newSection->id;
+            }
+
+            // Copy automation rules if requested (remap section/custom field/option ids)
+            if ($copyAutomationRules) {
+                foreach ($project->automationRules()->get() as $oldRule) {
+                    $newProject->automationRules()->create([
+                        'name' => $oldRule->name,
+                        'is_active' => $oldRule->is_active,
+                        'trigger_type' => $oldRule->trigger_type,
+                        'trigger_config' => $this->remapRuleTriggerConfig($oldRule->trigger_config, $customFieldMap),
+                        'conditions' => $this->remapRuleConditions($oldRule->conditions, $sectionMap, $customFieldMap, $optionMap, $fieldTypeMap),
+                        'actions' => $this->remapRuleActions($oldRule->actions, $sectionMap, $customFieldMap, $optionMap, $fieldTypeMap),
+                        'created_by' => $request->user()->id,
+                    ]);
+                }
             }
 
             // Copy tasks if requested
@@ -534,6 +553,91 @@ class ProjectController extends Controller
                 'name' => $newProject->name,
             ],
         ]);
+    }
+
+    private function remapRuleTriggerConfig(?array $triggerConfig, array $customFieldMap): ?array
+    {
+        if (empty($triggerConfig)) {
+            return $triggerConfig;
+        }
+
+        if (isset($triggerConfig['custom_field_id'])) {
+            $triggerConfig['custom_field_id'] = $customFieldMap[(int) $triggerConfig['custom_field_id']]
+                ?? $triggerConfig['custom_field_id'];
+        }
+
+        // form_id is left untouched — forms are not duplicated, so form-scoped
+        // rules simply never fire on the copy until re-pointed at a new form
+
+        return $triggerConfig;
+    }
+
+    private function remapRuleConditions(?array $conditions, array $sectionMap, array $customFieldMap, array $optionMap, array $fieldTypeMap): ?array
+    {
+        if (empty($conditions)) {
+            return $conditions;
+        }
+
+        return array_map(function (array $condition) use ($sectionMap, $customFieldMap, $optionMap, $fieldTypeMap) {
+            $field = $condition['field'] ?? null;
+
+            if ($field === 'section_id') {
+                $condition['value'] = $this->remapRuleIdValue($condition['value'] ?? null, $sectionMap);
+            } elseif ($field === 'custom_field') {
+                $oldCfId = $condition['custom_field_id'] ?? null;
+                if ($oldCfId !== null && $oldCfId !== '') {
+                    $condition['custom_field_id'] = $customFieldMap[(int) $oldCfId] ?? $oldCfId;
+
+                    // Select field values are option ids
+                    if (in_array($fieldTypeMap[(int) $oldCfId] ?? null, ['single_select', 'multi_select'], true)) {
+                        $condition['value'] = $this->remapRuleIdValue($condition['value'] ?? null, $optionMap);
+                    }
+                }
+            }
+
+            return $condition;
+        }, $conditions);
+    }
+
+    private function remapRuleActions(array $actions, array $sectionMap, array $customFieldMap, array $optionMap, array $fieldTypeMap): array
+    {
+        return array_map(function (array $action) use ($sectionMap, $customFieldMap, $optionMap, $fieldTypeMap) {
+            $params = $action['params'] ?? [];
+
+            if (($action['type'] ?? null) === 'move_to_section' && isset($params['section_id'])) {
+                $params['section_id'] = $this->remapRuleIdValue($params['section_id'], $sectionMap);
+            } elseif (($action['type'] ?? null) === 'set_custom_field') {
+                $oldCfId = $params['custom_field_id'] ?? null;
+                if ($oldCfId !== null && $oldCfId !== '') {
+                    $params['custom_field_id'] = $customFieldMap[(int) $oldCfId] ?? $oldCfId;
+
+                    if (in_array($fieldTypeMap[(int) $oldCfId] ?? null, ['single_select', 'multi_select'], true)) {
+                        $params['value'] = $this->remapRuleIdValue($params['value'] ?? null, $optionMap);
+                    }
+                }
+            }
+
+            $action['params'] = $params;
+
+            return $action;
+        }, $actions);
+    }
+
+    /**
+     * Remap a scalar or array-of-ids rule value through an old-id → new-id map.
+     * Non-numeric values (placeholders like __project_owner__, empty strings) pass through.
+     */
+    private function remapRuleIdValue($value, array $map)
+    {
+        if (is_array($value)) {
+            return array_map(fn ($v) => $this->remapRuleIdValue($v, $map), $value);
+        }
+
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return $value;
+        }
+
+        return $map[(int) $value] ?? $value;
     }
 
     private function duplicateTask(

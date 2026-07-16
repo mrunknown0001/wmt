@@ -9,6 +9,7 @@ export default function DuplicateProjectModal({ isOpen, onClose, project }) {
     const [copyDueDates, setCopyDueDates] = useState(true);
     const [copyAssignees, setCopyAssignees] = useState(true);
     const [copySubtasks, setCopySubtasks] = useState(true);
+    const [copyAutomationRules, setCopyAutomationRules] = useState(true);
     const [processing, setProcessing] = useState(false);
 
     const handleDuplicate = async () => {
@@ -22,6 +23,7 @@ export default function DuplicateProjectModal({ isOpen, onClose, project }) {
                     copy_due_dates: copyDueDates,
                     copy_assignees: copyAssignees,
                     copy_subtasks: copySubtasks,
+                    copy_automation_rules: copyAutomationRules,
                 }),
             });
             const data = await res.json();
@@ -100,6 +102,16 @@ export default function DuplicateProjectModal({ isOpen, onClose, project }) {
                             <span className="text-sm text-gray-600 dark:text-gray-300">Copy subtasks</span>
                         </label>
                     </div>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={copyAutomationRules}
+                            onChange={(e) => setCopyAutomationRules(e.target.checked)}
+                            className={checkboxClass}
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">Copy automation rules</span>
+                    </label>
                 </div>
 
                 <p className="text-xs text-gray-400 dark:text-gray-500">
