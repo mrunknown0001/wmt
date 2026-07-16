@@ -19,12 +19,15 @@ class Project extends Model
         'owner_id',
         'folder_id',
         'due_date',
+        'is_pinned',
+        'position',
     ];
 
     protected function casts(): array
     {
         return [
             'due_date' => 'date',
+            'is_pinned' => 'boolean',
         ];
     }
 

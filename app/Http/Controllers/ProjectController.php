@@ -72,7 +72,9 @@ class ProjectController extends Controller
             $query->where('owner_id', $ownerId);
         }
 
-        $projects = $query->orderBy('created_at', 'desc')
+        $projects = $query->orderByDesc('is_pinned')
+            ->orderBy('position')
+            ->orderBy('created_at', 'desc')
             ->paginate(20)
             ->withQueryString();
 
@@ -177,7 +179,9 @@ class ProjectController extends Controller
             $query->where('owner_id', $ownerId);
         }
 
-        $projects = $query->orderBy('updated_at', 'desc')
+        $projects = $query->orderByDesc('is_pinned')
+            ->orderBy('position')
+            ->orderBy('updated_at', 'desc')
             ->paginate(20)
             ->withQueryString();
 
@@ -689,6 +693,38 @@ class ProjectController extends Controller
         }
 
         return $newTask;
+    }
+
+    public function togglePin(Project $project): JsonResponse
+    {
+        $this->authorize('update', $project);
+
+        $project->update(['is_pinned' => !$project->is_pinned]);
+
+        ActivityLogger::logChanges($project, ['is_pinned' => !$project->is_pinned], auth()->user());
+
+        return response()->json(['success' => true, 'is_pinned' => $project->is_pinned]);
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        $request->validate([
+            'projects' => 'required|array',
+            'projects.*.id' => 'required|integer|exists:projects,id',
+            'projects.*.position' => 'required|integer|min:0',
+        ]);
+
+        DB::transaction(function () use ($request) {
+            foreach ($request->input('projects') as $item) {
+                $project = Project::find($item['id']);
+                if ($project) {
+                    $this->authorize('update', $project);
+                    $project->update(['position' => $item['position']]);
+                }
+            }
+        });
+
+        return response()->json(['success' => true]);
     }
 
     public function destroy(Project $project): RedirectResponse

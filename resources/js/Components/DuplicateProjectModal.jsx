@@ -11,6 +11,7 @@ export default function DuplicateProjectModal({ isOpen, onClose, project }) {
     const [copySubtasks, setCopySubtasks] = useState(true);
     const [copyAutomationRules, setCopyAutomationRules] = useState(true);
     const [processing, setProcessing] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     const handleDuplicate = async () => {
         if (!project) return;
@@ -28,8 +29,11 @@ export default function DuplicateProjectModal({ isOpen, onClose, project }) {
             });
             const data = await res.json();
             if (data.success) {
-                onClose();
-                router.visit(`/projects/${data.project.id}`);
+                setShowSuccess(true);
+                setTimeout(() => {
+                    onClose();
+                    router.visit(`/projects/${data.project.id}`);
+                }, 1500);
             }
         } finally {
             setProcessing(false);
@@ -37,6 +41,28 @@ export default function DuplicateProjectModal({ isOpen, onClose, project }) {
     };
 
     const checkboxClass = 'h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700 cursor-pointer';
+
+    if (showSuccess) {
+        return (
+            <Modal isOpen={isOpen} onClose={onClose} title="Duplicate Project">
+                <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                    <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
+                        <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            Project duplicated successfully!
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            Redirecting to {project?.name && `"Copy of ${project.name}"`}...
+                        </p>
+                    </div>
+                </div>
+            </Modal>
+        );
+    }
 
     return (
         <Modal

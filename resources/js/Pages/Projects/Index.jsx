@@ -1,5 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -33,6 +33,7 @@ export default function Index() {
     const [search, setSearch] = useState(filters?.search || '');
     const [status, setStatus] = useState(filters?.status || '');
     const [owner, setOwner] = useState(filters?.owner || '');
+    const [draggedProject, setDraggedProject] = useState(null);
     const debounceRef = useRef(null);
 
     const view = filters?.view === 'folders' ? 'folders' : 'all';
@@ -120,6 +121,44 @@ export default function Index() {
         router.patch(`/projects/${projectId}/folder`, { folder_id: folderId }, { preserveScroll: true });
     };
 
+    const handleTogglePin = (project) => {
+        router.patch(`/projects/${project.id}/toggle-pin`, {}, { preserveScroll: true, preserveState: true });
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDropReorder = (e, targetProject) => {
+        e.preventDefault();
+        if (!draggedProject || draggedProject.id === targetProject.id) return;
+
+        const projectsList = projects.data || [];
+        const draggedIndex = projectsList.findIndex(p => p.id === draggedProject.id);
+        const targetIndex = projectsList.findIndex(p => p.id === targetProject.id);
+
+        if (draggedIndex === -1 || targetIndex === -1) return;
+
+        // Prevent dragging pinned projects below non-pinned or vice versa
+        if (draggedProject.is_pinned !== targetProject.is_pinned) return;
+
+        const reorderedProjects = [...projectsList];
+        const [movedProject] = reorderedProjects.splice(draggedIndex, 1);
+        reorderedProjects.splice(targetIndex, 0, movedProject);
+
+        // Update positions based on pin status
+        const pinnedProjects = reorderedProjects.filter(p => p.is_pinned);
+        const unpinnedProjects = reorderedProjects.filter(p => !p.is_pinned);
+
+        const updates = [
+            ...pinnedProjects.map((p, i) => ({ id: p.id, position: i })),
+            ...unpinnedProjects.map((p, i) => ({ id: p.id, position: i })),
+        ];
+
+        router.post('/projects/reorder', { projects: updates }, { preserveScroll: true, preserveState: true });
+    };
+
     const breadcrumbChain = view === 'folders' && selectedFolder !== 'root'
         ? folderAncestors(folders, selectedFolder)
         : [];
@@ -154,15 +193,37 @@ export default function Index() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {projects.data.map((project) => (
-                                <tr
-                                    key={project.id}
-                                    className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
-                                    onClick={() => router.visit(`/projects/${project.id}`)}
-                                    draggable={view === 'folders' && canManage(project)}
-                                    onDragStart={(e) => e.dataTransfer.setData('project-id', String(project.id))}
-                                >
-                                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{project.name}</td>
+                            {projects.data.map((project, index) => {
+                                const isPinned = project.is_pinned;
+                                const isLastPinned = isPinned && (index === projects.data.length - 1 || !projects.data[index + 1].is_pinned);
+                                const showSeparator = isLastPinned;
+
+                                return (
+                                    <>
+                                        <tr
+                                            key={project.id}
+                                            className={`transition-colors ${isPinned ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''} ${draggedProject?.id === project.id ? 'opacity-50 bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'} ${canManage(project) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                                            onClick={() => router.visit(`/projects/${project.id}`)}
+                                            draggable={canManage(project)}
+                                            onDragStart={(e) => {
+                                                e.stopPropagation();
+                                                setDraggedProject(project);
+                                                e.dataTransfer.effectAllowed = 'move';
+                                            }}
+                                            onDragEnd={() => setDraggedProject(null)}
+                                            onDragOver={handleDragOver}
+                                            onDrop={(e) => handleDropReorder(e, project)}
+                                        >
+                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                <div className="flex items-center gap-2">
+                                                    {isPinned && (
+                                                        <svg className="h-4 w-4 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                                            <path d="M5 5a2 2 0 012-2h6a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                                        </svg>
+                                                    )}
+                                                    <span>{project.name}</span>
+                                                </div>
+                                            </td>
                                     <td className="px-6 py-4 text-sm">
                                         <StatusBadge status={project.status} type="project" />
                                     </td>
@@ -185,23 +246,31 @@ export default function Index() {
                                         <span className="text-gray-400">/{project.tasks_count}</span>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">{formatDate(project.due_date) || '—'}</td>
-                                    <td className="px-6 py-4 text-sm text-right" onClick={(e) => e.stopPropagation()}>
-                                        {canManage(project) && (
-                                            <div className="flex items-center justify-end">
-                                                <ProjectContextMenu
-                                                    project={project}
-                                                    isArchived={project.status === 'archived'}
-                                                    onEdit={() => router.visit(`/projects/${project.id}/edit`)}
-                                                    onDuplicate={() => setDuplicateTarget(project)}
-                                                    onMoveToFolder={() => setMoveTarget(project)}
-                                                    onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
-                                                    onDelete={() => setDeleteTarget(project)}
-                                                />
-                                            </div>
+                                            <td className="px-6 py-4 text-sm text-right" onClick={(e) => e.stopPropagation()}>
+                                                {canManage(project) && (
+                                                    <div className="flex items-center justify-end">
+                                                        <ProjectContextMenu
+                                                            project={project}
+                                                            isArchived={project.status === 'archived'}
+                                                            onEdit={() => router.visit(`/projects/${project.id}/edit`)}
+                                                            onDuplicate={() => setDuplicateTarget(project)}
+                                                            onMoveToFolder={() => setMoveTarget(project)}
+                                                            onTogglePin={() => handleTogglePin(project)}
+                                                            onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
+                                                            onDelete={() => setDeleteTarget(project)}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                        {showSeparator && (
+                                            <tr className="h-1 bg-gradient-to-r from-amber-200 to-transparent dark:from-amber-900/30">
+                                                <td colSpan="7" className="p-0"></td>
+                                            </tr>
                                         )}
-                                    </td>
-                                </tr>
-                            ))}
+                                    </>
+                                );
+                            })}
                         </tbody>
                     </table>
                     </div>

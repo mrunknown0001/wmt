@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Tooltip from './Tooltip';
 
-export default function ProjectContextMenu({ project, isArchived, onEdit, onCopyLink, onDuplicate, onMoveToFolder, onArchive, onDelete, align = 'right' }) {
+export default function ProjectContextMenu({ project, isArchived, onEdit, onCopyLink, onDuplicate, onMoveToFolder, onTogglePin, onArchive, onDelete, align = 'right' }) {
     const [isOpen, setIsOpen] = useState(false);
     const buttonRef = useRef(null);
     const menuRef = useRef(null);
@@ -119,6 +119,19 @@ export default function ProjectContextMenu({ project, isArchived, onEdit, onCopy
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l1.122 1.122a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 8v1.776" />
                             </svg>
                             Move to Folder
+                        </button>
+                    )}
+
+                    {onTogglePin && (
+                        <button className={itemClass} onClick={() => { setIsOpen(false); onTogglePin(); }}>
+                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                {project.is_pinned ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h6a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                )}
+                            </svg>
+                            {project.is_pinned ? 'Unpin from Top' : 'Pin to Top'}
                         </button>
                     )}
 
