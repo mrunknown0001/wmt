@@ -128,7 +128,7 @@ export default function ProjectContextMenu({ project, isArchived, onEdit, onCopy
                                 {project.is_pinned ? (
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h6a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z" />
                                 )}
                             </svg>
                             {project.is_pinned ? 'Unpin from Top' : 'Pin to Top'}
