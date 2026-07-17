@@ -441,6 +441,7 @@ class ProjectController extends Controller
             'copy_assignees' => 'boolean',
             'copy_subtasks' => 'boolean',
             'copy_automation_rules' => 'boolean',
+            'copy_forms' => 'boolean',
         ]);
 
         $includeTasks = $request->boolean('include_tasks', true);
@@ -448,8 +449,9 @@ class ProjectController extends Controller
         $copyAssignees = $request->boolean('copy_assignees', true);
         $copySubtasks = $request->boolean('copy_subtasks', true);
         $copyAutomationRules = $request->boolean('copy_automation_rules', true);
+        $copyForms = $request->boolean('copy_forms', true);
 
-        $newProject = DB::transaction(function () use ($project, $request, $includeTasks, $copyDueDates, $copyAssignees, $copySubtasks, $copyAutomationRules) {
+        $newProject = DB::transaction(function () use ($project, $request, $includeTasks, $copyDueDates, $copyAssignees, $copySubtasks, $copyAutomationRules, $copyForms) {
             $newProject = Project::create([
                 'name' => "Copy of {$project->name}",
                 'description' => $project->description,
@@ -501,14 +503,61 @@ class ProjectController extends Controller
                 $sectionMap[$oldSection->id] = $newSection->id;
             }
 
+            // Copy forms if requested (remap custom field ids)
+            if ($copyForms) {
+                foreach ($project->forms()->get() as $oldForm) {
+                    $newForm = $newProject->forms()->create([
+                        'name' => $oldForm->name,
+                        'description' => $oldForm->description,
+                        'is_active' => $oldForm->is_active,
+                        'submit_button_text' => $oldForm->submit_button_text,
+                        'success_message' => $oldForm->success_message,
+                        'task_defaults' => $oldForm->task_defaults,
+                        'created_by' => $request->user()->id,
+                        'logo_path' => $oldForm->logo_path,
+                        'logo_position' => $oldForm->logo_position,
+                        'banner_path' => $oldForm->banner_path,
+                    ]);
+
+                    foreach ($oldForm->fields()->orderBy('position')->get() as $oldField) {
+                        $newField = $newForm->fields()->create([
+                            'type' => $oldField->type,
+                            'label' => $oldField->label,
+                            'help_text' => $oldField->help_text,
+                            'is_required' => $oldField->is_required,
+                            'position' => $oldField->position,
+                            'config' => $oldField->config,
+                            'default_value' => $oldField->default_value,
+                            'is_visible' => $oldField->is_visible,
+                            'conditions' => $oldField->conditions,
+                            'maps_to' => $oldField->maps_to,
+                            'custom_field_id' => isset($oldField->custom_field_id) && isset($customFieldMap[$oldField->custom_field_id])
+                                ? $customFieldMap[$oldField->custom_field_id]
+                                : $oldField->custom_field_id,
+                        ]);
+                    }
+                }
+            }
+
             // Copy automation rules if requested (remap section/custom field/option ids)
             if ($copyAutomationRules) {
+                $formMap = [];
+                if ($copyForms) {
+                    $oldForms = $project->forms()->get();
+                    $newForms = $newProject->forms()->get();
+                    foreach ($oldForms as $index => $oldForm) {
+                        if (isset($newForms[$index])) {
+                            $formMap[$oldForm->id] = $newForms[$index]->id;
+                        }
+                    }
+                }
+
                 foreach ($project->automationRules()->get() as $oldRule) {
                     $newProject->automationRules()->create([
                         'name' => $oldRule->name,
                         'is_active' => $oldRule->is_active,
                         'trigger_type' => $oldRule->trigger_type,
-                        'trigger_config' => $this->remapRuleTriggerConfig($oldRule->trigger_config, $customFieldMap),
+                        'trigger_config' => $this->remapRuleTriggerConfig($oldRule->trigger_config, $customFieldMap, $formMap),
                         'conditions' => $this->remapRuleConditions($oldRule->conditions, $sectionMap, $customFieldMap, $optionMap, $fieldTypeMap),
                         'actions' => $this->remapRuleActions($oldRule->actions, $sectionMap, $customFieldMap, $optionMap, $fieldTypeMap),
                         'created_by' => $request->user()->id,
@@ -559,7 +608,7 @@ class ProjectController extends Controller
         ]);
     }
 
-    private function remapRuleTriggerConfig(?array $triggerConfig, array $customFieldMap): ?array
+    private function remapRuleTriggerConfig(?array $triggerConfig, array $customFieldMap, array $formMap = []): ?array
     {
         if (empty($triggerConfig)) {
             return $triggerConfig;
@@ -570,8 +619,10 @@ class ProjectController extends Controller
                 ?? $triggerConfig['custom_field_id'];
         }
 
-        // form_id is left untouched — forms are not duplicated, so form-scoped
-        // rules simply never fire on the copy until re-pointed at a new form
+        if (isset($triggerConfig['form_id']) && !empty($formMap)) {
+            $triggerConfig['form_id'] = $formMap[(int) $triggerConfig['form_id']]
+                ?? $triggerConfig['form_id'];
+        }
 
         return $triggerConfig;
     }
