@@ -63,10 +63,10 @@ export default function UserMultiSelect({ users, selected = [], onChange, label,
                     {selectedUsers.map((user) => (
                         <div
                             key={user.id}
-                            className="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-700 rounded-full pl-1 pr-2 py-1"
+                            className="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-700 rounded-full pl-1 pr-2 py-1 max-w-full"
                         >
                             <Avatar name={user.name} size="sm" />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">{user.name}</span>
+                            <span className="text-sm text-gray-700 dark:text-gray-300 break-word">{user.name}</span>
                             {roles && (
                                 <select
                                     value={getRoleForUser(user.id)}
@@ -111,10 +111,10 @@ export default function UserMultiSelect({ users, selected = [], onChange, label,
                                 key={user.id}
                                 type="button"
                                 onClick={() => handleAdd(user.id)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className="w-full flex items-start gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
                             >
                                 <Avatar name={user.name} size="sm" />
-                                <span>{user.name}</span>
+                                <span className="break-word">{user.name}</span>
                             </button>
                         ))}
                     </div>

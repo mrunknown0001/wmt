@@ -65,7 +65,7 @@ export default function SearchableSelect({ label, id, value, onChange, options =
                         {selectedOption ? (
                             <>
                                 {showAvatar && <Avatar name={selectedOption.label} size="sm" />}
-                                <span className="truncate flex-1">{selectedOption.label}</span>
+                                <span className="flex-1 break-word">{selectedOption.label}</span>
                                 {!disabled && (
                                     <span onClick={handleClear} className="text-gray-400 hover:text-red-500 shrink-0">
                                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -75,7 +75,7 @@ export default function SearchableSelect({ label, id, value, onChange, options =
                                 )}
                             </>
                         ) : (
-                            <span className="text-gray-400 dark:text-gray-500 truncate flex-1">{placeholder}</span>
+                            <span className="text-gray-400 dark:text-gray-500 flex-1 break-word">{placeholder}</span>
                         )}
                         <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -117,12 +117,12 @@ export default function SearchableSelect({ label, id, value, onChange, options =
                                     key={opt.value}
                                     type="button"
                                     onClick={() => handleSelect(opt)}
-                                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                                    className={`w-full flex items-start gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left ${
                                         String(opt.value) === String(value) ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : ''
                                     }`}
                                 >
                                     {showAvatar && <Avatar name={opt.label} size="sm" />}
-                                    <span className="truncate">{opt.label}</span>
+                                    <span className="break-word">{opt.label}</span>
                                 </button>
                             ))
                         ) : (
