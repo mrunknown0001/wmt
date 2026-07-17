@@ -5,7 +5,6 @@ import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
-import SearchableSelect from '../../Components/SearchableSelect';
 import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
@@ -36,7 +35,6 @@ export default function Create() {
         description: '',
         status: 'to_do',
         priority: 'medium',
-        assigned_to: '',
         start_date: '',
         due_date: '',
         collaborator_ids: [],
@@ -85,8 +83,6 @@ export default function Create() {
                             <Select label="Status" id="status" value={data.status} onChange={(e) => setData('status', e.target.value)} options={statuses.map((s) => ({ value: s, label: formatLabel(s) }))} error={errors.status} />
                             <Select label="Priority" id="priority" value={data.priority} onChange={(e) => setData('priority', e.target.value)} options={priorities.map((p) => ({ value: p, label: formatLabel(p) }))} error={errors.priority} />
                         </div>
-
-                        <SearchableSelect label="Assigned To" id="assigned_to" value={data.assigned_to} onChange={(val) => setData('assigned_to', val)} placeholder="— Unassigned —" options={users.map((u) => ({ value: u.id, label: u.name }))} error={errors.assigned_to} showAvatar />
 
                         <div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -176,7 +172,6 @@ export default function Create() {
                             users={users}
                             selected={data.collaborator_ids}
                             onChange={(ids) => setData('collaborator_ids', ids)}
-                            excludeIds={data.assigned_to ? [Number(data.assigned_to)] : []}
                         />
 
                         {customFields.length > 0 && (

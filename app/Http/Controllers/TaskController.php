@@ -83,6 +83,7 @@ class TaskController extends Controller
         $task = $project->tasks()->create([
             ...$validated,
             'created_by' => $request->user()->id,
+            'assigned_to' => $request->user()->id,
             'position' => $maxPosition + 1,
         ]);
 
@@ -153,7 +154,7 @@ class TaskController extends Controller
             'parent_id' => $parent->id,
             'status' => $status,
             'priority' => $validated['priority'] ?? 'medium',
-            'assigned_to' => $validated['assigned_to'] ?? null,
+            'assigned_to' => $request->user()->id,
             'due_date' => $validated['due_date'] ?? null,
             'created_by' => $request->user()->id,
             'position' => $maxPosition + 1,
