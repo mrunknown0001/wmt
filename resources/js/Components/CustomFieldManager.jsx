@@ -159,7 +159,7 @@ function OptionEditor({ options, onChange, sortMode }) {
                         onDragOver={isManual ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOptDragOverIndex(i); } : undefined}
                         onDrop={isManual ? (e) => handleOptDrop(e, i) : undefined}
                         onDragEnd={isManual ? () => { setOptDragIndex(null); setOptDragOverIndex(null); } : undefined}
-                        className={`flex items-center gap-2 ${
+                        className={`flex items-start gap-2 ${
                             optDragOverIndex === i && optDragIndex !== i ? 'ring-1 ring-primary-400/50 rounded' : ''
                         } ${optDragIndex === i ? 'opacity-50' : ''}`}
                     >
@@ -195,7 +195,7 @@ function OptionEditor({ options, onChange, sortMode }) {
                                 }
                             }}
                             placeholder={`Option ${i + 1}`}
-                            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 break-word"
                         />
                         <button
                             type="button"

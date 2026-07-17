@@ -109,7 +109,7 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                                         style={{ backgroundColor: opt.color }}
                                     />
                                 )}
-                                <span className="break-words whitespace-normal">
+                                <span className="break-word">
                                     {opt.label}
                                 </span>
                             </label>

@@ -24,7 +24,7 @@ function SelectOptions({ options, selectedId, onSelect }) {
                     }`}
                 >
                     {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: opt.color }} />}
-                    <span className="break-words whitespace-normal flex-1">
+                    <span className="break-word flex-1">
                         {opt.label}
                     </span>
                     {String(selectedId) === String(opt.id) && (
@@ -62,7 +62,7 @@ function MultiSelectOptions({ options, selectedIds = [], onToggle, onDone }) {
                                 )}
                             </span>
                             {opt.color && <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: opt.color }} />}
-                            <span className="break-words whitespace-normal flex-1">
+                            <span className="break-word flex-1">
                                 {opt.label}
                             </span>
                         </button>
@@ -121,7 +121,7 @@ function TextNumberEditor({ value, type, onSave, onClose }) {
         }
     };
 
-    const inputClass = "w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500";
+    const inputClass = "w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 break-word";
 
     return (
         <div className={`p-2 ${type === 'textarea' ? 'min-w-70' : 'min-w-45'}`}>
