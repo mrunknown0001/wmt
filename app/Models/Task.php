@@ -2,16 +2,20 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Observers\TaskObserver;
 
+#[ObservedBy(TaskObserver::class)]
 class Task extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     public const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
 

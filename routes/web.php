@@ -31,6 +31,7 @@ use App\Http\Controllers\FormController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\TaskCustomFieldValueController;
 use App\Http\Controllers\LinkController;
+use App\Http\Controllers\TrashController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -145,6 +146,11 @@ Route::middleware('auth')->group(function () {
 
     // Activity Log (admin)
     Route::get('/activity-log', [ActivityLogController::class, 'index'])->name('activity-log');
+
+    // Trash Bin (admin)
+    Route::get('/trash', [TrashController::class, 'index'])->name('trash.index');
+    Route::post('/trash/{type}/{id}/restore', [TrashController::class, 'restore'])->name('trash.restore');
+    Route::delete('/trash/{type}/{id}', [TrashController::class, 'forceDelete'])->name('trash.destroy');
 
     // Change Password
     Route::get('/settings/password', [PasswordController::class, 'edit'])->name('settings.password');

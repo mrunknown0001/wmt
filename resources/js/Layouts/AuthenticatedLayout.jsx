@@ -258,6 +258,11 @@ export default function AuthenticatedLayout({ children, title, contained = false
                                 Settings
                             </NavLink>
                         )}
+                        {hasRole('admin') && (
+                            <NavLink href="/trash" icon={<ArchiveIcon />} active={isActive('/trash')} collapsed={collapsed}>
+                                Trash Bin
+                            </NavLink>
+                        )}
                     </NavSection>
                 )}
             </nav>

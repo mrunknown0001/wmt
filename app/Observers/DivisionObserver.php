@@ -21,6 +21,13 @@ class DivisionObserver
 
     public function deleted(Division $division): void
     {
+        $division->departments()->withTrashed()->get()->each->delete();
         FolderService::removeFor(Division::class, $division->id);
+    }
+
+    public function restored(Division $division): void
+    {
+        $division->departments()->onlyTrashed()->restore();
+        FolderService::syncDivision($division);
     }
 }

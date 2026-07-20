@@ -21,6 +21,13 @@ class DepartmentObserver
 
     public function deleted(Department $department): void
     {
+        $department->teams()->withTrashed()->get()->each->delete();
         FolderService::removeFor(Department::class, $department->id);
+    }
+
+    public function restored(Department $department): void
+    {
+        $department->teams()->onlyTrashed()->restore();
+        FolderService::syncDepartment($department);
     }
 }

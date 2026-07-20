@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 
 class Folder extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     // Maximum user folder nesting (0-indexed): 5 levels below a system folder or root
     public const MAX_USER_DEPTH = 4;

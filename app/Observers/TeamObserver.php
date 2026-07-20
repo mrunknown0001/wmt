@@ -23,4 +23,9 @@ class TeamObserver
     {
         FolderService::removeFor(Team::class, $team->id);
     }
+
+    public function restored(Team $team): void
+    {
+        FolderService::syncTeam($team);
+    }
 }

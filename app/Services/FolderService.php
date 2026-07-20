@@ -193,7 +193,8 @@ class FolderService
                 ->update(['folder_id' => $parent?->id]);
 
             // Remaining subtree is system folders only; FK cascade clears descendants
-            $folder->delete();
+            // Use forceDelete to ensure system folders never appear in trash
+            $folder->forceDelete();
         });
     }
 }
