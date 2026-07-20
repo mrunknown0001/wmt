@@ -138,7 +138,7 @@ function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpd
     const [editBody, setEditBody] = useState('');
     const [saving, setSaving] = useState(false);
 
-    const commentUrl = `/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
+    const commentUrl = `/api/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
 
     const handleDelete = async () => {
         console.log('Delete comment URL:', commentUrl, { projectId, taskId, commentId: item.id });
@@ -424,7 +424,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                 headers['X-Socket-ID'] = window.Echo.socketId();
             }
 
-            const res = await fetch(`/projects/${projectId}/tasks/${taskId}/comments`, {
+            const res = await fetch(`/api/projects/${projectId}/tasks/${taskId}/comments`, {
                 method: 'POST',
                 headers,
                 body: formData,
