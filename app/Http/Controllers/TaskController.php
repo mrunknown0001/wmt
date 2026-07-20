@@ -341,6 +341,7 @@ class TaskController extends Controller
             'recurrenceFrequencies' => Task::RECURRENCE_FREQUENCIES,
             'recurrenceChain' => $recurrenceChain,
             'canManageTaskDetails' => $canManageTaskDetails,
+            'isStandalone' => false,
             'customFields' => $customFields,
             'customFieldValues' => $customFieldValues,
             'subtasks' => $subtasks,
