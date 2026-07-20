@@ -141,6 +141,7 @@ function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpd
     const commentUrl = `/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
 
     const handleDelete = async () => {
+        console.log('Delete comment URL:', commentUrl, { projectId, taskId, commentId: item.id });
         if (!confirm('Delete this comment?')) return;
         setDeleting(true);
         try {
