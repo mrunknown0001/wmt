@@ -40,20 +40,21 @@ export default function TrashIndex() {
 
     const handleFilterChange = (typeValue) => {
         setSelectedType(typeValue);
-        const params = {};
+        const params = [];
         if (typeValue) {
-            params.type = typeValue;
+            params.push(`type=${encodeURIComponent(typeValue)}`);
         }
         if (pagination.current_page > 1) {
-            params.page = 1;
+            params.push('page=1');
         }
-        router.get(route('trash.index'), params, { preserveScroll: true });
+        const url = params.length > 0 ? `/trash?${params.join('&')}` : '/trash';
+        router.get(url, {}, { preserveScroll: true });
     };
 
     const handleRestore = (type, id) => {
         setRestoringId(`${type}-${id}`);
         router.post(
-            route('trash.restore', { type, id }),
+            `/trash/${type}/${id}/restore`,
             {},
             {
                 onFinish: () => setRestoringId(null),
@@ -67,7 +68,7 @@ export default function TrashIndex() {
         }
         setDeletingId(`${type}-${id}`);
         router.delete(
-            route('trash.destroy', { type, id }),
+            `/trash/${type}/${id}`,
             {
                 onFinish: () => setDeletingId(null),
             }
@@ -265,16 +266,14 @@ export default function TrashIndex() {
                         <div className="space-x-2">
                             {pagination.current_page > 1 && (
                                 <button
-                                    onClick={() =>
-                                        router.get(
-                                            route('trash.index'),
-                                            {
-                                                ...filters,
-                                                page: pagination.current_page - 1,
-                                            },
-                                            { preserveScroll: true }
-                                        )
-                                    }
+                                    onClick={() => {
+                                        const params = [];
+                                        if (filters.type) {
+                                            params.push(`type=${encodeURIComponent(filters.type)}`);
+                                        }
+                                        params.push(`page=${pagination.current_page - 1}`);
+                                        router.get(`/trash?${params.join('&')}`, {}, { preserveScroll: true });
+                                    }}
                                     className="inline-block px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                                 >
                                     Previous
@@ -282,16 +281,14 @@ export default function TrashIndex() {
                             )}
                             {pagination.current_page < pagination.last_page && (
                                 <button
-                                    onClick={() =>
-                                        router.get(
-                                            route('trash.index'),
-                                            {
-                                                ...filters,
-                                                page: pagination.current_page + 1,
-                                            },
-                                            { preserveScroll: true }
-                                        )
-                                    }
+                                    onClick={() => {
+                                        const params = [];
+                                        if (filters.type) {
+                                            params.push(`type=${encodeURIComponent(filters.type)}`);
+                                        }
+                                        params.push(`page=${pagination.current_page + 1}`);
+                                        router.get(`/trash?${params.join('&')}`, {}, { preserveScroll: true });
+                                    }}
                                     className="inline-block px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                                 >
                                     Next
