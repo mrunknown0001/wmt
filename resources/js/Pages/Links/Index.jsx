@@ -137,22 +137,57 @@ export default function Index() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {links.data.map((link) => (
+                                    {links.data.map((link) => {
+                                        const displayTitle = link.title.length > 50 ? link.title.substring(0, 50) + '...' : link.title;
+                                        const displayDescription = link.description && link.description.length > 50 ? link.description.substring(0, 50) + '...' : (link.description || '—');
+                                        const displayUrl = link.url.replace(/^https?:\/\//, '').substring(0, 40);
+                                        const urlTruncated = link.url.replace(/^https?:\/\//, '').length > 40;
+
+                                        return (
                                         <tr key={link.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{link.title}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate hidden md:table-cell">{link.description || '—'}</td>
+                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                {link.title.length > 50 ? (
+                                                    <Tooltip content={link.title} position="top">
+                                                        <span className="cursor-help">{displayTitle}</span>
+                                                    </Tooltip>
+                                                ) : (
+                                                    link.title
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs hidden md:table-cell">
+                                                {link.description && link.description.length > 50 ? (
+                                                    <Tooltip content={link.description} position="top">
+                                                        <span className="truncate cursor-help">{displayDescription}</span>
+                                                    </Tooltip>
+                                                ) : (
+                                                    displayDescription
+                                                )}
+                                            </td>
                                             <td className="px-6 py-4 text-sm">
                                                 {link.url ? (
-                                                    <a
-                                                        href={link.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center max-w-xs truncate"
-                                                    >
-                                                        {link.url.replace(/^https?:\/\//, '').substring(0, 40)}
-                                                        {link.url.replace(/^https?:\/\//, '').length > 40 ? '...' : ''}
-                                                        <ExternalLinkIcon />
-                                                    </a>
+                                                    urlTruncated ? (
+                                                        <Tooltip content={link.url} position="top">
+                                                            <a
+                                                                href={link.url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center max-w-xs truncate cursor-help"
+                                                            >
+                                                                {displayUrl}...
+                                                                <ExternalLinkIcon />
+                                                            </a>
+                                                        </Tooltip>
+                                                    ) : (
+                                                        <a
+                                                            href={link.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center"
+                                                        >
+                                                            {displayUrl}
+                                                            <ExternalLinkIcon />
+                                                        </a>
+                                                    )
                                                 ) : '—'}
                                             </td>
                                             {canManage && (
@@ -188,7 +223,8 @@ export default function Index() {
                                                 </td>
                                             )}
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                             </div>
