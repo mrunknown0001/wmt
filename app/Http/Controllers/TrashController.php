@@ -81,7 +81,7 @@ class TrashController extends Controller
                 Task::onlyTrashed()
                     ->whereHas('project')
                     ->where(function ($q) {
-                        $q->whereNull('parent_id')->orWhereHas('parentTask');
+                        $q->whereNull('parent_id')->orWhereHas('parent');
                     })
                     ->get(),
                 'tasks',
