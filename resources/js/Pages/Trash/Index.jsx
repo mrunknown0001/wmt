@@ -1,7 +1,24 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { ChevronDown, Trash2, RotateCcw } from 'lucide-react';
+
+const TrashIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+    </svg>
+);
+
+const RestoreIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0H7.977M2.723 13.52a10.5 10.5 0 002.6 5.623c3.946 5.186 10.046 6.842 15.146 3.054m0-13.202a10.5 10.5 0 00-2.6-5.623C9.933 1.534 3.833-.122-1.267 3.654" />
+    </svg>
+);
+
+const ChevronDownIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+    </svg>
+);
 
 export default function TrashIndex() {
     const { items, pagination, filters } = usePage().props;
@@ -117,13 +134,17 @@ export default function TrashIndex() {
                                 </option>
                             ))}
                         </select>
-                        <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none w-4 h-4" />
+                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none w-4 h-4">
+                            <ChevronDownIcon />
+                        </div>
                     </div>
                 </div>
 
                 {items.length === 0 ? (
                     <div className="text-center py-12">
-                        <Trash2 className="mx-auto h-12 w-12 text-gray-400" />
+                        <div className="mx-auto h-12 w-12 text-gray-400">
+                            <TrashIcon />
+                        </div>
                         <p className="mt-4 text-gray-600 dark:text-gray-400">
                             No trashed items found
                         </p>
@@ -206,7 +227,9 @@ export default function TrashIndex() {
                                                 }
                                                 className="inline-flex items-center gap-2 text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                <RotateCcw className="w-4 h-4" />
+                                                <div className="w-4 h-4">
+                                                    <RestoreIcon />
+                                                </div>
                                                 Restore
                                             </button>
                                             <button
@@ -219,7 +242,9 @@ export default function TrashIndex() {
                                                 }
                                                 className="inline-flex items-center gap-2 text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <div className="w-4 h-4">
+                                                    <TrashIcon />
+                                                </div>
                                                 Delete
                                             </button>
                                         </td>
