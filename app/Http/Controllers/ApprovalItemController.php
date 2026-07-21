@@ -91,6 +91,17 @@ class ApprovalItemController extends Controller
             'comments.attachments',
         ]);
 
+        // Append URL to each attachment for proper serialization
+        if ($item->comments) {
+            foreach ($item->comments as $comment) {
+                if ($comment->attachments) {
+                    foreach ($comment->attachments as $attachment) {
+                        $attachment->append('url');
+                    }
+                }
+            }
+        }
+
         return Inertia::render('ApprovalItems/Show', [
             'project' => $approvalProject,
             'item' => $item,

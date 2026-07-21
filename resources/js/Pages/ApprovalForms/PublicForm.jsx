@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Head, router } from '@inertiajs/react';
-import { useForm } from '@inertiajs/react';
 
 export default function PublicForm({ form, fields, turnstile }) {
-    const { data, setData, post, processing, errors } = useForm({});
+    const formRef = useRef(null);
     const [fieldValues, setFieldValues] = useState({});
+    const [fileValues, setFileValues] = useState({});
+    const [errors, setErrors] = useState({});
+    const [processing, setProcessing] = useState(false);
     const [turnstileToken, setTurnstileToken] = useState(null);
 
     const handleFieldChange = (fieldId, value) => {
@@ -12,10 +14,27 @@ export default function PublicForm({ form, fields, turnstile }) {
             ...fieldValues,
             [`field_${fieldId}`]: value,
         });
+        // Clear error for this field when user starts typing
+        if (errors[`field_${fieldId}`]) {
+            setErrors({
+                ...errors,
+                [`field_${fieldId}`]: null,
+            });
+        }
+    };
+
+    const handleFileChange = (fieldId, files) => {
+        if (files) {
+            setFileValues({
+                ...fileValues,
+                [`field_${fieldId}`]: files,
+            });
+        }
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        setErrors({});
 
         // Validate Turnstile if enabled
         if (turnstile.enabled && !turnstileToken) {
@@ -23,12 +42,38 @@ export default function PublicForm({ form, fields, turnstile }) {
             return;
         }
 
-        const submitData = {
-            ...fieldValues,
-            ...(turnstile.enabled && turnstileToken && { cf_turnstile_response: turnstileToken }),
-        };
+        setProcessing(true);
 
-        post(route('forms-approval.submit', form.uuid), submitData);
+        const formData = new FormData();
+
+        // Add field values
+        Object.entries(fieldValues).forEach(([key, value]) => {
+            formData.append(key, value || '');
+        });
+
+        // Add file values
+        Object.entries(fileValues).forEach(([key, files]) => {
+            if (files) {
+                Array.from(files).forEach((file) => {
+                    formData.append(key, file);
+                });
+            }
+        });
+
+        // Add Turnstile token if enabled
+        if (turnstile.enabled && turnstileToken) {
+            formData.append('cf_turnstile_response', turnstileToken);
+        }
+
+        router.post(route('forms-approval.submit', form.uuid), formData, {
+            onError: (errors) => {
+                setErrors(errors);
+                setProcessing(false);
+            },
+            onSuccess: () => {
+                setProcessing(false);
+            },
+        });
     };
 
     return (
@@ -183,6 +228,103 @@ export default function PublicForm({ form, fields, turnstile }) {
                                                     </option>
                                                 ))}
                                             </select>
+                                            {errors[`field_${field.id}`] && (
+                                                <p className="text-red-600 text-sm mt-1">{errors[`field_${field.id}`]}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {field.type === 'attachment' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                {field.label}
+                                                {field.is_required && <span className="text-red-600">*</span>}
+                                            </label>
+                                            <input
+                                                type="file"
+                                                onChange={(e) => handleFileChange(field.id, e.target.files)}
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                required={field.is_required}
+                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.zip"
+                                                multiple
+                                            />
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Accepted formats: PDF, DOC, DOCX, XLS, XLSX, ZIP
+                                            </p>
+                                            {errors[`field_${field.id}`] && (
+                                                <p className="text-red-600 text-sm mt-1">{errors[`field_${field.id}`]}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {field.type === 'capture_photo' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                {field.label}
+                                                {field.is_required && <span className="text-red-600">*</span>}
+                                            </label>
+                                            <input
+                                                type="file"
+                                                onChange={(e) => handleFileChange(field.id, e.target.files)}
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                required={field.is_required}
+                                                accept="image/jpeg,image/jpg,image/png"
+                                                capture="environment"
+                                            />
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Accepted formats: JPG, PNG
+                                            </p>
+                                            {errors[`field_${field.id}`] && (
+                                                <p className="text-red-600 text-sm mt-1">{errors[`field_${field.id}`]}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {field.type === 'capture_video' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                {field.label}
+                                                {field.is_required && <span className="text-red-600">*</span>}
+                                            </label>
+                                            <input
+                                                type="file"
+                                                onChange={(e) => handleFileChange(field.id, e.target.files)}
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                required={field.is_required}
+                                                accept="video/mp4,video/quicktime,video/webm"
+                                                capture="environment"
+                                            />
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Accepted formats: MP4, MOV, WEBM
+                                            </p>
+                                            {errors[`field_${field.id}`] && (
+                                                <p className="text-red-600 text-sm mt-1">{errors[`field_${field.id}`]}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {field.type === 'multi_select' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                {field.label}
+                                                {field.is_required && <span className="text-red-600">*</span>}
+                                            </label>
+                                            <select
+                                                multiple
+                                                value={Array.isArray(fieldValues[`field_${field.id}`]) ? fieldValues[`field_${field.id}`] : []}
+                                                onChange={(e) => handleFieldChange(field.id, Array.from(e.target.selectedOptions, option => option.value))}
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                required={field.is_required}
+                                            >
+                                                {field.options?.map((option) => (
+                                                    <option key={option.id} value={option.id}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Hold Ctrl (or Cmd on Mac) to select multiple options
+                                            </p>
                                             {errors[`field_${field.id}`] && (
                                                 <p className="text-red-600 text-sm mt-1">{errors[`field_${field.id}`]}</p>
                                             )}
