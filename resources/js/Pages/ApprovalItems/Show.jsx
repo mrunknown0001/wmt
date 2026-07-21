@@ -13,6 +13,13 @@ const statusColors = {
     cancelled: 'bg-gray-100 text-gray-800',
 };
 
+const capitalizeStatus = (status) => {
+    if (!status) return '';
+    return status
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+};
 
 export default function Show({ item, project, canDecide, canEdit, auth }) {
     const [isDeciding, setIsDeciding] = useState(false);
@@ -77,7 +84,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                         </div>
                     </div>
                     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${statusColors[item.status]}`}>
-                        <span className="font-medium">{item.status.replace('_', ' ').charAt(0).toUpperCase() + item.status.replace('_', ' ').slice(1)}</span>
+                        <span className="font-medium">{capitalizeStatus(item.status)}</span>
                     </div>
                 </div>
 
@@ -143,7 +150,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                                                     instance.status === 'rejected' ? 'bg-red-100 text-red-800' :
                                                     'bg-gray-100 text-gray-800'
                                                 }`}>
-                                                    {instance.status}
+                                                    {capitalizeStatus(instance.status)}
                                                 </span>
                                             </div>
                                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
@@ -187,7 +194,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                                                                 <span className={`text-xs font-medium ${
                                                                     decision.decision === 'approved' ? 'text-green-600' : 'text-red-600'
                                                                 }`}>
-                                                                    {decision.decision}
+                                                                    {capitalizeStatus(decision.decision)}
                                                                 </span>
                                                             </div>
                                                             <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -226,7 +233,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                                             <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
                                                 currentStep.status === 'active' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
                                             }`}>
-                                                {currentStep.status}
+                                                {capitalizeStatus(currentStep.status)}
                                             </span>
                                         </p>
                                     </div>
