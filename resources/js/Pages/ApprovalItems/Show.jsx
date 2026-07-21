@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, usePage, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
@@ -18,37 +18,23 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
     const [decisionComment, setDecisionComment] = useState('');
     const [decidingAction, setDecidingAction] = useState(null);
 
-    const handleDecision = async (action) => {
+    const handleDecision = (action) => {
         if (!decidingAction) {
             setDecidingAction(action);
             return;
         }
 
-        setIsDeciding(true);
-        try {
-            const response = await fetch(
-                route('approval-projects.items.advance', [project.id, item.id]),
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    },
-                    body: JSON.stringify({
-                        action: decidingAction,
-                        comment: decisionComment,
-                    }),
-                }
-            );
-
-            if (response.ok) {
-                window.location.reload();
+        router.post(
+            route('approval-projects.items.advance', [project.id, item.id]),
+            {
+                action: decidingAction,
+                comment: decisionComment,
+            },
+            {
+                onStart: () => setIsDeciding(true),
+                onFinish: () => setIsDeciding(false),
             }
-        } catch (error) {
-            console.error('Error making decision:', error);
-        } finally {
-            setIsDeciding(false);
-        }
+        );
     };
 
     const currentStep = item.step_instances?.[0];
