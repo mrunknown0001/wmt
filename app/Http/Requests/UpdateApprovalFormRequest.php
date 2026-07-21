@@ -19,6 +19,7 @@ class UpdateApprovalFormRequest extends FormRequest
             'is_active' => 'nullable|boolean',
             'submit_button_text' => 'nullable|string|max:100',
             'success_message' => 'nullable|string|max:1000',
+            'email_mode' => 'nullable|string|in:any,registered',
             'item_defaults' => 'nullable|array',
             'item_defaults.status' => 'nullable|string',
             'item_defaults.section_id' => 'nullable|integer',
