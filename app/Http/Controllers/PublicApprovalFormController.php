@@ -105,10 +105,15 @@ class PublicApprovalFormController extends Controller
         if ($form->email_mode === 'registered') {
             // Find email field value
             $emailFieldValue = null;
+            $emailFieldKey = null;
+
             foreach ($allFields as $field) {
                 if ($field->type === 'email') {
-                    $emailFieldValue = $validated["field_{$field->id}"] ?? null;
-                    if ($emailFieldValue) {
+                    $emailFieldKey = "field_{$field->id}";
+                    $emailFieldValue = $validated[$emailFieldKey] ?? null;
+
+                    // Check if email field is visible and conditions are met
+                    if ($emailFieldValue && $field->is_visible && $this->fieldConditionsMet($field, $validated, $allFields)) {
                         break;
                     }
                 }
@@ -116,9 +121,17 @@ class PublicApprovalFormController extends Controller
 
             if ($emailFieldValue) {
                 $user = \App\Models\User::where('email', $emailFieldValue)->first();
-                if (!$user || !$user->is_active) {
-                    return back()->withErrors([
-                        'email' => 'This email is not registered or the account is inactive. Please use a valid registered email address.',
+
+                // Throw validation error if email not found or user is inactive
+                if (!$user) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $emailFieldKey => 'This email is not registered in the system. Only registered users can submit this form.',
+                    ]);
+                }
+
+                if (!$user->is_active) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $emailFieldKey => 'This email account is inactive. Please contact an administrator.',
                     ]);
                 }
             }
