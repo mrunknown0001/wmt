@@ -25,39 +25,51 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
             // Collect form data
             const formData = new FormData(formRef.current);
 
-            // Submit via fetch
+            // Submit via fetch - prevent automatic redirects
             const response = await fetch(route('forms-approval.submit', form.uuid), {
                 method: 'POST',
                 body: formData,
+                redirect: 'manual',
             });
 
-            const contentType = response.headers.get('content-type');
+            console.log('Response status:', response.status, 'Type:', response.type);
 
-            // Check if response is JSON (error response with validation errors)
-            if (contentType && contentType.includes('application/json')) {
+            // Handle validation errors (422)
+            if (response.status === 422) {
                 const data = await response.json();
-
-                if (response.status === 422 && data.errors) {
-                    // Validation error
+                if (data.errors) {
                     setErrors(data.errors);
                     window.scrollTo(0, 0);
                     return;
-                } else if (data.message) {
-                    setFormErrors(data.message);
-                    return;
-                }
-            } else {
-                // Successful submission (HTML response or redirect)
-                if (response.ok) {
-                    // Redirect to success page
-                    const text = await response.text();
-                    if (text.includes('success')) {
-                        window.location.href = response.url;
-                    }
-                } else {
-                    setFormErrors('An error occurred while submitting the form.');
                 }
             }
+
+            // Handle successful submission (200 or other success status)
+            if (response.ok || response.status === 200) {
+                // Try to parse as JSON first
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    // Redirect to success page
+                    window.location.href = window.location.href.replace('/forms-approval/', '/approval-projects/');
+                } else {
+                    // It's HTML - redirect to success
+                    window.location.href = response.url || window.location.href;
+                }
+                return;
+            }
+
+            // Handle redirects (3xx responses)
+            if (response.status >= 300 && response.status < 400) {
+                const redirectUrl = response.headers.get('location');
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
+                    return;
+                }
+            }
+
+            // Handle other errors
+            setFormErrors('An error occurred while submitting the form. Please try again.');
         } catch (error) {
             console.error('Form submission error:', error);
             setFormErrors('An error occurred while submitting the form. Please try again.');
