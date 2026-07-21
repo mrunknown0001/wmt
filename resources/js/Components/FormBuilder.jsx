@@ -1039,15 +1039,15 @@ export default function FormBuilder({ fields = [], onChange, customFields = [], 
     };
 
     const updateField = (index, updatedField) => {
-        const newFields = [...fields];
+        const newFields = [...safeFields];
         newFields[index] = updatedField;
         onChange(newFields);
     };
 
     const removeField = (index) => {
-        const removedField = fields[index];
+        const removedField = safeFields[index];
         const removedKey = removedField?.id ? `id:${removedField.id}` : `pos:${index}`;
-        let newFields = fields.filter((_, i) => i !== index);
+        let newFields = safeFields.filter((_, i) => i !== index);
 
         // Clean up conditions referencing the removed field and update pos: keys
         newFields = newFields.map((f, newIdx) => {
@@ -1091,7 +1091,7 @@ export default function FormBuilder({ fields = [], onChange, customFields = [], 
             posMapping[i] = dest;
         });
 
-        const newFields = arrayMove(fields, oldIndex, newIndex).map((f, i) => {
+        const newFields = arrayMove(safeFields, oldIndex, newIndex).map((f, i) => {
             const updated = { ...f, position: i };
             // Update pos: references in conditions
             if (updated.conditions?.rules?.length) {
