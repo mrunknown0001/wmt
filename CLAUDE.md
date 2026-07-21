@@ -79,6 +79,7 @@ Division → Department → Team → Users (fixed hierarchy)
 - `manage-projects`, `view-projects`
 - `manage-tasks`, `view-tasks`
 - `manage-links`, `view-links`
+- `manage-approval-projects`, `view-approval-projects`
 
 ## Key Decisions
 - Public registration is disabled; new users are created by admins/privileged users via user management UI
@@ -191,6 +192,87 @@ Division → Department → Team → Users (fixed hierarchy)
 - Frontend: Links Index/Create/Edit pages
 - URLs rendered as clickable links opening in new tabs
 - Sidebar "Links & URLs" nav item visible only to users with view-links (admin, executive)
+
+### Phase 7: Approval Projects (Phase A+B+C+D) — PHASES A-D COMPLETE
+**Phase A: Container + sections + custom fields — COMPLETE**
+- ApprovalProject, ApprovalSection, ApprovalCustomField, ApprovalCustomFieldOption models
+- 7 migrations (approval_projects, approval_project_members, approval_sections, approval_custom_fields, approval_custom_field_options, approval_items, approval_item_custom_field_values)
+- ApprovalItem model (submission instance)
+- ApprovalItemCustomFieldValue EAV table mirroring TaskCustomFieldValue typed-column pattern (value_text, value_number, value_date, value_json, value_option_id)
+- 2 new permissions (manage-approval-projects, view-approval-projects) wired into all roles
+- ApprovalProjectPolicy: create for any authenticated user; update/delete for manage-approval-projects OR owner OR admin member
+- ApprovalCustomFieldController (JSON API): CRUD + reorder, nested under approval-projects
+- ApprovalProjectController (Inertia): Index/Create/Edit/Show CRUD
+- Frontend: ApprovalProjects/{Index, Create, Edit, Show}.jsx
+- Sidebar: "Approvals" nav entry + ApprovalCheckIcon
+
+**Phase B: Approval chain engine + workflow state machine — COMPLETE**
+- **Chain models + versioning**: ApprovalChain, ApprovalChainVersion (immutable versioning on edit), ApprovalStep (per-version immutable snapshots)
+- **Runtime tracking**: ApprovalStepInstance, ApprovalStepInstanceApprover (eligible-approver snapshot), ApprovalStepDecision (audit trail)
+- **7 new migrations**: approval_chains, approval_chain_versions, approval_steps, approval_step_instances, approval_step_instance_approvers, approval_step_decisions, + alter approval_items to add FK
+- **Dynamic approver resolution**: ApprovalApproverResolver service (8 approver types: specific_user, role, requester_manager, department_head, division_head, team_leader, group, project_owner; fallback chain; quorum calculation)
+- **Versioning + in-flight protection**: ApprovalChainVersioningService (copy-on-write: new version only if items in flight; same-version edits in place; restrictOnDelete prevents corruption)
+- **Workflow engine**: ApprovalWorkflowEngine (state machine: submit → resolve chain → activate step 1 → collect decisions → evaluate quorum → progress/finalize/apply-rejection-behavior; reject behaviors: reject_item, return_to_previous_step, return_to_requester)
+- **Policies**: ApprovalItemPolicy (view: member/owner/requester/eligible approver; decide: eligible approver only)
+- **Controllers**: ApprovalChainController (chain CRUD, nested under projects), ApprovalItemController (item CRUD + advance/resubmit endpoints)
+- **Form Requests**: Store/UpdateApprovalChain, Store/UpdateApprovalItem (custom field value routing)
+- **Routes**: nested resources under approval-projects; advance/resubmit custom actions on items
+- **No frontend yet for Phase B** (placeholder on Show page) — frontend comes after Phase C/D when automation/forms complete
+
+**Phase C: Form intake system — COMPLETE**
+- **Form models**: ApprovalForm (uuid public link, branding, item_defaults JSON), ApprovalFormField (12 field types: text/textarea/select/multi_select/date/number/email/heading/description/attachment/capture_photo/capture_video)
+- **2 new migrations**: approval_forms, approval_form_fields
+- **Form builder controller**: ApprovalFormController (Inertia-driven CRUD, logo/banner uploads, field sync, condition key resolution)
+- **Public submission controller**: PublicApprovalFormController (Turnstile + throttle:10,1, dynamic validation per field type, condition evaluation, custom field mapping, title field assembly, file uploads, item creation, workflow trigger)
+- **Condition system**: same `{logic, rules}` JSON shape as FormField, evaluated recursively, field_key → field_id post-save resolution (same pattern as existing Forms)
+- **Custom field mapping**: form fields map to item description or custom fields; select/multi_select resolved to option labels for title assembly
+- **Item defaults**: status, section_id, title_field_ids — same as ProjectForm for consistency
+- **File handling**: attachments/photos/videos stored to public disk, ready for future ApprovalItemAttachment model (mirroring TaskAttachment)
+- **Routes**: authenticated form CRUD nested under approval-projects; public form show/submit (unauthenticated, throttled)
+- **No frontend yet for Phase C** — pages/components placeholder until Phase E
+
+**Phase D: Automation rules system — COMPLETE**
+- **Automation model**: ApprovalAutomationRule (trigger_type: item_submitted, approval_requested, approval_step_decided, approval_completed, approval_rejected, approval_changes_requested, approval_cancelled)
+- **1 new migration**: approval_automation_rules
+- **Condition system**: field ∈ {status, current_step_number, requested_by, custom_field}, same `{logic, rules}` JSON shape as ProjectAutomationRule; `__requester_manager__` placeholder for requestor's manager (mirroring `__project_owner__` pattern)
+- **Action system**: only 3 types allowed (no status/step mutations): send_notification, add_comment, set_custom_field; isolated to prevent audit trail corruption
+- **Automation engine**: ApprovalAutomationRuleEngine (static `$executing` guard against re-entrancy, condition evaluation reuses ApprovalWorkflowEngine logic for custom fields/dates/selects/etc., action execution via private methods)
+- **Broadcasting**: ApprovalAutomationRuleExecuted and ApprovalItemUpdated events broadcast on private channel approval-project.{id} for real-time UI sync
+- **Workflow integration**: automation fires at 7 trigger points: submit (item_submitted) → chain resolution, advance (approval_step_decided) → decision recorded, then progression (approval_requested) on next step, finalize (approval_completed or approval_rejected), returnToRequester (approval_changes_requested), cancel (approval_cancelled)
+- **Controller**: ApprovalAutomationRuleController (Inertia CRUD + toggle, nested under approval-projects with authorizeApprovalProject guard)
+- **Form Requests**: Store/UpdateApprovalAutomationRuleRequest
+- **Routes**: nested CRUD + toggle action under approval-projects
+- **No frontend yet for Phase D** — pages/components placeholder until Phase E
+
+**Phase E: Frontend pages and components — COMPLETE**
+- **Pages created**: 
+  - ApprovalItems/Show.jsx (approval detail with decision UI, step history, custom fields, audit trail)
+  - MyApprovals/Index.jsx (cross-project inbox for approvers with pending requests)
+  - ApprovalChains/{Index, Create, Edit}.jsx (chain management pages)
+  - ApprovalForms/{Index, Create, Edit}.jsx (form intake pages)
+  - ApprovalAutomationRules/{Index, Create, Edit}.jsx (automation rule pages)
+  - ApprovalProjects/Show.jsx (updated with tabbed interface for overview/chains/forms/automation)
+- **Components created**:
+  - ApprovalChainBuilder.jsx (step builder with drag-reorder, approver type picker, quorum config, reject behaviors)
+- **Controllers created**:
+  - MyApprovalsController.php (index action to fetch pending approvals for authenticated user)
+- **Routes added**:
+  - GET /my-approvals (MyApprovalsController@index) for approver inbox
+- **Sidebar**: Added "My Approvals" link under Approvals section for quick access to pending inbox
+- **UI Features**: 
+  - Status badges and color-coded workflows
+  - Approval decision form with comment input and confirmation
+  - Step-by-step audit trail visualization with decision history
+  - Quorum display and approval tracking per step
+  - Custom field value display
+  - Cross-project grouping in My Approvals inbox
+
+**Architecture completed**:
+- ✓ Container layer (projects, sections, custom fields)
+- ✓ Workflow engine (chains, versioning, steps, decisions, state machine)
+- ✓ Form intake (builder, public submissions, field mapping)
+- ✓ Automation layer (triggers, conditions, actions, broadcast events)
+- ✓ Frontend pages and components (full UI for all approval workflows)
 
 ## Running
 ```bash

@@ -30,6 +30,8 @@ class RolePermissionSeeder extends Seeder
             'view-tasks',
             'manage-links',
             'view-links',
+            'manage-approval-projects',
+            'view-approval-projects',
         ];
 
         foreach ($permissions as $permission) {
@@ -49,6 +51,7 @@ class RolePermissionSeeder extends Seeder
             'view-projects',
             'view-tasks',
             'view-links',
+            'view-approval-projects',
         ]);
 
         $divisionHead = Role::firstOrCreate(['name' => 'division_head']);
@@ -59,6 +62,7 @@ class RolePermissionSeeder extends Seeder
             'view-teams',
             'view-projects',
             'view-tasks',
+            'view-approval-projects',
         ]);
 
         $supervisor = Role::firstOrCreate(['name' => 'supervisor']);
@@ -69,12 +73,14 @@ class RolePermissionSeeder extends Seeder
             'view-projects',
             'view-tasks',
             'manage-tasks',
+            'view-approval-projects',
         ]);
 
         $user = Role::firstOrCreate(['name' => 'user']);
         $user->syncPermissions([
             'view-projects',
             'view-tasks',
+            'view-approval-projects',
         ]);
     }
 }

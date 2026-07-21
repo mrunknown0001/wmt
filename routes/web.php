@@ -33,6 +33,14 @@ use App\Http\Controllers\TaskCustomFieldValueController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\TrashController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ApprovalProjectController;
+use App\Http\Controllers\ApprovalCustomFieldController;
+use App\Http\Controllers\ApprovalChainController;
+use App\Http\Controllers\ApprovalItemController;
+use App\Http\Controllers\ApprovalFormController;
+use App\Http\Controllers\PublicApprovalFormController;
+use App\Http\Controllers\ApprovalAutomationRuleController;
+use App\Http\Controllers\MyApprovalsController;
 use Illuminate\Support\Facades\Route;
 
 // Guest routes
@@ -49,6 +57,10 @@ Route::middleware('guest')->group(function () {
 // Public forms (no auth required)
 Route::get('/forms/{uuid}', [PublicFormController::class, 'show'])->name('forms.show');
 Route::post('/forms/{uuid}', [PublicFormController::class, 'submit'])->middleware('throttle:10,1')->name('forms.submit');
+
+// Public approval forms (no auth required)
+Route::get('/forms-approval/{uuid}', [PublicApprovalFormController::class, 'show'])->name('forms-approval.show');
+Route::post('/forms-approval/{uuid}', [PublicApprovalFormController::class, 'submit'])->middleware('throttle:10,1')->name('forms-approval.submit');
 
 // Authenticated routes
 Route::middleware('auth')->group(function () {
@@ -119,6 +131,56 @@ Route::middleware('auth')->group(function () {
     Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
     Route::get('/projects/{project}/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'download'])->name('tasks.comments.attachments.download');
     Route::get('/projects/{project}/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
+
+    // Approval Projects
+    Route::resource('approval-projects', ApprovalProjectController::class);
+    Route::get('/approval-projects/{approvalProject}/custom-fields', [ApprovalCustomFieldController::class, 'index'])->name('approval-projects.custom-fields.index');
+    Route::post('/approval-projects/{approvalProject}/custom-fields', [ApprovalCustomFieldController::class, 'store'])->name('approval-projects.custom-fields.store');
+    Route::put('/approval-projects/{approvalProject}/custom-fields/{customField}', [ApprovalCustomFieldController::class, 'update'])->name('approval-projects.custom-fields.update');
+    Route::delete('/approval-projects/{approvalProject}/custom-fields/{customField}', [ApprovalCustomFieldController::class, 'destroy'])->name('approval-projects.custom-fields.destroy');
+    Route::post('/approval-projects/{approvalProject}/custom-fields/reorder', [ApprovalCustomFieldController::class, 'reorder'])->name('approval-projects.custom-fields.reorder');
+
+    // Approval Chains
+    Route::get('/approval-projects/{approvalProject}/chains', [ApprovalChainController::class, 'index'])->name('approval-projects.chains.index');
+    Route::get('/approval-projects/{approvalProject}/chains/create', [ApprovalChainController::class, 'create'])->name('approval-projects.chains.create');
+    Route::post('/approval-projects/{approvalProject}/chains', [ApprovalChainController::class, 'store'])->name('approval-projects.chains.store');
+    Route::get('/approval-projects/{approvalProject}/chains/{chain}', [ApprovalChainController::class, 'show'])->name('approval-projects.chains.show');
+    Route::get('/approval-projects/{approvalProject}/chains/{chain}/edit', [ApprovalChainController::class, 'edit'])->name('approval-projects.chains.edit');
+    Route::put('/approval-projects/{approvalProject}/chains/{chain}', [ApprovalChainController::class, 'update'])->name('approval-projects.chains.update');
+    Route::delete('/approval-projects/{approvalProject}/chains/{chain}', [ApprovalChainController::class, 'destroy'])->name('approval-projects.chains.destroy');
+
+    // Approval Items
+    Route::get('/approval-projects/{approvalProject}/items', [ApprovalItemController::class, 'index'])->name('approval-projects.items.index');
+    Route::get('/approval-projects/{approvalProject}/items/create', [ApprovalItemController::class, 'create'])->name('approval-projects.items.create');
+    Route::post('/approval-projects/{approvalProject}/items', [ApprovalItemController::class, 'store'])->name('approval-projects.items.store');
+    Route::get('/approval-projects/{approvalProject}/items/{item}', [ApprovalItemController::class, 'show'])->name('approval-projects.items.show');
+    Route::get('/approval-projects/{approvalProject}/items/{item}/edit', [ApprovalItemController::class, 'edit'])->name('approval-projects.items.edit');
+    Route::put('/approval-projects/{approvalProject}/items/{item}', [ApprovalItemController::class, 'update'])->name('approval-projects.items.update');
+    Route::delete('/approval-projects/{approvalProject}/items/{item}', [ApprovalItemController::class, 'destroy'])->name('approval-projects.items.destroy');
+    Route::post('/approval-projects/{approvalProject}/items/{item}/advance', [ApprovalItemController::class, 'advance'])->name('approval-projects.items.advance');
+    Route::post('/approval-projects/{approvalProject}/items/{item}/resubmit', [ApprovalItemController::class, 'resubmit'])->name('approval-projects.items.resubmit');
+
+    // Approval Forms
+    Route::get('/approval-projects/{approvalProject}/forms', [ApprovalFormController::class, 'index'])->name('approval-projects.forms.index');
+    Route::get('/approval-projects/{approvalProject}/forms/create', [ApprovalFormController::class, 'create'])->name('approval-projects.forms.create');
+    Route::post('/approval-projects/{approvalProject}/forms', [ApprovalFormController::class, 'store'])->name('approval-projects.forms.store');
+    Route::get('/approval-projects/{approvalProject}/forms/{form}', [ApprovalFormController::class, 'show'])->name('approval-projects.forms.show');
+    Route::get('/approval-projects/{approvalProject}/forms/{form}/edit', [ApprovalFormController::class, 'edit'])->name('approval-projects.forms.edit');
+    Route::put('/approval-projects/{approvalProject}/forms/{form}', [ApprovalFormController::class, 'update'])->name('approval-projects.forms.update');
+    Route::delete('/approval-projects/{approvalProject}/forms/{form}', [ApprovalFormController::class, 'destroy'])->name('approval-projects.forms.destroy');
+    Route::patch('/approval-projects/{approvalProject}/forms/{form}/toggle', [ApprovalFormController::class, 'toggle'])->name('approval-projects.forms.toggle');
+
+    // Approval Automation Rules
+    Route::get('/approval-projects/{approvalProject}/automation-rules', [ApprovalAutomationRuleController::class, 'index'])->name('approval-projects.automation-rules.index');
+    Route::get('/approval-projects/{approvalProject}/automation-rules/create', [ApprovalAutomationRuleController::class, 'create'])->name('approval-projects.automation-rules.create');
+    Route::post('/approval-projects/{approvalProject}/automation-rules', [ApprovalAutomationRuleController::class, 'store'])->name('approval-projects.automation-rules.store');
+    Route::get('/approval-projects/{approvalProject}/automation-rules/{rule}/edit', [ApprovalAutomationRuleController::class, 'edit'])->name('approval-projects.automation-rules.edit');
+    Route::put('/approval-projects/{approvalProject}/automation-rules/{rule}', [ApprovalAutomationRuleController::class, 'update'])->name('approval-projects.automation-rules.update');
+    Route::delete('/approval-projects/{approvalProject}/automation-rules/{rule}', [ApprovalAutomationRuleController::class, 'destroy'])->name('approval-projects.automation-rules.destroy');
+    Route::patch('/approval-projects/{approvalProject}/automation-rules/{rule}/toggle', [ApprovalAutomationRuleController::class, 'toggle'])->name('approval-projects.automation-rules.toggle');
+
+    // My Approvals (Approver Inbox)
+    Route::get('/my-approvals', [MyApprovalsController::class, 'index'])->name('my-approvals.index');
 
     // Folders
     Route::post('/folders', [FolderController::class, 'store'])->name('folders.store');
