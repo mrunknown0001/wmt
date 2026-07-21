@@ -20,7 +20,7 @@ class ApprovalItemCommentController extends Controller
 
         $comment = $item->comments()->create([
             'user_id' => auth()->id(),
-            'body' => $request->body,
+            'body' => $request->body ?? '',
         ]);
 
         // Handle file attachments
