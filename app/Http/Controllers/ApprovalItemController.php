@@ -86,6 +86,8 @@ class ApprovalItemController extends Controller
         return Inertia::render('ApprovalItems/Show', [
             'project' => $approvalProject,
             'item' => $item,
+            'canDecide' => auth()->user()->can('decide', $item),
+            'canEdit' => auth()->user()->can('update', $item),
         ]);
     }
 
