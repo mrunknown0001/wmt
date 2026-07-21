@@ -69,29 +69,33 @@ class PublicApprovalFormController extends Controller
                 continue;
             }
 
-            $fieldRules = [];
+            $fieldRuleStr = '';
 
             if ($field->is_required) {
-                $fieldRules[] = 'required';
+                $fieldRuleStr = 'required';
             } else {
-                $fieldRules[] = 'nullable';
+                $fieldRuleStr = 'nullable';
             }
 
-            match ($field->type) {
-                'text', 'email' => $fieldRules[] = 'string|max:255',
-                'textarea' => $fieldRules[] = 'string|max:10000',
-                'number' => $fieldRules[] = 'numeric',
-                'date' => $fieldRules[] = 'date',
-                'select' => $fieldRules[] = 'string',
-                'multi_select' => $fieldRules[] = 'array',
-                'attachment' => $fieldRules[] = 'file|max:52428800|mimes:pdf,doc,docx,xls,xlsx,zip',
-                'capture_photo' => $fieldRules[] = 'file|max:52428800|mimes:jpeg,jpg,png',
-                'capture_video' => $fieldRules[] = 'file|max:104857600|mimes:mp4,webm,mov',
-                default => null,
+            $typeRules = match ($field->type) {
+                'text', 'email' => 'string|max:255',
+                'textarea' => 'string|max:10000',
+                'number' => 'numeric',
+                'date' => 'date',
+                'select' => 'string',
+                'multi_select' => 'array',
+                'attachment' => 'file|max:52428800|mimes:pdf,doc,docx,xls,xlsx,zip',
+                'capture_photo' => 'file|max:52428800|mimes:jpeg,jpg,png',
+                'capture_video' => 'file|max:104857600|mimes:mp4,webm,mov',
+                default => '',
             };
 
-            if (!empty($fieldRules)) {
-                $rules["field_{$field->id}"] = $fieldRules;
+            if ($typeRules) {
+                $fieldRuleStr .= '|' . $typeRules;
+            }
+
+            if ($fieldRuleStr) {
+                $rules["field_{$field->id}"] = $fieldRuleStr;
             }
         }
 
