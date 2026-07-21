@@ -4,14 +4,66 @@ import { Head } from '@inertiajs/react';
 export default function PublicForm({ form, fields, turnstile, csrf_token }) {
     const formRef = useRef(null);
     const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState({});
+    const [formErrors, setFormErrors] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // Clear previous errors
+        setErrors({});
+        setFormErrors('');
+
         if (turnstile.enabled && !window.turnstileToken) {
-            e.preventDefault();
-            alert('Please verify that you are not a robot');
+            setFormErrors('Please verify that you are not a robot');
             return;
         }
+
         setProcessing(true);
+
+        try {
+            // Collect form data
+            const formData = new FormData(formRef.current);
+
+            // Submit via fetch
+            const response = await fetch(route('forms-approval.submit', form.uuid), {
+                method: 'POST',
+                body: formData,
+            });
+
+            const contentType = response.headers.get('content-type');
+
+            // Check if response is JSON (error response with validation errors)
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+
+                if (response.status === 422 && data.errors) {
+                    // Validation error
+                    setErrors(data.errors);
+                    window.scrollTo(0, 0);
+                    return;
+                } else if (data.message) {
+                    setFormErrors(data.message);
+                    return;
+                }
+            } else {
+                // Successful submission (HTML response or redirect)
+                if (response.ok) {
+                    // Redirect to success page
+                    const text = await response.text();
+                    if (text.includes('success')) {
+                        window.location.href = response.url;
+                    }
+                } else {
+                    setFormErrors('An error occurred while submitting the form.');
+                }
+            }
+        } catch (error) {
+            console.error('Form submission error:', error);
+            setFormErrors('An error occurred while submitting the form. Please try again.');
+        } finally {
+            setProcessing(false);
+        }
     };
 
     return (
@@ -33,12 +85,17 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
 
                     {/* Form */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+                        {/* General Form Error */}
+                        {formErrors && (
+                            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg">
+                                <p className="text-red-700 dark:text-red-100 font-medium">{formErrors}</p>
+                            </div>
+                        )}
+
                         <form
                             ref={formRef}
-                            action={route('forms-approval.submit', form.uuid)}
-                            method="POST"
-                            encType="multipart/form-data"
                             onSubmit={handleSubmit}
+                            encType="multipart/form-data"
                             className="space-y-6"
                         >
                             {/* CSRF Token */}
@@ -100,9 +157,18 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 type="email"
                                                 name={`field_${field.id}`}
                                                 placeholder={field.help_text || ''}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={`w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                                    errors[`field_${field.id}`]
+                                                        ? 'border-red-500 dark:border-red-500'
+                                                        : 'border-gray-300 dark:border-gray-600'
+                                                }`}
                                                 required={field.is_required}
                                             />
+                                            {errors[`field_${field.id}`] && (
+                                                <p className="text-red-600 dark:text-red-400 text-sm mt-1">
+                                                    {errors[`field_${field.id}`][0]}
+                                                </p>
+                                            )}
                                         </div>
                                     )}
 
