@@ -146,7 +146,7 @@ export default function Index({ pendingApprovals, stats }) {
                                                         </span>
                                                     </div>
                                                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                                                        Submitted by {approval.requested_by_user?.name} on{' '}
+                                                        Submitted by {approval.requester?.name} on{' '}
                                                         {new Date(approval.submitted_at).toLocaleDateString()}
                                                     </p>
                                                     {approval.description && (

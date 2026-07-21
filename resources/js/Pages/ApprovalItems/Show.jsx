@@ -91,7 +91,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Requested By</label>
-                                    <p className="mt-1 text-gray-900 dark:text-white">{item.requested_by_user?.name}</p>
+                                    <p className="mt-1 text-gray-900 dark:text-white">{item.requester?.name}</p>
                                 </div>
                                 {item.title && (
                                     <div>

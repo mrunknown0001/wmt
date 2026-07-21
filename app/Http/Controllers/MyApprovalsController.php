@@ -20,7 +20,7 @@ class MyApprovalsController extends Controller
                         'item' => function ($q) {
                             $q->with([
                                 'approvalProject',
-                                'requested_by_user' => function ($q) {
+                                'requester' => function ($q) {
                                     $q->select('id', 'name');
                                 }
                             ])->select('id', 'approval_project_id', 'title', 'description', 'status', 'current_step_number', 'submitted_at', 'requested_by');
@@ -48,7 +48,7 @@ class MyApprovalsController extends Controller
                         'item' => function ($q) {
                             $q->with([
                                 'approvalProject',
-                                'requested_by_user' => function ($q) {
+                                'requester' => function ($q) {
                                     $q->select('id', 'name');
                                 }
                             ])->whereIn('status', ['changes_requested'])
