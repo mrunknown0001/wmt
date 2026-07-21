@@ -135,9 +135,10 @@ export default function Edit({ project, form }) {
                     {/* Form Builder */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                         <FormBuilder
-                            value={data.fields}
+                            fields={data.fields}
                             onChange={(fields) => setData('fields', fields)}
                             customFields={customFields}
+                            sections={localSections}
                         />
                         {errors.fields && <p className="text-red-600 text-sm mt-2">{errors.fields}</p>}
                     </div>
