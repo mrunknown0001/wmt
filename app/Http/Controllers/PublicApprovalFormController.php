@@ -33,6 +33,7 @@ class PublicApprovalFormController extends Controller
         return Inertia::render('ApprovalForms/PublicForm', [
             'form' => $form,
             'fields' => $fields,
+            'csrf_token' => csrf_token(),
             'turnstile' => [
                 'enabled' => config('services.turnstile.enabled', false),
                 'siteKey' => config('services.turnstile.site_key'),

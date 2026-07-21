@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { Head } from '@inertiajs/react';
 
-export default function PublicForm({ form, fields, turnstile }) {
+export default function PublicForm({ form, fields, turnstile, csrf_token }) {
     const formRef = useRef(null);
     const [processing, setProcessing] = useState(false);
 
@@ -42,7 +42,7 @@ export default function PublicForm({ form, fields, turnstile }) {
                             className="space-y-6"
                         >
                             {/* CSRF Token */}
-                            <input type="hidden" name="_token" value={document.querySelector('meta[name="csrf-token"]')?.content || ''} />
+                            <input type="hidden" name="_token" value={csrf_token || ''} />
 
                             {fields.map((field) => (
                                 <div key={field.id}>
