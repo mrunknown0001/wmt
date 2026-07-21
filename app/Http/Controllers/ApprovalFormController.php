@@ -102,10 +102,12 @@ class ApprovalFormController extends Controller
         $this->authorizeProject($approvalProject);
         abort_if($form->approval_project_id !== $approvalProject->id, 404);
 
+        $form = $form->load('fields.customField.options');
+        $form->append('public_url');
+
         return Inertia::render('ApprovalForms/Show', [
             'project' => $approvalProject,
-            'form' => $form->load('fields.customField.options'),
-            'public_url' => $form->public_url,
+            'form' => $form,
         ]);
     }
 
