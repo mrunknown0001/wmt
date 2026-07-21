@@ -22,6 +22,14 @@ const priorityBadgeColors = {
     urgent: 'bg-red-100 text-red-800',
 };
 
+const capitalizeStatus = (status) => {
+    if (!status) return '';
+    return status
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+};
+
 export default function Index({ pendingApprovals, stats }) {
     const [filteredStatus, setFilteredStatus] = useState('all');
 
@@ -162,7 +170,7 @@ export default function Index({ pendingApprovals, stats }) {
                                                             approval.status === 'changes_requested' ? 'bg-orange-100 text-orange-800' :
                                                             'bg-gray-100 text-gray-800'
                                                         }`}>
-                                                            {approval.status.replace('_', ' ')}
+                                                            {capitalizeStatus(approval.status)}
                                                         </span>
                                                     </div>
                                                 </div>
