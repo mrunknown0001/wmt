@@ -289,7 +289,11 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                                                     <button
                                                         onClick={() => handleDecision(decidingAction)}
                                                         disabled={isDeciding}
-                                                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition disabled:opacity-50"
+                                                        className={`flex-1 text-white font-medium py-2 px-4 rounded-lg transition disabled:opacity-50 ${
+                                                            decidingAction === 'approved'
+                                                                ? 'bg-green-600 hover:bg-green-700'
+                                                                : 'bg-red-600 hover:bg-red-700'
+                                                        }`}
                                                     >
                                                         {isDeciding ? 'Processing...' : 'Confirm'}
                                                     </button>
