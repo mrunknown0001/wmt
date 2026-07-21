@@ -1,14 +1,26 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 
 export default function Index({ project, forms }) {
+    const [copiedFormId, setCopiedFormId] = useState(null);
+
     const handleDelete = (form) => {
         if (confirm(`Delete the form "${form.name}"?`)) {
             router.delete(route('approval-projects.forms.destroy', [project.id, form.id]), {
                 onSuccess: () => {
                     // Page will be updated by Inertia automatically
                 },
+            });
+        }
+    };
+
+    const handleCopyLink = (form) => {
+        if (form.public_url) {
+            navigator.clipboard.writeText(form.public_url).then(() => {
+                setCopiedFormId(form.id);
+                setTimeout(() => setCopiedFormId(null), 2000);
             });
         }
     };
@@ -67,6 +79,16 @@ export default function Index({ project, forms }) {
                                             View Public Form
                                         </span>
                                     </a>
+                                    <button
+                                        onClick={() => handleCopyLink(form)}
+                                        className="relative group inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition"
+                                        title="Copy Link"
+                                    >
+                                        {copiedFormId === form.id ? '✓' : '📋'}
+                                        <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                                            {copiedFormId === form.id ? 'Copied!' : 'Copy Link'}
+                                        </span>
+                                    </button>
                                     <Link
                                         href={route('approval-projects.forms.edit', [project.id, form.id])}
                                         className="relative group inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition"

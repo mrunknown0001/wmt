@@ -30,6 +30,11 @@ class ApprovalFormController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
+        // Append public_url to each form
+        $forms->each(function ($form) {
+            $form->append('public_url');
+        });
+
         return Inertia::render('ApprovalForms/Index', [
             'project' => $approvalProject,
             'forms' => $forms,
