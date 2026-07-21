@@ -69,7 +69,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link
-                            href={route('approval-projects.show', project.id)}
+                            href={route('approval-projects.items.index', project.id)}
                             className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                         >
                             ← Back
