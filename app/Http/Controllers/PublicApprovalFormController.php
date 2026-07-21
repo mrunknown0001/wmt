@@ -118,6 +118,7 @@ class PublicApprovalFormController extends Controller
 
         $customFieldMappings = [];
         $titleFieldValues = [];
+        $submitterEmail = null;
 
         foreach ($allFields as $field) {
             $fieldKey = "field_{$field->id}";
@@ -129,6 +130,11 @@ class PublicApprovalFormController extends Controller
 
             if ($field->type === 'heading' || $field->type === 'description') {
                 continue;
+            }
+
+            // Capture email for requester detection
+            if ($field->type === 'email' && !$submitterEmail) {
+                $submitterEmail = $value;
             }
 
             // Map to item description
@@ -144,6 +150,14 @@ class PublicApprovalFormController extends Controller
             // Collect for title building
             if (in_array((int) $field->position, $itemDefaults['title_field_ids'] ?? [])) {
                 $titleFieldValues[] = $this->resolveOptionLabel($field, $value);
+            }
+        }
+
+        // Auto-detect requester from email field
+        if ($submitterEmail) {
+            $requester = \App\Models\User::where('email', $submitterEmail)->first();
+            if ($requester) {
+                $itemData['requested_by'] = $requester->id;
             }
         }
 
