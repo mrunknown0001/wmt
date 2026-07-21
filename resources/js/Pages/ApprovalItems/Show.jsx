@@ -25,7 +25,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
         }
 
         router.post(
-            route('approval-projects.items.advance', [project.id, item.id]),
+            route('approval-projects.items.advance', { approvalProject: project.id, item: item.id }),
             {
                 action: decidingAction,
                 comment: decisionComment,
