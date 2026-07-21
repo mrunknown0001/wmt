@@ -24,6 +24,15 @@ class ApprovalItemPolicy
         if ($activeInstance && $activeInstance->approvers()->where('user_id', $user->id)->exists()) {
             return true;
         }
+        // Also allow viewing if user has already made a decision on this item (in any step instance)
+        $hasDecided = $item->stepInstances()
+            ->whereHas('decisions', function ($q) use ($user) {
+                $q->where('decided_by', $user->id);
+            })
+            ->exists();
+        if ($hasDecided) {
+            return true;
+        }
         return false;
     }
 
