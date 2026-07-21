@@ -32,9 +32,9 @@ export default function Index({ project, forms }) {
                     </Link>
                 </div>
 
-                {forms && forms.length > 0 ? (
+                {forms && forms.data && forms.data.length > 0 ? (
                     <div className="space-y-4">
-                        {forms.map((form) => (
+                        {forms.data.map((form) => (
                             <div key={form.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex-1">
