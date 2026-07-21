@@ -265,12 +265,12 @@ export default function ApprovalItemComments({ project, item, comments, auth }) 
                                                                 </a>
                                                             ) : (
                                                                 <a
-                                                                    href={route('approval-projects.items.comments.attachments.download', [
-                                                                        project.id,
-                                                                        item.id,
-                                                                        comment.id,
-                                                                        attachment.id,
-                                                                    ])}
+                                                                    href={route('approval-projects.items.comments.attachments.download', {
+                                                                        approvalProject: project.id,
+                                                                        item: item.id,
+                                                                        comment: comment.id,
+                                                                        attachment: attachment.id,
+                                                                    })}
                                                                     className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition"
                                                                 >
                                                                     <AttachmentIcon />
