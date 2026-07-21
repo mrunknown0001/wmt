@@ -32,36 +32,39 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                 redirect: 'manual',
             });
 
-            console.log('Response status:', response.status, 'Type:', response.type);
+            console.log('Response status:', response.status);
 
             // Handle validation errors (422)
             if (response.status === 422) {
-                const data = await response.json();
-                if (data.errors) {
-                    setErrors(data.errors);
-                    window.scrollTo(0, 0);
-                    return;
+                try {
+                    const data = await response.json();
+                    console.log('Validation errors:', data.errors);
+                    if (data.errors) {
+                        setErrors(data.errors);
+                        window.scrollTo(0, 0);
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Failed to parse error response:', e);
+                    setFormErrors('Validation failed. Please check your entries and try again.');
                 }
+                return;
             }
 
-            // Handle successful submission (200 or other success status)
-            if (response.ok || response.status === 200) {
-                // Try to parse as JSON first
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    const data = await response.json();
-                    // Redirect to success page
-                    window.location.href = window.location.href.replace('/forms-approval/', '/approval-projects/');
-                } else {
-                    // It's HTML - redirect to success
-                    window.location.href = response.url || window.location.href;
-                }
+            // Handle successful submission (200)
+            if (response.status === 200) {
+                console.log('Submission successful, redirecting...');
+                // Redirect to success page
+                const successUrl = `/forms-approval/${form.uuid}/success`;
+                console.log('Redirecting to:', successUrl);
+                window.location.href = successUrl;
                 return;
             }
 
             // Handle redirects (3xx responses)
             if (response.status >= 300 && response.status < 400) {
                 const redirectUrl = response.headers.get('location');
+                console.log('Redirect response:', redirectUrl);
                 if (redirectUrl) {
                     window.location.href = redirectUrl;
                     return;
@@ -69,6 +72,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
             }
 
             // Handle other errors
+            console.error('Unexpected response status:', response.status);
             setFormErrors('An error occurred while submitting the form. Please try again.');
         } catch (error) {
             console.error('Form submission error:', error);

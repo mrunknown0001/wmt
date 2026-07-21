@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m 'Fix: Display specific validation errors and success page after form submission *)"
+    ]
+  }
+}

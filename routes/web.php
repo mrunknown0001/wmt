@@ -62,6 +62,7 @@ Route::post('/forms/{uuid}', [PublicFormController::class, 'submit'])->middlewar
 // Public approval forms (no auth required)
 Route::get('/forms-approval/{uuid}', [PublicApprovalFormController::class, 'show'])->name('forms-approval.show');
 Route::post('/forms-approval/{uuid}', [PublicApprovalFormController::class, 'submit'])->middleware('throttle:10,1')->name('forms-approval.submit');
+Route::get('/forms-approval/{uuid}/success', [PublicApprovalFormController::class, 'success'])->name('forms-approval.success');
 
 // Authenticated routes
 Route::middleware('auth')->group(function () {

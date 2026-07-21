@@ -250,6 +250,17 @@ class PublicApprovalFormController extends Controller
         // Start the approval workflow
         ApprovalWorkflowEngine::submit($item);
 
+        return redirect()->route('forms-approval.success', $form->uuid);
+    }
+
+    public function success(string $uuid)
+    {
+        $form = ApprovalForm::where('uuid', $uuid)
+            ->where('is_active', true)
+            ->first();
+
+        abort_if(!$form, 404);
+
         return Inertia::render('ApprovalForms/PublicFormSuccess', [
             'form' => $form,
             'message' => $form->success_message ?? 'Your submission has been received and is now in review.',
