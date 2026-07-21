@@ -37,6 +37,7 @@ use App\Http\Controllers\ApprovalProjectController;
 use App\Http\Controllers\ApprovalCustomFieldController;
 use App\Http\Controllers\ApprovalChainController;
 use App\Http\Controllers\ApprovalItemController;
+use App\Http\Controllers\ApprovalItemCommentController;
 use App\Http\Controllers\ApprovalFormController;
 use App\Http\Controllers\PublicApprovalFormController;
 use App\Http\Controllers\ApprovalAutomationRuleController;
