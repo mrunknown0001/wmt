@@ -4,7 +4,9 @@ import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
 
-export default function Create({ project, customFields, sections }) {
+export default function Create({ project }) {
+    const customFields = project?.customFields || [];
+    const sections = project?.sections || [];
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         description: '',

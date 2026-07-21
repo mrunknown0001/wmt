@@ -4,7 +4,9 @@ import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
 
-export default function Edit({ project, form, customFields, sections }) {
+export default function Edit({ project, form }) {
+    const customFields = project?.customFields || [];
+    const sections = project?.sections || [];
     const { data, setData, put, processing, errors } = useForm({
         name: form.name,
         description: form.description,
