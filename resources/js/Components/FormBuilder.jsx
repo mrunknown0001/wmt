@@ -1004,7 +1004,11 @@ function AddFieldDropdown({ onAdd }) {
 }
 
 // --- Main FormBuilder ---
-export default function FormBuilder({ fields, onChange, customFields = [], sections = [], taskDefaults = {}, onTaskDefaultsChange, errors = {} }) {
+export default function FormBuilder({ fields = [], onChange, customFields = [], sections = [], taskDefaults = {}, onTaskDefaultsChange, errors = {} }) {
+    const safeFields = Array.isArray(fields) ? fields : [];
+    const safeCustomFields = Array.isArray(customFields) ? customFields : [];
+    const safeSections = Array.isArray(sections) ? sections : [];
+
     const [activeTab, setActiveTab] = useState('questions');
     const [expandedIndex, setExpandedIndex] = useState(null);
     const [deleteIndex, setDeleteIndex] = useState(null);
@@ -1021,7 +1025,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
             label: '',
             help_text: '',
             is_required: false,
-            position: fields.length,
+            position: safeFields.length,
             config: type === 'email' ? { email_mode: 'plain' } : null,
             default_value: null,
             is_visible: true,
@@ -1029,7 +1033,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
             maps_to: null,
             custom_field_id: null,
         };
-        const newFields = [...fields, newField];
+        const newFields = [...safeFields, newField];
         onChange(newFields);
         setExpandedIndex(newFields.length - 1);
     };
@@ -1116,7 +1120,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
         }
     };
 
-    const sortableIds = fields.map((_, i) => `field-${i}`);
+    const sortableIds = safeFields.map((_, i) => `field-${i}`);
 
     return (
         <div>
@@ -1149,7 +1153,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
             {/* Questions Tab */}
             {activeTab === 'questions' && (
                 <div className="space-y-3">
-                    {fields.length === 0 ? (
+                    {safeFields.length === 0 ? (
                         <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                                 Add questions to your form using the buttons below.
@@ -1158,7 +1162,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
                     ) : (
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                             <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-                                {fields.map((field, i) => (
+                                {safeFields.map((field, i) => (
                                     <SortableFieldRow
                                         key={`field-${i}`}
                                         field={field}
@@ -1166,8 +1170,8 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
                                         isExpanded={expandedIndex === i}
                                         onToggleExpand={(idx) => setExpandedIndex(expandedIndex === idx ? null : idx)}
                                         onRemove={(idx) => setDeleteIndex(idx)}
-                                        customFields={customFields}
-                                        allFields={fields}
+                                        customFields={safeCustomFields}
+                                        allFields={safeFields}
                                         onChange={updateField}
                                     />
                                 ))}
@@ -1177,7 +1181,7 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
 
                     <AddFieldDropdown onAdd={addField} />
 
-                    {customFields.length > 0 && (
+                    {safeCustomFields.length > 0 && (
                         <button
                             type="button"
                             onClick={() => setCfModalOpen(true)}
@@ -1195,8 +1199,8 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
             {/* Settings Tab */}
             {activeTab === 'settings' && (
                 <SettingsTab
-                    fields={fields}
-                    sections={sections}
+                    fields={safeFields}
+                    sections={safeSections}
                     taskDefaults={taskDefaults}
                     onTaskDefaultsChange={onTaskDefaultsChange}
                 />
@@ -1206,8 +1210,8 @@ export default function FormBuilder({ fields, onChange, customFields = [], secti
             <CustomFieldsModal
                 isOpen={cfModalOpen}
                 onClose={() => setCfModalOpen(false)}
-                customFields={customFields}
-                currentFields={fields}
+                customFields={safeCustomFields}
+                currentFields={safeFields}
                 onUpdate={onChange}
             />
 

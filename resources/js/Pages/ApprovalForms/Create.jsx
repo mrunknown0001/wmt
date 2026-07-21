@@ -5,8 +5,20 @@ import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
 
 export default function Create({ project }) {
-    const customFields = project?.customFields || [];
-    const sections = project?.sections || [];
+    if (!project) {
+        return (
+            <AuthenticatedLayout title="Create Form - Error">
+                <Head title="Create Form - Error" />
+                <div className="text-center py-12">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Project Not Found</h1>
+                    <p className="text-gray-600 dark:text-gray-400">Unable to load the project data.</p>
+                </div>
+            </AuthenticatedLayout>
+        );
+    }
+
+    const customFields = Array.isArray(project.customFields) ? project.customFields : [];
+    const sections = Array.isArray(project.sections) ? project.sections : [];
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         description: '',
