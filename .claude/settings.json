@@ -4,7 +4,8 @@
       "Bash(git commit -m 'Fix: Display specific validation errors and success page after form submission *)",
       "Bash(git commit -m 'Debug: Add detailed logging for email validation *)",
       "Bash(git commit -m 'Fix: Use direct URL for form submission instead of route helper *)",
-      "Bash(git commit -m 'Fix: Allow fetch to follow redirects automatically for form submission *)"
+      "Bash(git commit -m 'Fix: Allow fetch to follow redirects automatically for form submission *)",
+      "Bash(git commit -m 'Fix: Properly handle form redirect by using window.location.href *)"
     ]
   }
 }

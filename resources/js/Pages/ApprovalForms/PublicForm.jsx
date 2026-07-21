@@ -29,13 +29,14 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
             const submitUrl = `/forms-approval/${form.uuid}`;
             console.log('Submitting to:', submitUrl);
 
-            // Submit via fetch - allow redirects to be followed
+            // Submit via fetch - prevent auto-redirect to handle responses
             const response = await fetch(submitUrl, {
                 method: 'POST',
                 body: formData,
+                redirect: 'manual',
             });
 
-            console.log('Response status:', response.status, 'URL:', response.url);
+            console.log('Response status:', response.status);
 
             // Handle validation errors (422)
             if (response.status === 422) {
@@ -54,10 +55,21 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                 return;
             }
 
-            // Handle successful submission (200 means we're on the success page)
+            // Handle successful submission (redirect response from server)
+            if (response.status >= 300 && response.status < 400) {
+                const redirectUrl = response.headers.get('location');
+                console.log('Submission successful! Redirecting to:', redirectUrl);
+                // Use window.location for full page reload to properly initialize Inertia
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
+                }
+                return;
+            }
+
+            // Fallback for unexpected success
             if (response.ok) {
                 console.log('Submission successful!');
-                // Page has already redirected via fetch following redirects
+                window.location.href = `/forms-approval/${form.uuid}/success`;
                 return;
             }
 
