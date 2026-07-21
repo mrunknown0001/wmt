@@ -25,8 +25,12 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
             // Collect form data
             const formData = new FormData(formRef.current);
 
+            // Build URL directly
+            const submitUrl = `/forms-approval/${form.uuid}`;
+            console.log('Submitting to:', submitUrl);
+
             // Submit via fetch - prevent automatic redirects
-            const response = await fetch(route('forms-approval.submit', form.uuid), {
+            const response = await fetch(submitUrl, {
                 method: 'POST',
                 body: formData,
                 redirect: 'manual',

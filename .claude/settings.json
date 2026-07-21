@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(git commit -m 'Fix: Display specific validation errors and success page after form submission *)",
-      "Bash(git commit -m 'Debug: Add detailed logging for email validation *)"
+      "Bash(git commit -m 'Debug: Add detailed logging for email validation *)",
+      "Bash(git commit -m 'Fix: Use direct URL for form submission instead of route helper *)"
     ]
   }
 }
