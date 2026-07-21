@@ -57,4 +57,9 @@ class ApprovalItem extends Model
     {
         return $this->hasMany(ApprovalStepInstance::class)->orderBy('step_number');
     }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(ApprovalItemComment::class)->orderBy('created_at', 'desc');
+    }
 }

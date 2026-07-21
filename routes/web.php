@@ -160,6 +160,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/approval-projects/{approvalProject}/items/{item}/advance', [ApprovalItemController::class, 'advance'])->name('approval-projects.items.advance');
     Route::post('/approval-projects/{approvalProject}/items/{item}/resubmit', [ApprovalItemController::class, 'resubmit'])->name('approval-projects.items.resubmit');
 
+    // Approval Item Comments
+    Route::post('/approval-projects/{approvalProject}/items/{item}/comments', [ApprovalItemCommentController::class, 'store'])->name('approval-projects.items.comments.store');
+    Route::put('/approval-projects/{approvalProject}/items/{item}/comments/{comment}', [ApprovalItemCommentController::class, 'update'])->name('approval-projects.items.comments.update');
+    Route::delete('/approval-projects/{approvalProject}/items/{item}/comments/{comment}', [ApprovalItemCommentController::class, 'destroy'])->name('approval-projects.items.comments.destroy');
+    Route::get('/approval-projects/{approvalProject}/items/{item}/comments/{comment}/attachments/{attachment}/download', [ApprovalItemCommentController::class, 'download'])->name('approval-projects.items.comments.attachments.download');
+
     // Approval Forms
     Route::get('/approval-projects/{approvalProject}/forms', [ApprovalFormController::class, 'index'])->name('approval-projects.forms.index');
     Route::get('/approval-projects/{approvalProject}/forms/create', [ApprovalFormController::class, 'create'])->name('approval-projects.forms.create');
