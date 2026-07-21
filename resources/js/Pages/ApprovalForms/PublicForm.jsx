@@ -29,14 +29,13 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
             const submitUrl = `/forms-approval/${form.uuid}`;
             console.log('Submitting to:', submitUrl);
 
-            // Submit via fetch - prevent auto-redirect to handle responses
+            // Submit via fetch - allow it to follow redirects naturally
             const response = await fetch(submitUrl, {
                 method: 'POST',
                 body: formData,
-                redirect: 'manual',
             });
 
-            console.log('Response status:', response.status);
+            console.log('Response status:', response.status, 'Final URL:', response.url);
 
             // Handle validation errors (422)
             if (response.status === 422) {
@@ -46,29 +45,23 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                     if (data.errors) {
                         setErrors(data.errors);
                         window.scrollTo(0, 0);
+                        setProcessing(false);
                         return;
                     }
                 } catch (e) {
                     console.error('Failed to parse error response:', e);
                     setFormErrors('Validation failed. Please check your entries and try again.');
+                    setProcessing(false);
+                    return;
                 }
+                setProcessing(false);
                 return;
             }
 
-            // Handle successful submission (redirect response from server)
-            if (response.status >= 300 && response.status < 400) {
-                const redirectUrl = response.headers.get('location');
-                console.log('Submission successful! Redirecting to:', redirectUrl);
-                // Use window.location for full page reload to properly initialize Inertia
-                if (redirectUrl) {
-                    window.location.href = redirectUrl;
-                }
-                return;
-            }
-
-            // Fallback for unexpected success
+            // Handle successful submission - navigate to success page
             if (response.ok) {
-                console.log('Submission successful!');
+                console.log('Submission successful! Navigating to success page');
+                // Use window.location to properly initialize Inertia on the success page
                 window.location.href = `/forms-approval/${form.uuid}/success`;
                 return;
             }
