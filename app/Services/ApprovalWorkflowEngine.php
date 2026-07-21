@@ -346,8 +346,8 @@ class ApprovalWorkflowEngine
             return;
         }
 
-        // Check if step should be skipped
-        if (self::conditionsMet($item, $step->skip_conditions)) {
+        // Check if step should be skipped (only if skip_conditions is explicitly defined)
+        if ($step->skip_conditions && self::conditionsMet($item, $step->skip_conditions)) {
             // Skip this step and move to next
             self::materializeAndActivateStep($item, $stepNumber + 1, $attemptNumber);
             return;
