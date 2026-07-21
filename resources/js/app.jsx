@@ -2,9 +2,17 @@ import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from './ThemeContext';
 import './echo';
+import { route as ziggyRoute } from 'ziggy-js';
 
-// Try to import Ziggy, fallback to simple URL builder
+// Global route helper - will be updated when Inertia loads with Ziggy routes
 let route = function(name, params = {}) {
+    // Will use Ziggy when available via Inertia props
+    // This is set up in the createInertiaApp setup function
+    return ziggyRoute(name, params);
+};
+
+// Fallback route function for when Ziggy hasn't loaded yet
+let fallbackRoute = function(name, params = {}) {
     // Try to use Ziggy if available
     if (typeof window.Ziggy !== 'undefined') {
         try {
@@ -75,17 +83,38 @@ let route = function(name, params = {}) {
         // Custom route - join all parts
         url = '/' + parts.join('/');
 
-        // Replace parameters
-        paramArray.forEach((param) => {
-            url = url.replace(/{id}/, param).replace(/:id/, param);
-        });
+        // For routes with dynamic parameters (like forms-approval.submit which maps to /forms-approval/{uuid})
+        // Try to match route patterns
+        if (name === 'forms-approval.submit' && paramArray.length > 0) {
+            // This is /forms-approval/{uuid}
+            url = `/forms-approval/${paramArray[0]}`;
+        } else if (name === 'forms.submit' && paramArray.length > 0) {
+            // This is /forms/{uuid}
+            url = `/forms/${paramArray[0]}`;
+        } else {
+            // Fallback: replace any {placeholder} patterns
+            paramArray.forEach((param, index) => {
+                // Try common placeholder names
+                url = url.replace(/{id}/, param).replace(/:id/, param);
+                url = url.replace(/{uuid}/, param).replace(/:uuid/, param);
+                // If still no replacement, try replacing the last URL segment
+                if (!url.includes(param) && index === 0) {
+                    const parts = url.split('/');
+                    if (parts[parts.length - 1] && !parts[parts.length - 1].includes('.')) {
+                        parts[parts.length - 1] = param;
+                        url = parts.join('/');
+                    }
+                }
+            });
+        }
     }
 
     return url;
 };
 
-// Make route helper globally available
+// Make route helper globally available (will be updated in Inertia setup)
 window.route = route;
+window.fallbackRoute = fallbackRoute;
 
 // Register Firebase service worker for push notifications
 if ('serviceWorker' in navigator) {
@@ -136,6 +165,20 @@ createInertiaApp({
         return pages[`./Pages/${name}.jsx`];
     },
     setup({ el, App, props }) {
+        // Initialize Ziggy with routes from Inertia props
+        if (props.initialPage.props.ziggy) {
+            window.Ziggy = props.initialPage.props.ziggy;
+            // Update route function to use the Ziggy routes
+            route = function(name, params = {}) {
+                return ziggyRoute(name, params);
+            };
+            window.route = route;
+        } else {
+            // Fallback if Ziggy is not available
+            route = fallbackRoute;
+            window.route = route;
+        }
+
         createRoot(el).render(
             <ThemeProvider>
                 <App {...props} />
