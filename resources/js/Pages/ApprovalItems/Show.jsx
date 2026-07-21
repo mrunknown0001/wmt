@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
+import ApprovalItemComments from '../../Components/ApprovalItemComments';
 
 const statusColors = {
     pending: 'bg-gray-100 text-gray-800',
@@ -322,6 +323,14 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                                 </p>
                             </div>
                         )}
+
+                        {/* Comments & Activity */}
+                        <ApprovalItemComments
+                            project={project}
+                            item={item}
+                            comments={item.comments}
+                            auth={auth}
+                        />
                     </div>
                 </div>
             </div>

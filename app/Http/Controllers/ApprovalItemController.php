@@ -81,6 +81,8 @@ class ApprovalItemController extends Controller
             'stepInstances.approvers.user',
             'stepInstances.decisions.decider',
             'chainVersion.steps',
+            'comments.user',
+            'comments.attachments',
         ]);
 
         return Inertia::render('ApprovalItems/Show', [
