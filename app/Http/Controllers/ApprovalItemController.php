@@ -17,7 +17,13 @@ class ApprovalItemController extends Controller
         $this->authorize('view', $approvalProject);
 
         $items = $approvalProject->approvalItems()
-            ->with('requester', 'chainVersion.chain')
+            ->with([
+                'requester',
+                'chainVersion.chain',
+                'stepInstances' => function ($q) {
+                    $q->where('status', 'active')->with('approvers');
+                }
+            ])
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 

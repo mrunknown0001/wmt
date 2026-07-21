@@ -1,8 +1,17 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage, router } from '@inertiajs/react';
+import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 
-export default function Index({ project, items }) {
+const CheckIcon = () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+);
+
+export default function Index({ project, items, auth }) {
+    const [approvingItemId, setApprovingItemId] = useState(null);
+
     const getStatusColor = (status) => {
         const colors = {
             pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
@@ -12,6 +21,26 @@ export default function Index({ project, items }) {
             cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
         };
         return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    };
+
+    const isUserApprover = (item) => {
+        if (item.status !== 'pending') return false;
+        const activeStep = item.step_instances?.find(s => s.status === 'active');
+        if (!activeStep) return false;
+        return activeStep.approvers?.some(a => a.user_id === auth.user.id);
+    };
+
+    const handleApprove = (item) => {
+        router.post(
+            `/approval-projects/${project.id}/items/${item.id}/advance`,
+            {
+                action: 'approved',
+                comment: '',
+            },
+            {
+                onFinish: () => setApprovingItemId(null),
+            }
+        );
     };
 
     return (
@@ -69,9 +98,20 @@ export default function Index({ project, items }) {
                                             </p>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <Link href={route('approval-projects.items.show', [project.id, item.id])}>
-                                                <Button size="sm" variant="secondary">View</Button>
-                                            </Link>
+                                            <div className="flex gap-2">
+                                                {isUserApprover(item) && (
+                                                    <button
+                                                        onClick={() => setApprovingItemId(item.id)}
+                                                        className="inline-flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition"
+                                                    >
+                                                        <CheckIcon />
+                                                        Approve
+                                                    </button>
+                                                )}
+                                                <Link href={route('approval-projects.items.show', [project.id, item.id])}>
+                                                    <Button size="sm" variant="secondary">View</Button>
+                                                </Link>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -84,6 +124,37 @@ export default function Index({ project, items }) {
                         <Link href={route('approval-projects.items.create', project.id)}>
                             <Button>Create Your First Request</Button>
                         </Link>
+                    </div>
+                )}
+
+                {/* Approve Confirmation Modal */}
+                {approvingItemId && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm mx-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                Approve Request
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400 mb-6">
+                                Are you sure you want to approve this approval request?
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => setApprovingItemId(null)}
+                                    className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium rounded-lg transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const item = items.data.find(i => i.id === approvingItemId);
+                                        if (item) handleApprove(item);
+                                    }}
+                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition"
+                                >
+                                    Approve
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
