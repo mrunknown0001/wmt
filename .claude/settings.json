@@ -6,7 +6,8 @@
       "Bash(git commit -m 'Fix: Use direct URL for form submission instead of route helper *)",
       "Bash(git commit -m 'Fix: Allow fetch to follow redirects automatically for form submission *)",
       "Bash(git commit -m 'Fix: Properly handle form redirect by using window.location.href *)",
-      "Bash(git commit -m 'Fix: Use default fetch redirect behavior with explicit window.location navigation *)"
+      "Bash(git commit -m 'Fix: Use default fetch redirect behavior with explicit window.location navigation *)",
+      "Bash(git commit -m 'Add detailed response logging to debug validation error handling *)"
     ]
   }
 }

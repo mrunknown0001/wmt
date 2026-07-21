@@ -35,31 +35,38 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                 body: formData,
             });
 
-            console.log('Response status:', response.status, 'Final URL:', response.url);
+            console.log('Response status:', response.status, 'Final URL:', response.url, 'Content-Type:', response.headers.get('content-type'));
+
+            // Clone response for reading
+            const contentType = response.headers.get('content-type');
+            let responseData;
+
+            // Try to parse as JSON if it looks like JSON
+            if (contentType && contentType.includes('application/json')) {
+                responseData = await response.json();
+            } else {
+                responseData = await response.text();
+            }
+
+            console.log('Response data:', responseData);
 
             // Handle validation errors (422)
             if (response.status === 422) {
-                try {
-                    const data = await response.json();
-                    console.log('Validation errors:', data.errors);
-                    if (data.errors) {
-                        setErrors(data.errors);
-                        window.scrollTo(0, 0);
-                        setProcessing(false);
-                        return;
-                    }
-                } catch (e) {
-                    console.error('Failed to parse error response:', e);
+                console.log('Validation error detected, errors:', responseData?.errors);
+                if (responseData?.errors) {
+                    setErrors(responseData.errors);
+                    window.scrollTo(0, 0);
+                    setProcessing(false);
+                    return;
+                } else {
                     setFormErrors('Validation failed. Please check your entries and try again.');
                     setProcessing(false);
                     return;
                 }
-                setProcessing(false);
-                return;
             }
 
-            // Handle successful submission - navigate to success page
-            if (response.ok) {
+            // Handle successful submission (200 OK)
+            if (response.status === 200) {
                 console.log('Submission successful! Navigating to success page');
                 // Use window.location to properly initialize Inertia on the success page
                 window.location.href = `/forms-approval/${form.uuid}/success`;
@@ -67,7 +74,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
             }
 
             // Handle other errors
-            console.error('Unexpected response status:', response.status);
+            console.error('Unexpected response status:', response.status, 'Response:', responseData);
             setFormErrors('An error occurred while submitting the form. Please try again.');
         } catch (error) {
             console.error('Form submission error:', error);
