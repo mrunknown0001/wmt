@@ -35,6 +35,7 @@ export default function ApprovalItemComments({ project, item, comments, auth }) 
     const [attachments, setAttachments] = useState([]);
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [editingBody, setEditingBody] = useState('');
+    const [deletingCommentId, setDeletingCommentId] = useState(null);
 
     const handleAddComment = (e) => {
         e.preventDefault();
@@ -74,11 +75,14 @@ export default function ApprovalItemComments({ project, item, comments, auth }) 
     };
 
     const handleDeleteComment = (comment) => {
-        if (confirm('Are you sure you want to delete this comment?')) {
-            router.delete(
-                route('approval-projects.items.comments.destroy', [project.id, item.id, comment.id])
-            );
-        }
+        router.delete(
+            route('approval-projects.items.comments.destroy', [project.id, item.id, comment.id])
+        );
+        setDeletingCommentId(null);
+    };
+
+    const confirmDelete = (comment) => {
+        setDeletingCommentId(comment.id);
     };
 
     const handleFileSelect = (e) => {
@@ -202,7 +206,7 @@ export default function ApprovalItemComments({ project, item, comments, auth }) 
                                             </Tooltip>
                                             <Tooltip content="Delete">
                                                 <button
-                                                    onClick={() => handleDeleteComment(comment)}
+                                                    onClick={() => confirmDelete(comment)}
                                                     className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                                                 >
                                                     <DeleteIcon />
@@ -286,6 +290,34 @@ export default function ApprovalItemComments({ project, item, comments, auth }) 
                     </div>
                 ) : (
                     <p className="text-gray-600 dark:text-gray-400">No comments yet. Be the first to comment!</p>
+                )}
+
+                {/* Delete Confirmation Modal */}
+                {deletingCommentId && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm mx-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                Delete Comment
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400 mb-6">
+                                Are you sure you want to delete this comment? This action cannot be undone.
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => setDeletingCommentId(null)}
+                                    className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium rounded-lg transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteComment({ id: deletingCommentId })}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
