@@ -177,7 +177,12 @@ class PublicApprovalFormController extends Controller
             if ($request->hasFile($fieldKey)) {
                 foreach ($request->file($fieldKey) as $file) {
                     $path = $file->store("approval-form-submissions/{$item->id}", 'public');
-                    // In future: create ApprovalItemAttachment rows
+                    $item->attachments()->create([
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
+                        'file_type' => $file->getClientMimeType(),
+                        'file_size' => $file->getSize(),
+                    ]);
                 }
             }
         }

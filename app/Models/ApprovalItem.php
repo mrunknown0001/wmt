@@ -62,4 +62,9 @@ class ApprovalItem extends Model
     {
         return $this->hasMany(ApprovalItemComment::class)->orderBy('created_at', 'desc');
     }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(ApprovalItemAttachment::class);
+    }
 }

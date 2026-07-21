@@ -114,6 +114,39 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                             </div>
                         </div>
 
+                        {/* Attachments */}
+                        {item.attachments && item.attachments.length > 0 && (
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Attachments</h2>
+                                <div className="space-y-2">
+                                    {item.attachments.map((attachment) => (
+                                        <div key={attachment.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                            <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                                <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M8 16.5a1 1 0 01-1-1v-5h-3V9.5a3 3 0 013-3h1V5a1 1 0 011-1h2a1 1 0 011 1v1h1a3 3 0 013 3v1.5h-3v5a1 1 0 11-2 0v-5H8v5a1 1 0 01-1 1zm6-11H9.5V5h4.5v.5z" clipRule="evenodd" />
+                                                </svg>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                                        {attachment.file_name}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                        {(attachment.file_size / 1024 / 1024).toFixed(2)} MB
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <a
+                                                href={attachment.url}
+                                                download={attachment.file_name}
+                                                className="ml-4 inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 transition flex-shrink-0"
+                                            >
+                                                Download
+                                            </a>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Custom Fields */}
                         {item.custom_field_values && item.custom_field_values.length > 0 && (
                             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">

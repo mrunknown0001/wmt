@@ -89,6 +89,7 @@ class ApprovalItemController extends Controller
             'chainVersion.steps',
             'comments.user',
             'comments.attachments',
+            'attachments',
         ]);
 
         // Append URL to each attachment for proper serialization
@@ -99,6 +100,13 @@ class ApprovalItemController extends Controller
                         $attachment->append('url');
                     }
                 }
+            }
+        }
+
+        // Append URL to item attachments
+        if ($item->attachments) {
+            foreach ($item->attachments as $attachment) {
+                $attachment->append('url');
             }
         }
 
