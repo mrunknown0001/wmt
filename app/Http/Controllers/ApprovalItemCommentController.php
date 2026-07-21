@@ -9,7 +9,7 @@ use App\Models\ApprovalCommentAttachment;
 use App\Http\Requests\StoreApprovalItemCommentRequest;
 use App\Http\Requests\UpdateApprovalItemCommentRequest;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Facades\Response;
 
 class ApprovalItemCommentController extends Controller
 {
@@ -73,13 +73,14 @@ class ApprovalItemCommentController extends Controller
         return redirect()->back()->with('success', 'Comment deleted successfully.');
     }
 
-    public function download(ApprovalProject $approvalProject, ApprovalItem $item, ApprovalItemComment $comment, ApprovalCommentAttachment $attachment): StreamedResponse
+    public function download(ApprovalProject $approvalProject, ApprovalItem $item, ApprovalItemComment $comment, ApprovalCommentAttachment $attachment)
     {
         $this->authorize('view', $item);
         abort_if($item->approval_project_id !== $approvalProject->id, 404);
         abort_if($comment->approval_item_id !== $item->id, 404);
         abort_if($attachment->approval_item_comment_id !== $comment->id, 404);
 
-        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
+        $path = Storage::disk('public')->path($attachment->file_path);
+        return Response::download($path, $attachment->file_name);
     }
 }
