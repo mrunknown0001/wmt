@@ -64,6 +64,7 @@ class ApprovalFormController extends Controller
             'item_defaults' => $this->normalizeItemDefaults($request->item_defaults),
             'created_by' => auth()->id(),
             'logo_position' => $request->logo_position ?? 'left',
+            'email_mode' => $request->email_mode ?? 'any',
         ]);
 
         // Handle logo upload
@@ -145,6 +146,7 @@ class ApprovalFormController extends Controller
             'success_message' => $request->success_message,
             'item_defaults' => $this->normalizeItemDefaults($request->item_defaults),
             'logo_position' => $request->logo_position ?? 'left',
+            'email_mode' => $request->email_mode ?? 'any',
         ]);
 
         // Handle logo

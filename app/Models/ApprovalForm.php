@@ -25,6 +25,7 @@ class ApprovalForm extends Model
         'logo_path',
         'logo_position',
         'banner_path',
+        'email_mode',
     ];
 
     protected function casts(): array

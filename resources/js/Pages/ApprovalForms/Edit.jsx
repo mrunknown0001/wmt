@@ -30,6 +30,7 @@ export default function Edit({ project, form }) {
         is_active: form.is_active,
         submit_button_text: form.submit_button_text,
         success_message: form.success_message,
+        email_mode: form.email_mode || 'any',
         fields: form.fields || [],
         item_defaults: form.item_defaults || {
             status: 'pending',
@@ -119,6 +120,23 @@ export default function Edit({ project, form }) {
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                                 rows="2"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Email Mode
+                            </label>
+                            <select
+                                value={data.email_mode}
+                                onChange={(e) => setData('email_mode', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                            >
+                                <option value="any">Accept Any Email</option>
+                                <option value="registered">Registered Users Only</option>
+                            </select>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                If "Registered Users Only", submissions with unregistered or inactive emails will be rejected.
+                            </p>
                         </div>
 
                         <label className="flex items-center gap-2">

@@ -101,6 +101,29 @@ class PublicApprovalFormController extends Controller
 
         $validated = $request->validate($rules);
 
+        // Validate email mode if form requires registered users
+        if ($form->email_mode === 'registered') {
+            // Find email field value
+            $emailFieldValue = null;
+            foreach ($allFields as $field) {
+                if ($field->type === 'email') {
+                    $emailFieldValue = $validated["field_{$field->id}"] ?? null;
+                    if ($emailFieldValue) {
+                        break;
+                    }
+                }
+            }
+
+            if ($emailFieldValue) {
+                $user = \App\Models\User::where('email', $emailFieldValue)->first();
+                if (!$user || !$user->is_active) {
+                    return back()->withErrors([
+                        'email' => 'This email is not registered or the account is inactive. Please use a valid registered email address.',
+                    ]);
+                }
+            }
+        }
+
         // Merge defaults for hidden fields
         foreach ($allFields as $field) {
             if ($field->is_visible && $field->default_value !== null) {
