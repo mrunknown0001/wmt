@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ActivityLogController;
+use App\Http\Controllers\Api\ApprovalSectionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AutomationRuleController;
 use App\Http\Controllers\Api\CalendarController;
@@ -111,6 +112,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/projects/{project}/sections/{section}', [TaskSectionController::class, 'update']);
     Route::delete('/projects/{project}/sections/{section}', [TaskSectionController::class, 'destroy']);
     Route::post('/projects/{project}/sections/reorder', [TaskSectionController::class, 'reorder']);
+
+    // Approval sections CRUD
+    Route::post('/approval-projects/{approvalProject}/sections', [ApprovalSectionController::class, 'store']);
+    Route::put('/approval-projects/{approvalProject}/sections/{section}', [ApprovalSectionController::class, 'update']);
+    Route::delete('/approval-projects/{approvalProject}/sections/{section}', [ApprovalSectionController::class, 'destroy']);
 
     // Activity log (admin)
     Route::get('/activity-log', ActivityLogController::class);

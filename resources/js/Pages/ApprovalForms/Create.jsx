@@ -1,8 +1,9 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
+import AddSectionModal from '../../Components/AddSectionModal';
 
 export default function Create({ project }) {
     if (!project) {
@@ -17,8 +18,12 @@ export default function Create({ project }) {
         );
     }
 
+    const [localSections, setLocalSections] = useState(
+        Array.isArray(project.sections) ? project.sections : []
+    );
     const customFields = Array.isArray(project.customFields) ? project.customFields : [];
-    const sections = Array.isArray(project.sections) ? project.sections : [];
+    const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         description: '',
@@ -41,6 +46,10 @@ export default function Create({ project }) {
         post(route('approval-projects.forms.store', project.id), {
             onFinish: () => setIsSubmitting(false),
         });
+    };
+
+    const handleSectionAdded = (newSection) => {
+        setLocalSections([...localSections, newSection]);
     };
 
     return (
@@ -155,23 +164,31 @@ export default function Create({ project }) {
                             </select>
                         </div>
 
-                        {sections && sections.length > 0 && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Default Section
-                                </label>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Default Section
+                            </label>
+                            <div className="flex gap-2">
                                 <select
                                     value={data.item_defaults.section_id || ''}
                                     onChange={(e) => setData('item_defaults', { ...data.item_defaults, section_id: e.target.value ? parseInt(e.target.value) : null })}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                                 >
                                     <option value="">None</option>
-                                    {sections.map(section => (
+                                    {localSections.map(section => (
                                         <option key={section.id} value={section.id}>{section.name}</option>
                                     ))}
                                 </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddSectionModal(true)}
+                                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
+                                    title="Add new section"
+                                >
+                                    +
+                                </button>
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     {/* Form Actions */}
@@ -185,6 +202,13 @@ export default function Create({ project }) {
                     </div>
                 </form>
             </div>
+
+            <AddSectionModal
+                isOpen={showAddSectionModal}
+                onClose={() => setShowAddSectionModal(false)}
+                projectId={project.id}
+                onSectionAdded={handleSectionAdded}
+            />
         </AuthenticatedLayout>
     );
 }

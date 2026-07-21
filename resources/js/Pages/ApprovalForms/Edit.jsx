@@ -1,12 +1,29 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
+import AddSectionModal from '../../Components/AddSectionModal';
 
 export default function Edit({ project, form }) {
-    const customFields = project?.customFields || [];
-    const sections = project?.sections || [];
+    if (!project) {
+        return (
+            <AuthenticatedLayout title="Edit Form - Error">
+                <Head title="Edit Form - Error" />
+                <div className="text-center py-12">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Project Not Found</h1>
+                    <p className="text-gray-600 dark:text-gray-400">Unable to load the project data.</p>
+                </div>
+            </AuthenticatedLayout>
+        );
+    }
+
+    const [localSections, setLocalSections] = useState(
+        Array.isArray(project.sections) ? project.sections : []
+    );
+    const customFields = Array.isArray(project.customFields) ? project.customFields : [];
+    const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+
     const { data, setData, put, processing, errors } = useForm({
         name: form.name,
         description: form.description,
@@ -29,6 +46,10 @@ export default function Edit({ project, form }) {
         put(route('approval-projects.forms.update', [project.id, form.id]), {
             onFinish: () => setIsSubmitting(false),
         });
+    };
+
+    const handleSectionAdded = (newSection) => {
+        setLocalSections([...localSections, newSection]);
     };
 
     return (
@@ -141,23 +162,31 @@ export default function Edit({ project, form }) {
                             </select>
                         </div>
 
-                        {sections && sections.length > 0 && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Default Section
-                                </label>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Default Section
+                            </label>
+                            <div className="flex gap-2">
                                 <select
                                     value={data.item_defaults.section_id || ''}
                                     onChange={(e) => setData('item_defaults', { ...data.item_defaults, section_id: e.target.value ? parseInt(e.target.value) : null })}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                                 >
                                     <option value="">None</option>
-                                    {sections.map(section => (
+                                    {localSections.map(section => (
                                         <option key={section.id} value={section.id}>{section.name}</option>
                                     ))}
                                 </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddSectionModal(true)}
+                                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
+                                    title="Add new section"
+                                >
+                                    +
+                                </button>
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     {/* Form Actions */}
@@ -171,6 +200,13 @@ export default function Edit({ project, form }) {
                     </div>
                 </form>
             </div>
+
+            <AddSectionModal
+                isOpen={showAddSectionModal}
+                onClose={() => setShowAddSectionModal(false)}
+                projectId={project.id}
+                onSectionAdded={handleSectionAdded}
+            />
         </AuthenticatedLayout>
     );
 }
