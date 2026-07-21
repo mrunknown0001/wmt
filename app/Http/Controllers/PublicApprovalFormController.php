@@ -134,17 +134,27 @@ class PublicApprovalFormController extends Controller
             // Email must belong to a registered, active user
             $user = \App\Models\User::where('email', $emailFieldValue)->first();
 
+            \Log::info('Email validation check', [
+                'email' => $emailFieldValue,
+                'user_found' => $user ? 'yes' : 'no',
+                'is_active' => $user ? $user->is_active : 'N/A',
+            ]);
+
             if (!$user) {
+                \Log::warning('Email not found in database', ['email' => $emailFieldValue]);
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     $emailFieldKey => 'This email is not registered in the system. Only registered users can submit this form.',
                 ]);
             }
 
             if (!$user->is_active) {
+                \Log::warning('User is inactive', ['email' => $emailFieldValue, 'user_id' => $user->id]);
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     $emailFieldKey => 'This email account is inactive. Please contact an administrator.',
                 ]);
             }
+
+            \Log::info('Email validation passed', ['email' => $emailFieldValue, 'user_id' => $user->id]);
         }
 
         // Merge defaults for hidden fields
