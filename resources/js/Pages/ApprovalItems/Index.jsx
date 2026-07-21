@@ -57,7 +57,7 @@ export default function Index({ project, items }) {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-                                                {item.status.replace('_', ' ')}
+                                                {item.status.replace('_', ' ').charAt(0).toUpperCase() + item.status.replace('_', ' ').slice(1)}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">

@@ -78,7 +78,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                         </div>
                     </div>
                     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${statusColors[item.status]}`}>
-                        <span className="font-medium">{item.status.replace('_', ' ')}</span>
+                        <span className="font-medium">{item.status.replace('_', ' ').charAt(0).toUpperCase() + item.status.replace('_', ' ').slice(1)}</span>
                     </div>
                 </div>
 

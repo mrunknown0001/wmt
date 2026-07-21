@@ -297,7 +297,7 @@ export default function AuthenticatedLayout({ children, title, contained = false
                         <>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-white truncate">{auth.user?.name}</p>
-                                <Badge color="blue" className="mt-0.5">{auth.user?.roles?.[0]}</Badge>
+                                <Badge color="blue" className="mt-0.5">{auth.user?.roles?.[0]?.charAt(0).toUpperCase() + auth.user?.roles?.[0]?.slice(1)}</Badge>
                             </div>
                             <Tooltip content="Logout">
                             <button

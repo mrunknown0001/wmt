@@ -60,7 +60,7 @@ export default function Show({ project }) {
                                 ? 'text-yellow-600'
                                 : 'text-gray-600'
                         }`}>
-                            {project.status.replace('_', ' ')}
+                            {project.status.replace('_', ' ').charAt(0).toUpperCase() + project.status.replace('_', ' ').slice(1)}
                         </p>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
