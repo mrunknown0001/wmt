@@ -103,37 +103,47 @@ class PublicApprovalFormController extends Controller
 
         // Validate email mode if form requires registered users
         if ($form->email_mode === 'registered') {
-            // Find email field value
             $emailFieldValue = null;
             $emailFieldKey = null;
+            $emailFieldFound = false;
 
+            // Find email field
             foreach ($allFields as $field) {
-                if ($field->type === 'email') {
+                if ($field->type === 'email' && $field->is_visible && $this->fieldConditionsMet($field, $validated, $allFields)) {
                     $emailFieldKey = "field_{$field->id}";
                     $emailFieldValue = $validated[$emailFieldKey] ?? null;
-
-                    // Check if email field is visible and conditions are met
-                    if ($emailFieldValue && $field->is_visible && $this->fieldConditionsMet($field, $validated, $allFields)) {
-                        break;
-                    }
+                    $emailFieldFound = true;
+                    break;
                 }
             }
 
-            if ($emailFieldValue) {
-                $user = \App\Models\User::where('email', $emailFieldValue)->first();
+            // If registered mode requires email field
+            if (!$emailFieldFound) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'form' => 'This form requires an email address for registered users only.',
+                ]);
+            }
 
-                // Throw validation error if email not found or user is inactive
-                if (!$user) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        $emailFieldKey => 'This email is not registered in the system. Only registered users can submit this form.',
-                    ]);
-                }
+            // Email field must have a value
+            if (!$emailFieldValue) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    $emailFieldKey => 'Email is required to submit this form.',
+                ]);
+            }
 
-                if (!$user->is_active) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        $emailFieldKey => 'This email account is inactive. Please contact an administrator.',
-                    ]);
-                }
+            // Email must belong to a registered, active user
+            $user = \App\Models\User::where('email', $emailFieldValue)->first();
+
+            if (!$user) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    $emailFieldKey => 'This email is not registered in the system. Only registered users can submit this form.',
+                ]);
+            }
+
+            if (!$user->is_active) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    $emailFieldKey => 'This email account is inactive. Please contact an administrator.',
+                ]);
             }
         }
 
