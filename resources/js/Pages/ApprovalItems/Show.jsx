@@ -1,5 +1,5 @@
 import { Head, Link, usePage, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
@@ -18,14 +18,26 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
     const [decisionComment, setDecisionComment] = useState('');
     const [decidingAction, setDecidingAction] = useState(null);
 
+    useEffect(() => {
+        console.log('Route helper available:', typeof window.route !== 'undefined');
+        console.log('Item:', item);
+        console.log('Project:', project);
+    }, []);
+
     const handleDecision = (action) => {
         if (!decidingAction) {
             setDecidingAction(action);
             return;
         }
 
+        // Build the URL manually if route() is not available
+        const url = `/approval-projects/${project.id}/items/${item.id}/advance`;
+        console.log('Decision URL:', url);
+        console.log('Project ID:', project.id);
+        console.log('Item ID:', item.id);
+
         router.post(
-            route('approval-projects.items.advance', { approvalProject: project.id, item: item.id }),
+            url,
             {
                 action: decidingAction,
                 comment: decisionComment,
