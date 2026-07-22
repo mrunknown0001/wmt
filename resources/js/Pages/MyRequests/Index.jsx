@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, useCallback, useRef } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
@@ -48,6 +48,11 @@ export default function Index({ items, stats, projects = [], availableProjects =
         setSearch(''); setStatus(''); setProjectId('');
         router.get(route('my-requests.index'), {}, { preserveState: true, preserveScroll: true });
     };
+
+    // Send the requestor back here (with their filters/page intact) instead of to
+    // the approval project's request list, which requestors can't access.
+    const { url: pageUrl } = usePage();
+    const backParam = '?back=' + encodeURIComponent(pageUrl);
 
     const hasActiveFilters = !!search || !!status || !!projectId;
     const hasAnyRequests = (stats?.total ?? 0) > 0;
@@ -196,7 +201,7 @@ export default function Index({ items, stats, projects = [], availableProjects =
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <Link
-                                                        href={route('approval-projects.items.show', [item.approval_project_id, item.id])}
+                                                        href={route('approval-projects.items.show', [item.approval_project_id, item.id]) + backParam}
                                                         className="inline-flex items-center gap-1 px-3 py-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-medium rounded transition"
                                                     >
                                                         View

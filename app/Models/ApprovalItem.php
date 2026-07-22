@@ -22,6 +22,7 @@ class ApprovalItem extends Model
         'current_step_number',
         'submitted_at',
         'decided_at',
+        'archived_at',
         'position',
     ];
 
@@ -30,7 +31,23 @@ class ApprovalItem extends Model
         return [
             'submitted_at' => 'datetime',
             'decided_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('archived_at');
+    }
+
+    public function scopeNotArchived($query)
+    {
+        return $query->whereNull('archived_at');
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->archived_at !== null;
     }
 
     protected static function booted(): void

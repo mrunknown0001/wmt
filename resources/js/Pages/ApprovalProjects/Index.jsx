@@ -23,10 +23,22 @@ const Tooltip = ({ content, children }) => (
     </div>
 );
 
-export default function Index({ projects }) {
+const ArchiveIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+    </svg>
+);
+
+export default function Index({ projects, archivedCount = 0 }) {
     const handleDelete = (id) => {
         if (confirm('Are you sure? This will delete the approval project.')) {
             router.delete(route('approval-projects.destroy', id));
+        }
+    };
+
+    const handleArchive = (project) => {
+        if (confirm(`Archive "${project.name}"? It will be hidden from the active list.`)) {
+            router.patch(route('approval-projects.archive', project.id), {}, { preserveScroll: true });
         }
     };
 
@@ -39,9 +51,19 @@ export default function Index({ projects }) {
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Approval Projects</h1>
                         <p className="text-gray-600 dark:text-gray-400 mt-1">Manage approval workflows and requests</p>
                     </div>
-                    <Link href={route('approval-projects.create')}>
-                        <Button>Create Approval Project</Button>
-                    </Link>
+                    <div className="flex items-center gap-3">
+                        {archivedCount > 0 && (
+                            <Link
+                                href={route('approval-projects.archived')}
+                                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                            >
+                                Archived ({archivedCount})
+                            </Link>
+                        )}
+                        <Link href={route('approval-projects.create')}>
+                            <Button>Create Approval Project</Button>
+                        </Link>
+                    </div>
                 </div>
 
                 {projects.data.length === 0 ? (
@@ -90,6 +112,14 @@ export default function Index({ projects }) {
                                                     <EditIcon />
                                                 </button>
                                             </Link>
+                                        </Tooltip>
+                                        <Tooltip content="Archive">
+                                            <button
+                                                onClick={() => handleArchive(project)}
+                                                className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+                                            >
+                                                <ArchiveIcon />
+                                            </button>
                                         </Tooltip>
                                         <Tooltip content="Delete">
                                             <button

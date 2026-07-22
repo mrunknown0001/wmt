@@ -136,7 +136,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/projects/{project}/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
 
     // Approval Projects
+    // Archived list must be declared before the resource so it isn't captured by {approvalProject}
+    Route::get('/approval-projects/archived', [ApprovalProjectController::class, 'archived'])->name('approval-projects.archived');
     Route::resource('approval-projects', ApprovalProjectController::class);
+    Route::patch('/approval-projects/{approvalProject}/archive', [ApprovalProjectController::class, 'archive'])->name('approval-projects.archive');
+    Route::patch('/approval-projects/{approvalProject}/items/{item}/archive', [ApprovalItemController::class, 'archive'])->name('approval-projects.items.archive');
     Route::get('/approval-projects/{approvalProject}/custom-fields', [ApprovalCustomFieldController::class, 'index'])->name('approval-projects.custom-fields.index');
     Route::post('/approval-projects/{approvalProject}/custom-fields', [ApprovalCustomFieldController::class, 'store'])->name('approval-projects.custom-fields.store');
     Route::put('/approval-projects/{approvalProject}/custom-fields/{customField}', [ApprovalCustomFieldController::class, 'update'])->name('approval-projects.custom-fields.update');

@@ -25,8 +25,9 @@ const EyeIcon = () => (
     </svg>
 );
 
-export default function Index({ project, items, auth, chains = [], requesters = [], filters = {} }) {
+export default function Index({ project, items, auth, chains = [], requesters = [], filters = {}, archivedCount = 0 }) {
     const [approvingItemId, setApprovingItemId] = useState(null);
+    const showArchived = !!filters.archived;
     const [search, setSearch] = useState(filters.search || '');
     const [status, setStatus] = useState(filters.status || '');
     const [chainId, setChainId] = useState(filters.chain_id || '');
@@ -43,13 +44,20 @@ export default function Index({ project, items, auth, chains = [], requesters = 
             requester_id: overrides.requester_id ?? requesterId,
             sort: overrides.sort ?? sort,
             direction: overrides.direction ?? direction,
+            archived: (overrides.archived ?? showArchived) ? 1 : '',
         };
         Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; });
         router.get(route('approval-projects.items.index', project.id), params, {
             preserveState: true,
             preserveScroll: true,
         });
-    }, [search, status, chainId, requesterId, sort, direction, project.id]);
+    }, [search, status, chainId, requesterId, sort, direction, showArchived, project.id]);
+
+    const handleArchive = (item) => {
+        const archiving = !item.archived_at;
+        if (archiving && !confirm(`Archive "${item.title}"? It will be hidden from the active list.`)) return;
+        router.patch(route('approval-projects.items.archive', [project.id, item.id]), {}, { preserveScroll: true });
+    };
 
     const handleSort = (column) => {
         const newDirection = sort === column
@@ -83,7 +91,7 @@ export default function Index({ project, items, auth, chains = [], requesters = 
     // param and the inline Approve action, so the approver always returns to this
     // exact filtered/sorted view.
     const listQuery = (() => {
-        const params = { search, status, chain_id: chainId, requester_id: requesterId, sort, direction };
+        const params = { search, status, chain_id: chainId, requester_id: requesterId, sort, direction, archived: showArchived ? 1 : '' };
         Object.keys(params).forEach((k) => { if (!params[k]) delete params[k]; });
         const qs = new URLSearchParams(params).toString();
         return qs ? '?' + qs : '';
@@ -208,6 +216,18 @@ export default function Index({ project, items, auth, chains = [], requesters = 
                             ))}
                         </select>
                     )}
+                    <button
+                        type="button"
+                        onClick={() => applyFilters({ archived: !showArchived })}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                            showArchived
+                                ? 'bg-amber-600 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                        title={showArchived ? 'Back to active requests' : 'View archived requests'}
+                    >
+                        {showArchived ? 'Viewing Archived' : `Archived (${archivedCount})`}
+                    </button>
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
@@ -270,6 +290,15 @@ export default function Index({ project, items, auth, chains = [], requesters = 
                                                         View
                                                     </button>
                                                 </Link>
+                                                <button
+                                                    onClick={() => handleArchive(item)}
+                                                    title={item.archived_at ? 'Unarchive' : 'Archive'}
+                                                    className="inline-flex items-center justify-center w-8 h-8 text-gray-500 hover:text-amber-600 dark:text-gray-400 dark:hover:text-amber-400 rounded hover:bg-amber-50 dark:hover:bg-amber-900/30 transition"
+                                                >
+                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                                    </svg>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

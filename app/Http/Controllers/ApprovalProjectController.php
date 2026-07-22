@@ -16,12 +16,41 @@ class ApprovalProjectController extends Controller
         $this->authorize('viewAny', ApprovalProject::class);
 
         $projects = ApprovalProject::with('owner')
+            ->where('status', '!=', 'archived')
             ->orderBy('position')
             ->paginate(15);
 
         return Inertia::render('ApprovalProjects/Index', [
             'projects' => $projects,
+            'archivedCount' => ApprovalProject::where('status', 'archived')->count(),
         ]);
+    }
+
+    public function archived()
+    {
+        $this->authorize('viewAny', ApprovalProject::class);
+
+        $projects = ApprovalProject::with('owner')
+            ->where('status', 'archived')
+            ->orderBy('updated_at', 'desc')
+            ->paginate(15);
+
+        return Inertia::render('ApprovalProjects/Archived', [
+            'projects' => $projects,
+        ]);
+    }
+
+    /** Toggle a project between archived and active. */
+    public function archive(ApprovalProject $approvalProject)
+    {
+        $this->authorize('update', $approvalProject);
+
+        $newStatus = $approvalProject->status === 'archived' ? 'active' : 'archived';
+        $approvalProject->update(['status' => $newStatus]);
+
+        $label = $newStatus === 'archived' ? 'archived' : 'unarchived';
+
+        return back()->with('success', "Approval project {$label} successfully.");
     }
 
     public function create()

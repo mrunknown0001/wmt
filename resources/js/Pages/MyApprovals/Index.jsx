@@ -31,19 +31,29 @@ const capitalizeStatus = (status) => {
         .join(' ');
 };
 
-export default function Index({ pendingApprovals, stats, filters = {} }) {
+export default function Index({ pendingApprovals, stats, filters = {}, trail, trailStats, trailFilters = {} }) {
     // Filtering is server-side now (so it composes with search and pagination).
     const filteredStatus = filters.status || 'all';
     const [search, setSearch] = useState(filters.search || '');
     const searchTimeout = useRef(null);
 
-    const applyFilters = (overrides = {}) => {
-        const params = {
-            status: overrides.status ?? (filteredStatus === 'all' ? '' : filteredStatus),
-            search: overrides.search ?? search,
-        };
+    // The queue and the approval trail each own their own query params, so every
+    // navigation carries the other section's params through untouched.
+    const currentQuery = () =>
+        Object.fromEntries(new URLSearchParams(window.location.search).entries());
+
+    const visit = (params) => {
         Object.keys(params).forEach((k) => { if (!params[k]) delete params[k]; });
         router.get(route('my-approvals.index'), params, { preserveState: true, preserveScroll: true });
+    };
+
+    const applyFilters = (overrides = {}) => {
+        visit({
+            ...currentQuery(),
+            status: overrides.status ?? (filteredStatus === 'all' ? '' : filteredStatus),
+            search: overrides.search ?? search,
+            page: '', // a changed filter invalidates the current page
+        });
     };
 
     const applyFilter = (status) => applyFilters({ status: status === 'all' ? '' : status });
@@ -58,6 +68,29 @@ export default function Index({ pendingApprovals, stats, filters = {} }) {
         setSearch('');
         applyFilters({ search: '' });
     };
+
+    // --- Approval trail ---
+    const [trailSearch, setTrailSearch] = useState(trailFilters.search || '');
+    const trailSearchTimeout = useRef(null);
+    const trailDecision = trailFilters.decision || '';
+
+    const applyTrailFilters = (overrides = {}) => {
+        visit({
+            ...currentQuery(),
+            trail_decision: overrides.decision ?? trailDecision,
+            trail_search: overrides.search ?? trailSearch,
+            trail_page: '', // a changed filter invalidates the current trail page
+        });
+    };
+
+    const handleTrailSearchChange = (value) => {
+        setTrailSearch(value);
+        clearTimeout(trailSearchTimeout.current);
+        trailSearchTimeout.current = setTimeout(() => applyTrailFilters({ search: value }), 300);
+    };
+
+    const trailRows = trail?.data ?? [];
+    const hasTrailFilters = !!trailSearch || !!trailDecision;
 
     const filtered = pendingApprovals?.data ?? [];
 
@@ -227,6 +260,137 @@ export default function Index({ pendingApprovals, stats, filters = {} }) {
                         <Pagination links={pendingApprovals?.links} />
                     </div>
                 )}
+
+                {/* Approval Trail — decisions this approver has already made */}
+                <div className="pt-4">
+                    <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Approval Trail</h2>
+                            <p className="text-gray-600 dark:text-gray-400 mt-1">
+                                A record of every decision you've made, most recent first
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total</p>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{trailStats?.total ?? 0}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Approved</p>
+                                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{trailStats?.approved ?? 0}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Rejected</p>
+                                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{trailStats?.rejected ?? 0}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4 flex flex-wrap items-center gap-3">
+                        <input
+                            type="text"
+                            value={trailSearch}
+                            onChange={(e) => handleTrailSearchChange(e.target.value)}
+                            placeholder="Search trail by request, project, requester or comment..."
+                            className="flex-1 min-w-[16rem] px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        />
+                        <select
+                            value={trailDecision}
+                            onChange={(e) => applyTrailFilters({ decision: e.target.value })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="">All Decisions</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                        {hasTrailFilters && (
+                            <button
+                                onClick={() => { setTrailSearch(''); applyTrailFilters({ search: '', decision: '' }); }}
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+                            >
+                                Clear
+                            </button>
+                        )}
+                    </div>
+
+                    {trailRows.length > 0 ? (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                    <thead className="bg-gray-50 dark:bg-gray-900">
+                                        <tr>
+                                            {['Decision', 'Request', 'Approval Project', 'Requester', 'Step', 'Comment', 'Decided'].map((h) => (
+                                                <th
+                                                    key={h}
+                                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap"
+                                                >
+                                                    {h}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {trailRows.map((row) => (
+                                            <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                                        row.decision === 'approved'
+                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                                                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                                                    }`}>
+                                                        {capitalizeStatus(row.decision)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 min-w-[14rem] max-w-[20rem]">
+                                                    {row.project_id && row.item_id ? (
+                                                        <Link
+                                                            href={route('approval-projects.items.show', [row.project_id, row.item_id])}
+                                                            title={row.item_title || `Request #${row.item_id}`}
+                                                            className="block truncate font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
+                                                        >
+                                                            {row.item_title || `Request #${row.item_id}`}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-gray-500 dark:text-gray-400">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                                                    {row.project_name || '—'}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                                    {row.requester || '—'}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                                    {row.step_name || (row.step_number ? `Step ${row.step_number}` : '—')}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-xs">
+                                                    <span className="line-clamp-2">{row.comment || '—'}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                                    {row.decided_at
+                                                        ? new Date(row.decided_at).toLocaleString(undefined, {
+                                                            year: 'numeric', month: 'short', day: 'numeric',
+                                                            hour: '2-digit', minute: '2-digit',
+                                                        })
+                                                        : '—'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <Pagination links={trail?.links} />
+                        </div>
+                    ) : (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+                            <p className="text-gray-600 dark:text-gray-400">
+                                {hasTrailFilters
+                                    ? 'No decisions match your search or filter.'
+                                    : "You haven't decided on any requests yet."}
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
         </AuthenticatedLayout>
     );

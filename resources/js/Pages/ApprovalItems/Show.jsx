@@ -33,7 +33,14 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
         const qIndex = pageUrl.indexOf('?');
         return qIndex === -1 ? '' : (new URLSearchParams(pageUrl.slice(qIndex + 1)).get('back') || '');
     })();
-    const backHref = route('approval-projects.items.index', project.id) + backQuery;
+    // `back` may be either a local return path (e.g. "/my-requests?status=pending",
+    // used by the requestor view) or a bare query string appended to the approval
+    // project's request list (used by the approver view). "//host" is rejected so a
+    // crafted ?back= can't turn this into an off-site redirect.
+    const isLocalPath = backQuery.startsWith('/') && !backQuery.startsWith('//');
+    const backHref = isLocalPath
+        ? backQuery
+        : route('approval-projects.items.index', project.id) + (backQuery.startsWith('?') ? backQuery : '');
 
     useEffect(() => {
         console.log('Route helper available:', typeof window.route !== 'undefined');

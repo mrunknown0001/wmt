@@ -47,6 +47,12 @@ class ApprovalItemController extends Controller
             $query->where('requested_by', $requesterId);
         }
 
+        // Archived requests are hidden unless explicitly requested (?archived=1).
+        $showArchived = $request->boolean('archived');
+        $showArchived
+            ? $query->whereNotNull('archived_at')
+            : $query->whereNull('archived_at');
+
         // Sorting — whitelist of sortable columns to keep this injection-safe.
         $sortable = ['title', 'requester', 'status', 'chain', 'created_at'];
         $sort = in_array($request->input('sort'), $sortable, true)
@@ -96,7 +102,9 @@ class ApprovalItemController extends Controller
                 'requester_id' => $request->input('requester_id', ''),
                 'sort' => $sort,
                 'direction' => $direction,
+                'archived' => $showArchived,
             ],
+            'archivedCount' => $approvalProject->approvalItems()->whereNotNull('archived_at')->count(),
         ]);
     }
 
@@ -253,6 +261,18 @@ class ApprovalItemController extends Controller
 
         return redirect()->route('approval-projects.items.show', [$approvalProject, $item])
             ->with('success', 'Approval request updated successfully.');
+    }
+
+    /** Toggle a request between archived and active. */
+    public function archive(Request $request, ApprovalProject $approvalProject, ApprovalItem $item)
+    {
+        $this->authorize('update', $item);
+        abort_if($item->approval_project_id !== $approvalProject->id, 404);
+
+        $archiving = !$item->isArchived();
+        $item->update(['archived_at' => $archiving ? now() : null]);
+
+        return back()->with('success', 'Request ' . ($archiving ? 'archived' : 'unarchived') . ' successfully.');
     }
 
     public function destroy(ApprovalProject $approvalProject, ApprovalItem $item)
