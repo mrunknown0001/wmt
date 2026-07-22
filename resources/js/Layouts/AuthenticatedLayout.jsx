@@ -104,6 +104,12 @@ const ApprovalCheckIcon = () => (
     </svg>
 );
 
+const MyRequestsIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+);
+
 const SettingsIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z" />
@@ -112,13 +118,34 @@ const SettingsIcon = () => (
 );
 
 export default function AuthenticatedLayout({ children, title, contained = false }) {
-    const { auth, flash, settings, unreadNotificationsCount } = usePage().props;
+    const { auth, flash, settings, unreadNotificationsCount, pendingApprovalsCount } = usePage().props;
     const currentUrl = usePage().url;
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
         try { return localStorage.getItem('sidebar_collapsed') === '1'; } catch { return false; }
     });
     const [toasts, setToasts] = useState([]);
+    // Live pending-approvals badge: seeded from the server on each Inertia visit,
+    // then bumped in real time when an approval notification arrives via websocket.
+    const [approvalsCount, setApprovalsCount] = useState(pendingApprovalsCount || 0);
+
+    // Re-sync to the authoritative server count on every page navigation.
+    useEffect(() => {
+        setApprovalsCount(pendingApprovalsCount || 0);
+    }, [pendingApprovalsCount]);
+
+    // Bump the badge the moment a new approval request lands (NotificationBell's
+    // Echo subscription re-dispatches every notification as a `wmt:notification` event).
+    useEffect(() => {
+        const handler = (e) => {
+            const n = e.detail;
+            if (n && (n.type === 'approval_requested' || n.approval_item_id != null)) {
+                setApprovalsCount((prev) => prev + 1);
+            }
+        };
+        window.addEventListener('wmt:notification', handler);
+        return () => window.removeEventListener('wmt:notification', handler);
+    }, []);
 
     const toggleSidebarCollapsed = () => {
         setSidebarCollapsed((prev) => {
@@ -221,13 +248,23 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     </div>
                 )}
 
-                {hasPermission('view-approval-projects') && (
+                {/* Approvals area — only for users granted the "Can Approve Requests" capability */}
+                {auth.user?.can_approve && hasPermission('view-approval-projects') && (
                     <div className="space-y-0.5">
                         <NavLink href="/approval-projects" icon={<ApprovalCheckIcon />} active={isActive('/approval-projects')} collapsed={collapsed}>
                             Approvals
                         </NavLink>
-                        <NavLink href="/my-approvals" icon={<ApprovalCheckIcon />} active={isActive('/my-approvals')} collapsed={collapsed}>
+                        <NavLink href="/my-approvals" icon={<ApprovalCheckIcon />} active={isActive('/my-approvals')} badge={approvalsCount || null} collapsed={collapsed}>
                             My Approvals
+                        </NavLink>
+                    </div>
+                )}
+
+                {/* Requestor view — only for users granted the "Can Request" capability */}
+                {auth.user?.can_request && (
+                    <div className="space-y-0.5">
+                        <NavLink href="/my-requests" icon={<MyRequestsIcon />} active={isActive('/my-requests')} collapsed={collapsed}>
+                            My Requests
                         </NavLink>
                     </div>
                 )}

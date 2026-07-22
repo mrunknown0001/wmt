@@ -263,6 +263,7 @@ export default function Index({ taskGroups, isCompletedFilter, pagination, stats
     const [filterSearch, setFilterSearch] = useState(filters.search || '');
     const [filterStatus, setFilterStatus] = useState(filters.status || '');
     const [filterPriority, setFilterPriority] = useState(filters.priority || '');
+    const [filterDue, setFilterDue] = useState(filters.due || '');
     const searchTimeout = useRef(null);
 
     // Reload task list when task-related notifications arrive
@@ -282,6 +283,7 @@ export default function Index({ taskGroups, isCompletedFilter, pagination, stats
             status: overrides.status ?? filterStatus,
             priority: overrides.priority ?? filterPriority,
             search: overrides.search ?? filterSearch,
+            due: overrides.due ?? filterDue,
         };
 
         // Remove empty params
@@ -313,10 +315,17 @@ export default function Index({ taskGroups, isCompletedFilter, pagination, stats
         setFilterSearch('');
         setFilterStatus('');
         setFilterPriority('');
+        setFilterDue('');
         router.get('/my-tasks', {}, { preserveState: true, preserveScroll: true });
     };
 
-    const hasActiveFilters = filterSearch || filterStatus || filterPriority;
+    // Clicking a stat card filters by due-date bucket ("Active Tasks" clears it).
+    const handleDueCard = (value) => {
+        setFilterDue(value);
+        applyFilters({ due: value });
+    };
+
+    const hasActiveFilters = filterSearch || filterStatus || filterPriority || filterDue;
     const sections = isCompletedFilter ? completedSections : activeSections;
     const hasAnyTasks = Object.values(taskGroups).some(group => group.length > 0);
 
@@ -345,28 +354,30 @@ export default function Index({ taskGroups, isCompletedFilter, pagination, stats
 
             {/* Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <Card>
-                    <div className="text-center">
-                        <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{stats.total}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Active Tasks</p>
-                    </div>
-                </Card>
-                <Card>
-                    <div className="text-center">
-                        <p className={`text-2xl font-semibold ${stats.overdue > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                            {stats.overdue}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Overdue</p>
-                    </div>
-                </Card>
-                <Card>
-                    <div className="text-center">
-                        <p className={`text-2xl font-semibold ${stats.dueToday > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                            {stats.dueToday}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Due Today</p>
-                    </div>
-                </Card>
+                {[
+                    { value: '', label: 'Active Tasks', count: stats.total, tone: 'text-gray-900 dark:text-gray-100', title: 'Show all active tasks' },
+                    { value: 'overdue', label: 'Overdue', count: stats.overdue, tone: stats.overdue > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100', title: 'Show only overdue tasks' },
+                    { value: 'today', label: 'Due Today', count: stats.dueToday, tone: stats.dueToday > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-gray-100', title: 'Show only tasks due today' },
+                ].map((card) => {
+                    const active = filterDue === card.value;
+                    return (
+                        <button
+                            key={card.label}
+                            type="button"
+                            onClick={() => handleDueCard(card.value)}
+                            aria-pressed={active}
+                            title={card.title}
+                            className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                active ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-blue-300 dark:hover:ring-blue-700'
+                            }`}
+                        >
+                            <div className="text-center">
+                                <p className={`text-2xl font-semibold ${card.tone}`}>{card.count}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{card.label}</p>
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Quick Add */}

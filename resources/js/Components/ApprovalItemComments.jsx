@@ -185,7 +185,7 @@ export default function ApprovalItemComments({ project, item, comments, auth }) 
                                 <div className="flex items-start justify-between mb-2">
                                     <div>
                                         <p className="font-medium text-gray-900 dark:text-white">
-                                            {comment.user?.name || 'Unknown'}
+                                            {comment.user?.name || 'Automation'}
                                         </p>
                                         <p className="text-sm text-gray-600 dark:text-gray-400">
                                             {new Date(comment.created_at).toLocaleString()}

@@ -9,11 +9,15 @@ class ApprovalProjectPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('view-approval-projects');
+        // The Approvals area is only available to users granted the approver capability.
+        return $user->can_approve && $user->hasPermissionTo('view-approval-projects');
     }
 
     public function view(User $user, ApprovalProject $project): bool
     {
+        if (!$user->can_approve) {
+            return false;
+        }
         if ($user->hasPermissionTo('manage-approval-projects')) {
             return true;
         }

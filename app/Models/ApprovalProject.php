@@ -75,6 +75,13 @@ class ApprovalProject extends Model
 
     public function isProjectAdmin(User $user): bool
     {
-        return $this->members()->where('user_id', $user->id)->where('role', 'admin')->exists();
+        return $this->members()->where('user_id', $user->id)
+            ->whereIn('role', ['admin', 'co-owner'])
+            ->exists();
+    }
+
+    public function coOwners(): BelongsToMany
+    {
+        return $this->members()->wherePivot('role', 'co-owner');
     }
 }

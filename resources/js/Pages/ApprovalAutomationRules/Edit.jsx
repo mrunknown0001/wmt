@@ -2,7 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
-import AutomationRuleBuilder from '../../Components/AutomationRuleBuilder';
+import ApprovalAutomationBuilder from '../../Components/ApprovalAutomationBuilder';
 
 const TRIGGER_TYPES = {
     item_submitted: 'Item Submitted',
@@ -97,13 +97,12 @@ export default function Edit({ project, rule, customFields }) {
 
                     {/* Automation Builder */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                        <AutomationRuleBuilder
+                        <ApprovalAutomationBuilder
                             conditions={data.conditions}
                             onConditionsChange={(conditions) => setData('conditions', conditions)}
                             actions={data.actions}
                             onActionsChange={(actions) => setData('actions', actions)}
-                            customFields={customFields}
-                            actionTypes={['send_notification', 'add_comment', 'set_custom_field']}
+                            customFields={customFields || project.custom_fields || []}
                         />
                         {errors.actions && <p className="text-red-600 text-sm mt-2">{errors.actions}</p>}
                     </div>

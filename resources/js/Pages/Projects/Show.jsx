@@ -3054,7 +3054,7 @@ export default function Show() {
                             sections={localSections}
                             customFields={localCustomFields}
                             forms={forms}
-                            canCreateRules={!!auth.user?.can_create_rules}
+                            canCreateRules={!!auth.user?.can_create_rules || !!auth.user?.permissions?.includes('manage-projects')}
                         />
                     </Card>
                 </div>

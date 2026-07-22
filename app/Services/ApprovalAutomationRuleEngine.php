@@ -275,19 +275,38 @@ class ApprovalAutomationRuleEngine
             return;
         }
 
-        // Send notification (using queued notification pattern from Phase 5)
-        // For now, this is a placeholder for notification integration
+        $message = self::applyPlaceholders($params['message'] ?? '', $item);
+        if ($message === '') {
+            $message = "Update on \"{$item->title}\"";
+        }
+
+        $recipient->notify(new \App\Notifications\ApprovalAutomationNotification($item, $message));
     }
 
     private static function actionAddComment(ApprovalItem $item, array $params): void
     {
-        $message = $params['message'] ?? null;
-        if (!$message) {
+        $message = self::applyPlaceholders($params['message'] ?? '', $item);
+        if ($message === '') {
             return;
         }
 
-        // Replace placeholder variables
-        $message = str_replace(
+        // System-generated comment (no author — rendered as "Automation" in the UI).
+        $item->comments()->create([
+            'user_id' => null,
+            'body' => $message,
+        ]);
+    }
+
+    /**
+     * Substitute the supported template variables in an automation message.
+     */
+    private static function applyPlaceholders(?string $message, ApprovalItem $item): string
+    {
+        if (!$message) {
+            return '';
+        }
+
+        return str_replace(
             ['{item}', '{status}', '{requester}'],
             [
                 $item->title,
@@ -296,9 +315,6 @@ class ApprovalAutomationRuleEngine
             ],
             $message
         );
-
-        // Create comment row (when ApprovalItemComment model is added)
-        // For now, this is a placeholder
     }
 
     private static function actionSetCustomField(ApprovalItem $item, array $params): void

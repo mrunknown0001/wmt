@@ -1,7 +1,8 @@
-import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { useState, useRef } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
+import Pagination from '../../Components/Pagination';
 
 const statusColors = {
     pending: 'bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400',
@@ -30,15 +31,39 @@ const capitalizeStatus = (status) => {
         .join(' ');
 };
 
-export default function Index({ pendingApprovals, stats }) {
-    const [filteredStatus, setFilteredStatus] = useState('all');
+export default function Index({ pendingApprovals, stats, filters = {} }) {
+    // Filtering is server-side now (so it composes with search and pagination).
+    const filteredStatus = filters.status || 'all';
+    const [search, setSearch] = useState(filters.search || '');
+    const searchTimeout = useRef(null);
 
-    const filtered = filteredStatus === 'all'
-        ? pendingApprovals
-        : pendingApprovals.filter(a => a.status === filteredStatus);
+    const applyFilters = (overrides = {}) => {
+        const params = {
+            status: overrides.status ?? (filteredStatus === 'all' ? '' : filteredStatus),
+            search: overrides.search ?? search,
+        };
+        Object.keys(params).forEach((k) => { if (!params[k]) delete params[k]; });
+        router.get(route('my-approvals.index'), params, { preserveState: true, preserveScroll: true });
+    };
+
+    const applyFilter = (status) => applyFilters({ status: status === 'all' ? '' : status });
+
+    const handleSearchChange = (value) => {
+        setSearch(value);
+        clearTimeout(searchTimeout.current);
+        searchTimeout.current = setTimeout(() => applyFilters({ search: value }), 300);
+    };
+
+    const clearSearch = () => {
+        setSearch('');
+        applyFilters({ search: '' });
+    };
+
+    const filtered = pendingApprovals?.data ?? [];
 
     const groupedByProject = {};
     filtered.forEach((approval) => {
+        if (!approval) return;
         const projectId = approval.approval_project_id;
         if (!groupedByProject[projectId]) {
             groupedByProject[projectId] = {
@@ -61,64 +86,69 @@ export default function Index({ pendingApprovals, stats }) {
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Approvals</p>
-                                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats?.pending || 0}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Changes Requested</p>
-                                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats?.changes_requested || 0}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Decided This Week</p>
-                                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats?.decided_this_week || 0}</p>
-                            </div>
-                        </div>
-                    </div>
+                    {[
+                        { value: 'pending', label: 'Pending Approvals', count: stats?.pending || 0, title: 'Show only requests awaiting your decision' },
+                        { value: 'changes_requested', label: 'Changes Requested', count: stats?.changes_requested || 0, title: 'Show only requests needing changes' },
+                        { value: 'decided', label: 'Decided This Week', count: stats?.decided_this_week || 0, title: 'Show requests you decided this week' },
+                    ].map((card) => {
+                        const active = filteredStatus === card.value;
+                        return (
+                            <button
+                                key={card.value}
+                                type="button"
+                                onClick={() => applyFilter(active ? 'all' : card.value)}
+                                aria-pressed={active}
+                                title={card.title}
+                                className={`text-left bg-white dark:bg-gray-800 rounded-lg shadow p-6 transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                    active ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-blue-300 dark:hover:ring-blue-700'
+                                }`}
+                            >
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{card.label}</p>
+                                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{card.count}</p>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Search */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex items-center gap-3">
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        placeholder="Search by request title, description or requester..."
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                    {search && (
+                        <button
+                            onClick={clearSearch}
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+                        >
+                            Clear search
+                        </button>
+                    )}
                 </div>
 
                 {/* Filters */}
                 <div className="flex gap-2">
-                    <button
-                        onClick={() => setFilteredStatus('all')}
-                        className={`px-4 py-2 rounded-lg font-medium transition ${
-                            filteredStatus === 'all'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
-                    >
-                        All
-                    </button>
-                    <button
-                        onClick={() => setFilteredStatus('pending')}
-                        className={`px-4 py-2 rounded-lg font-medium transition ${
-                            filteredStatus === 'pending'
-                                ? 'bg-yellow-600 text-white'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
-                    >
-                        Pending ({stats?.pending || 0})
-                    </button>
-                    <button
-                        onClick={() => setFilteredStatus('changes_requested')}
-                        className={`px-4 py-2 rounded-lg font-medium transition ${
-                            filteredStatus === 'changes_requested'
-                                ? 'bg-orange-600 text-white'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
-                    >
-                        Changes Requested ({stats?.changes_requested || 0})
-                    </button>
+                    {[
+                        { value: 'all', label: 'All', activeClass: 'bg-blue-600 text-white' },
+                        { value: 'pending', label: `Pending (${stats?.pending || 0})`, activeClass: 'bg-yellow-600 text-white' },
+                        { value: 'changes_requested', label: `Changes Requested (${stats?.changes_requested || 0})`, activeClass: 'bg-orange-600 text-white' },
+                        { value: 'decided', label: `Decided This Week (${stats?.decided_this_week || 0})`, activeClass: 'bg-green-600 text-white' },
+                    ].map((tab) => (
+                        <button
+                            key={tab.value}
+                            onClick={() => applyFilter(tab.value)}
+                            className={`px-4 py-2 rounded-lg font-medium transition ${
+                                filteredStatus === tab.value
+                                    ? tab.activeClass
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Approvals by Project */}
@@ -185,8 +215,16 @@ export default function Index({ pendingApprovals, stats }) {
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">All caught up!</h3>
                         <p className="text-gray-600 dark:text-gray-400">
-                            You have no pending approvals at this time.
+                            {filteredStatus === 'all'
+                                ? 'You have no pending approvals at this time.'
+                                : 'No requests match this filter.'}
                         </p>
+                    </div>
+                )}
+
+                {filtered.length > 0 && (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+                        <Pagination links={pendingApprovals?.links} />
                     </div>
                 )}
             </div>

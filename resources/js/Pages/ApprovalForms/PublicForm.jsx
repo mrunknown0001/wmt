@@ -1,6 +1,21 @@
 import { useState, useRef } from 'react';
 import { Head } from '@inertiajs/react';
 
+const NUMBER_MIN = -99999999999;
+const NUMBER_MAX = 99999999999;
+
+// Hard-clamp a number field value so typed/pasted out-of-range input snaps back
+// into range. Preserves partial input ('', '-') and non-numeric strings (the
+// server rule catches those) so the field stays editable while being bounded.
+function clampNumber(v) {
+    if (v === '' || v === '-') return v;
+    const n = Number(v);
+    if (Number.isNaN(n)) return v;
+    if (n > NUMBER_MAX) return String(NUMBER_MAX);
+    if (n < NUMBER_MIN) return String(NUMBER_MIN);
+    return v;
+}
+
 export default function PublicForm({ form, fields, turnstile, csrf_token }) {
     const formRef = useRef(null);
     const [processing, setProcessing] = useState(false);
@@ -29,10 +44,16 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
             const submitUrl = `/forms-approval/${form.uuid}`;
             console.log('Submitting to:', submitUrl);
 
-            // Submit via fetch - allow it to follow redirects naturally
+            // Submit via fetch. Declare that we expect JSON so Laravel returns a
+            // 422 with validation errors instead of a 302 redirect-back (which
+            // fetch would follow into a 200 and misread as a successful submit).
             const response = await fetch(submitUrl, {
                 method: 'POST',
                 body: formData,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
             });
 
             console.log('Response status:', response.status, 'Final URL:', response.url, 'Content-Type:', response.headers.get('content-type'));
@@ -55,6 +76,11 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                 console.log('Validation error detected, errors:', responseData?.errors);
                 if (responseData?.errors) {
                     setErrors(responseData.errors);
+                    // Surface non-field errors (e.g. the 'form' key) in the top banner
+                    // so they aren't silently dropped by the per-field display.
+                    if (responseData.errors.form) {
+                        setFormErrors(responseData.errors.form[0]);
+                    }
                     window.scrollTo(0, 0);
                     setProcessing(false);
                     return;
@@ -83,6 +109,20 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
             setProcessing(false);
         }
     };
+
+    // Server-side validation errors arrive as { field_7: ['message', ...] }.
+    // These helpers drive the red border + inline message for every field type.
+    const fieldError = (id) => errors[`field_${id}`]?.[0];
+    const inputClasses = (id) =>
+        `w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            fieldError(id)
+                ? 'border-red-500 dark:border-red-500'
+                : 'border-gray-300 dark:border-gray-600'
+        }`;
+    const renderFieldError = (id) =>
+        fieldError(id) ? (
+            <p className="text-red-600 dark:text-red-400 text-sm mt-1">{fieldError(id)}</p>
+        ) : null;
 
     return (
         <>
@@ -143,9 +183,10 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 type="text"
                                                 name={`field_${field.id}`}
                                                 placeholder={field.help_text || ''}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             />
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -159,9 +200,10 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 name={`field_${field.id}`}
                                                 placeholder={field.help_text || ''}
                                                 rows="4"
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             />
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -175,18 +217,10 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 type="email"
                                                 name={`field_${field.id}`}
                                                 placeholder={field.help_text || ''}
-                                                className={`w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                    errors[`field_${field.id}`]
-                                                        ? 'border-red-500 dark:border-red-500'
-                                                        : 'border-gray-300 dark:border-gray-600'
-                                                }`}
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             />
-                                            {errors[`field_${field.id}`] && (
-                                                <p className="text-red-600 dark:text-red-400 text-sm mt-1">
-                                                    {errors[`field_${field.id}`][0]}
-                                                </p>
-                                            )}
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -200,9 +234,13 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 type="number"
                                                 name={`field_${field.id}`}
                                                 placeholder={field.help_text || ''}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
+                                                min={NUMBER_MIN}
+                                                max={NUMBER_MAX}
+                                                onChange={(e) => { e.target.value = clampNumber(e.target.value); }}
                                             />
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -215,9 +253,10 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="date"
                                                 name={`field_${field.id}`}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             />
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -229,7 +268,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             </label>
                                             <select
                                                 name={`field_${field.id}`}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             >
                                                 <option value="">-- Select --</option>
@@ -239,6 +278,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                     </option>
                                                 ))}
                                             </select>
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -251,7 +291,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <select
                                                 multiple
                                                 name={`field_${field.id}`}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             >
                                                 {field.options?.map((option) => (
@@ -263,6 +303,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                 Hold Ctrl (or Cmd on Mac) to select multiple options
                                             </p>
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -275,7 +316,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="file"
                                                 name={`field_${field.id}`}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept=".pdf,.doc,.docx,.xls,.xlsx,.zip"
                                                 multiple
@@ -283,6 +324,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                 Accepted formats: PDF, DOC, DOCX, XLS, XLSX, ZIP
                                             </p>
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -295,7 +337,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="file"
                                                 name={`field_${field.id}`}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept="image/jpeg,image/jpg,image/png"
                                                 capture="environment"
@@ -303,6 +345,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                 Accepted formats: JPG, PNG
                                             </p>
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
 
@@ -315,7 +358,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="file"
                                                 name={`field_${field.id}`}
-                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept="video/mp4,video/quicktime,video/webm"
                                                 capture="environment"
@@ -323,6 +366,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                 Accepted formats: MP4, MOV, WEBM
                                             </p>
+                                            {renderFieldError(field.id)}
                                         </div>
                                     )}
                                 </div>

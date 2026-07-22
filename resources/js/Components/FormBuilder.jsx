@@ -22,19 +22,26 @@ import Button from './Button';
 import Modal, { ConfirmModal } from './Modal';
 import Tooltip from './Tooltip';
 
+// Consistent stroke-based icons (Heroicons) for each field type.
+const fieldIcon = (d) => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        {(Array.isArray(d) ? d : [d]).map((p, i) => <path key={i} d={p} />)}
+    </svg>
+);
+
 const FIELD_TYPES = [
-    { value: 'text', label: 'Text Input', icon: 'A' },
-    { value: 'textarea', label: 'Text Area', icon: 'P' },
-    { value: 'number', label: 'Number', icon: '#' },
-    { value: 'date', label: 'Date', icon: 'D' },
-    { value: 'email', label: 'Email', icon: '@' },
-    { value: 'select', label: 'Dropdown', icon: 'v' },
-    { value: 'multi_select', label: 'Multi Select', icon: 'M' },
-    { value: 'attachment', label: 'Attachment', icon: '📎' },
-    { value: 'capture_photo', label: 'Camera Photo', icon: '📷' },
-    { value: 'capture_video', label: 'Camera Video', icon: '🎥' },
-    { value: 'heading', label: 'Heading', icon: 'H' },
-    { value: 'description', label: 'Description', icon: 'i' },
+    { value: 'text', label: 'Text Input', icon: fieldIcon('M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 12v6a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 18V7.5A2.25 2.25 0 016.75 5.25H12') },
+    { value: 'textarea', label: 'Text Area', icon: fieldIcon('M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5') },
+    { value: 'number', label: 'Number', icon: fieldIcon('M9 4.5l-3 15m9-15l-3 15M4.5 8.25h15M3.75 15.75h15') },
+    { value: 'date', label: 'Date', icon: fieldIcon('M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5') },
+    { value: 'email', label: 'Email', icon: fieldIcon('M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75') },
+    { value: 'select', label: 'Dropdown', icon: fieldIcon('M19.5 8.25l-7.5 7.5-7.5-7.5') },
+    { value: 'multi_select', label: 'Multi Select', icon: fieldIcon('M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z') },
+    { value: 'attachment', label: 'Attachment', icon: fieldIcon('M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13') },
+    { value: 'capture_photo', label: 'Camera Photo', icon: fieldIcon(['M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z', 'M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z']) },
+    { value: 'capture_video', label: 'Camera Video', icon: fieldIcon('M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z') },
+    { value: 'heading', label: 'Heading', icon: fieldIcon('M6 4.5v15M18 4.5v15M6 12h12') },
+    { value: 'description', label: 'Description', icon: fieldIcon('M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zM12 6.75h.008v.008H12V6.75z') },
 ];
 
 const STATIC_TYPES = ['heading', 'description'];
@@ -50,7 +57,8 @@ const CUSTOM_FIELD_TYPE_MAP = {
 };
 
 function getFieldIcon(type) {
-    return FIELD_TYPES.find(t => t.value === type)?.icon || '?';
+    return FIELD_TYPES.find(t => t.value === type)?.icon
+        || fieldIcon('M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5M3.75 6.75h.008v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.008v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 17.25h.008v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z');
 }
 
 function getFieldTypeLabel(type) {

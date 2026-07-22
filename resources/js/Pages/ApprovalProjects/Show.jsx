@@ -36,7 +36,7 @@ export default function Show({ project }) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link href={route('approval-projects.index')} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                            ← Back
+                            <span className="inline-flex items-center gap-1"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>Back</span>
                         </Link>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{project.name}</h1>
@@ -66,6 +66,17 @@ export default function Show({ project }) {
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Owner</h3>
                         <p className="text-2xl font-bold mt-2 dark:text-white">{project.owner?.name || 'Unassigned'}</p>
+                        {(() => {
+                            const coOwners = (project.members || []).filter((m) => m.pivot?.role === 'co-owner');
+                            return coOwners.length > 0 ? (
+                                <div className="mt-3">
+                                    <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400">Co-owners</h3>
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">
+                                        {coOwners.map((m) => m.name).join(', ')}
+                                    </p>
+                                </div>
+                            ) : null;
+                        })()}
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Due Date</h3>

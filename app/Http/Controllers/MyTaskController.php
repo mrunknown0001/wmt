@@ -19,6 +19,8 @@ class MyTaskController extends Controller
         $status = $request->query('status', '');
         $priority = $request->query('priority', '');
         $search = $request->query('search', '');
+        // Due-date filter driven by the clickable stat cards ('' | overdue | today).
+        $due = $request->query('due', '');
 
         $query = Task::with('project', 'parent:id,title')
             ->where('assigned_to', $user->id);
@@ -31,6 +33,12 @@ class MyTaskController extends Controller
         }
         if ($priority) {
             $query->where('priority', $priority);
+        }
+        // Mirrors how the Overdue / Due Today stats are counted.
+        if ($due === 'overdue') {
+            $query->whereNotNull('due_date')->where('due_date', '<', $today);
+        } elseif ($due === 'today') {
+            $query->where('due_date', $today);
         }
 
         $query->orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END')
@@ -101,6 +109,7 @@ class MyTaskController extends Controller
                 'status' => $status,
                 'priority' => $priority,
                 'search' => $search,
+                'due' => $due,
             ],
             'canAssignOthers' => $canAssignOthers,
             'users' => $canAssignOthers

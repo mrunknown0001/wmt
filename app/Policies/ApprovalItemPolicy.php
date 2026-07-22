@@ -74,7 +74,11 @@ class ApprovalItemPolicy
 
     public function decide(User $user, ApprovalItem $item): bool
     {
-        // User must be an eligible approver in an active step
+        // User must have the approver capability enabled...
+        if (!$user->can_approve) {
+            return false;
+        }
+        // ...and be an eligible approver in an active step.
         $activeInstance = $item->stepInstances()->where('status', 'active')->first();
         if (!$activeInstance) {
             return false;

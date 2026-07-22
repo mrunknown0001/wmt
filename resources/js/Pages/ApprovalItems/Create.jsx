@@ -7,11 +7,13 @@ export default function Create({ project }) {
         title: '',
         description: '',
         customFieldValues: {},
+        attachments: [],
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('approval-projects.items.store', project.id));
+        // forceFormData so the file uploads are sent as multipart
+        post(route('approval-projects.items.store', project.id), { forceFormData: true });
     };
 
     return (
@@ -20,7 +22,7 @@ export default function Create({ project }) {
             <div className="space-y-6">
                 <div className="flex items-center gap-4">
                     <Link href={route('approval-projects.items.index', project.id)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                        ← Back
+                        <span className="inline-flex items-center gap-1"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>Back</span>
                     </Link>
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create Approval Request</h1>
@@ -59,6 +61,31 @@ export default function Create({ project }) {
                                 placeholder="Enter request description"
                             />
                             {errors.description && <p className="text-red-600 text-sm mt-1">{errors.description}</p>}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Attachments
+                            </label>
+                            <input
+                                type="file"
+                                multiple
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.jpg,.jpeg,.png"
+                                onChange={(e) => setData('attachments', Array.from(e.target.files))}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Up to 5 files (PDF, DOC, XLS, ZIP, images) — max 50 MB each.
+                            </p>
+                            {data.attachments?.length > 0 && (
+                                <ul className="mt-2 space-y-1">
+                                    {data.attachments.map((f, i) => (
+                                        <li key={i} className="text-sm text-gray-600 dark:text-gray-400">{f.name}</li>
+                                    ))}
+                                </ul>
+                            )}
+                            {errors.attachments && <p className="text-red-600 text-sm mt-1">{errors.attachments}</p>}
+                            {errors['attachments.0'] && <p className="text-red-600 text-sm mt-1">{errors['attachments.0']}</p>}
                         </div>
 
                         <div className="flex gap-4 pt-4">

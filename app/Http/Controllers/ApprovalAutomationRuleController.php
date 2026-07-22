@@ -26,7 +26,7 @@ class ApprovalAutomationRuleController extends Controller
         $rules = $approvalProject->automationRules()
             ->with('creator')
             ->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ->get();
 
         return Inertia::render('ApprovalAutomationRules/Index', [
             'project' => $approvalProject,

@@ -26,6 +26,15 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
     const [decisionComment, setDecisionComment] = useState('');
     const [decidingAction, setDecidingAction] = useState(null);
 
+    // The list's filters/sort, carried in via the ?back= param. Reused for the
+    // "← Back" link and for returning here after a decision.
+    const { url: pageUrl } = usePage();
+    const backQuery = (() => {
+        const qIndex = pageUrl.indexOf('?');
+        return qIndex === -1 ? '' : (new URLSearchParams(pageUrl.slice(qIndex + 1)).get('back') || '');
+    })();
+    const backHref = route('approval-projects.items.index', project.id) + backQuery;
+
     useEffect(() => {
         console.log('Route helper available:', typeof window.route !== 'undefined');
         console.log('Item:', item);
@@ -49,6 +58,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
             {
                 action: decidingAction,
                 comment: decisionComment,
+                back: backQuery, // return to the filtered list the approver came from
             },
             {
                 onStart: () => setIsDeciding(true),
@@ -59,7 +69,7 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
 
     const currentStep = item.step_instances?.[0];
     const isActiveStep = currentStep?.status === 'active';
-    const isUserApprover = isActiveStep && currentStep.approvers?.some(a => a.user_id === auth.user.id);
+    const isUserApprover = isActiveStep && !!auth.user?.can_approve && currentStep.approvers?.some(a => a.user_id === auth.user.id);
 
     return (
         <AuthenticatedLayout title={item.id}>
@@ -69,10 +79,10 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link
-                            href={route('approval-projects.items.index', project.id)}
+                            href={backHref}
                             className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                         >
-                            ← Back
+                            <span className="inline-flex items-center gap-1"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>Back</span>
                         </Link>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">

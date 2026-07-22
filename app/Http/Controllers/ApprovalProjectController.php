@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ApprovalProject;
+use App\Models\User;
 use App\Http\Requests\StoreApprovalProjectRequest;
 use App\Http\Requests\UpdateApprovalProjectRequest;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +28,9 @@ class ApprovalProjectController extends Controller
     {
         $this->authorize('create', ApprovalProject::class);
 
-        return Inertia::render('ApprovalProjects/Create');
+        return Inertia::render('ApprovalProjects/Create', [
+            'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+        ]);
     }
 
     public function store(StoreApprovalProjectRequest $request)
@@ -42,6 +45,8 @@ class ApprovalProjectController extends Controller
             'due_date' => $request->due_date,
             'is_pinned' => $request->is_pinned ?? false,
         ]);
+
+        $this->syncCoOwners($project, $request->input('co_owner_ids', []), $request->owner_id);
 
         return redirect()->route('approval-projects.show', $project)
             ->with('success', 'Approval project created successfully.');
@@ -62,6 +67,7 @@ class ApprovalProjectController extends Controller
 
         return Inertia::render('ApprovalProjects/Edit', [
             'project' => $approvalProject->load('owner', 'members'),
+            'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -78,8 +84,27 @@ class ApprovalProjectController extends Controller
             'is_pinned' => $request->is_pinned ?? false,
         ]);
 
+        $this->syncCoOwners($approvalProject, $request->input('co_owner_ids', []), $request->owner_id);
+
         return redirect()->route('approval-projects.show', $approvalProject)
             ->with('success', 'Approval project updated successfully.');
+    }
+
+    /**
+     * Replace the project's co-owners (stored as members with the "co-owner" role).
+     * The owner is never also recorded as a co-owner.
+     */
+    private function syncCoOwners(ApprovalProject $project, array $coOwnerIds, $ownerId): void
+    {
+        $ids = collect($coOwnerIds)
+            ->map(fn ($id) => (int) $id)
+            ->reject(fn ($id) => $id === (int) $ownerId)
+            ->unique()
+            ->values();
+
+        $project->members()->sync(
+            $ids->mapWithKeys(fn ($id) => [$id => ['role' => 'co-owner']])->all()
+        );
     }
 
     public function destroy(ApprovalProject $approvalProject)

@@ -43,6 +43,10 @@ function notificationMessage(data) {
             return <><strong>{data.deleted_by}</strong> deleted a comment mentioning you in <strong>{data.task_title}</strong> in {data.project_name}</>;
         case 'task_escalated':
             return <>Task <strong>{data.task_title}</strong> in {data.project_name} has been escalated ({data.escalation_label}) — assigned to {data.assigned_to_name}</>;
+        case 'approval_requested':
+            return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in {data.approval_project_name}</> : null}{data.requester ? <> — submitted by {data.requester}</> : null}</>;
+        case 'approval_automation':
+            return <>{data.message || <>Update on <strong>{data.item_title}</strong></>}</>;
         default:
             return 'New notification';
     }
@@ -105,6 +109,22 @@ function notificationIcon(type) {
                 <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center shrink-0">
                     <svg className="h-4 w-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                </div>
+            );
+        case 'approval_requested':
+            return (
+                <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            );
+        case 'approval_automation':
+            return (
+                <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                 </div>
             );
@@ -200,17 +220,21 @@ export default function Index({ notifications, filter = 'inbox' }) {
 
     function handleNotificationClick(notification) {
         const data = notification.data;
-        const taskUrl = data.project_id
-            ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
-            : `/tasks/${data.task_id}/edit`;
+        const target = data.type === 'approval_requested'
+            ? '/my-approvals'
+            : data.type === 'approval_automation'
+                ? `/approval-projects/${data.approval_project_id}/items/${data.approval_item_id}`
+                : (data.project_id
+                    ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
+                    : `/tasks/${data.task_id}/edit`);
 
         if (!notification.read_at) {
             router.patch(`/inbox/${notification.id}/read`, {}, {
                 preserveScroll: true,
-                onSuccess: () => router.visit(taskUrl),
+                onSuccess: () => router.visit(target),
             });
         } else {
-            router.visit(taskUrl);
+            router.visit(target);
         }
     }
 

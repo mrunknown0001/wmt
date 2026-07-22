@@ -371,9 +371,11 @@ class ApprovalWorkflowEngine
             'activated_at' => now(),
         ]);
 
-        // Materialize the eligible approver snapshot
+        // Materialize the eligible approver snapshot and notify each approver
+        // that an item is now awaiting their decision.
         foreach ($approvers as $approver) {
             $instance->approvers()->create(['user_id' => $approver->id]);
+            $approver->notify(new \App\Notifications\ApprovalRequestedNotification($item, $step));
         }
 
         // Update the item's current step

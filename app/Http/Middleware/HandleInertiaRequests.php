@@ -52,10 +52,18 @@ class HandleInertiaRequests extends Middleware
                     'roles' => $request->user()->getRoleNames(),
                     'permissions' => $request->user()->getAllPermissions()->pluck('name'),
                     'can_create_rules' => $request->user()->can_create_rules,
+                    'can_approve' => $request->user()->can_approve,
+                    'can_request' => $request->user()->can_request,
                 ] : null,
             ],
             'settings' => fn () => \App\Models\Setting::current(),
             'unreadNotificationsCount' => fn () => $request->user()?->unreadNotifications()->count() ?? 0,
+            'pendingApprovalsCount' => fn () => $request->user()
+                ? \App\Models\ApprovalStepInstance::where('status', 'active')
+                    ->whereHas('item') // excludes soft-deleted items
+                    ->whereHas('approvers', fn ($q) => $q->where('user_id', $request->user()->id))
+                    ->count()
+                : 0,
             'personalTodosCount' => fn () => $request->user()?->personalTodos()->incomplete()->count() ?? 0,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

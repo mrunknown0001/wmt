@@ -48,7 +48,7 @@ export default function Index({ project, chains }) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link href={route('approval-projects.show', project.id)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                            ← Back
+                            <span className="inline-flex items-center gap-1"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>Back</span>
                         </Link>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Approval Chains</h1>

@@ -19,7 +19,10 @@ class ProjectAutomationRuleController extends Controller
 
     private function authorizeRuleManagement(): void
     {
-        if (!auth()->user()->can_create_rules) {
+        $user = auth()->user();
+        // Allowed if the user has the per-user capability, or can manage projects
+        // (admins) — consistent with how the rest of the app gates project management.
+        if (!$user->can_create_rules && !$user->hasPermissionTo('manage-projects')) {
             abort(403, 'You do not have permission to manage automation rules.');
         }
     }

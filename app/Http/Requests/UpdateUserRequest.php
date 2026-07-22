@@ -25,6 +25,8 @@ class UpdateUserRequest extends FormRequest
             'position' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
             'can_create_rules' => ['boolean'],
+            'can_approve' => ['boolean'],
+            'can_request' => ['boolean'],
             'role' => ['required', 'string', 'exists:roles,name'],
         ];
     }

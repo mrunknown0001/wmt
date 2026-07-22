@@ -11,6 +11,20 @@ import ThemeToggle from '../../Components/ThemeToggle';
 const ACCEPTED_FILE_TYPES = 'image/*,video/*,.xlsx,.xls,.csv';
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILES = 5;
+const NUMBER_MIN = -99999999999;
+const NUMBER_MAX = 99999999999;
+
+// Hard-clamp a number field value so typed/pasted out-of-range input snaps back
+// into range. Preserves partial input ('', '-') and non-numeric strings (the
+// server rule catches those) so the field stays editable while being bounded.
+function clampNumber(v) {
+    if (v === '' || v === '-') return v;
+    const n = Number(v);
+    if (Number.isNaN(n)) return v;
+    if (n > NUMBER_MAX) return String(NUMBER_MAX);
+    if (n < NUMBER_MIN) return String(NUMBER_MIN);
+    return v;
+}
 
 function formatFileSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
@@ -231,10 +245,10 @@ export default function PublicForm() {
                             id={`field-${field.id}`}
                             type="number"
                             value={value ?? ''}
-                            onChange={(e) => setFieldValue(field.id, e.target.value)}
+                            onChange={(e) => setFieldValue(field.id, clampNumber(e.target.value))}
                             error={fieldError}
-                            max={99999999999}
-                            min={-99999999999}
+                            max={NUMBER_MAX}
+                            min={NUMBER_MIN}
                         />
                         {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>

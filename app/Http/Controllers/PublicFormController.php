@@ -13,6 +13,7 @@ use App\Services\AutomationRuleEngine;
 use App\Services\CustomFieldDefaults;
 use App\Services\TaskActivityLogger;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -90,6 +91,7 @@ class PublicFormController extends Controller
         // Build dynamic validation rules
         $submittedFields = $request->input('fields', []);
         $rules = [];
+        $attributes = [];
         foreach ($form->fields as $field) {
             if (in_array($field->type, ['heading', 'description'])) {
                 continue;
@@ -106,6 +108,8 @@ class PublicFormController extends Controller
             }
 
             $key = "fields.{$field->id}";
+            // Use the field's label in validation messages instead of "fields.2".
+            $attributes[$key] = $field->label;
 
             if (in_array($field->type, ['attachment', 'capture_photo', 'capture_video'])) {
                 $maxFiles = $field->type === 'capture_video' ? 1 : 5;
@@ -122,6 +126,7 @@ class PublicFormController extends Controller
                     $rules[$key] = ['nullable', 'array', 'max:' . $maxFiles];
                 }
                 $rules["{$key}.*"] = ['file', "mimes:{$mimes}", "max:{$maxSize}"];
+                $attributes["{$key}.*"] = $field->label;
                 continue;
             }
 
@@ -154,6 +159,28 @@ class PublicFormController extends Controller
                     'multi_select' => $fieldRules[] = 'array',
                     default => null,
                 };
+
+                // Bound number fields to match the frontend caps (±99,999,999,999).
+                if ($field->type === 'number') {
+                    $fieldRules[] = 'min:-99999999999';
+                    $fieldRules[] = 'max:99999999999';
+                }
+
+                // Restrict select/multi_select submissions to the field's configured
+                // options so arbitrary values can't be injected. Only enforced when the
+                // field actually has options defined (otherwise Rule::in would reject all).
+                if (in_array($field->type, ['select', 'multi_select'], true)) {
+                    $optionValues = $this->optionValues($field);
+                    if (!empty($optionValues)) {
+                        if ($field->type === 'select') {
+                            $fieldRules[] = Rule::in($optionValues);
+                        } else {
+                            // Validate each selected element against the allowed options.
+                            $rules["{$key}.*"] = [Rule::in($optionValues)];
+                            $attributes["{$key}.*"] = $field->label;
+                        }
+                    }
+                }
             }
 
             $rules[$key] = $fieldRules;
@@ -168,7 +195,7 @@ class PublicFormController extends Controller
             }
         }
 
-        $validated = $request->validate($rules, $messages);
+        $validated = $request->validate($rules, $messages, $attributes);
         $fieldValues = $validated['fields'] ?? [];
 
         // Merge default values for hidden fields
@@ -393,6 +420,30 @@ class PublicFormController extends Controller
         }
 
         return $logic === 'all' ? !in_array(false, $results, true) : in_array(true, $results, true);
+    }
+
+    /**
+     * The set of valid submitted values for a select/multi_select field.
+     * Mirrors how options are exposed in show() and the frontend: custom-field
+     * options use their id, inline config options use id (falling back to value).
+     */
+    private function optionValues($field): array
+    {
+        if ($field->customField && $field->customField->options) {
+            return $field->customField->options
+                ->map(fn ($o) => (string) $o->id)
+                ->all();
+        }
+
+        if (!empty($field->config['options'])) {
+            return collect($field->config['options'])
+                ->map(fn ($o) => (string) ($o['id'] ?? $o['value'] ?? ''))
+                ->filter(fn ($v) => $v !== '')
+                ->values()
+                ->all();
+        }
+
+        return [];
     }
 
     private function resolveOptionLabels($field, $val): string|array

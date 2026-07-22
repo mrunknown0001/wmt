@@ -1,13 +1,15 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
+import UserMultiSelect from '../../Components/UserMultiSelect';
 
-export default function Create() {
+export default function Create({ users = [] }) {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         description: '',
         status: 'active',
         owner_id: '',
+        co_owner_ids: [],
         due_date: '',
         is_pinned: false,
     });
@@ -54,6 +56,39 @@ export default function Create() {
                                 placeholder="Optional description"
                             />
                             {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Owner
+                            </label>
+                            <select
+                                value={data.owner_id}
+                                onChange={(e) => setData('owner_id', e.target.value)}
+                                className={`w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                                    errors.owner_id ? 'border-red-500' : 'border-gray-300'
+                                }`}
+                            >
+                                <option value="">— Select owner —</option>
+                                {users.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </select>
+                            {errors.owner_id && <p className="text-red-500 text-sm mt-1">{errors.owner_id}</p>}
+                        </div>
+
+                        <div>
+                            <UserMultiSelect
+                                label="Co-owners"
+                                users={users}
+                                selected={data.co_owner_ids}
+                                onChange={(ids) => setData('co_owner_ids', ids)}
+                                excludeIds={data.owner_id ? [Number(data.owner_id)] : []}
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Co-owners can manage this approval project alongside the owner.
+                            </p>
+                            {errors.co_owner_ids && <p className="text-red-500 text-sm mt-1">{errors.co_owner_ids}</p>}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

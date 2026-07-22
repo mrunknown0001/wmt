@@ -33,6 +33,22 @@ class ApprovalItem extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // When an approval item is soft-deleted, auto-cancel any open step
+        // instances so the item never lingers in an approver's pending queue.
+        // Force-deletes remove the rows outright, so there's nothing to cancel.
+        static::deleting(function (ApprovalItem $item) {
+            if ($item->isForceDeleting()) {
+                return;
+            }
+
+            $item->stepInstances()
+                ->whereIn('status', ['active', 'pending'])
+                ->update(['status' => 'cancelled', 'completed_at' => now()]);
+        });
+    }
+
     public function approvalProject(): BelongsTo
     {
         return $this->belongsTo(ApprovalProject::class);

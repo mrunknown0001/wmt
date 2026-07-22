@@ -45,6 +45,8 @@ class User extends Authenticatable
         'team_id',
         'is_active',
         'can_create_rules',
+        'can_approve',
+        'can_request',
         'dashboard_preferences',
         'notification_preferences',
     ];
@@ -61,6 +63,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'can_create_rules' => 'boolean',
+            'can_approve' => 'boolean',
+            'can_request' => 'boolean',
             'dashboard_preferences' => 'array',
             'notification_preferences' => 'array',
         ];

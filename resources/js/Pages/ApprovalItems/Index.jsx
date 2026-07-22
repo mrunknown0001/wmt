@@ -1,7 +1,16 @@
 import { Head, Link, usePage, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
+import Pagination from '../../Components/Pagination';
+
+const STATUS_OPTIONS = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'changes_requested', label: 'Changes Requested' },
+    { value: 'cancelled', label: 'Cancelled' },
+];
 
 const CheckIcon = () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -16,8 +25,88 @@ const EyeIcon = () => (
     </svg>
 );
 
-export default function Index({ project, items, auth }) {
+export default function Index({ project, items, auth, chains = [], requesters = [], filters = {} }) {
     const [approvingItemId, setApprovingItemId] = useState(null);
+    const [search, setSearch] = useState(filters.search || '');
+    const [status, setStatus] = useState(filters.status || '');
+    const [chainId, setChainId] = useState(filters.chain_id || '');
+    const [requesterId, setRequesterId] = useState(filters.requester_id || '');
+    const [sort, setSort] = useState(filters.sort || 'created_at');
+    const [direction, setDirection] = useState(filters.direction || 'desc');
+    const debounceRef = useRef(null);
+
+    const applyFilters = useCallback((overrides = {}) => {
+        const params = {
+            search: overrides.search ?? search,
+            status: overrides.status ?? status,
+            chain_id: overrides.chain_id ?? chainId,
+            requester_id: overrides.requester_id ?? requesterId,
+            sort: overrides.sort ?? sort,
+            direction: overrides.direction ?? direction,
+        };
+        Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; });
+        router.get(route('approval-projects.items.index', project.id), params, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    }, [search, status, chainId, requesterId, sort, direction, project.id]);
+
+    const handleSort = (column) => {
+        const newDirection = sort === column
+            ? (direction === 'asc' ? 'desc' : 'asc')
+            : (column === 'created_at' ? 'desc' : 'asc');
+        setSort(column);
+        setDirection(newDirection);
+        applyFilters({ sort: column, direction: newDirection });
+    };
+
+    const handleSearchChange = (value) => {
+        setSearch(value);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => applyFilters({ search: value }), 300);
+    };
+
+    const clearFilters = () => {
+        setSearch('');
+        setStatus('');
+        setChainId('');
+        setRequesterId('');
+        router.get(route('approval-projects.items.index', project.id), {}, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    const hasActiveFilters = !!search || !!status || !!chainId || !!requesterId;
+
+    // The current list query (filters + sort). Reused for the View link's back
+    // param and the inline Approve action, so the approver always returns to this
+    // exact filtered/sorted view.
+    const listQuery = (() => {
+        const params = { search, status, chain_id: chainId, requester_id: requesterId, sort, direction };
+        Object.keys(params).forEach((k) => { if (!params[k]) delete params[k]; });
+        const qs = new URLSearchParams(params).toString();
+        return qs ? '?' + qs : '';
+    })();
+    const backParam = listQuery ? `?back=${encodeURIComponent(listQuery)}` : '';
+
+    const SortHeader = ({ column, children }) => {
+        const active = sort === column;
+        return (
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                <button
+                    type="button"
+                    onClick={() => handleSort(column)}
+                    className="group inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                    {children}
+                    <span className={`text-[10px] leading-none ${active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 opacity-0 group-hover:opacity-100'}`}>
+                        {active ? (direction === 'asc' ? '▲' : '▼') : '▲'}
+                    </span>
+                </button>
+            </th>
+        );
+    };
 
     const getStatusColor = (status) => {
         const colors = {
@@ -31,6 +120,7 @@ export default function Index({ project, items, auth }) {
     };
 
     const isUserApprover = (item) => {
+        if (!auth.user?.can_approve) return false;
         if (item.status !== 'pending') return false;
         const activeStep = item.step_instances?.find(s => s.status === 'active');
         if (!activeStep) return false;
@@ -43,8 +133,10 @@ export default function Index({ project, items, auth }) {
             {
                 action: 'approved',
                 comment: '',
+                back: listQuery, // return to this filtered/sorted list after approving
             },
             {
+                preserveScroll: true,
                 onFinish: () => setApprovingItemId(null),
             }
         );
@@ -57,7 +149,7 @@ export default function Index({ project, items, auth }) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link href={route('approval-projects.show', project.id)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                            ← Back
+                            <span className="inline-flex items-center gap-1"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>Back</span>
                         </Link>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Approval Requests</h1>
@@ -69,16 +161,73 @@ export default function Index({ project, items, auth }) {
                     </Link>
                 </div>
 
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative flex-1 min-w-50 max-w-xs">
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                            placeholder="Search requests..."
+                            className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        />
+                    </div>
+                    <select
+                        value={status}
+                        onChange={(e) => { setStatus(e.target.value); applyFilters({ status: e.target.value }); }}
+                        className="py-1.5 px-3 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                        <option value="">All Statuses</option>
+                        {STATUS_OPTIONS.map((s) => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                    </select>
+                    {chains.length > 0 && (
+                        <select
+                            value={chainId}
+                            onChange={(e) => { setChainId(e.target.value); applyFilters({ chain_id: e.target.value }); }}
+                            className="py-1.5 px-3 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        >
+                            <option value="">All Chains</option>
+                            {chains.map((c) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    )}
+                    {requesters.length > 0 && (
+                        <select
+                            value={requesterId}
+                            onChange={(e) => { setRequesterId(e.target.value); applyFilters({ requester_id: e.target.value }); }}
+                            className="py-1.5 px-3 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        >
+                            <option value="">All Requesters</option>
+                            {requesters.map((r) => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                        </select>
+                    )}
+                    {hasActiveFilters && (
+                        <button
+                            onClick={clearFilters}
+                            className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
+
                 {items.data && items.data.length > 0 ? (
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
                         <table className="w-full">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Title</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Requester</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Status</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Chain</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Created</th>
+                                    <SortHeader column="title">Title</SortHeader>
+                                    <SortHeader column="requester">Requester</SortHeader>
+                                    <SortHeader column="status">Status</SortHeader>
+                                    <SortHeader column="chain">Chain</SortHeader>
+                                    <SortHeader column="created_at">Created</SortHeader>
                                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Action</th>
                                 </tr>
                             </thead>
@@ -115,7 +264,7 @@ export default function Index({ project, items, auth }) {
                                                         Approve
                                                     </button>
                                                 )}
-                                                <Link href={route('approval-projects.items.show', [project.id, item.id])}>
+                                                <Link href={route('approval-projects.items.show', [project.id, item.id]) + backParam}>
                                                     <button className="inline-flex items-center gap-1 px-3 py-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-medium rounded transition">
                                                         <EyeIcon />
                                                         View
@@ -128,12 +277,28 @@ export default function Index({ project, items, auth }) {
                             </tbody>
                         </table>
                     </div>
+                ) : hasActiveFilters ? (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+                        <p className="text-gray-600 dark:text-gray-400 mb-4">No approval requests match your filters</p>
+                        <button
+                            onClick={clearFilters}
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                            Clear filters
+                        </button>
+                    </div>
                 ) : (
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
                         <p className="text-gray-600 dark:text-gray-400 mb-4">No approval requests yet</p>
                         <Link href={route('approval-projects.items.create', project.id)}>
                             <Button>Create Your First Request</Button>
                         </Link>
+                    </div>
+                )}
+
+                {items.data && items.data.length > 0 && (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+                        <Pagination links={items.links} />
                     </div>
                 )}
 

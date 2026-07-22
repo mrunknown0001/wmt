@@ -1,13 +1,17 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
+import UserMultiSelect from '../../Components/UserMultiSelect';
 
-export default function Edit({ project }) {
+export default function Edit({ project, users = [] }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name || '',
         description: project.description || '',
         status: project.status || 'active',
         owner_id: project.owner_id || '',
+        co_owner_ids: (project.members || [])
+            .filter((m) => m.pivot?.role === 'co-owner')
+            .map((m) => m.id),
         due_date: project.due_date || '',
         is_pinned: project.is_pinned || false,
     });
@@ -23,7 +27,7 @@ export default function Edit({ project }) {
             <div className="space-y-6">
                 <div className="flex items-center gap-4">
                     <Link href={route('approval-projects.show', project.id)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                        ← Back
+                        <span className="inline-flex items-center gap-1"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>Back</span>
                     </Link>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Edit Approval Project</h1>
                 </div>
@@ -59,6 +63,39 @@ export default function Edit({ project }) {
                                 placeholder="Optional description"
                             />
                             {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Owner
+                            </label>
+                            <select
+                                value={data.owner_id}
+                                onChange={(e) => setData('owner_id', e.target.value)}
+                                className={`w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                                    errors.owner_id ? 'border-red-500' : 'border-gray-300'
+                                }`}
+                            >
+                                <option value="">— Select owner —</option>
+                                {users.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </select>
+                            {errors.owner_id && <p className="text-red-500 text-sm mt-1">{errors.owner_id}</p>}
+                        </div>
+
+                        <div>
+                            <UserMultiSelect
+                                label="Co-owners"
+                                users={users}
+                                selected={data.co_owner_ids}
+                                onChange={(ids) => setData('co_owner_ids', ids)}
+                                excludeIds={data.owner_id ? [Number(data.owner_id)] : []}
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Co-owners can manage this approval project alongside the owner.
+                            </p>
+                            {errors.co_owner_ids && <p className="text-red-500 text-sm mt-1">{errors.co_owner_ids}</p>}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

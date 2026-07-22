@@ -25,6 +25,10 @@ function notificationMessage(data) {
             return <><strong>{data.deleted_by}</strong> deleted a comment mentioning you in <strong>{data.task_title}</strong></>;
         case 'task_escalated':
             return <>Task <strong>{data.task_title}</strong> escalated — {data.escalation_label}</>;
+        case 'approval_requested':
+            return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in <strong>{data.approval_project_name}</strong></> : null}</>;
+        case 'approval_automation':
+            return <>{data.message || <>Update on <strong>{data.item_title}</strong></>}</>;
         default:
             return 'New notification';
     }
@@ -140,9 +144,13 @@ export default function NotificationBell({ onToast }) {
 
     const handleClick = (notification) => {
         const data = notification.data;
-        const taskUrl = data.project_id
-            ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
-            : `/tasks/${data.task_id}/edit`;
+        const target = data.type === 'approval_requested'
+            ? '/my-approvals'
+            : data.type === 'approval_automation'
+                ? `/approval-projects/${data.approval_project_id}/items/${data.approval_item_id}`
+                : (data.project_id
+                    ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
+                    : `/tasks/${data.task_id}/edit`);
 
         if (!notification.read_at) {
             // Mark as read optimistically
@@ -154,7 +162,7 @@ export default function NotificationBell({ onToast }) {
         }
 
         setIsOpen(false);
-        router.visit(taskUrl);
+        router.visit(target);
     };
 
     return (

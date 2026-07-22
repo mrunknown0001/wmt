@@ -42,6 +42,7 @@ use App\Http\Controllers\ApprovalFormController;
 use App\Http\Controllers\PublicApprovalFormController;
 use App\Http\Controllers\ApprovalAutomationRuleController;
 use App\Http\Controllers\MyApprovalsController;
+use App\Http\Controllers\MyRequestsController;
 use Illuminate\Support\Facades\Route;
 
 // Guest routes
@@ -189,6 +190,7 @@ Route::middleware('auth')->group(function () {
 
     // My Approvals (Approver Inbox)
     Route::get('/my-approvals', [MyApprovalsController::class, 'index'])->name('my-approvals.index');
+    Route::get('/my-requests', [MyRequestsController::class, 'index'])->name('my-requests.index');
 
     // Folders
     Route::post('/folders', [FolderController::class, 'store'])->name('folders.store');

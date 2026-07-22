@@ -58,6 +58,7 @@ class PublicApprovalFormController extends Controller
 
         // Build dynamic validation rules
         $rules = [];
+        $attributes = [];
         $allFields = $form->fields()->get();
 
         foreach ($allFields as $field) {
@@ -80,7 +81,7 @@ class PublicApprovalFormController extends Controller
             $typeRules = match ($field->type) {
                 'text', 'email' => 'string|max:255',
                 'textarea' => 'string|max:10000',
-                'number' => 'numeric',
+                'number' => 'numeric|min:-99999999999|max:99999999999',
                 'date' => 'date',
                 'select' => 'string',
                 'multi_select' => 'array',
@@ -96,65 +97,82 @@ class PublicApprovalFormController extends Controller
 
             if ($fieldRuleStr) {
                 $rules["field_{$field->id}"] = $fieldRuleStr;
+                // Use the field's label in validation messages instead of "field 8".
+                $attributes["field_{$field->id}"] = $field->label;
             }
         }
 
-        $validated = $request->validate($rules);
+        try {
+            $validated = $request->validate($rules, [], $attributes);
 
-        // Validate email mode if form requires registered users
-        if ($form->email_mode === 'registered') {
-            $emailFieldValue = null;
-            $emailFieldKey = null;
-            $emailFieldFound = false;
+            // Validate email mode if form requires registered users
+            if ($form->email_mode === 'registered') {
+                $emailFieldValue = null;
+                $emailFieldKey = null;
+                $emailFieldFound = false;
 
-            // Find email field
-            foreach ($allFields as $field) {
-                if ($field->type === 'email' && $field->is_visible && $this->fieldConditionsMet($field, $validated, $allFields)) {
-                    $emailFieldKey = "field_{$field->id}";
-                    $emailFieldValue = $validated[$emailFieldKey] ?? null;
-                    $emailFieldFound = true;
-                    break;
+                // Find email field
+                foreach ($allFields as $field) {
+                    if ($field->type === 'email' && $field->is_visible && $this->fieldConditionsMet($field, $validated, $allFields)) {
+                        $emailFieldKey = "field_{$field->id}";
+                        $emailFieldValue = $validated[$emailFieldKey] ?? null;
+                        $emailFieldFound = true;
+                        break;
+                    }
                 }
-            }
 
-            // If registered mode requires email field
-            if (!$emailFieldFound) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'form' => 'This form requires an email address for registered users only.',
+                // If registered mode requires email field
+                if (!$emailFieldFound) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'form' => 'This form requires an email address for registered users only.',
+                    ]);
+                }
+
+                // Email field must have a value
+                if (!$emailFieldValue) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $emailFieldKey => 'Email is required to submit this form.',
+                    ]);
+                }
+
+                // Email must belong to a registered, active user
+                $user = \App\Models\User::where('email', $emailFieldValue)->first();
+
+                \Log::info('Email validation check', [
+                    'email' => $emailFieldValue,
+                    'user_found' => $user ? 'yes' : 'no',
+                    'is_active' => $user ? $user->is_active : 'N/A',
                 ]);
+
+                if (!$user) {
+                    \Log::warning('Email not found in database', ['email' => $emailFieldValue]);
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $emailFieldKey => 'This email is not registered in the system. Only registered users can submit this form.',
+                    ]);
+                }
+
+                if (!$user->is_active) {
+                    \Log::warning('User is inactive', ['email' => $emailFieldValue, 'user_id' => $user->id]);
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $emailFieldKey => 'This email account is inactive. Please contact an administrator.',
+                    ]);
+                }
+
+                \Log::info('Email validation passed', ['email' => $emailFieldValue, 'user_id' => $user->id]);
+            }
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Public forms are submitted via fetch/AJAX. This app only renders JSON
+            // error responses for api/* routes (see bootstrap/app.php), so without this
+            // the exception becomes a 302 redirect that the frontend misreads as success.
+            // Return a proper 422 with field errors so the form can display them.
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'errors' => $e->errors(),
+                ], 422);
             }
 
-            // Email field must have a value
-            if (!$emailFieldValue) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    $emailFieldKey => 'Email is required to submit this form.',
-                ]);
-            }
-
-            // Email must belong to a registered, active user
-            $user = \App\Models\User::where('email', $emailFieldValue)->first();
-
-            \Log::info('Email validation check', [
-                'email' => $emailFieldValue,
-                'user_found' => $user ? 'yes' : 'no',
-                'is_active' => $user ? $user->is_active : 'N/A',
-            ]);
-
-            if (!$user) {
-                \Log::warning('Email not found in database', ['email' => $emailFieldValue]);
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    $emailFieldKey => 'This email is not registered in the system. Only registered users can submit this form.',
-                ]);
-            }
-
-            if (!$user->is_active) {
-                \Log::warning('User is inactive', ['email' => $emailFieldValue, 'user_id' => $user->id]);
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    $emailFieldKey => 'This email account is inactive. Please contact an administrator.',
-                ]);
-            }
-
-            \Log::info('Email validation passed', ['email' => $emailFieldValue, 'user_id' => $user->id]);
+            throw $e;
         }
 
         // Merge defaults for hidden fields
@@ -245,7 +263,11 @@ class PublicApprovalFormController extends Controller
 
             $fieldKey = "field_{$field->id}";
             if ($request->hasFile($fieldKey)) {
-                foreach ($request->file($fieldKey) as $file) {
+                // A single-file input returns one UploadedFile; a multiple input returns an array.
+                // Normalize to an array so both cases store correctly.
+                $files = $request->file($fieldKey);
+                $files = is_array($files) ? $files : [$files];
+                foreach ($files as $file) {
                     $path = $file->store("approval-form-submissions/{$item->id}", 'public');
                     $item->attachments()->create([
                         'file_name' => $file->getClientOriginalName(),

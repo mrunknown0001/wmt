@@ -18,6 +18,8 @@ class StoreApprovalItemRequest extends FormRequest
             'description' => 'nullable|string|max:10000',
             'customFieldValues' => 'nullable|array',
             'customFieldValues.*' => 'nullable',
+            'attachments' => 'nullable|array|max:5',
+            'attachments.*' => 'file|max:51200|mimes:pdf,doc,docx,xls,xlsx,zip,jpg,jpeg,png',
         ];
     }
 }
