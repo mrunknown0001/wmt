@@ -40,6 +40,29 @@ export function apiFetch(url, options = {}) {
     return fetch(url, { ...options, headers });
 }
 
+/**
+ * Raise a toast from anywhere, including plain JSON/fetch paths that never go
+ * through Inertia's flash props. AuthenticatedLayout listens for this event.
+ */
+export function toast(message, type = 'error') {
+    if (!message) return;
+    window.dispatchEvent(new CustomEvent('app:toast', { detail: { message, type } }));
+}
+
+/**
+ * Pull a human-readable message out of a failed JSON response. Handles Laravel's
+ * 422 shape ({message, errors:{field:[...]}}) and falls back to a default.
+ */
+export async function errorMessageFrom(response, fallback = 'Something went wrong.') {
+    try {
+        const json = await response.clone().json();
+        const firstFieldError = json?.errors && Object.values(json.errors)?.[0]?.[0];
+        return firstFieldError || json?.message || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 export const formatDate = (value) => {
     if (!value) return null;
     const date = new Date(value);

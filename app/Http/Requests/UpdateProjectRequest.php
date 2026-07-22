@@ -30,6 +30,7 @@ class UpdateProjectRequest extends FormRequest
                 }
             }],
             'due_date' => ['nullable', 'date'],
+            'require_comment_attachment_on_close' => ['sometimes', 'boolean'],
             'members' => ['nullable', 'array'],
             'members.*.user_id' => ['required', 'exists:users,id'],
             'members.*.role' => ['required', 'string', 'in:viewer,editor,admin'],

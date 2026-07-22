@@ -8,7 +8,7 @@ import CameraCapture from '../../Components/CameraCapture';
 import TurnstileWidget from '../../Components/TurnstileWidget';
 import ThemeToggle from '../../Components/ThemeToggle';
 
-const ACCEPTED_FILE_TYPES = 'image/*,video/*,.xlsx,.xls,.csv';
+const ACCEPTED_FILE_TYPES = '.pdf,image/*,video/*,.xlsx,.xls,.csv';
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILES = 5;
 const NUMBER_MIN = -99999999999;
@@ -353,7 +353,7 @@ export default function PublicForm() {
                                     file:cursor-pointer file:transition-colors"
                             />
                             <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                                Images, videos, or Excel files. Max {MAX_FILES} files, {MAX_FILE_SIZE_MB}MB each.
+                                PDF, images, videos, or Excel files. Max {MAX_FILES} files, {MAX_FILE_SIZE_MB}MB each.
                             </p>
                             {files.length > 0 && (
                                 <div className="mt-3 space-y-1">

@@ -9,6 +9,7 @@ import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import ProjectRules from '../../Components/ProjectRules';
 import { flattenFolders } from '../../Components/FolderTree';
 import { formatLabel } from '../../utils';
 
@@ -22,6 +23,7 @@ export default function Create() {
         owner_id: auth.user?.id || '',
         folder_id: defaultFolderId || '',
         due_date: '',
+        require_comment_attachment_on_close: false,
         members: [],
     });
 
@@ -79,6 +81,11 @@ export default function Create() {
                             />
                             <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
                         </div>
+
+                        <ProjectRules
+                            requireAttachment={data.require_comment_attachment_on_close}
+                            onChange={(val) => setData('require_comment_attachment_on_close', val)}
+                        />
 
                         <UserMultiSelect
                             label="Members"

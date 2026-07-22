@@ -509,7 +509,18 @@ class TaskController extends Controller
         $collaboratorIds = $validated['collaborator_ids'] ?? null;
         unset($validated['collaborator_ids']);
 
-        $task->update($validated);
+        // This is a JSON endpoint, but bootstrap/app.php only renders exceptions as
+        // JSON for `api/*` paths — so a model-level rule (e.g. the project's
+        // comment-attachment rule) would otherwise come back as a 302 the caller
+        // can't read. Translate it into the 422 the client expects.
+        try {
+            $task->update($validated);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
+        }
 
         if ($collaboratorIds !== null) {
             $task->collaborators()->sync($collaboratorIds);

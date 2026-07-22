@@ -9,6 +9,7 @@ import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import ProjectRules from '../../Components/ProjectRules';
 import { flattenFolders } from '../../Components/FolderTree';
 import { formatLabel } from '../../utils';
 
@@ -22,6 +23,7 @@ export default function Edit() {
         owner_id: project.owner_id || '',
         folder_id: project.folder_id || '',
         due_date: project.due_date ? project.due_date.split('T')[0] : '',
+        require_comment_attachment_on_close: project.require_comment_attachment_on_close ?? false,
         members: (project.members || []).map((m) => ({ user_id: m.id, role: m.pivot.role })),
     });
 
@@ -80,6 +82,11 @@ export default function Edit() {
                             />
                             <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
                         </div>
+
+                        <ProjectRules
+                            requireAttachment={data.require_comment_attachment_on_close}
+                            onChange={(val) => setData('require_comment_attachment_on_close', val)}
+                        />
 
                         <UserMultiSelect
                             label="Members"

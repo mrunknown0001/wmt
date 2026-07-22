@@ -25,6 +25,7 @@ class Project extends Model
         'due_date',
         'is_pinned',
         'position',
+        'require_comment_attachment_on_close',
     ];
 
     protected function casts(): array
@@ -32,6 +33,7 @@ class Project extends Model
         return [
             'due_date' => 'date',
             'is_pinned' => 'boolean',
+            'require_comment_attachment_on_close' => 'boolean',
         ];
     }
 

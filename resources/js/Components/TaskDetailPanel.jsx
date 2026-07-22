@@ -6,7 +6,7 @@ import Avatar from './Avatar';
 import RichTextEditor from './RichTextEditor';
 import Tooltip from './Tooltip';
 import SearchableSelect from './SearchableSelect';
-import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo } from '../utils';
+import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom } from '../utils';
 import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
 
 function formatFileSize(bytes) {
@@ -376,22 +376,35 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
             ...prev,
             completed_subtasks_count: prev.completed_subtasks_count + (newStatus === 'done' ? 1 : -1),
         }));
-        try {
-            await apiFetch(`/projects/${projectId}/tasks/${subtask.id}/patch`, {
-                method: 'PATCH',
-                body: JSON.stringify({ status: newStatus }),
-            });
-            onTaskUpdate?.();
-        } catch (e) {
+        const revert = () => {
             setSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: subtask.status } : s));
             setTaskData(prev => ({
                 ...prev,
                 completed_subtasks_count: prev.completed_subtasks_count + (newStatus === 'done' ? -1 : 1),
             }));
+        };
+        try {
+            const res = await apiFetch(`/projects/${projectId}/tasks/${subtask.id}/patch`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: newStatus }),
+            });
+            // fetch only rejects on network errors, so a rejected save (e.g. the
+            // project's comment-attachment rule) must be caught on the status code —
+            // otherwise the optimistic tick sticks while the server said no.
+            if (!res.ok) {
+                toast(await errorMessageFrom(res, 'Failed to update subtask.'));
+                revert();
+                return;
+            }
+            onTaskUpdate?.();
+        } catch (e) {
+            toast('Failed to update subtask. Please try again.');
+            revert();
         }
     };
 
     const handleFieldUpdate = async (field, value) => {
+        const previous = taskData?.[field];
         try {
             const res = await apiFetch(`/projects/${projectId}/tasks/${taskId}/patch`, {
                 method: 'PATCH',
@@ -401,9 +414,16 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                 const json = await res.json();
                 setTaskData(json.task);
                 onTaskUpdate?.(taskId, field, value);
+                return;
             }
+            // Rejected by the server (e.g. the project's comment-attachment rule):
+            // tell the user why and put the control back where it was.
+            toast(await errorMessageFrom(res, 'Failed to update task.'));
+            setTaskData(prev => ({ ...prev, [field]: previous }));
         } catch (e) {
             console.error('Failed to update field:', e);
+            toast('Failed to update task. Please try again.');
+            setTaskData(prev => ({ ...prev, [field]: previous }));
         }
     };
 

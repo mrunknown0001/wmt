@@ -69,6 +69,11 @@ class Task extends Model
                 $newStatus = $task->status;
                 $oldStatus = $task->getOriginal('status');
 
+                // Project rule: a task can only be closed once one of its comments
+                // carries an attachment. Enforced here rather than per-controller so
+                // every path (edit, patch, kanban drag, bulk update) is covered.
+                $task->assertClosableUnderProjectRules($newStatus, $oldStatus);
+
                 if ($newStatus === 'done' && $oldStatus !== 'done') {
                     $task->completed_at = now();
                 } elseif ($oldStatus === 'done' && $newStatus !== 'done') {
@@ -76,6 +81,60 @@ class Task extends Model
                 }
             }
         });
+    }
+
+    /** The statuses that close a task: "completed" and "unable to complete". */
+    public const CLOSING_STATUSES = ['done', 'cancelled'];
+
+    /** True when at least one of this task's comments has an attachment. */
+    public function hasCommentAttachment(): bool
+    {
+        if (!$this->exists) {
+            return false;
+        }
+
+        return $this->comments()->whereHas('attachments')->exists();
+    }
+
+    /**
+     * Block a close transition when the task's project requires a comment
+     * attachment as proof of work and none exists yet.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    public function assertClosableUnderProjectRules(?string $newStatus, ?string $oldStatus): void
+    {
+        // Only guard the transition *into* a closing status.
+        if (!in_array($newStatus, self::CLOSING_STATUSES, true)
+            || in_array($oldStatus, self::CLOSING_STATUSES, true)) {
+            return;
+        }
+
+        if (!$this->project_id) {
+            return; // personal tasks have no project rules
+        }
+
+        $project = $this->relationLoaded('project') ? $this->project : Project::find($this->project_id);
+
+        if (!$project?->require_comment_attachment_on_close || $this->hasCommentAttachment()) {
+            return;
+        }
+
+        $label = $newStatus === 'done' ? 'Done' : 'Cancelled';
+        $message = "This task needs a comment with at least one attachment before it can be marked {$label}.";
+
+        // Flash so the user gets a toast on Inertia form/redirect paths. JSON callers
+        // are skipped deliberately — nothing would render it there, and it would
+        // resurface as a stale toast on their next page load. Those paths read the
+        // 422 body and raise the toast client-side instead.
+        $request = request();
+        if ($request && !$request->expectsJson() && $request->hasSession()) {
+            $request->session()->flash('error', $message);
+        }
+
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'status' => $message,
+        ]);
     }
 
     public function calculateNextDueDate(): ?\Carbon\Carbon

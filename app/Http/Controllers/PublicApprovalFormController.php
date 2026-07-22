@@ -85,9 +85,12 @@ class PublicApprovalFormController extends Controller
                 'date' => 'date',
                 'select' => 'string',
                 'multi_select' => 'array',
-                'attachment' => 'file|max:52428800|mimes:pdf,doc,docx,xls,xlsx,zip',
-                'capture_photo' => 'file|max:52428800|mimes:jpeg,jpg,png',
-                'capture_video' => 'file|max:104857600|mimes:mp4,webm,mov',
+                // Laravel sizes file rules in KILOBYTES: 51200 = 50MB, 102400 = 100MB.
+                // (These previously read 52428800/104857600 — byte values, which meant
+                // ~50GB/~100GB and left PHP's upload_max_filesize as the real ceiling.)
+                'attachment' => 'file|max:51200|mimes:pdf,doc,docx,xls,xlsx,zip',
+                'capture_photo' => 'file|max:51200|mimes:jpeg,jpg,png',
+                'capture_video' => 'file|max:102400|mimes:mp4,webm,mov',
                 default => '',
             };
 

@@ -125,6 +125,17 @@ export default function AuthenticatedLayout({ children, title, contained = false
         try { return localStorage.getItem('sidebar_collapsed') === '1'; } catch { return false; }
     });
     const [toasts, setToasts] = useState([]);
+    // Toasts raised imperatively via toast() from JSON/fetch paths, which never
+    // populate Inertia's flash props. `key` forces a re-mount so repeating the
+    // same message re-triggers the auto-dismiss timer.
+    const [appToast, setAppToast] = useState(null);
+
+    useEffect(() => {
+        const handler = (e) => setAppToast({ ...e.detail, key: Date.now() });
+        window.addEventListener('app:toast', handler);
+        return () => window.removeEventListener('app:toast', handler);
+    }, []);
+
     // Live pending-approvals badge: seeded from the server on each Inertia visit,
     // then bumped in real time when an approval notification arrives via websocket.
     const [approvalsCount, setApprovalsCount] = useState(pendingApprovalsCount || 0);
@@ -424,6 +435,10 @@ export default function AuthenticatedLayout({ children, title, contained = false
                 {/* Flash messages */}
                 {flash?.success && <FlashMessage type="success" message={flash.success} />}
                 {flash?.error && <FlashMessage type="error" message={flash.error} />}
+                {/* Client-raised toasts (JSON/fetch paths that bypass Inertia flash) */}
+                {appToast && (
+                    <FlashMessage key={appToast.key} type={appToast.type} message={appToast.message} />
+                )}
                 <NotificationToast toasts={toasts} onDismiss={dismissToast} />
                 <AiChatWidget />
             </div>

@@ -116,7 +116,7 @@ class PublicFormController extends Controller
                 $mimes = match ($field->type) {
                     'capture_photo' => 'jpg,jpeg,png,webp',
                     'capture_video' => 'mp4,webm,mov',
-                    default => 'jpg,jpeg,png,gif,bmp,webp,mp4,mov,avi,webm,xlsx,xls,csv',
+                    default => 'pdf,jpg,jpeg,png,gif,bmp,webp,mp4,mov,avi,webm,xlsx,xls,csv',
                 };
                 $maxSize = $field->type === 'capture_video' ? 102400 : 51200;
 
