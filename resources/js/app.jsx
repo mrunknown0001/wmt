@@ -1,4 +1,5 @@
 import { createInertiaApp, router } from '@inertiajs/react';
+import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from './ThemeContext';
 import './echo';
@@ -160,10 +161,13 @@ router.on('finish', () => {
 
 createInertiaApp({
     title: (title) => title ? `${title} - WMT` : 'WMT',
-    resolve: (name) => {
-        const pages = import.meta.glob('./Pages/**/*.jsx', { eager: true });
-        return pages[`./Pages/${name}.jsx`];
-    },
+    // Lazy page resolution: Vite emits one chunk per page and fetches it on
+    // demand. With { eager: true } every page was inlined into the entry bundle,
+    // so the first paint downloaded all of them.
+    resolve: (name) => resolvePageComponent(
+        `./Pages/${name}.jsx`,
+        import.meta.glob('./Pages/**/*.jsx'),
+    ),
     setup({ el, App, props }) {
         // Initialize Ziggy with routes from Inertia props
         if (props.initialPage.props.ziggy) {
