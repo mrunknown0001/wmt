@@ -28,6 +28,67 @@ const UserIcon = () => (
     </svg>
 );
 
+const FolderIcon = () => (
+    <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+    </svg>
+);
+
+const ApprovalProjectIcon = () => (
+    <svg className="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+    </svg>
+);
+
+const ApprovalItemIcon = () => (
+    <svg className="h-4 w-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+);
+
+/**
+ * Result sections, rendered in this order. Each entry maps a payload key from
+ * /api/search to how a row should look. Adding a searchable type means adding
+ * one entry here plus the matching key in SearchController.
+ */
+const SECTIONS = [
+    {
+        key: 'projects', label: 'Projects', Icon: ProjectIcon,
+        title: (r) => r.name,
+        subtitle: (r) => (r.owner ? `Owner: ${r.owner}` : null),
+        badge: (r) => <StatusBadge status={r.status} type="project" />,
+    },
+    {
+        key: 'folders', label: 'Folders', Icon: FolderIcon,
+        title: (r) => r.name,
+        subtitle: (r) => `${r.project_count} ${r.project_count === 1 ? 'project' : 'projects'}`,
+    },
+    {
+        key: 'tasks', label: 'Tasks', Icon: TaskIcon,
+        title: (r) => r.title,
+        subtitle: (r) => r.project_name,
+        badge: (r) => <StatusBadge status={r.status} type="task" />,
+    },
+    {
+        key: 'approvalProjects', label: 'Approval Projects', Icon: ApprovalProjectIcon,
+        title: (r) => r.name,
+        subtitle: (r) => (r.owner ? `Owner: ${r.owner}` : null),
+        badge: (r) => <StatusBadge status={r.status} type="project" />,
+    },
+    {
+        key: 'approvalItems', label: 'Items for Approval', Icon: ApprovalItemIcon,
+        title: (r) => r.title,
+        subtitle: (r) => [r.project_name, r.requester && `by ${r.requester}`, r.archived && 'Archived']
+            .filter(Boolean).join(' · '),
+        badge: (r) => <StatusBadge status={r.status} type="task" />,
+    },
+    {
+        key: 'users', label: 'Employees', avatar: true,
+        title: (r) => r.name,
+        subtitle: (r) => r.position || r.email,
+    },
+];
+
 export default function GlobalSearch() {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState(null);
@@ -38,12 +99,16 @@ export default function GlobalSearch() {
     const inputRef = useRef(null);
     const debounceRef = useRef(null);
 
-    // Flatten results for keyboard navigation
-    const flatResults = results ? [
-        ...results.projects.map((r) => ({ ...r, type: 'project', label: r.name, url: r.url })),
-        ...results.tasks.map((r) => ({ ...r, type: 'task', label: r.title, url: r.url })),
-        ...results.users.map((r) => ({ ...r, type: 'user', label: r.name, url: r.url })),
-    ] : [];
+    // Sections that actually returned rows, in display order. Older payloads (or a
+    // cached bundle) may omit newer keys, so default each to an empty list.
+    const activeSections = results
+        ? SECTIONS.map((s) => ({ ...s, rows: results[s.key] ?? [] })).filter((s) => s.rows.length > 0)
+        : [];
+
+    // Flatten results for keyboard navigation, matching the rendered order.
+    const flatResults = activeSections.flatMap((s) =>
+        s.rows.map((r) => ({ ...r, type: s.key, label: s.title(r), url: r.url }))
+    );
 
     const search = useCallback(async (q) => {
         if (q.length < 2) {
@@ -121,7 +186,7 @@ export default function GlobalSearch() {
         return () => document.removeEventListener('keydown', handler);
     }, []);
 
-    const hasResults = results && (results.projects.length > 0 || results.tasks.length > 0 || results.users.length > 0);
+    const hasResults = activeSections.length > 0;
     const noResults = results && !hasResults;
 
     let flatIndex = -1;
@@ -159,88 +224,38 @@ export default function GlobalSearch() {
                         </div>
                     )}
 
-                    {results?.projects.length > 0 && (
-                        <div>
+                    {activeSections.map((section) => (
+                        <div key={section.key}>
                             <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-800/50">
-                                Projects
+                                {section.label}
                             </div>
-                            {results.projects.map((project) => {
+                            {section.rows.map((row) => {
                                 flatIndex++;
                                 const idx = flatIndex;
+                                const subtitle = section.subtitle?.(row);
                                 return (
                                     <button
-                                        key={`project-${project.id}`}
-                                        onClick={() => navigate(project.url)}
+                                        key={`${section.key}-${row.id}`}
+                                        onClick={() => navigate(row.url)}
                                         className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                                             activeIndex === idx ? 'bg-primary-50 dark:bg-primary-900/20' : ''
                                         }`}
                                     >
-                                        <ProjectIcon />
+                                        {section.avatar
+                                            ? <Avatar name={section.title(row)} size="sm" />
+                                            : <section.Icon />}
                                         <div className="flex-1 min-w-0 text-left">
-                                            <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{project.name}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{project.owner && `Owner: ${project.owner}`}</p>
+                                            <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{section.title(row)}</p>
+                                            {subtitle && (
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{subtitle}</p>
+                                            )}
                                         </div>
-                                        <StatusBadge status={project.status} type="project" />
+                                        {section.badge?.(row)}
                                     </button>
                                 );
                             })}
                         </div>
-                    )}
-
-                    {results?.tasks.length > 0 && (
-                        <div>
-                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-800/50">
-                                Tasks
-                            </div>
-                            {results.tasks.map((task) => {
-                                flatIndex++;
-                                const idx = flatIndex;
-                                return (
-                                    <button
-                                        key={`task-${task.id}`}
-                                        onClick={() => navigate(task.url)}
-                                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-                                            activeIndex === idx ? 'bg-primary-50 dark:bg-primary-900/20' : ''
-                                        }`}
-                                    >
-                                        <TaskIcon />
-                                        <div className="flex-1 min-w-0 text-left">
-                                            <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{task.title}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{task.project_name}</p>
-                                        </div>
-                                        <StatusBadge status={task.status} type="task" />
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {results?.users.length > 0 && (
-                        <div>
-                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-800/50">
-                                Users
-                            </div>
-                            {results.users.map((user) => {
-                                flatIndex++;
-                                const idx = flatIndex;
-                                return (
-                                    <button
-                                        key={`user-${user.id}`}
-                                        onClick={() => navigate(user.url)}
-                                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-                                            activeIndex === idx ? 'bg-primary-50 dark:bg-primary-900/20' : ''
-                                        }`}
-                                    >
-                                        <Avatar name={user.name} size="sm" />
-                                        <div className="flex-1 min-w-0 text-left">
-                                            <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{user.name}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{user.position || user.email}</p>
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
+                    ))}
                 </div>
             )}
         </div>
