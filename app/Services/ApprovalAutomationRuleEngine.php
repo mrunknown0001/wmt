@@ -9,6 +9,7 @@ use App\Models\ApprovalCustomField;
 use App\Models\ApprovalItem;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 class ApprovalAutomationRuleEngine
 {
@@ -263,15 +264,9 @@ class ApprovalAutomationRuleEngine
 
     private static function actionSendNotification(ApprovalItem $item, array $params): void
     {
-        $target = $params['target'] ?? 'requester';
+        $recipients = self::resolveNotificationRecipients($item, $params['target'] ?? 'requester');
 
-        $recipient = match ($target) {
-            'requester' => $item->requester,
-            '__requester_manager__' => self::resolveRequesterManager($item),
-            default => is_numeric($target) ? User::find($target) : null,
-        };
-
-        if (!$recipient) {
+        if ($recipients->isEmpty()) {
             return;
         }
 
@@ -280,7 +275,41 @@ class ApprovalAutomationRuleEngine
             $message = "Update on \"{$item->title}\"";
         }
 
-        $recipient->notify(new \App\Notifications\ApprovalAutomationNotification($item, $message));
+        foreach ($recipients as $recipient) {
+            $recipient->notify(new \App\Notifications\ApprovalAutomationNotification($item, $message));
+        }
+    }
+
+    /**
+     * Resolve a notification target into the users to notify.
+     *
+     * Supported targets: 'requester', '__requester_manager__', 'user:{id}' and
+     * 'team:{id}' (every active member). A bare numeric id is still accepted so
+     * rules saved before the user:/team: prefixes keep working.
+     */
+    private static function resolveNotificationRecipients(ApprovalItem $item, string $target): Collection
+    {
+        if ($target === 'requester') {
+            return collect([$item->requester])->filter();
+        }
+
+        if ($target === '__requester_manager__') {
+            return collect([self::resolveRequesterManager($item)])->filter();
+        }
+
+        if (str_starts_with($target, 'team:')) {
+            $teamId = (int) substr($target, 5);
+
+            return $teamId
+                ? User::where('team_id', $teamId)->where('is_active', true)->get()
+                : collect();
+        }
+
+        $userId = str_starts_with($target, 'user:') ? (int) substr($target, 5) : (int) $target;
+
+        return $userId
+            ? User::where('id', $userId)->where('is_active', true)->get()
+            : collect();
     }
 
     private static function actionAddComment(ApprovalItem $item, array $params): void

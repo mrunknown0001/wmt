@@ -30,7 +30,7 @@ const actionDefaults = (type, customFields) => ({
     set_custom_field: { custom_field_id: customFields[0]?.id ?? '', value: '' },
 }[type]);
 
-export default function ApprovalAutomationBuilder({ conditions, onConditionsChange, actions = [], onActionsChange, customFields = [] }) {
+export default function ApprovalAutomationBuilder({ conditions, onConditionsChange, actions = [], onActionsChange, customFields = [], notifyUsers = [], notifyTeams = [] }) {
     // ----- Actions (at least one is required) -----
     const addAction = () => onActionsChange([...actions, { type: 'add_comment', params: { message: '' } }]);
     const setAction = (i, next) => onActionsChange(actions.map((a, idx) => (idx === i ? next : a)));
@@ -118,6 +118,22 @@ export default function ApprovalAutomationBuilder({ conditions, onConditionsChan
                                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">Notify</label>
                                         <select value={action.params.target ?? 'requester'} onChange={(e) => setParam(i, 'target', e.target.value)} className={selectClass}>
                                             {NOTIFY_TARGETS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                            {notifyUsers.length > 0 && (
+                                                <optgroup label="Specific User">
+                                                    {notifyUsers.map((u) => (
+                                                        <option key={`user-${u.id}`} value={`user:${u.id}`}>{u.name}</option>
+                                                    ))}
+                                                </optgroup>
+                                            )}
+                                            {notifyTeams.length > 0 && (
+                                                <optgroup label="Team">
+                                                    {notifyTeams.map((t) => (
+                                                        <option key={`team-${t.id}`} value={`team:${t.id}`}>
+                                                            {t.name}{typeof t.members_count === 'number' ? ` (${t.members_count})` : ''}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            )}
                                         </select>
                                         <input type="text" value={action.params.message ?? ''} onChange={(e) => setParam(i, 'message', e.target.value)} placeholder="Message" className={inputClass} />
                                         <p className="text-xs text-gray-400">Placeholders: {'{item}'}, {'{status}'}, {'{requester}'}</p>

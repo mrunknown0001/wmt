@@ -14,7 +14,7 @@ const TRIGGER_TYPES = {
     approval_cancelled: 'Approval Cancelled',
 };
 
-export default function Edit({ project, rule, customFields }) {
+export default function Edit({ project, rule, customFields, notifyUsers = [], notifyTeams = [] }) {
     const { data, setData, put, processing, errors } = useForm({
         name: rule.name,
         is_active: rule.is_active,
@@ -103,6 +103,8 @@ export default function Edit({ project, rule, customFields }) {
                             actions={data.actions}
                             onActionsChange={(actions) => setData('actions', actions)}
                             customFields={customFields || project.custom_fields || []}
+                            notifyUsers={notifyUsers}
+                            notifyTeams={notifyTeams}
                         />
                         {errors.actions && <p className="text-red-600 text-sm mt-2">{errors.actions}</p>}
                     </div>

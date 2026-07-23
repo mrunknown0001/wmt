@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ApprovalProject;
+use App\Models\Team;
+use App\Models\User;
 use App\Models\ApprovalAutomationRule;
 use App\Http\Requests\StoreApprovalAutomationRuleRequest;
 use App\Http\Requests\UpdateApprovalAutomationRuleRequest;
@@ -10,6 +12,22 @@ use Inertia\Inertia;
 
 class ApprovalAutomationRuleController extends Controller
 {
+    /**
+     * Users and teams selectable as "Send Notification" targets. Teams carry a
+     * member count so an empty team is obvious before it's picked.
+     */
+    private static function notifyTargetOptions(): array
+    {
+        return [
+            'notifyUsers' => User::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']),
+            'notifyTeams' => Team::withCount(['members' => fn ($q) => $q->where('is_active', true)])
+                ->orderBy('name')
+                ->get(['id', 'name']),
+        ];
+    }
+
     private function authorizeProject(ApprovalProject $project): void
     {
         if (!auth()->user()->can('manage-approval-projects')
@@ -40,6 +58,7 @@ class ApprovalAutomationRuleController extends Controller
 
         return Inertia::render('ApprovalAutomationRules/Create', [
             'project' => $approvalProject->load('customFields.options'),
+            ...self::notifyTargetOptions(),
         ]);
     }
 
@@ -69,6 +88,7 @@ class ApprovalAutomationRuleController extends Controller
         return Inertia::render('ApprovalAutomationRules/Edit', [
             'project' => $approvalProject->load('customFields.options'),
             'rule' => $rule,
+            ...self::notifyTargetOptions(),
         ]);
     }
 
