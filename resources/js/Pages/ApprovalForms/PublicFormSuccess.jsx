@@ -4,7 +4,7 @@ export default function PublicFormSuccess({ form, message }) {
     return (
         <>
             <Head title="Form Submitted" />
-            <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center py-12 px-4">
+            <div className="h-screen overflow-y-auto bg-gradient-to-br from-green-50 to-green-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center py-12 px-4">
                 <div className="text-center max-w-2xl mx-auto">
                     {/* Success Icon */}
                     <div className="mb-6 flex justify-center">

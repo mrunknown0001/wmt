@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Head } from '@inertiajs/react';
+import TurnstileWidget from '../../Components/TurnstileWidget';
 
 const NUMBER_MIN = -99999999999;
 const NUMBER_MAX = 99999999999;
@@ -21,6 +22,10 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState({});
     const [formErrors, setFormErrors] = useState('');
+    const [turnstileToken, setTurnstileToken] = useState('');
+
+    const handleTurnstileVerify = useCallback((token) => setTurnstileToken(token), []);
+    const handleTurnstileExpire = useCallback(() => setTurnstileToken(''), []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -29,7 +34,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
         setErrors({});
         setFormErrors('');
 
-        if (turnstile.enabled && !window.turnstileToken) {
+        if (turnstile.enabled && !turnstileToken) {
             setFormErrors('Please verify that you are not a robot');
             return;
         }
@@ -39,6 +44,12 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
         try {
             // Collect form data
             const formData = new FormData(formRef.current);
+
+            // The widget renders outside the <form>, so its token isn't picked up
+            // by FormData automatically. Name it as the server rule expects.
+            if (turnstile.enabled) {
+                formData.append('cf_turnstile_response', turnstileToken);
+            }
 
             // Build URL directly
             const submitUrl = `/forms-approval/${form.uuid}`;
@@ -127,7 +138,10 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
     return (
         <>
             <Head title={form.name} />
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4">
+            {/* h-screen + overflow-y-auto: html/body are overflow:hidden globally (the
+                app shell scrolls its own inner container), so a public page needs to
+                provide the scroll container itself or long forms get clipped. */}
+            <div className="h-screen overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4">
                 <div className="max-w-2xl mx-auto">
                     {/* Form Header */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
@@ -372,9 +386,16 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                 </div>
                             ))}
 
-                            {/* Turnstile */}
+                            {/* Turnstile — the widget component loads Cloudflare's script and
+                                renders explicitly. A bare .cf-turnstile div renders nothing
+                                unless that script is on the page. */}
                             {turnstile.enabled && (
-                                <div className="cf-turnstile" data-sitekey={turnstile.siteKey} />
+                                <TurnstileWidget
+                                    siteKey={turnstile.siteKey}
+                                    onVerify={handleTurnstileVerify}
+                                    onExpire={handleTurnstileExpire}
+                                    error={errors.cf_turnstile_response}
+                                />
                             )}
 
                             {/* Submit Button */}
