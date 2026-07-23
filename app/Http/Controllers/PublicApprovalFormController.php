@@ -191,6 +191,18 @@ class PublicApprovalFormController extends Controller
         $itemData = [];
         $itemDefaults = $form->item_defaults ?? [];
         $itemData['status'] = $itemDefaults['status'] ?? 'pending';
+
+        // The form's "Default Section" groups incoming requests. Verified against
+        // this project so a stale/foreign section id can't be applied.
+        if (!empty($itemDefaults['section_id'])) {
+            $sectionId = $form->approvalProject->sections()
+                ->whereKey($itemDefaults['section_id'])
+                ->value('id');
+
+            if ($sectionId) {
+                $itemData['approval_section_id'] = $sectionId;
+            }
+        }
         $itemData['title'] = "{$form->name} - " . now()->format('Y-m-d H:i');
 
         $customFieldMappings = [];

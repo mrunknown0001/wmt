@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { router } from '@inertiajs/react';
+import { apiFetch, errorMessageFrom } from '../utils';
 
 const SECTION_COLORS = [
     '#6366f1', // indigo
@@ -18,7 +18,10 @@ export default function AddSectionModal({ isOpen, onClose, projectId, onSectionA
     const [isCreating, setIsCreating] = useState(false);
     const [error, setError] = useState(null);
 
-    const handleSubmit = (e) => {
+    // The sections endpoint is a JSON API, so this posts with fetch rather than
+    // Inertia's router (which expects an Inertia page response and would choke on
+    // the JSON payload — and the named route it used never existed).
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
 
@@ -28,29 +31,27 @@ export default function AddSectionModal({ isOpen, onClose, projectId, onSectionA
         }
 
         setIsCreating(true);
-        router.post(
-            route('api.approval-projects.sections.store', projectId),
-            {
-                name: name.trim(),
-                color,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: (response) => {
-                    if (response.section) {
-                        onSectionAdded(response.section);
-                        setName('');
-                        setColor('#6366f1');
-                        onClose();
-                    }
-                },
-                onError: (errors) => {
-                    setError(errors.message || 'Failed to create section');
-                    setIsCreating(false);
-                },
-                onFinish: () => setIsCreating(false),
+        try {
+            const res = await apiFetch(`/api/approval-projects/${projectId}/sections`, {
+                method: 'POST',
+                body: JSON.stringify({ name: name.trim(), color }),
+            });
+
+            if (!res.ok) {
+                setError(await errorMessageFrom(res, 'Failed to create section'));
+                return;
             }
-        );
+
+            const { section } = await res.json();
+            onSectionAdded?.(section);
+            setName('');
+            setColor('#6366f1');
+            onClose();
+        } catch {
+            setError('Failed to create section');
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     if (!isOpen) return null;

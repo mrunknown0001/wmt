@@ -3,6 +3,7 @@ import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import CustomFieldManager from '../../Components/CustomFieldManager';
+import ApprovalSectionManager from '../../Components/ApprovalSectionManager';
 
 const tabs = [
     { id: 'overview', label: 'Overview', icon: 'ℹ️' },
@@ -126,22 +127,10 @@ export default function Show({ project }) {
                         <div className="p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Sections ({project.sections?.length || 0})</h4>
-                                    {project.sections?.length > 0 ? (
-                                        <ul className="space-y-2">
-                                            {project.sections.map((section) => (
-                                                <li key={section.id} className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                                    <div
-                                                        className="w-3 h-3 rounded-full"
-                                                        style={{ backgroundColor: section.color }}
-                                                    />
-                                                    {section.name}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <p className="text-gray-600 dark:text-gray-400">No sections yet</p>
-                                    )}
+                                    <ApprovalSectionManager
+                                        projectId={project.id}
+                                        initialSections={project.sections || []}
+                                    />
                                 </div>
 
                                 <div>

@@ -1,5 +1,5 @@
 import { Head, Link, usePage, router } from '@inertiajs/react';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, Fragment } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import Pagination from '../../Components/Pagination';
@@ -25,7 +25,7 @@ const EyeIcon = () => (
     </svg>
 );
 
-export default function Index({ project, items, auth, chains = [], requesters = [], filters = {}, archivedCount = 0 }) {
+export default function Index({ project, items, auth, chains = [], sections = [], requesters = [], filters = {}, archivedCount = 0, groupBySection = false }) {
     const [approvingItemId, setApprovingItemId] = useState(null);
     const showArchived = !!filters.archived;
     const [search, setSearch] = useState(filters.search || '');
@@ -34,6 +34,7 @@ export default function Index({ project, items, auth, chains = [], requesters = 
     const [requesterId, setRequesterId] = useState(filters.requester_id || '');
     const [sort, setSort] = useState(filters.sort || 'created_at');
     const [direction, setDirection] = useState(filters.direction || 'desc');
+    const [sectionId, setSectionId] = useState(filters.section_id || '');
     const debounceRef = useRef(null);
 
     const applyFilters = useCallback((overrides = {}) => {
@@ -42,6 +43,7 @@ export default function Index({ project, items, auth, chains = [], requesters = 
             status: overrides.status ?? status,
             chain_id: overrides.chain_id ?? chainId,
             requester_id: overrides.requester_id ?? requesterId,
+            section_id: overrides.section_id ?? sectionId,
             sort: overrides.sort ?? sort,
             direction: overrides.direction ?? direction,
             archived: (overrides.archived ?? showArchived) ? 1 : '',
@@ -51,7 +53,7 @@ export default function Index({ project, items, auth, chains = [], requesters = 
             preserveState: true,
             preserveScroll: true,
         });
-    }, [search, status, chainId, requesterId, sort, direction, showArchived, project.id]);
+    }, [search, status, chainId, requesterId, sectionId, sort, direction, showArchived, project.id]);
 
     const handleArchive = (item) => {
         const archiving = !item.archived_at;
@@ -79,19 +81,24 @@ export default function Index({ project, items, auth, chains = [], requesters = 
         setStatus('');
         setChainId('');
         setRequesterId('');
+        setSectionId('');
         router.get(route('approval-projects.items.index', project.id), {}, {
             preserveState: true,
             preserveScroll: true,
         });
     };
 
-    const hasActiveFilters = !!search || !!status || !!chainId || !!requesterId;
+    const hasActiveFilters = !!search || !!status || !!chainId || !!requesterId || !!sectionId;
+
+    // Only show group headers once something is actually grouped — otherwise a
+    // project with sections but no assignments gets a lone "No Section" banner.
+    const showGroups = groupBySection && items.data?.some((i) => i.approval_section_id);
 
     // The current list query (filters + sort). Reused for the View link's back
     // param and the inline Approve action, so the approver always returns to this
     // exact filtered/sorted view.
     const listQuery = (() => {
-        const params = { search, status, chain_id: chainId, requester_id: requesterId, sort, direction, archived: showArchived ? 1 : '' };
+        const params = { search, status, chain_id: chainId, requester_id: requesterId, section_id: sectionId, sort, direction, archived: showArchived ? 1 : '' };
         Object.keys(params).forEach((k) => { if (!params[k]) delete params[k]; });
         const qs = new URLSearchParams(params).toString();
         return qs ? '?' + qs : '';
@@ -216,6 +223,19 @@ export default function Index({ project, items, auth, chains = [], requesters = 
                             ))}
                         </select>
                     )}
+                    {sections.length > 0 && (
+                        <select
+                            value={sectionId}
+                            onChange={(e) => { setSectionId(e.target.value); applyFilters({ section_id: e.target.value }); }}
+                            className="py-1.5 px-3 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        >
+                            <option value="">All Sections</option>
+                            {sections.map((s) => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                            <option value="none">No Section</option>
+                        </select>
+                    )}
                     <button
                         type="button"
                         onClick={() => applyFilters({ archived: !showArchived })}
@@ -252,8 +272,30 @@ export default function Index({ project, items, auth, chains = [], requesters = 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {items.data.map((item) => (
-                                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                                {items.data.map((item, idx) => {
+                                    // Rows arrive ordered by section, so a header row is
+                                    // emitted whenever the section changes.
+                                    const prev = idx > 0 ? items.data[idx - 1] : null;
+                                    const startsGroup = showGroups
+                                        && (idx === 0 || prev?.approval_section_id !== item.approval_section_id);
+                                    return (
+                                <Fragment key={item.id}>
+                                {startsGroup && (
+                                    <tr className="bg-gray-50 dark:bg-gray-900/50">
+                                        <td colSpan={6} className="px-6 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <span
+                                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                    style={{ backgroundColor: item.section?.color || '#9ca3af' }}
+                                                />
+                                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                                    {item.section?.name || 'No Section'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                                         <td className="px-6 py-4">
                                             <p className="font-medium text-gray-900 dark:text-white">{item.title || 'Untitled'}</p>
                                         </td>
@@ -302,7 +344,9 @@ export default function Index({ project, items, auth, chains = [], requesters = 
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                </Fragment>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

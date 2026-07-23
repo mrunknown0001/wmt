@@ -14,6 +14,7 @@ class ApprovalItem extends Model
 
     protected $fillable = [
         'approval_project_id',
+        'approval_section_id',
         'approval_chain_version_id',
         'title',
         'description',
@@ -69,6 +70,13 @@ class ApprovalItem extends Model
     public function approvalProject(): BelongsTo
     {
         return $this->belongsTo(ApprovalProject::class);
+    }
+
+    public function section(): BelongsTo
+    {
+        // Explicit FK — the column is approval_section_id, not the section_id
+        // Eloquent would infer from the method name.
+        return $this->belongsTo(ApprovalSection::class, 'approval_section_id');
     }
 
     public function chainVersion(): BelongsTo

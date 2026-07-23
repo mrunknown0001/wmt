@@ -20,6 +20,7 @@ class ApprovalItemController extends Controller
         $query = $approvalProject->approvalItems()
             ->with([
                 'requester',
+                'section',
                 'chainVersion.chain',
                 'stepInstances' => function ($q) {
                     $q->where('status', 'active')->with('approvers');
@@ -47,6 +48,13 @@ class ApprovalItemController extends Controller
             $query->where('requested_by', $requesterId);
         }
 
+        // 'none' narrows to ungrouped requests; any other value is a section id.
+        if ($sectionId = $request->input('section_id')) {
+            $sectionId === 'none'
+                ? $query->whereNull('approval_section_id')
+                : $query->where('approval_section_id', $sectionId);
+        }
+
         // Archived requests are hidden unless explicitly requested (?archived=1).
         $showArchived = $request->boolean('archived');
         $showArchived
@@ -65,6 +73,15 @@ class ApprovalItemController extends Controller
         }
 
         $query->reorder(); // clear the relation's default orderBy('position')
+
+        // Group by section: order by section first so each section's rows stay
+        // contiguous (ungrouped last), then apply the chosen sort within a group.
+        $groupBySection = $approvalProject->sections()->exists();
+        if ($groupBySection) {
+            $query->orderByRaw('approval_items.approval_section_id IS NULL')
+                ->orderBy('approval_items.approval_section_id');
+        }
+
         match ($sort) {
             'requester' => $query
                 ->leftJoin('users', 'users.id', '=', 'approval_items.requested_by')
@@ -94,17 +111,20 @@ class ApprovalItemController extends Controller
             'project' => $approvalProject,
             'items' => $items,
             'chains' => $approvalProject->chains()->get(['id', 'name']),
+            'sections' => $approvalProject->sections()->get(['id', 'name', 'color']),
             'requesters' => $requesters,
             'filters' => [
                 'search' => $request->input('search', ''),
                 'status' => $request->input('status', ''),
                 'chain_id' => $request->input('chain_id', ''),
                 'requester_id' => $request->input('requester_id', ''),
+                'section_id' => $request->input('section_id', ''),
                 'sort' => $sort,
                 'direction' => $direction,
                 'archived' => $showArchived,
             ],
             'archivedCount' => $approvalProject->approvalItems()->whereNotNull('archived_at')->count(),
+            'groupBySection' => $groupBySection,
         ]);
     }
 
