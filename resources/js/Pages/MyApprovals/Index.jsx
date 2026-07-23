@@ -31,7 +31,7 @@ const capitalizeStatus = (status) => {
         .join(' ');
 };
 
-export default function Index({ pendingApprovals, stats, filters = {}, trail, trailStats, trailFilters = {} }) {
+export default function Index({ pendingApprovals, stats, filters = {}, trail, trailStats, trailProjects = [], trailFilters = {} }) {
     // Filtering is server-side now (so it composes with search and pagination).
     const filteredStatus = filters.status || 'all';
     const [search, setSearch] = useState(filters.search || '');
@@ -73,12 +73,14 @@ export default function Index({ pendingApprovals, stats, filters = {}, trail, tr
     const [trailSearch, setTrailSearch] = useState(trailFilters.search || '');
     const trailSearchTimeout = useRef(null);
     const trailDecision = trailFilters.decision || '';
+    const trailProjectId = trailFilters.project_id ?? '';
 
     const applyTrailFilters = (overrides = {}) => {
         visit({
             ...currentQuery(),
             trail_decision: overrides.decision ?? trailDecision,
             trail_search: overrides.search ?? trailSearch,
+            trail_project_id: overrides.project_id ?? trailProjectId,
             trail_page: '', // a changed filter invalidates the current trail page
         });
     };
@@ -90,7 +92,32 @@ export default function Index({ pendingApprovals, stats, filters = {}, trail, tr
     };
 
     const trailRows = trail?.data ?? [];
-    const hasTrailFilters = !!trailSearch || !!trailDecision;
+    const hasTrailFilters = !!trailSearch || !!trailDecision || trailProjectId !== '';
+
+    // Collapsed project groups, persisted so an approver's chosen layout survives
+    // navigation and reloads. Stores only the collapsed ids, so new projects
+    // default to expanded.
+    const COLLAPSE_KEY = 'my_approvals_collapsed_projects';
+    const [collapsed, setCollapsed] = useState(() => {
+        try {
+            return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]'));
+        } catch {
+            return new Set();
+        }
+    });
+
+    const toggleProject = (projectId) => {
+        setCollapsed((prev) => {
+            const next = new Set(prev);
+            next.has(String(projectId)) ? next.delete(String(projectId)) : next.add(String(projectId));
+            try {
+                localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]));
+            } catch { /* storage unavailable — collapsing still works for this visit */ }
+            return next;
+        });
+    };
+
+    const isCollapsed = (projectId) => collapsed.has(String(projectId));
 
     const filtered = pendingApprovals?.data ?? [];
 
@@ -189,17 +216,40 @@ export default function Index({ pendingApprovals, stats, filters = {}, trail, tr
                     <div className="space-y-6">
                         {Object.entries(groupedByProject).map(([projectId, group]) => (
                             <div key={projectId}>
-                                <div className="bg-white dark:bg-gray-800 rounded-t-lg shadow px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                                    <Link
-                                        href={route('approval-projects.show', group.project.id)}
-                                        className="inline-flex items-center gap-2 hover:text-blue-600"
+                                <div className={`bg-white dark:bg-gray-800 shadow px-6 py-4 flex items-center gap-3 ${
+                                    isCollapsed(projectId) ? 'rounded-lg' : 'rounded-t-lg border-b border-gray-200 dark:border-gray-700'
+                                }`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleProject(projectId)}
+                                        aria-expanded={!isCollapsed(projectId)}
+                                        title={isCollapsed(projectId) ? 'Expand' : 'Collapse'}
+                                        className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                                     >
+                                        <svg
+                                            className={`h-4 w-4 transition-transform ${isCollapsed(projectId) ? '-rotate-90' : ''}`}
+                                            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                                            strokeLinecap="round" strokeLinejoin="round"
+                                        >
+                                            <path d="M19 9l-7 7-7-7" />
+                                        </svg>
                                         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                                             {group.project.name}
                                         </h2>
+                                    </button>
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                                        {group.items.length}
+                                    </span>
+                                    <Link
+                                        href={route('approval-projects.show', group.project.id)}
+                                        className="ml-auto text-sm text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+                                    >
+                                        Open project
                                     </Link>
                                 </div>
-                                <div className="bg-white dark:bg-gray-800 rounded-b-lg shadow divide-y divide-gray-200 dark:divide-gray-700">
+                                <div className={`bg-white dark:bg-gray-800 rounded-b-lg shadow divide-y divide-gray-200 dark:divide-gray-700 ${
+                                    isCollapsed(projectId) ? 'hidden' : ''
+                                }`}>
                                     {group.items.map((approval) => (
                                         <Link
                                             key={approval.id}
@@ -295,6 +345,16 @@ export default function Index({ pendingApprovals, stats, filters = {}, trail, tr
                             className="flex-1 min-w-[16rem] px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         />
                         <select
+                            value={trailProjectId}
+                            onChange={(e) => applyTrailFilters({ project_id: e.target.value })}
+                            className="px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="">All Approval Projects</option>
+                            {trailProjects.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                        <select
                             value={trailDecision}
                             onChange={(e) => applyTrailFilters({ decision: e.target.value })}
                             className="px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
@@ -305,7 +365,7 @@ export default function Index({ pendingApprovals, stats, filters = {}, trail, tr
                         </select>
                         {hasTrailFilters && (
                             <button
-                                onClick={() => { setTrailSearch(''); applyTrailFilters({ search: '', decision: '' }); }}
+                                onClick={() => { setTrailSearch(''); applyTrailFilters({ search: '', decision: '', project_id: '' }); }}
                                 className="text-sm text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
                             >
                                 Clear

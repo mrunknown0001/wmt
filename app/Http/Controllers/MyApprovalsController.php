@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ApprovalItem;
+use App\Models\ApprovalProject;
 use App\Models\ApprovalStepDecision;
 use App\Models\ApprovalStepInstanceApprover;
 use Illuminate\Http\Request;
@@ -125,6 +126,7 @@ class MyApprovalsController extends Controller
         // pending queue above.
         $trailDecision = $request->input('trail_decision', '');
         $trailSearch = trim((string) $request->input('trail_search', ''));
+        $trailProjectId = $request->input('trail_project_id', '');
 
         $trailBase = fn () => ApprovalStepDecision::where('decided_by', $user->id)
             ->whereHas('instance.item'); // skip decisions whose request was deleted
@@ -139,6 +141,12 @@ class MyApprovalsController extends Controller
 
         if (in_array($trailDecision, ['approved', 'rejected'], true)) {
             $trailQuery->where('decision', $trailDecision);
+        }
+
+        if ($trailProjectId !== '') {
+            $trailQuery->whereHas('instance.item', function ($q) use ($trailProjectId) {
+                $q->where('approval_project_id', $trailProjectId);
+            });
         }
 
         // Search the decision comment plus the request it belongs to.
@@ -176,6 +184,12 @@ class MyApprovalsController extends Controller
             ]);
 
         // Summary counts are over the whole trail, not the current filter.
+        // Only projects this user has actually decided in — offering every project
+        // would fill the dropdown with options that return nothing.
+        $trailProjects = ApprovalProject::whereHas('approvalItems.stepInstances.decisions',
+            fn ($q) => $q->where('decided_by', $user->id)
+        )->orderBy('name')->get(['id', 'name']);
+
         $trailStats = [
             'total' => $trailBase()->count(),
             'approved' => $trailBase()->where('decision', 'approved')->count(),
@@ -188,7 +202,8 @@ class MyApprovalsController extends Controller
             'filters' => ['status' => $status, 'search' => $search],
             'trail' => $trail,
             'trailStats' => $trailStats,
-            'trailFilters' => ['decision' => $trailDecision, 'search' => $trailSearch],
+            'trailProjects' => $trailProjects,
+            'trailFilters' => ['decision' => $trailDecision, 'search' => $trailSearch, 'project_id' => $trailProjectId],
         ]);
     }
 }
