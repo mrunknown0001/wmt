@@ -355,7 +355,10 @@ function FormulaEditor({ config, onChange, availableFields }) {
     );
 }
 
-export default forwardRef(function CustomFieldManager({ projectId, initialFields = [], onFieldsChange }, ref) {
+export default forwardRef(function CustomFieldManager({ projectId, initialFields = [], onFieldsChange, baseUrl }, ref) {
+    // Approval projects expose the same custom-field API under a different prefix;
+    // pass baseUrl to point this manager at it. Defaults to regular projects.
+    const fieldsUrl = baseUrl || `/projects/${projectId}/custom-fields`;
     const [fields, setFieldsInternal] = useState(initialFields);
 
     // Wrap setFields to also notify parent
@@ -466,12 +469,12 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
 
             let result;
             if (editingField) {
-                result = await apiFetch(`/projects/${projectId}/custom-fields/${editingField.id}`, {
+                result = await apiFetch(`${fieldsUrl}/${editingField.id}`, {
                     method: 'PUT',
                     body: JSON.stringify(payload),
                 });
             } else {
-                result = await apiFetch(`/projects/${projectId}/custom-fields`, {
+                result = await apiFetch(`${fieldsUrl}`, {
                     method: 'POST',
                     body: JSON.stringify(payload),
                 });
@@ -492,12 +495,12 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
         } finally {
             setSaving(false);
         }
-    }, [form, editingField, projectId]);
+    }, [form, editingField, projectId, fieldsUrl]);
 
     const handleDelete = useCallback(async () => {
         if (!deleteField) return;
         try {
-            await apiFetch(`/projects/${projectId}/custom-fields/${deleteField.id}`, {
+            await apiFetch(`${fieldsUrl}/${deleteField.id}`, {
                 method: 'DELETE',
             });
             setFields(prev => prev.filter(f => f.id !== deleteField.id));
@@ -505,7 +508,7 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
         } catch (e) {
             console.error('Failed to delete custom field', e);
         }
-    }, [deleteField, projectId]);
+    }, [deleteField, projectId, fieldsUrl]);
 
     const handleDragStart = (e, index) => {
         setDragIndex(index);
@@ -534,7 +537,7 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
         setDragOverIndex(null);
 
         try {
-            await apiFetch(`/projects/${projectId}/custom-fields/reorder`, {
+            await apiFetch(`${fieldsUrl}/reorder`, {
                 method: 'POST',
                 body: JSON.stringify({ order: reordered.map(f => f.id) }),
             });

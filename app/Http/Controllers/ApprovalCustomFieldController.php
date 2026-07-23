@@ -53,7 +53,9 @@ class ApprovalCustomFieldController extends Controller
             }
         }
 
-        return response()->json($field->load('options'), 201);
+        // Wrapped in a "field" key to match CustomFieldController, so the shared
+        // CustomFieldManager component can talk to either endpoint.
+        return response()->json(['field' => $field->load('options')], 201);
     }
 
     public function update(UpdateApprovalCustomFieldRequest $request, ApprovalProject $approvalProject, ApprovalCustomField $customField): JsonResponse
@@ -96,7 +98,7 @@ class ApprovalCustomFieldController extends Controller
             $customField->options()->delete();
         }
 
-        return response()->json($customField->load('options'));
+        return response()->json(['field' => $customField->load('options')]);
     }
 
     public function destroy(ApprovalProject $approvalProject, ApprovalCustomField $customField): JsonResponse

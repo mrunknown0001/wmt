@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
+import CustomFieldManager from '../../Components/CustomFieldManager';
 
 const tabs = [
     { id: 'overview', label: 'Overview', icon: 'ℹ️' },
@@ -144,21 +145,14 @@ export default function Show({ project }) {
                                 </div>
 
                                 <div>
-                                    <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Custom Fields ({project.customFields?.length || 0})</h4>
-                                    {project.customFields?.length > 0 ? (
-                                        <ul className="space-y-2">
-                                            {project.customFields.map((field) => (
-                                                <li key={field.id} className="flex items-center justify-between text-gray-700 dark:text-gray-300">
-                                                    <span>{field.name}</span>
-                                                    <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                                                        {field.type}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <p className="text-gray-600 dark:text-gray-400">No custom fields yet</p>
-                                    )}
+                                    {/* Full manager (add/edit/delete/reorder) rather than a
+                                        read-only list — it talks to the approval project's
+                                        own custom-field endpoints. */}
+                                    <CustomFieldManager
+                                        projectId={project.id}
+                                        baseUrl={`/approval-projects/${project.id}/custom-fields`}
+                                        initialFields={project.customFields || []}
+                                    />
                                 </div>
                             </div>
 
