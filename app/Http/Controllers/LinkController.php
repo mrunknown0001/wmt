@@ -4,7 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreLinkRequest;
 use App\Http\Requests\UpdateLinkRequest;
+use App\Models\Department;
+use App\Models\Division;
 use App\Models\Link;
+use App\Models\LinkAssignment;
+use App\Models\LinkGroup;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
@@ -21,10 +26,11 @@ class LinkController extends Controller
         $user = $request->user();
         $canManage = $user->hasPermissionTo('manage-links');
 
-        $query = Link::with('user', 'creator');
+        $query = Link::with('user', 'creator', 'assignments.assignable');
 
         if (!$canManage) {
-            $query->where('user_id', $user->id);
+            // Assigned directly, via an org unit, a role, or a custom group.
+            $query->visibleTo($user);
         } else {
             if ($userId = $request->input('user_id')) {
                 $query->where('user_id', $userId);
@@ -57,21 +63,77 @@ class LinkController extends Controller
         ]);
     }
 
+    /** Everything a link can be assigned to, for the picker. */
+    private static function assignmentOptions(): array
+    {
+        return [
+            'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'teams' => Team::withCount(['members' => fn ($q) => $q->where('is_active', true)])
+                ->orderBy('name')->get(['id', 'name']),
+            'departments' => Department::orderBy('name')->get(['id', 'name']),
+            'divisions' => Division::orderBy('name')->get(['id', 'name']),
+            'roles' => \Spatie\Permission\Models\Role::orderBy('name')->get(['id', 'name']),
+            'linkGroups' => LinkGroup::withCount('members')->orderBy('name')->get(['id', 'name']),
+        ];
+    }
+
+    /** Current assignments as {type, id} pairs the picker understands. */
+    private static function assignmentPayload(Link $link): array
+    {
+        return $link->assignments
+            ->map(fn (LinkAssignment $a) => ['type' => $a->type_key, 'id' => $a->assignable_id])
+            ->filter(fn ($a) => $a['type'] !== null)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Replace a link's assignments with the submitted set. Unknown types and ids
+     * that don't resolve are dropped rather than stored as dangling targets.
+     */
+    private static function syncAssignments(Link $link, array $assignments): void
+    {
+        $rows = [];
+
+        foreach ($assignments as $assignment) {
+            $class = LinkAssignment::TYPES[$assignment['type'] ?? ''] ?? null;
+            $id = $assignment['id'] ?? null;
+
+            if (!$class || !$id || !$class::whereKey($id)->exists()) {
+                continue;
+            }
+
+            $rows[$class . ':' . $id] = ['assignable_type' => $class, 'assignable_id' => (int) $id];
+        }
+
+        $link->assignments()->delete();
+
+        foreach ($rows as $row) {
+            $link->assignments()->create($row);
+        }
+    }
+
     public function create(): Response
     {
         $this->authorize('create', Link::class);
 
         return Inertia::render('Links/Create', [
-            'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            ...self::assignmentOptions(),
         ]);
     }
 
     public function store(StoreLinkRequest $request): RedirectResponse
     {
+        $data = $request->validated();
+        $assignments = $data['assignments'] ?? [];
+        unset($data['assignments']);
+
         $link = Link::create([
-            ...$request->validated(),
+            ...$data,
             'created_by' => $request->user()->id,
         ]);
+
+        self::syncAssignments($link, $assignments);
 
         ActivityLogger::logCreated($link, $request->user());
 
@@ -83,11 +145,12 @@ class LinkController extends Controller
     {
         $this->authorize('update', $link);
 
-        $link->load('user', 'creator');
+        $link->load('user', 'creator', 'assignments.assignable');
 
         return Inertia::render('Links/Edit', [
             'link' => $link,
-            'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'assignments' => self::assignmentPayload($link),
+            ...self::assignmentOptions(),
         ]);
     }
 
@@ -95,7 +158,15 @@ class LinkController extends Controller
     {
         $oldValues = $link->only(['title', 'description', 'url', 'user_id']);
 
-        $link->update($request->validated());
+        $data = $request->validated();
+        $assignments = $data['assignments'] ?? null;
+        unset($data['assignments']);
+
+        $link->update($data);
+
+        if ($assignments !== null) {
+            self::syncAssignments($link, $assignments);
+        }
 
         ActivityLogger::logChanges($link, $oldValues, $request->user());
 

@@ -17,7 +17,12 @@ class UpdateLinkRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'url' => ['nullable', 'url', 'max:2048'],
-            'user_id' => ['required', 'exists:users,id'],
+            // Assignment moved to the polymorphic assignments list; user_id is kept
+            // optional so older payloads (and single-assignee links) still work.
+            'user_id' => ['nullable', 'exists:users,id'],
+            'assignments' => ['nullable', 'array'],
+            'assignments.*.type' => ['required_with:assignments', 'string', 'in:user,team,department,division,role,group'],
+            'assignments.*.id' => ['required_with:assignments', 'integer', 'min:1'],
         ];
     }
 }

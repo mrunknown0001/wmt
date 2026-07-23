@@ -28,6 +28,16 @@ const ExternalLinkIcon = () => (
     </svg>
 );
 
+// Morph class => human label, for the assignment chips' tooltips.
+const ASSIGN_TYPE_LABEL = {
+    'App\\Models\\User': 'User',
+    'App\\Models\\Team': 'Team',
+    'App\\Models\\Department': 'Department',
+    'App\\Models\\Division': 'Division',
+    'App\\Models\\LinkGroup': 'Group',
+    'Spatie\\Permission\\Models\\Role': 'Role',
+};
+
 export default function Index() {
     const { links, users, auth, filters } = usePage().props;
     const canManage = auth.user?.permissions?.includes('manage-links');
@@ -80,7 +90,12 @@ export default function Index() {
                         { label: 'Dashboard', href: '/dashboard' },
                         { label: 'Links & URLs' },
                     ]}
-                    actions={canManage && <LinkButton href="/links/create">Add Link</LinkButton>}
+                    actions={canManage && (
+                        <div className="flex gap-2">
+                            <LinkButton href="/links/groups" variant="secondary">Manage Groups</LinkButton>
+                            <LinkButton href="/links/create">Add Link</LinkButton>
+                        </div>
+                    )}
                 />
 
                 <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -192,12 +207,31 @@ export default function Index() {
                                             </td>
                                             {canManage && (
                                                 <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
-                                                    {link.user ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <Avatar name={link.user.name} size="sm" />
-                                                            {link.user.name}
-                                                        </div>
-                                                    ) : '—'}
+                                                    {(() => {
+                                                        // A link can now target several users/groups at once.
+                                                        const targets = link.assignments ?? [];
+                                                        if (targets.length === 0) {
+                                                            return link.user ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Avatar name={link.user.name} size="sm" />
+                                                                    {link.user.name}
+                                                                </div>
+                                                            ) : '—';
+                                                        }
+                                                        return (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {targets.map((a) => (
+                                                                    <span
+                                                                        key={`${a.assignable_type}-${a.assignable_id}`}
+                                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                                                        title={ASSIGN_TYPE_LABEL[a.assignable_type] || ''}
+                                                                    >
+                                                                        {a.assignable?.name ?? `#${a.assignable_id}`}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                             )}
                                             {canManage && (

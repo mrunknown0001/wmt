@@ -31,6 +31,7 @@ use App\Http\Controllers\FormController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\TaskCustomFieldValueController;
 use App\Http\Controllers\LinkController;
+use App\Http\Controllers\LinkGroupController;
 use App\Http\Controllers\TrashController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ApprovalProjectController;
@@ -277,6 +278,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/ai/conversations/{conversation}/messages', [AiChatController::class, 'sendMessage'])->name('ai.conversations.sendMessage');
 
     // Links & URLs
+    // Link groups must be declared before the resource route so /links/groups
+    // isn't swallowed by links/{link}.
+    Route::get('/links/groups', [LinkGroupController::class, 'index'])->name('link-groups.index');
+    Route::post('/links/groups', [LinkGroupController::class, 'store'])->name('link-groups.store');
+    Route::put('/links/groups/{linkGroup}', [LinkGroupController::class, 'update'])->name('link-groups.update');
+    Route::delete('/links/groups/{linkGroup}', [LinkGroupController::class, 'destroy'])->name('link-groups.destroy');
     Route::resource('links', LinkController::class)->except(['show']);
 
     // Organization structure

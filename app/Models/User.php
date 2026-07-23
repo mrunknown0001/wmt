@@ -85,6 +85,11 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class);
     }
 
+    public function linkGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(LinkGroup::class, 'link_group_user');
+    }
+
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
