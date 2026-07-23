@@ -21,7 +21,9 @@ export default function Edit({ project, form }) {
     const [localSections, setLocalSections] = useState(
         Array.isArray(project.sections) ? project.sections : []
     );
-    const customFields = Array.isArray(project.customFields) ? project.customFields : [];
+    // Eloquent serialises the customFields relation as snake_case; without this the
+    // list is empty and no custom field can be chosen as a mapping target.
+    const customFields = project.custom_fields ?? project.customFields ?? [];
     const [showAddSectionModal, setShowAddSectionModal] = useState(false);
 
     const { data, setData, put, processing, errors } = useForm({

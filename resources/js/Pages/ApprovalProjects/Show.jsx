@@ -151,7 +151,7 @@ export default function Show({ project }) {
                                     <CustomFieldManager
                                         projectId={project.id}
                                         baseUrl={`/approval-projects/${project.id}/custom-fields`}
-                                        initialFields={project.customFields || []}
+                                        initialFields={project.custom_fields || project.customFields || []}
                                     />
                                 </div>
                             </div>
