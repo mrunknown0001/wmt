@@ -80,7 +80,12 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
         );
     };
 
-    const currentStep = item.step_instances?.[0];
+    // The step in play is the *active* instance — not step_instances[0], which stays
+    // on step 1 forever and made the card (and the decision panel) go stale as soon
+    // as step 1 was decided. Falls back to the furthest step reached once finished.
+    const stepInstances = item.step_instances ?? [];
+    const currentStep = stepInstances.find((si) => si.status === 'active')
+        ?? [...stepInstances].sort((a, b) => (b.step_number ?? 0) - (a.step_number ?? 0))[0];
     const isActiveStep = currentStep?.status === 'active';
     const isUserApprover = isActiveStep && !!auth.user?.can_approve && currentStep.approvers?.some(a => a.user_id === auth.user.id);
 
