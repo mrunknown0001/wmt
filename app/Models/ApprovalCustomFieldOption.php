@@ -19,6 +19,8 @@ class ApprovalCustomFieldOption extends Model
 
     public function customField(): BelongsTo
     {
-        return $this->belongsTo(ApprovalCustomField::class);
+        // Explicit FK — the column is approval_custom_field_id, not the
+        // custom_field_id Eloquent would infer from the method name.
+        return $this->belongsTo(ApprovalCustomField::class, 'approval_custom_field_id');
     }
 }

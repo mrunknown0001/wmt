@@ -2,7 +2,6 @@ import { Head, Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
-import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import ApprovalItemComments from '../../Components/ApprovalItemComments';
 
 const statusColors = {
@@ -25,6 +24,13 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
     const [isDeciding, setIsDeciding] = useState(false);
     const [decisionComment, setDecisionComment] = useState('');
     const [decidingAction, setDecidingAction] = useState(null);
+
+    // Custom fields: definitions from the project, values keyed by field id.
+    // (Eloquent serialises these relations in snake_case.)
+    const customFields = project?.custom_fields ?? [];
+    const valuesByFieldId = Object.fromEntries(
+        (item.custom_field_values ?? []).map((cfv) => [cfv.approval_custom_field_id, cfv])
+    );
 
     // The list's filters/sort, carried in via the ?back= param. Reused for the
     // "← Back" link and for returning here after a decision.
@@ -164,22 +170,29 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                             </div>
                         )}
 
-                        {/* Custom Fields */}
-                        {item.custom_field_values && item.custom_field_values.length > 0 && (
+                        {/* Custom Fields — driven by the project's field definitions so a
+                            field added after submission still appears (as "—"). */}
+                        {customFields.length > 0 && (
                             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Additional Information</h2>
-                                <div className="space-y-4">
-                                    {item.custom_field_values.map((cfv) => (
-                                        <div key={cfv.id}>
-                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                {cfv.custom_field?.name}
-                                            </label>
-                                            <p className="mt-1 text-gray-900 dark:text-white">
-                                                {cfv.value}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
+                                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {customFields.map((field) => {
+                                        const cfv = valuesByFieldId[field.id];
+                                        const display = cfv?.display_value;
+                                        return (
+                                            <div key={field.id}>
+                                                <dt className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    {field.name}
+                                                </dt>
+                                                <dd className={`mt-1 whitespace-pre-wrap break-words ${
+                                                    display ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'
+                                                }`}>
+                                                    {display || '—'}
+                                                </dd>
+                                            </div>
+                                        );
+                                    })}
+                                </dl>
                             </div>
                         )}
 

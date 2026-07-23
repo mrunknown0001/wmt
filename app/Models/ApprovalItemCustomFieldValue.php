@@ -20,6 +20,13 @@ class ApprovalItemCustomFieldValue extends Model
         'value_option_id',
     ];
 
+    /**
+     * `value` is type-dependent and `display_value` resolves select options to
+     * their labels. Both are accessors, so they must be appended to appear in the
+     * JSON handed to the front end.
+     */
+    protected $appends = ['value', 'display_value'];
+
     protected function casts(): array
     {
         return [
@@ -36,7 +43,9 @@ class ApprovalItemCustomFieldValue extends Model
 
     public function customField(): BelongsTo
     {
-        return $this->belongsTo(ApprovalCustomField::class);
+        // Explicit FK: the column is approval_custom_field_id, but Eloquent would
+        // infer custom_field_id from the method name and always resolve to null.
+        return $this->belongsTo(ApprovalCustomField::class, 'approval_custom_field_id');
     }
 
     public function selectedOption(): BelongsTo
@@ -60,6 +69,45 @@ class ApprovalItemCustomFieldValue extends Model
             'multi_select' => $this->value_json,
             default => null,
         };
+    }
+
+    /**
+     * Human-readable value for display. Select types store option IDs, so those
+     * are resolved back to their labels.
+     */
+    public function getDisplayValueAttribute(): ?string
+    {
+        if (!$this->customField) {
+            $this->load('customField');
+        }
+
+        return match ($this->customField?->type) {
+            'text', 'textarea' => $this->value_text,
+            'number' => $this->value_number === null
+                ? null
+                : rtrim(rtrim((string) $this->value_number, '0'), '.'),
+            'date' => $this->value_date?->format('M j, Y'),
+            'single_select' => $this->optionLabels([$this->value_option_id]),
+            'multi_select' => $this->optionLabels($this->value_json ?? []),
+            default => null,
+        };
+    }
+
+    /** Map option IDs to labels, falling back to the raw values if they aren't IDs. */
+    private function optionLabels(array $ids): ?string
+    {
+        $ids = array_values(array_filter($ids, fn ($id) => $id !== null && $id !== ''));
+
+        if (empty($ids)) {
+            return null;
+        }
+
+        $labels = $this->customField?->options
+            ->whereIn('id', $ids)
+            ->pluck('label')
+            ->all() ?? [];
+
+        return implode(', ', !empty($labels) ? $labels : $ids);
     }
 
     public function setTypedValue(string $type, mixed $rawValue): self

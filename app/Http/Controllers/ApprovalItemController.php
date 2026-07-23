@@ -218,7 +218,10 @@ class ApprovalItemController extends Controller
         }
 
         return Inertia::render('ApprovalItems/Show', [
-            'project' => $approvalProject,
+            // Field definitions come from the project so every custom field is shown
+            // on the request, including ones added after it was submitted (which
+            // have no stored value yet).
+            'project' => $approvalProject->load('customFields.options'),
             'item' => $item,
             'canDecide' => auth()->user()->can('decide', $item),
             'canEdit' => auth()->user()->can('update', $item),
