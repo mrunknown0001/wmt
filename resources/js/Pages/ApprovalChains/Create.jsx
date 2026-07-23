@@ -10,7 +10,7 @@ const REJECT_BEHAVIORS = {
     return_to_requester: 'Return to Requester',
 };
 
-export default function Create({ project, users, roles }) {
+export default function Create({ project, users, roles, departments = [], divisions = [], teams = [] }) {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         description: '',
@@ -160,6 +160,9 @@ export default function Create({ project, users, roles }) {
                             onChange={(steps) => setData('steps', steps)}
                             users={users}
                             roles={roles}
+                            departments={departments}
+                            divisions={divisions}
+                            teams={teams}
                         />
                         {errors.steps && (
                             <div className="text-red-600 text-sm mt-2 bg-red-50 dark:bg-red-900/20 p-3 rounded">

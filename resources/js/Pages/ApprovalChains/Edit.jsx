@@ -10,7 +10,7 @@ const REJECT_BEHAVIORS = {
     return_to_requester: 'Return to Requester',
 };
 
-export default function Edit({ project, chain, currentVersion, users, roles, inFlightItems = [] }) {
+export default function Edit({ project, chain, currentVersion, users, roles, departments = [], divisions = [], teams = [], inFlightItems = [] }) {
     const { data, setData, put, processing, errors } = useForm({
         name: chain.name,
         description: chain.description,
@@ -144,6 +144,9 @@ export default function Edit({ project, chain, currentVersion, users, roles, inF
                             onChange={(steps) => setData('steps', steps)}
                             users={users}
                             roles={roles}
+                            departments={departments}
+                            divisions={divisions}
+                            teams={teams}
                         />
                         {errors.steps && <p className="text-red-600 text-sm mt-2">{errors.steps}</p>}
                     </div>

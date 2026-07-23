@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\ApprovalProject;
 use App\Models\ApprovalChain;
+use App\Models\Department;
+use App\Models\Division;
+use App\Models\Team;
 use App\Models\User;
 use App\Http\Requests\StoreApprovalChainRequest;
 use App\Http\Requests\UpdateApprovalChainRequest;
@@ -51,6 +54,10 @@ class ApprovalChainController extends Controller
             'project' => $approvalProject,
             'users' => $users,
             'roles' => $roles,
+            // Targets for head/leader steps that resolve against a fixed org entity.
+            'departments' => Department::orderBy('name')->get(['id', 'name']),
+            'divisions' => Division::orderBy('name')->get(['id', 'name']),
+            'teams' => Team::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -111,6 +118,10 @@ class ApprovalChainController extends Controller
             'currentVersion' => $currentVersion,
             'users' => $users,
             'roles' => $roles,
+            // Targets for head/leader steps that resolve against a fixed org entity.
+            'departments' => Department::orderBy('name')->get(['id', 'name']),
+            'divisions' => Division::orderBy('name')->get(['id', 'name']),
+            'teams' => Team::orderBy('name')->get(['id', 'name']),
         ]);
     }
 

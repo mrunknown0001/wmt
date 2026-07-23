@@ -11,6 +11,14 @@ const APPROVER_TYPES = {
     project_owner: 'Project Owner',
 };
 
+// Approver types that resolve against an org entity; each needs an "of" mode and,
+// in fixed mode, an entity_id.
+const ORG_SCOPED_TYPES = {
+    department_head: { label: 'Department', list: 'departments' },
+    division_head: { label: 'Division', list: 'divisions' },
+    team_leader: { label: 'Team', list: 'teams' },
+};
+
 const QUORUM_MODES = {
     any: 'Any Approver',
     all: 'All Approvers',
@@ -24,7 +32,7 @@ const REJECT_BEHAVIORS = {
     return_to_requester: 'Return to Requester',
 };
 
-export default function ApprovalChainBuilder({ value = [], onChange, users = [], roles = [] }) {
+export default function ApprovalChainBuilder({ value = [], onChange, users = [], roles = [], departments = [], divisions = [], teams = [] }) {
     const [expandedStep, setExpandedStep] = useState(null);
 
     const addStep = () => {
@@ -124,7 +132,15 @@ export default function ApprovalChainBuilder({ value = [], onChange, users = [],
                                         </label>
                                         <select
                                             value={step.approver_type}
-                                            onChange={(e) => updateStep(step.temp_id || step.id, { approver_type: e.target.value })}
+                                            onChange={(e) => updateStep(step.temp_id || step.id, {
+                                                approver_type: e.target.value,
+                                                // Reset config for the new type, seeding the "of" default that
+                                                // the Resolve From select displays — otherwise accepting the
+                                                // default submits an empty config the server rejects.
+                                                approver_config: ORG_SCOPED_TYPES[e.target.value]
+                                                    ? { of: 'requester' }
+                                                    : {},
+                                            })}
                                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-500 rounded-lg dark:bg-gray-700 dark:text-white"
                                         >
                                             {Object.entries(APPROVER_TYPES).map(([key, label]) => (
@@ -174,23 +190,65 @@ export default function ApprovalChainBuilder({ value = [], onChange, users = [],
                                         </div>
                                     )}
 
-                                    {step.approver_type === 'department_head' && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                Resolve From
-                                            </label>
-                                            <select
-                                                value={step.approver_config?.of || 'requester'}
-                                                onChange={(e) => updateStep(step.temp_id || step.id, {
-                                                    approver_config: { ...step.approver_config, of: e.target.value }
-                                                })}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-500 rounded-lg dark:bg-gray-700 dark:text-white"
-                                            >
-                                                <option value="requester">Requester's Department</option>
-                                                <option value="fixed">Fixed Department</option>
-                                            </select>
-                                        </div>
-                                    )}
+                                    {/* Head/leader types all resolve the same way, against their
+                                        own kind of org entity. */}
+                                    {ORG_SCOPED_TYPES[step.approver_type] && (() => {
+                                        const scope = ORG_SCOPED_TYPES[step.approver_type];
+                                        const entities = { departments, divisions, teams }[scope.list] || [];
+                                        const mode = step.approver_config?.of || 'requester';
+                                        return (
+                                            <>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                        Resolve From
+                                                    </label>
+                                                    <select
+                                                        value={mode}
+                                                        onChange={(e) => updateStep(step.temp_id || step.id, {
+                                                            // Drop entity_id when leaving fixed mode so a stale id isn't submitted.
+                                                            approver_config: e.target.value === 'fixed'
+                                                                ? { ...step.approver_config, of: 'fixed' }
+                                                                : { ...step.approver_config, of: e.target.value, entity_id: undefined },
+                                                        })}
+                                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-500 rounded-lg dark:bg-gray-700 dark:text-white"
+                                                    >
+                                                        <option value="requester">{`Requester's ${scope.label}`}</option>
+                                                        <option value="fixed">{`Fixed ${scope.label}`}</option>
+                                                    </select>
+                                                </div>
+
+                                                {mode === 'fixed' && (
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                            {scope.label}
+                                                        </label>
+                                                        <select
+                                                            value={step.approver_config?.entity_id || ''}
+                                                            onChange={(e) => updateStep(step.temp_id || step.id, {
+                                                                approver_config: {
+                                                                    ...step.approver_config,
+                                                                    of: 'fixed',
+                                                                    entity_id: e.target.value ? parseInt(e.target.value) : undefined,
+                                                                },
+                                                            })}
+                                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-500 rounded-lg dark:bg-gray-700 dark:text-white"
+                                                        >
+                                                            <option value="">{`Choose a ${scope.label.toLowerCase()}...`}</option>
+                                                            {entities.map((entity) => (
+                                                                <option key={entity.id} value={entity.id}>{entity.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        {entities.length === 0 && (
+                                                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                                                                No {scope.label.toLowerCase()}s exist yet — create one first, or use
+                                                                “Requester's {scope.label}”.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
 
                                     {/* Quorum Settings */}
                                     <div>

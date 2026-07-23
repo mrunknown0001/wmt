@@ -77,8 +77,10 @@ class UpdateApprovalChainRequest extends FormRequest
             case 'department_head':
             case 'division_head':
             case 'team_leader':
-                if (!isset($approverConfig['of']) || ($approverConfig['of'] === 'fixed' && empty($approverConfig['entity_id']))) {
-                    $validator->errors()->add($path, "Step {$stepNum}: {$approverType} type requires 'of' and 'entity_id' (for fixed mode) in approver_config.");
+                // 'of' defaults to 'requester' (what the builder shows), so only a
+                // fixed target without an entity is actually invalid.
+                if (($approverConfig['of'] ?? 'requester') === 'fixed' && empty($approverConfig['entity_id'])) {
+                    $validator->errors()->add($path, "Step {$stepNum}: {$approverType} set to a fixed target needs entity_id in approver_config.");
                 }
                 break;
 
