@@ -26,7 +26,9 @@ class UpdateApprovalChainRequest extends FormRequest
             'steps.*.step_number' => 'nullable|integer|min:1',
             'steps.*.name' => 'required|string|max:255',
             'steps.*.approver_type' => 'required|string|in:specific_user,role,requester_manager,department_head,division_head,team_leader,group,project_owner',
-            'steps.*.approver_config' => 'required|array',
+            // See StoreApprovalChainRequest: `required` rejects the empty config that
+            // config-less approver types legitimately send.
+            'steps.*.approver_config' => 'nullable|array',
             'steps.*.quorum_mode' => 'nullable|string|in:any,all,majority,count',
             'steps.*.quorum_count' => 'nullable|integer|min:1',
             'steps.*.skip_conditions' => 'nullable|array',

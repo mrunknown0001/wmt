@@ -25,7 +25,11 @@ class StoreApprovalChainRequest extends FormRequest
             'steps.*.step_number' => 'nullable|integer|min:1',
             'steps.*.name' => 'required|string|max:255',
             'steps.*.approver_type' => 'required|string|in:specific_user,role,requester_manager,department_head,division_head,team_leader,group,project_owner',
-            'steps.*.approver_config' => 'required|array',
+            // Not `required`: an empty array fails that rule, and approver types
+            // like requester_manager / project_owner legitimately carry no config.
+            // Per-type requirements are enforced in validateStepApproverConfig(),
+            // which produces a message naming the missing key.
+            'steps.*.approver_config' => 'nullable|array',
             'steps.*.quorum_mode' => 'nullable|string|in:any,all,majority,count',
             'steps.*.quorum_count' => 'nullable|integer|min:1',
             'steps.*.skip_conditions' => 'nullable|array',
