@@ -164,9 +164,22 @@ export default function ApprovalChainBuilder({ value = [], onChange, users = [],
                                             >
                                                 <option value="">Choose a user...</option>
                                                 {users.map(user => (
-                                                    <option key={user.id} value={user.id}>{user.name}</option>
+                                                    <option key={user.id} value={user.id}>
+                                                        {user.can_approve === false ? `${user.name} — cannot approve` : user.name}
+                                                    </option>
                                                 ))}
                                             </select>
+                                            {(() => {
+                                                const picked = users.find(u => u.id === step.approver_config?.user_id);
+                                                if (!picked || picked.can_approve !== false) return null;
+                                                return (
+                                                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                                                        {picked.name} doesn’t have “Can Approve Requests” enabled, so this step
+                                                        would stall — they’d be assigned but unable to approve or reject.
+                                                        Enable it in Admin → Users.
+                                                    </p>
+                                                );
+                                            })()}
                                         </div>
                                     )}
 

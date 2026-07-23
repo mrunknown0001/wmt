@@ -44,9 +44,11 @@ class ApprovalChainController extends Controller
     {
         $this->authorizeProject($approvalProject);
 
+        // can_approve travels with each user so the builder can flag approvers who
+        // would be assigned but unable to act on the step.
         $users = User::where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name', 'email', 'can_approve']);
 
         $roles = Role::orderBy('name')->get(['id', 'name']);
 
@@ -103,9 +105,11 @@ class ApprovalChainController extends Controller
         $this->authorizeProject($approvalProject);
         abort_if($chain->approval_project_id !== $approvalProject->id, 404);
 
+        // can_approve travels with each user so the builder can flag approvers who
+        // would be assigned but unable to act on the step.
         $users = User::where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name', 'email', 'can_approve']);
 
         $roles = Role::orderBy('name')->get(['id', 'name']);
 
