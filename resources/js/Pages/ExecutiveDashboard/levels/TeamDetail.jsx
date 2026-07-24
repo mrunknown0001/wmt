@@ -4,10 +4,10 @@ import ActivityFeed from '../../../Components/Dashboard/ActivityFeed';
 import DonutChart from '../../../Components/Dashboard/DonutChart';
 import BarChart from '../../../Components/Dashboard/BarChart';
 
-export default function TeamDetail({ metrics, members, distributions, activityFeed }) {
+export default function TeamDetail({ metrics, members, distributions, activityFeed, entity }) {
     return (
         <div className="space-y-6">
-            <MetricCards data={metrics} />
+            <MetricCards data={metrics} scope="team" scopeId={entity?.id} />
 
             <MemberTable members={members} />
 

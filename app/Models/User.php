@@ -90,6 +90,14 @@ class User extends Authenticatable
         return $this->belongsToMany(LinkGroup::class, 'link_group_user');
     }
 
+    /** True if this user heads a division/department or leads a team. */
+    public function headsAnyOrgUnit(): bool
+    {
+        return Division::where('head_id', $this->id)->exists()
+            || Department::where('head_id', $this->id)->exists()
+            || Team::where('leader_id', $this->id)->exists();
+    }
+
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);

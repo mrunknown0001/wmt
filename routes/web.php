@@ -110,6 +110,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
 
     // User management (admin)
+    // whereNumber keeps this from shadowing /users/create.
+    Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show')->whereNumber('user');
     Route::resource('users', UserController::class)->except(['show']);
 
     // Projects & Tasks
@@ -217,6 +219,7 @@ Route::middleware('auth')->group(function () {
 
     // Executive Dashboard (admin + executive)
     Route::get('/executive-dashboard', [ExecutiveDashboardController::class, 'index'])->name('executive-dashboard');
+    Route::get('/executive-dashboard/tasks', [ExecutiveDashboardController::class, 'tasks'])->name('executive-dashboard.tasks');
     Route::get('/executive-dashboard/divisions/{division}', [ExecutiveDashboardController::class, 'division'])->name('executive-dashboard.division');
     Route::get('/executive-dashboard/departments/{department}', [ExecutiveDashboardController::class, 'department'])->name('executive-dashboard.department');
     Route::get('/executive-dashboard/teams/{team}', [ExecutiveDashboardController::class, 'team'])->name('executive-dashboard.team');

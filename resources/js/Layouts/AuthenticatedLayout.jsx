@@ -242,7 +242,9 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     <NavLink href="/links" icon={<LinkIcon />} active={isActive('/links')} collapsed={collapsed}>
                         Links & URLs
                     </NavLink>
-                    {(hasRole('admin') || hasRole('executive')) && (
+                    {/* Admins/executives see the whole org; unit heads are redirected
+                        to the scope they oversee. */}
+                    {(hasRole('admin') || hasRole('executive') || auth.user?.is_org_head) && (
                         <NavLink href="/executive-dashboard" icon={<ChartBarIcon />} active={isActive('/executive-dashboard')} collapsed={collapsed}>
                             Executive Dashboard
                         </NavLink>

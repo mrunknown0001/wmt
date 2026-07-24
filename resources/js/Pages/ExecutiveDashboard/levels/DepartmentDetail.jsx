@@ -4,10 +4,10 @@ import ActivityTrendChart from '../components/ActivityTrendChart';
 import WorkloadChart from '../components/WorkloadChart';
 import AtRiskItems from '../components/AtRiskItems';
 
-export default function DepartmentDetail({ metrics, units, activityTrend, workload, atRiskItems }) {
+export default function DepartmentDetail({ metrics, units, activityTrend, workload, atRiskItems, entity }) {
     return (
         <div className="space-y-6">
-            <MetricCards data={metrics} />
+            <MetricCards data={metrics} scope="department" scopeId={entity?.id} />
 
             {units?.length > 0 && (
                 <div>

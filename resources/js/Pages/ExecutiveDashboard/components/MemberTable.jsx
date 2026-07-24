@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import Card from '../../../Components/Card';
 import Avatar from '../../../Components/Avatar';
 
@@ -35,7 +36,9 @@ export default function MemberTable({ members }) {
                                     <div className="flex items-center gap-3">
                                         <Avatar name={member.name} size="sm" />
                                         <div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{member.name}</p>
+                                            <Link href={`/users/${member.id}`} className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+                                                {member.name}
+                                            </Link>
                                             {member.position && (
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">{member.position}</p>
                                             )}

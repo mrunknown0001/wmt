@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,48 @@ class ExecutiveDashboardController extends Controller
         if (!$user->hasRole('admin') && !$user->hasRole('executive')) {
             abort(403);
         }
+    }
+
+    /** Admins and executives can monitor the whole organization. */
+    private function seesEverything(User $user): bool
+    {
+        return $user->hasRole('admin') || $user->hasRole('executive');
+    }
+
+    /**
+     * Completion-monitoring visibility follows the org hierarchy:
+     *  - a division head sees their division, its departments, and their teams
+     *  - a department head sees their department and its teams
+     *  - a team leader sees their team
+     */
+    private function canAccessDivision(User $user, Division $division): bool
+    {
+        return $this->seesEverything($user) || $division->head_id === $user->id;
+    }
+
+    private function canAccessDepartment(User $user, Department $department): bool
+    {
+        if ($this->seesEverything($user) || $department->head_id === $user->id) {
+            return true;
+        }
+
+        // The head of the division this department belongs to.
+        return $department->division && $department->division->head_id === $user->id;
+    }
+
+    private function canAccessTeam(User $user, Team $team): bool
+    {
+        if ($this->seesEverything($user) || $team->leader_id === $user->id) {
+            return true;
+        }
+
+        $department = $team->department;
+        if ($department && $department->head_id === $user->id) {
+            return true;
+        }
+
+        // The division head above this team.
+        return $department && $department->division && $department->division->head_id === $user->id;
     }
 
     private function dateFilters(Request $request): array
@@ -176,6 +219,107 @@ class ExecutiveDashboardController extends Controller
     }
 
     /**
+     * Org-wide task browser backing the Executive Summary cards. Scopes to the
+     * same user set the metrics use (all active users, or a division/department/
+     * team) and applies the card filters (status / due), plus search and priority.
+     */
+    public function tasks(Request $request): Response
+    {
+        // Resolve the audience the same way the metrics do, so drill-through counts
+        // line up with the card that was clicked.
+        $scope = $request->input('scope', 'org');
+        $scopeId = $request->input('scope_id');
+
+        // Authorize against the requested scope, not blanket admin/executive, so a
+        // unit head can open the task list for a unit they oversee.
+        $this->authorizeTaskScope($request->user(), $scope, $scopeId);
+
+        [$userIds, $scopeLabel] = $this->resolveTaskScope($scope, $scopeId);
+
+        $status = $request->input('status', '');
+        $due = $request->input('due', '');
+        $priority = $request->input('priority', '');
+        $search = trim((string) $request->input('search', ''));
+        $today = now()->toDateString();
+
+        $query = Task::with('project:id,name', 'assignee:id,name')
+            ->whereIn('assigned_to', $userIds);
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+        if ($priority) {
+            $query->where('priority', $priority);
+        }
+        if ($search !== '') {
+            $query->where('title', 'like', '%' . $search . '%');
+        }
+        if ($due === 'overdue') {
+            $query->whereNotIn('status', ['done', 'cancelled'])
+                ->whereNotNull('due_date')
+                ->where('due_date', '<', $today);
+        } elseif ($due === 'today') {
+            $query->where('due_date', $today);
+        }
+
+        $tasks = $query
+            ->orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('due_date')
+            ->orderByDesc('priority')
+            ->paginate(25)
+            ->withQueryString();
+
+        return Inertia::render('ExecutiveDashboard/Tasks', [
+            'tasks' => $tasks,
+            'scopeLabel' => $scopeLabel,
+            'filters' => [
+                'scope' => $scope,
+                'scope_id' => $scopeId,
+                'status' => $status,
+                'due' => $due,
+                'priority' => $priority,
+                'search' => $search,
+            ],
+        ]);
+    }
+
+    /** Gate the task list by the requested scope, honouring the org hierarchy. */
+    private function authorizeTaskScope(User $user, string $scope, $scopeId): void
+    {
+        $allowed = match ($scope) {
+            'division' => $this->canAccessDivision($user, Division::findOrFail($scopeId)),
+            'department' => $this->canAccessDepartment($user, Department::with('division')->findOrFail($scopeId)),
+            'team' => $this->canAccessTeam($user, Team::with('department.division')->findOrFail($scopeId)),
+            default => $this->seesEverything($user), // org-wide is admin/executive only
+        };
+
+        abort_unless($allowed, 403);
+    }
+
+    /** @return array{0: Collection, 1: string} [userIds, human label] */
+    private function resolveTaskScope(string $scope, $scopeId): array
+    {
+        return match ($scope) {
+            'division' => [
+                $this->getUserIdsForDivision(Division::findOrFail($scopeId)),
+                'Division: ' . Division::findOrFail($scopeId)->name,
+            ],
+            'department' => [
+                User::where('department_id', $scopeId)->where('is_active', true)->pluck('id'),
+                'Department: ' . Department::findOrFail($scopeId)->name,
+            ],
+            'team' => [
+                User::where('team_id', $scopeId)->where('is_active', true)->pluck('id'),
+                'Team: ' . Team::findOrFail($scopeId)->name,
+            ],
+            default => [
+                User::where('is_active', true)->pluck('id'),
+                'Organization-wide',
+            ],
+        };
+    }
+
+    /**
      * Rank org units (teams or departments) with a size-fair composite score:
      * 40% completion rate + 30% on-time delivery + 30% completed-per-member
      * (normalized to the best unit). Cancelled tasks are excluded from totals.
@@ -248,9 +392,26 @@ class ExecutiveDashboardController extends Controller
             ->values();
     }
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
-        $this->authorizeAccess($request);
+        $user = $request->user();
+
+        // Only admins/executives see the whole organization. A unit head who lands
+        // here is sent to the broadest unit they oversee (division ▸ dept ▸ team);
+        // anyone who oversees nothing is denied.
+        if (!$this->seesEverything($user)) {
+            if ($division = Division::where('head_id', $user->id)->first()) {
+                return redirect()->route('executive-dashboard.division', $division);
+            }
+            if ($department = Department::where('head_id', $user->id)->first()) {
+                return redirect()->route('executive-dashboard.department', $department);
+            }
+            if ($team = Team::where('leader_id', $user->id)->first()) {
+                return redirect()->route('executive-dashboard.team', $team);
+            }
+            abort(403);
+        }
+
         $filters = $this->dateFilters($request);
 
         $allActiveUserIds = User::where('is_active', true)->pluck('id');
@@ -306,9 +467,9 @@ class ExecutiveDashboardController extends Controller
 
     public function division(Request $request, Division $division): Response
     {
-        $this->authorizeAccess($request);
-        $filters = $this->dateFilters($request);
         $division->load('head');
+        abort_unless($this->canAccessDivision($request->user(), $division), 403);
+        $filters = $this->dateFilters($request);
 
         $userIds = $this->getUserIdsForDivision($division);
         $metrics = $this->buildMetrics($userIds, $filters['date_from'], $filters['date_to']);
@@ -356,9 +517,9 @@ class ExecutiveDashboardController extends Controller
 
     public function department(Request $request, Department $department): Response
     {
-        $this->authorizeAccess($request);
-        $filters = $this->dateFilters($request);
         $department->load('division', 'head');
+        abort_unless($this->canAccessDepartment($request->user(), $department), 403);
+        $filters = $this->dateFilters($request);
 
         $userIds = User::where('department_id', $department->id)->where('is_active', true)->pluck('id');
         $metrics = $this->buildMetrics($userIds, $filters['date_from'], $filters['date_to']);
@@ -405,9 +566,9 @@ class ExecutiveDashboardController extends Controller
 
     public function team(Request $request, Team $team): Response
     {
-        $this->authorizeAccess($request);
-        $filters = $this->dateFilters($request);
         $team->load('department.division', 'leader');
+        abort_unless($this->canAccessTeam($request->user(), $team), 403);
+        $filters = $this->dateFilters($request);
 
         $userIds = User::where('team_id', $team->id)->where('is_active', true)->pluck('id');
         $metrics = $this->buildMetrics($userIds, $filters['date_from'], $filters['date_to']);

@@ -52,6 +52,127 @@ class UserController extends Controller
         ]);
     }
 
+    /**
+     * User Overview — KPIs for a single user (projects, task throughput,
+     * productivity, activity). Reachable from the Users list and from the
+     * Executive Dashboard member drill-down.
+     */
+    public function show(Request $request, User $user): Response
+    {
+        abort_unless($this->canViewOverview($request->user(), $user), 403);
+
+        $user->load('department.division', 'team', 'roles:id,name');
+
+        $tasks = \App\Models\Task::where('assigned_to', $user->id);
+        $total = (clone $tasks)->count();
+        $completed = (clone $tasks)->where('status', 'done')->count();
+        $active = (clone $tasks)->whereNotIn('status', ['done', 'cancelled'])->count();
+        $overdue = (clone $tasks)->whereNotIn('status', ['done', 'cancelled'])
+            ->whereNotNull('due_date')->where('due_date', '<', now())->count();
+
+        // On-time rate over completed tasks that had a due date.
+        $completedWithDue = (clone $tasks)->where('status', 'done')->whereNotNull('due_date')->whereNotNull('completed_at');
+        $completedDueTotal = (clone $completedWithDue)->count();
+        $completedOnTime = (clone $completedWithDue)
+            ->whereColumn('completed_at', '<=', 'due_date')->count();
+
+        // Activity: log entries over the last 30 days, and the most recent one.
+        $since = now()->subDays(30);
+        $activity30 = \App\Models\ActivityLog::where('user_id', $user->id)->where('created_at', '>=', $since)->count();
+        $lastActivity = \App\Models\ActivityLog::where('user_id', $user->id)->max('created_at');
+
+        $projectsOwned = \App\Models\Project::where('owner_id', $user->id)->count();
+        $projectsMember = $user->memberProjects()->count();
+        // Projects the user actually works in (owns, is a member of, or has a task in).
+        $projectsInvolved = \App\Models\Project::where('owner_id', $user->id)
+            ->orWhereHas('members', fn ($q) => $q->where('users.id', $user->id))
+            ->orWhereHas('tasks', fn ($q) => $q->where('assigned_to', $user->id))
+            ->count();
+
+        $completionRate = $total > 0 ? round(($completed / $total) * 100) : 0;
+        $onTimeRate = $completedDueTotal > 0 ? round(($completedOnTime / $completedDueTotal) * 100) : 0;
+
+        // Composite productivity: completion, punctuality, and recent activity.
+        $activityScore = min(100, $activity30 * 5); // 20 actions/30d ≈ fully active
+        $productivity = round($completionRate * 0.5 + $onTimeRate * 0.3 + $activityScore * 0.2);
+
+        $recentActivity = \App\Models\ActivityLog::where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->limit(12)
+            ->get(['action', 'entity_type', 'entity_name', 'description', 'created_at'])
+            ->map(fn ($a) => [
+                'action' => $a->action,
+                'entity' => $a->entity_name ?: class_basename($a->entity_type ?? ''),
+                'description' => $a->description,
+                'created_at' => $a->created_at,
+            ]);
+
+        return Inertia::render('Users/Show', [
+            'profile' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'position' => $user->position,
+                'is_active' => (bool) $user->is_active,
+                'department' => $user->department?->name,
+                'division' => $user->department?->division?->name,
+                'team' => $user->team?->name,
+                'roles' => $user->roles->pluck('name'),
+            ],
+            'kpis' => [
+                'projectsOwned' => $projectsOwned,
+                'projectsMember' => $projectsMember,
+                'projectsInvolved' => $projectsInvolved,
+                'tasksTotal' => $total,
+                'tasksCompleted' => $completed,
+                'tasksActive' => $active,
+                'tasksOverdue' => $overdue,
+                'completionRate' => $completionRate,
+                'onTimeRate' => $onTimeRate,
+                'productivity' => $productivity,
+                'activity30' => $activity30,
+                'lastActivityAt' => $lastActivity,
+            ],
+            'recentActivity' => $recentActivity,
+            'canManage' => $request->user()->can('manage-users'),
+        ]);
+    }
+
+    /**
+     * Who may view a user's overview: managers, the user themselves, or a head
+     * who oversees them (team leader ▸ department head ▸ division head).
+     */
+    private function canViewOverview(User $viewer, User $target): bool
+    {
+        if ($viewer->id === $target->id
+            || $viewer->can('manage-users')
+            || $viewer->can('view-users')
+            || $viewer->hasRole('admin')
+            || $viewer->hasRole('executive')) {
+            return true;
+        }
+
+        // Team leader of the target's team.
+        if ($target->team_id && Team::where('id', $target->team_id)->where('leader_id', $viewer->id)->exists()) {
+            return true;
+        }
+
+        // Head of the target's department.
+        if ($target->department_id && Department::where('id', $target->department_id)->where('head_id', $viewer->id)->exists()) {
+            return true;
+        }
+
+        // Head of the division the target's department belongs to.
+        if ($target->department_id) {
+            $divisionId = Department::where('id', $target->department_id)->value('division_id');
+            if ($divisionId && \App\Models\Division::where('id', $divisionId)->where('head_id', $viewer->id)->exists()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function create(): Response
     {
         $this->authorize('create', User::class);

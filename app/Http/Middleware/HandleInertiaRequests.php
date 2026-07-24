@@ -54,6 +54,8 @@ class HandleInertiaRequests extends Middleware
                     'can_create_rules' => $request->user()->can_create_rules,
                     'can_approve' => $request->user()->can_approve,
                     'can_request' => $request->user()->can_request,
+                    // Heads a division/department/team → can reach completion monitoring.
+                    'is_org_head' => $request->user()->headsAnyOrgUnit(),
                 ] : null,
             ],
             'settings' => fn () => \App\Models\Setting::current(),
