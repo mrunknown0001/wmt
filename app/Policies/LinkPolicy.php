@@ -9,13 +9,17 @@ class LinkPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('view-links');
+        // Links & URLs is open to every authenticated user; the index scopes each
+        // user to the links actually assigned to them (directly or via a group).
+        return true;
     }
 
     public function view(User $user, Link $link): bool
     {
+        // Managers see everything; everyone else sees a link only if it's assigned
+        // to them, matching the same visibility rule used by the index.
         return $user->hasPermissionTo('manage-links')
-            || ($user->hasPermissionTo('view-links') && $link->user_id === $user->id);
+            || Link::visibleTo($user)->whereKey($link->id)->exists();
     }
 
     public function create(User $user): bool

@@ -20,7 +20,6 @@ class UpdateApprovalProjectRequest extends FormRequest
             'owner_id' => 'nullable|exists:users,id',
             'co_owner_ids' => 'nullable|array',
             'co_owner_ids.*' => 'integer|exists:users,id',
-            'due_date' => 'nullable|date',
             'is_pinned' => 'nullable|boolean',
         ];
     }

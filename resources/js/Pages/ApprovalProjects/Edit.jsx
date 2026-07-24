@@ -12,7 +12,6 @@ export default function Edit({ project, users = [] }) {
         co_owner_ids: (project.members || [])
             .filter((m) => m.pivot?.role === 'co-owner')
             .map((m) => m.id),
-        due_date: project.due_date || '',
         is_pinned: project.is_pinned || false,
     });
 
@@ -113,18 +112,6 @@ export default function Edit({ project, users = [] }) {
                                     <option value="completed">Completed</option>
                                     <option value="archived">Archived</option>
                                 </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Due Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={data.due_date}
-                                    onChange={(e) => setData('due_date', e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                />
                             </div>
                         </div>
 

@@ -71,7 +71,6 @@ class ApprovalProjectController extends Controller
             'description' => $request->description,
             'status' => $request->status ?? 'active',
             'owner_id' => $request->owner_id,
-            'due_date' => $request->due_date,
             'is_pinned' => $request->is_pinned ?? false,
         ]);
 
@@ -109,7 +108,6 @@ class ApprovalProjectController extends Controller
             'description' => $request->description,
             'status' => $request->status,
             'owner_id' => $request->owner_id,
-            'due_date' => $request->due_date,
             'is_pinned' => $request->is_pinned ?? false,
         ]);
 

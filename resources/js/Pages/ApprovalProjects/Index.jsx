@@ -100,9 +100,6 @@ export default function Index({ projects, archivedCount = 0 }) {
                                             {project.owner && (
                                                 <span className="text-gray-600 dark:text-gray-400">Owner: {project.owner.name}</span>
                                             )}
-                                            {project.due_date && (
-                                                <span className="text-gray-600 dark:text-gray-400">Due: {new Date(project.due_date).toLocaleDateString()}</span>
-                                            )}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3 ml-4">
