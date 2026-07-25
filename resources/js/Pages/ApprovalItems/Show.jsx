@@ -20,6 +20,15 @@ const capitalizeStatus = (status) => {
         .join(' ');
 };
 
+// Human-readable decision timestamp, e.g. "Jul 24, 2026, 2:30 PM".
+const formatDecisionDate = (value) => {
+    if (!value) return '';
+    return new Date(value).toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+    });
+};
+
 export default function Show({ item, project, canDecide, canEdit, auth }) {
     const [isDeciding, setIsDeciding] = useState(false);
     const [decisionComment, setDecisionComment] = useState('');
@@ -214,35 +223,33 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                                                 instance.status === 'rejected' ? 'border-red-400' :
                                                 isActive ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'
                                             }`}>
-                                                <div className="flex items-center justify-between">
-                                                    <h3 className="font-medium text-gray-900 dark:text-white text-sm">
-                                                        Step {instance.step_number}: {instance.step?.name}
-                                                    </h3>
-                                                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                                                        instance.status === 'active' ? 'bg-blue-100 text-blue-800' :
-                                                        instance.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                                        instance.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                                        'bg-gray-100 text-gray-800'
-                                                    }`}>
-                                                        {capitalizeStatus(instance.status)}
-                                                    </span>
-                                                </div>
+                                                {/* Step title only — the decision word lives on each approver row,
+                                                    so there's a single status per line (no duplicate badge). */}
+                                                <h3 className="font-medium text-gray-900 dark:text-white text-sm">
+                                                    Step {instance.step_number}: {instance.step?.name}
+                                                </h3>
 
-                                                {/* Compact approver → decision list. Comments kept (not redundant). */}
-                                                <div className="mt-2 space-y-1">
+                                                <div className="mt-2 space-y-1.5">
                                                     {instance.approvers?.map((approver) => {
                                                         const decision = instance.decisions?.find(d => d.decided_by === approver.user_id);
                                                         return (
                                                             <div key={approver.id} className="text-sm">
-                                                                <div className="flex items-center justify-between">
+                                                                <div className="flex items-center justify-between gap-3">
                                                                     <span className="text-gray-700 dark:text-gray-300">{approver.user?.name}</span>
-                                                                    <span className={`font-medium ${
-                                                                        !decision ? 'text-yellow-600 dark:text-yellow-400' :
-                                                                        decision.decision === 'approved' ? 'text-green-600 dark:text-green-400' :
-                                                                        'text-red-600 dark:text-red-400'
-                                                                    }`}>
-                                                                        {decision ? capitalizeStatus(decision.decision) : 'Pending'}
-                                                                    </span>
+                                                                    <div className="text-right shrink-0">
+                                                                        <span className={`font-medium ${
+                                                                            !decision ? 'text-yellow-600 dark:text-yellow-400' :
+                                                                            decision.decision === 'approved' ? 'text-green-600 dark:text-green-400' :
+                                                                            'text-red-600 dark:text-red-400'
+                                                                        }`}>
+                                                                            {decision ? capitalizeStatus(decision.decision) : 'Pending'}
+                                                                        </span>
+                                                                        {decision?.decided_at && (
+                                                                            <p className="text-xs text-gray-400 dark:text-gray-500">
+                                                                                {formatDecisionDate(decision.decided_at)}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                                 {decision?.comment && (
                                                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 italic">“{decision.comment}”</p>
