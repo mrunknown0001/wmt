@@ -11,7 +11,7 @@ class AiChatService
      *
      * @return \Generator<string> yields content chunks
      */
-    public static function streamChat(string $systemPrompt, array $messageHistory): \Generator
+    public static function streamChat(string $systemPrompt, array $messageHistory, array $options = []): \Generator
     {
         $platform = config('ai.platform', 'openai');
         $config = config("ai.{$platform}");
@@ -31,19 +31,31 @@ class AiChatService
             $headers['X-Title'] = config('app.name', 'WMT');
         }
 
+        $payload = [
+            // Model is chosen per-purpose by AiModelRouter; falls back to the
+            // platform default when no override is supplied.
+            'model' => $options['model'] ?? $config['model'],
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ...$messageHistory,
+            ],
+            'stream' => true,
+            'temperature' => 0.7,
+            'max_tokens' => $options['max_tokens'] ?? 2000,
+        ];
+
+        // When a PDF file part is present on OpenRouter, request the free text
+        // engine so PDF parsing is predictable and doesn't incur OCR costs.
+        if (!empty($options['has_pdf']) && $platform === 'openrouter') {
+            $payload['plugins'] = [
+                ['id' => 'file-parser', 'pdf' => ['engine' => 'pdf-text']],
+            ];
+        }
+
         $response = Http::withHeaders($headers)
             ->withOptions(['stream' => true])
-            ->timeout(60)
-            ->post("{$config['base_url']}/chat/completions", [
-                'model' => $config['model'],
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ...$messageHistory,
-                ],
-                'stream' => true,
-                'temperature' => 0.7,
-                'max_tokens' => 2000,
-            ]);
+            ->timeout(120)
+            ->post("{$config['base_url']}/chat/completions", $payload);
 
         if ($response->failed()) {
             yield "Sorry, I encountered an error communicating with the AI service. Please try again.";

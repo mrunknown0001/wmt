@@ -15,5 +15,29 @@ return [
         'base_url' => 'https://openrouter.ai/api/v1',
     ],
 
+    /*
+     * Per-purpose models. The app auto-routes each request to the right one:
+     *   - vision    → an image or PDF is attached
+     *   - documents → a Word/Excel/CSV file's text is in play
+     *   - reasoning → the prompt asks for deep analysis
+     *   - chat      → everything else (the default)
+     *
+     * Any purpose left blank falls back to `chat`, which itself falls back to the
+     * platform's `model` above — so a single-model setup keeps working unchanged.
+     * All ids are for the active platform (e.g. OpenRouter model slugs).
+     */
+    'models' => [
+        'chat' => env('AI_MODEL_CHAT'),
+        'vision' => env('AI_MODEL_VISION'),
+        'reasoning' => env('AI_MODEL_REASONING'),
+        'documents' => env('AI_MODEL_DOCUMENTS'),
+    ],
+
+    // Optional per-purpose response length; falls back to 2000.
+    'purpose_max_tokens' => [
+        'reasoning' => (int) env('AI_MAX_TOKENS_REASONING', 4000),
+        'documents' => (int) env('AI_MAX_TOKENS_DOCUMENTS', 4000),
+    ],
+
     'max_messages_per_conversation' => 10,
 ];

@@ -38,7 +38,7 @@ class AiChatController extends Controller
             abort(403);
         }
 
-        $conversation->load('messages');
+        $conversation->load(['messages.attachments:id,ai_message_id,file_name,kind,file_size']);
 
         return response()->json(['conversation' => $conversation]);
     }
@@ -61,7 +61,9 @@ class AiChatController extends Controller
         }
 
         $validated = $request->validate([
-            'content' => 'required|string|max:2000',
+            'content' => 'required_without:attachments|nullable|string|max:4000',
+            'attachments' => 'nullable|array|max:5',
+            'attachments.*' => 'file|max:20480|mimes:jpg,jpeg,png,webp,gif,pdf,docx,xls,xlsx,csv',
         ]);
 
         if ($conversation->hasReachedLimit()) {
@@ -70,18 +72,47 @@ class AiChatController extends Controller
             ], 422);
         }
 
-        // Save user message
-        $conversation->messages()->create([
+        // Read each attachment: images/PDFs become AI content parts (this turn only),
+        // documents/spreadsheets are extracted to text stored on the attachment so
+        // later turns can replay it.
+        $reader = new \App\Services\AiAttachmentReader();
+        $userText = trim((string) ($validated['content'] ?? ''));
+        $mediaParts = [];   // image/file parts sent only on this turn
+        $attachmentRecords = [];
+
+        foreach ($request->file('attachments', []) as $file) {
+            if (!$file || !$file->isValid()) {
+                continue;
+            }
+            $result = $reader->read($file, "ai-attachments/{$conversation->id}");
+            $record = $result['stored'];
+            $record['extracted_text'] = $result['text'] ?? null;
+            $attachmentRecords[] = $record;
+
+            if (isset($result['part'])) {
+                $mediaParts[] = $result['part'];
+            }
+        }
+
+        // The chat bubble shows only the user's prompt; extracted text lives on the
+        // attachment records, not in the visible message.
+        $storedContent = $userText !== '' ? $userText : '(attachment only)';
+
+        $userMessage = $conversation->messages()->create([
             'role' => 'user',
-            'content' => $validated['content'],
+            'content' => $storedContent,
         ]);
+        foreach ($attachmentRecords as $att) {
+            $userMessage->attachments()->create($att);
+        }
+
         $conversation->increment('user_message_count');
         $conversation->refresh();
 
         // Auto-title on first message
         if ($conversation->user_message_count === 1) {
             $conversation->update([
-                'title' => Str::limit($validated['content'], 80),
+                'title' => Str::limit($userText !== '' ? $userText : ($attachmentRecords[0]['file_name'] ?? 'Attachment'), 80),
             ]);
         }
 
@@ -89,17 +120,51 @@ class AiChatController extends Controller
         $user = $request->user();
         $systemPrompt = $this->buildSystemPrompt($user);
 
-        // Build message history
+        // Build message history, folding each message's extracted attachment text
+        // back into its content so the model retains document context across turns.
         $messageHistory = $conversation->messages()
+            ->with('attachments:id,ai_message_id,file_name,kind,extracted_text')
             ->orderBy('id')
-            ->get(['role', 'content'])
-            ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content])
+            ->get()
+            ->map(function ($m) {
+                $content = $m->content;
+                foreach ($m->attachments as $att) {
+                    if ($att->extracted_text) {
+                        $content .= "\n\n" . $att->extracted_text;
+                    } elseif ($att->kind !== 'text') {
+                        $content .= "\n[" . ($att->kind === 'image' ? 'Image' : 'File') . ": {$att->file_name}]";
+                    }
+                }
+                return ['role' => $m->role, 'content' => trim($content)];
+            })
             ->toArray();
 
-        return response()->stream(function () use ($systemPrompt, $messageHistory, $conversation) {
+        // For this turn, attach image/PDF parts to the final user message so the
+        // model can actually see them (binary isn't reconstructable from history).
+        if (!empty($mediaParts) && !empty($messageHistory)) {
+            $lastIndex = count($messageHistory) - 1;
+            $messageHistory[$lastIndex]['content'] = array_merge(
+                [['type' => 'text', 'text' => $messageHistory[$lastIndex]['content']]],
+                $mediaParts,
+            );
+        }
+
+        $hasPdf = collect($mediaParts)->contains(fn ($p) => ($p['type'] ?? '') === 'file');
+        $hasImage = collect($mediaParts)->contains(fn ($p) => ($p['type'] ?? '') === 'image_url');
+        $hasDocument = collect($attachmentRecords)->contains(fn ($a) => !empty($a['extracted_text']));
+
+        // Auto-route this turn to the appropriate model.
+        $route = \App\Services\AiModelRouter::route($hasImage || $hasPdf, $hasDocument, $userText);
+        $streamOptions = [
+            'has_pdf' => $hasPdf,
+            'model' => $route['model'],
+            'max_tokens' => $route['max_tokens'],
+        ];
+
+        return response()->stream(function () use ($systemPrompt, $messageHistory, $conversation, $streamOptions, $route) {
             $fullResponse = '';
 
-            foreach (AiChatService::streamChat($systemPrompt, $messageHistory) as $chunk) {
+            foreach (AiChatService::streamChat($systemPrompt, $messageHistory, $streamOptions) as $chunk) {
                 $fullResponse .= $chunk;
                 echo "data: " . json_encode(['chunk' => $chunk]) . "\n\n";
 
@@ -123,6 +188,8 @@ class AiChatController extends Controller
             // Send final event
             echo "data: " . json_encode([
                 'done' => true,
+                'model' => $route['model'],
+                'purpose' => $route['purpose'],
                 'follow_up_prompts' => $followUpPrompts,
             ]) . "\n\n";
 

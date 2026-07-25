@@ -110,7 +110,7 @@ export default function AiChatPanel({ onClose, conversationId, onConversationCha
     };
 
     // Send message with streaming
-    const handleSend = async (content) => {
+    const handleSend = async (content, files = []) => {
         if (isStreaming || !conversationId) return;
 
         // If no conversation yet, create one first
@@ -130,24 +130,38 @@ export default function AiChatPanel({ onClose, conversationId, onConversationCha
         setStreamingStarted(false);
         setFollowUpPrompts([]);
 
-        // Add user message optimistically
-        setMessages(prev => [...prev, { role: 'user', content }]);
+        // Add user message optimistically (with attachment chips)
+        const optimisticAttachments = files.map((f) => ({
+            file_name: f.name,
+            kind: f.type?.startsWith('image/') ? 'image' : 'file',
+        }));
+        setMessages(prev => [...prev, { role: 'user', content, attachments: optimisticAttachments }]);
 
         // Auto-title on first message
         if (messageCount === 0) {
-            setConversationTitle(content.length > 80 ? content.substring(0, 80) + '...' : content);
+            const t = content || files[0]?.name || 'Attachment';
+            setConversationTitle(t.length > 80 ? t.substring(0, 80) + '...' : t);
         }
 
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+            // multipart when files are attached; JSON otherwise.
+            const headers = { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'text/event-stream' };
+            let body;
+            if (files.length > 0) {
+                body = new FormData();
+                if (content) body.append('content', content);
+                files.forEach((f) => body.append('attachments[]', f));
+            } else {
+                headers['Content-Type'] = 'application/json';
+                body = JSON.stringify({ content });
+            }
+
             const response = await fetch(`/api/ai/conversations/${activeId}/messages`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'text/event-stream',
-                },
-                body: JSON.stringify({ content }),
+                headers,
+                body,
             });
 
             if (!response.ok) {
@@ -209,6 +223,8 @@ export default function AiChatPanel({ onClose, conversationId, onConversationCha
                                     ...last,
                                     content: cleanContent,
                                     isStreaming: false,
+                                    model: data.model,
+                                    purpose: data.purpose,
                                 };
                                 return updated;
                             });
