@@ -18,6 +18,7 @@ class AiContextBuilder
             self::buildActiveTasks($user),
             self::buildOverdueTasks($user),
             self::buildProjects($user),
+            self::buildAllProjects($user),
             self::buildTeamWorkload($user),
             self::buildOrgMetrics($user),
             self::buildRecentActivity($user),
@@ -133,6 +134,54 @@ class AiContextBuilder
                 ? round(($project->completed_tasks_count / $project->tasks_count) * 100) . '%'
                 : '—';
             $lines[] = "| {$project->name} | {$role} | {$project->status} | {$project->tasks_count} | {$project->completed_tasks_count} | {$rate} |";
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Org-wide project visibility for admins and executives: they can ask the AI
+     * about ANY project, not just ones they own or belong to.
+     */
+    private static function buildAllProjects(User $user): ?string
+    {
+        if (!$user->hasAnyRole(['admin', 'executive'])) {
+            return null;
+        }
+
+        $limit = 50;
+        $total = Project::count();
+
+        $projects = Project::with('owner:id,name')
+            ->withCount('tasks')
+            ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
+            ->withCount(['tasks as overdue_tasks_count' => fn ($q) => $q
+                ->whereNotIn('status', ['done', 'cancelled'])
+                ->whereNotNull('due_date')
+                ->where('due_date', '<', now())])
+            ->orderByDesc('updated_at')
+            ->take($limit)
+            ->get();
+
+        if ($projects->isEmpty()) {
+            return "## All Projects (Organization-wide)\nNo projects.";
+        }
+
+        $heading = $total > $limit
+            ? "## All Projects (Organization-wide — showing {$limit} most recent of {$total})"
+            : "## All Projects (Organization-wide, {$total})";
+
+        $lines = [$heading];
+        $lines[] = "You have organization-wide access to every project below, including those you do not own or belong to.";
+        $lines[] = "| Project | Owner | Status | Tasks | Completed | Overdue | Rate |";
+        $lines[] = "|---------|-------|--------|-------|-----------|---------|------|";
+
+        foreach ($projects as $project) {
+            $rate = $project->tasks_count > 0
+                ? round(($project->completed_tasks_count / $project->tasks_count) * 100) . '%'
+                : '—';
+            $owner = $project->owner?->name ?? '—';
+            $lines[] = "| {$project->name} | {$owner} | {$project->status} | {$project->tasks_count} | {$project->completed_tasks_count} | {$project->overdue_tasks_count} | {$rate} |";
         }
 
         return implode("\n", $lines);
