@@ -39,6 +39,19 @@ class Setting extends Model
         ];
     }
 
+    /**
+     * Absolute URL to the app logo for push/browser notifications, falling back to
+     * the favicon when no logo is configured. Absolute so FCM/webpush accepts it.
+     */
+    public function logoUrl(): string
+    {
+        if ($this->logo_path) {
+            return url(\Illuminate\Support\Facades\Storage::disk('public')->url($this->logo_path));
+        }
+
+        return url('favicon.ico');
+    }
+
     public static function current(): self
     {
         $attributes = Cache::rememberForever('app_settings', function () {

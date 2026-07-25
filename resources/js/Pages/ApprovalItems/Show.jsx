@@ -205,78 +205,55 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
                         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Approval History</h2>
                             {item.step_instances && item.step_instances.length > 0 ? (
-                                <div className="space-y-6">
-                                    {item.step_instances.map((instance, idx) => (
-                                        <div key={instance.id} className="border-l-4 border-gray-200 dark:border-gray-700 pl-4">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h3 className="font-semibold text-gray-900 dark:text-white">
-                                                    Step {instance.step_number}: {instance.step?.name}
-                                                </h3>
-                                                <span className={`text-xs px-2 py-1 rounded font-medium ${
-                                                    instance.status === 'active' ? 'bg-blue-100 text-blue-800' :
-                                                    instance.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                                    instance.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                                    'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                    {capitalizeStatus(instance.status)}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                                                Activated {new Date(instance.activated_at).toLocaleString()}
-                                                {instance.completed_at && ` • Completed ${new Date(instance.completed_at).toLocaleString()}`}
-                                            </p>
+                                <div className="space-y-4">
+                                    {item.step_instances.map((instance) => {
+                                        const isActive = instance.status === 'active';
+                                        return (
+                                            <div key={instance.id} className={`border-l-4 pl-4 ${
+                                                instance.status === 'approved' ? 'border-green-400' :
+                                                instance.status === 'rejected' ? 'border-red-400' :
+                                                isActive ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'
+                                            }`}>
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="font-medium text-gray-900 dark:text-white text-sm">
+                                                        Step {instance.step_number}: {instance.step?.name}
+                                                    </h3>
+                                                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                                                        instance.status === 'active' ? 'bg-blue-100 text-blue-800' :
+                                                        instance.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                        instance.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                        {capitalizeStatus(instance.status)}
+                                                    </span>
+                                                </div>
 
-                                            {/* Approvers */}
-                                            <div className="mb-4">
-                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Approvers:</p>
-                                                <div className="space-y-2">
+                                                {/* Compact approver → decision list. Comments kept (not redundant). */}
+                                                <div className="mt-2 space-y-1">
                                                     {instance.approvers?.map((approver) => {
                                                         const decision = instance.decisions?.find(d => d.decided_by === approver.user_id);
                                                         return (
-                                                            <div key={approver.id} className="flex items-center justify-between text-sm">
-                                                                <span className="text-gray-700 dark:text-gray-300">{approver.user?.name}</span>
-                                                                {decision ? (
+                                                            <div key={approver.id} className="text-sm">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-gray-700 dark:text-gray-300">{approver.user?.name}</span>
                                                                     <span className={`font-medium ${
-                                                                        decision.decision === 'approved' ? 'text-green-600' : 'text-red-600'
+                                                                        !decision ? 'text-yellow-600 dark:text-yellow-400' :
+                                                                        decision.decision === 'approved' ? 'text-green-600 dark:text-green-400' :
+                                                                        'text-red-600 dark:text-red-400'
                                                                     }`}>
-                                                                        {decision.decision}
+                                                                        {decision ? capitalizeStatus(decision.decision) : 'Pending'}
                                                                     </span>
-                                                                ) : (
-                                                                    <span className="text-yellow-600">Pending</span>
+                                                                </div>
+                                                                {decision?.comment && (
+                                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 italic">“{decision.comment}”</p>
                                                                 )}
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
                                             </div>
-
-                                            {/* Decisions */}
-                                            {instance.decisions && instance.decisions.length > 0 && (
-                                                <div className="space-y-2 text-sm">
-                                                    {instance.decisions.map((decision) => (
-                                                        <div key={decision.id} className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                                                            <div className="flex items-center justify-between mb-1">
-                                                                <span className="font-medium text-gray-900 dark:text-white">
-                                                                    {decision.decided_by_user?.name}
-                                                                </span>
-                                                                <span className={`text-xs font-medium ${
-                                                                    decision.decision === 'approved' ? 'text-green-600' : 'text-red-600'
-                                                                }`}>
-                                                                    {capitalizeStatus(decision.decision)}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                                                                {new Date(decision.decided_at).toLocaleString()}
-                                                            </p>
-                                                            {decision.comment && (
-                                                                <p className="text-gray-700 dark:text-gray-300 mt-2">{decision.comment}</p>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <p className="text-gray-600 dark:text-gray-400">No approval history yet</p>
@@ -286,8 +263,9 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
 
                     {/* Sidebar */}
                     <div className="space-y-6">
-                        {/* Current Step Info */}
-                        {currentStep && (
+                        {/* Current Step Info — only while a step is actually active.
+                            Once the chain is fully decided the history tells the story. */}
+                        {isActiveStep && (
                             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Current Step</h3>
                                 <div className="space-y-3">

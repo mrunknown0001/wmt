@@ -35,6 +35,9 @@ class FcmService
 
         $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
 
+        // App logo for the notification icon/badge (falls back to favicon).
+        $logoUrl = \App\Models\Setting::current()->logoUrl();
+
         foreach ($tokens as $token) {
             $payload = [
                 'message' => [
@@ -49,6 +52,8 @@ class FcmService
                         'project_id' => (string) ($data['project_id'] ?? ''),
                         'notification_id' => (string) ($data['notification_id'] ?? ''),
                         'click_action' => 'OPEN_ACTIVITY',
+                        // Carried through so the service worker can show the logo.
+                        'icon' => $logoUrl,
                     ],
                     'android' => [
                         'priority' => 'high',
@@ -67,7 +72,8 @@ class FcmService
                     ],
                     'webpush' => [
                         'notification' => [
-                            'icon' => '/favicon.ico',
+                            'icon' => $logoUrl,
+                            'badge' => $logoUrl,
                         ],
                         'fcm_options' => [
                             'link' => '/',

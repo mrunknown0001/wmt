@@ -14,12 +14,19 @@ self.addEventListener('push', (event) => {
     }
 
     const notification = payload.notification || {};
+    const data = payload.data || {};
+
+    // Prefer the app logo sent from the server (notification.icon or data.icon);
+    // fall back to the favicon.
+    const icon = notification.icon || data.icon || '/favicon.ico';
+    const badge = notification.badge || data.icon || '/favicon.ico';
 
     event.waitUntil(
         self.registration.showNotification(notification.title || 'WMT', {
             body: notification.body || 'New notification',
-            icon: '/favicon.ico',
-            data: payload.data || {},
+            icon,
+            badge,
+            data,
         })
     );
 });
