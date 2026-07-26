@@ -46,4 +46,13 @@ return [
         'secret_key' => env('TURNSTILE_SECRET_KEY'),
     ],
 
+    /*
+     * Inbound webhook: external platforms POST here to raise a notification for a
+     * user. Callers authenticate with the x-api-key header. Leave the key unset to
+     * disable the endpoint entirely.
+     */
+    'webhook' => [
+        'api_key' => env('WEBHOOK_API_KEY'),
+    ],
+
 ];

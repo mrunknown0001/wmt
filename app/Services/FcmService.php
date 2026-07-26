@@ -54,6 +54,8 @@ class FcmService
                         'click_action' => 'OPEN_ACTIVITY',
                         // Carried through so the service worker can show the logo.
                         'icon' => $logoUrl,
+                        // Optional deep link used by the SW's notificationclick.
+                        'url' => (string) ($data['url'] ?? ''),
                     ],
                     'android' => [
                         'priority' => 'high',
@@ -76,7 +78,9 @@ class FcmService
                             'badge' => $logoUrl,
                         ],
                         'fcm_options' => [
-                            'link' => '/',
+                            // Honour an explicit deep link (e.g. from the inbound
+                            // webhook); otherwise land on the app root.
+                            'link' => $data['url'] ?? '/',
                         ],
                     ],
                 ],

@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PersonalTodoController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\WebhookNotificationController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\StandaloneTaskController;
 use App\Http\Controllers\Api\TaskCommentController;
@@ -37,6 +38,11 @@ Route::post('/login', [AuthController::class, 'login']);
 // Public approval form definition (submission posts to /forms-approval/{uuid}
 // with Accept: application/json, which returns JSON).
 Route::get('/forms-approval/{uuid}', [ApprovalFormController::class, 'publicShow']);
+
+// Inbound webhook — authenticated by x-api-key header, not a user session.
+// Throttled to blunt brute-forcing of the key and notification spam.
+Route::post('/webhooks/notify', [WebhookNotificationController::class, 'notify'])
+    ->middleware(['webhook.key', 'throttle:60,1']);
 
 // Authenticated (Sanctum)
 Route::middleware('auth:sanctum')->group(function () {

@@ -47,6 +47,8 @@ function notificationMessage(data) {
             return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in {data.approval_project_name}</> : null}{data.requester ? <> — submitted by {data.requester}</> : null}</>;
         case 'approval_automation':
             return <>{data.message || <>Update on <strong>{data.item_title}</strong></>}</>;
+        case 'external_webhook':
+            return <>{data.message || <>You have an item to review in <strong>{data.platform}</strong></>}</>;
         default:
             return 'New notification';
     }
@@ -224,17 +226,25 @@ export default function Index({ notifications, filter = 'inbox' }) {
             ? '/my-approvals'
             : data.type === 'approval_automation'
                 ? `/approval-projects/${data.approval_project_id}/items/${data.approval_item_id}`
-                : (data.project_id
-                    ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
-                    : `/tasks/${data.task_id}/edit`);
+                : data.url
+                    ? data.url
+                    : (data.project_id
+                        ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
+                        : `/tasks/${data.task_id}/edit`);
+
+        // Webhook notifications may point at another system — Inertia's router only
+        // handles in-app routes, so absolute URLs go through the browser instead.
+        const go = /^https?:\/\//i.test(target)
+            ? () => window.open(target, '_blank', 'noopener,noreferrer')
+            : () => router.visit(target);
 
         if (!notification.read_at) {
             router.patch(`/inbox/${notification.id}/read`, {}, {
                 preserveScroll: true,
-                onSuccess: () => router.visit(target),
+                onSuccess: go,
             });
         } else {
-            router.visit(target);
+            go();
         }
     }
 

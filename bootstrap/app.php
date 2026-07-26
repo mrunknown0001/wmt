@@ -21,6 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Session\Middleware\AuthenticateSession::class,
         ]);
+        $middleware->alias([
+            'webhook.key' => \App\Http\Middleware\VerifyWebhookApiKey::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

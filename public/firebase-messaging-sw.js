@@ -38,7 +38,11 @@ self.addEventListener('notificationclick', (event) => {
     const data = event.notification.data || {};
     let url = '/';
 
-    if (data.project_id && data.task_id) {
+    // An explicit deep link (e.g. from the inbound webhook) wins over the
+    // task/project convention below.
+    if (data.url) {
+        url = data.url;
+    } else if (data.project_id && data.task_id) {
         url = `/projects/${data.project_id}/tasks/${data.task_id}/edit`;
     } else if (data.project_id) {
         url = `/projects/${data.project_id}`;

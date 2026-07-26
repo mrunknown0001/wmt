@@ -29,6 +29,8 @@ function notificationMessage(data) {
             return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in <strong>{data.approval_project_name}</strong></> : null}</>;
         case 'approval_automation':
             return <>{data.message || <>Update on <strong>{data.item_title}</strong></>}</>;
+        case 'external_webhook':
+            return <>{data.message || <>You have an item to review in <strong>{data.platform}</strong></>}</>;
         default:
             return 'New notification';
     }
@@ -148,9 +150,14 @@ export default function NotificationBell({ onToast }) {
             ? '/my-approvals'
             : data.type === 'approval_automation'
                 ? `/approval-projects/${data.approval_project_id}/items/${data.approval_item_id}`
-                : (data.project_id
-                    ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
-                    : `/tasks/${data.task_id}/edit`);
+                : data.url
+                    ? data.url
+                    : (data.project_id
+                        ? `/projects/${data.project_id}/tasks/${data.task_id}/edit`
+                        : `/tasks/${data.task_id}/edit`);
+        // Webhook notifications can point at another system; Inertia's router only
+        // handles in-app routes, so send absolute URLs through the browser.
+        const isExternal = /^https?:\/\//i.test(target);
 
         if (!notification.read_at) {
             // Mark as read optimistically
@@ -162,7 +169,11 @@ export default function NotificationBell({ onToast }) {
         }
 
         setIsOpen(false);
-        router.visit(target);
+        if (isExternal) {
+            window.open(target, '_blank', 'noopener,noreferrer');
+        } else {
+            router.visit(target);
+        }
     };
 
     return (
