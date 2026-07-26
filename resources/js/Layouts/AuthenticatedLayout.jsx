@@ -261,8 +261,9 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     </div>
                 )}
 
-                {/* Approvals area — only for users granted the "Can Approve Requests" capability */}
-                {auth.user?.can_approve && hasPermission('view-approval-projects') && (
+                {/* Approvals area — approvers (Can Approve Requests) plus admins/
+                    executives, who are never locked out. */}
+                {((auth.user?.can_approve && hasPermission('view-approval-projects')) || hasRole('admin') || hasRole('executive')) && (
                     <div className="space-y-0.5">
                         <NavLink href="/approval-projects" icon={<ApprovalCheckIcon />} active={isActive('/approval-projects')} collapsed={collapsed}>
                             Approvals

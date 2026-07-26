@@ -17,8 +17,8 @@ class MyApprovalsController extends Controller
     {
         $user = Auth::user();
 
-        // Only users with the approver capability can access their approvals queue.
-        abort_unless($user->can_approve, 403);
+        // Approvers, plus admins/executives (never locked out), can view this queue.
+        abort_unless($user->canAccessApprovals(), 403);
 
         // Find all approval step instances where the current user is an eligible approver
         $activeApprovals = ApprovalStepInstanceApprover::where('user_id', $user->id)

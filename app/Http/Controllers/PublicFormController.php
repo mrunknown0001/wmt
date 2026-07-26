@@ -141,6 +141,7 @@ class PublicFormController extends Controller
             if ($field->type === 'email') {
                 $fieldRules[] = 'string';
                 $fieldRules[] = 'email';
+                $fieldRules[] = 'max:255';
                 if (($field->config['email_mode'] ?? 'plain') === 'registered_user') {
                     $fieldRules[] = 'exists:users,email';
                     $fieldRules[] = function ($attribute, $value, $fail) {
@@ -151,11 +152,13 @@ class PublicFormController extends Controller
                     };
                 }
             } else {
+                // Cap text length so a submission can't bloat the DB or DoS the form.
                 match ($field->type) {
-                    'text', 'textarea' => $fieldRules[] = 'string',
+                    'text' => array_push($fieldRules, 'string', 'max:255'),
+                    'textarea' => array_push($fieldRules, 'string', 'max:10000'),
                     'number' => $fieldRules[] = 'numeric',
                     'date' => $fieldRules[] = 'date',
-                    'select' => $fieldRules[] = 'string',
+                    'select' => array_push($fieldRules, 'string', 'max:255'),
                     'multi_select' => $fieldRules[] = 'array',
                     default => null,
                 };

@@ -200,12 +200,28 @@ export default function Index({ items, stats, projects = [], availableProjects =
                                                         : '—'}
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <Link
-                                                        href={route('approval-projects.items.show', [item.approval_project_id, item.id]) + backParam}
-                                                        className="inline-flex items-center gap-1 px-3 py-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-medium rounded transition"
-                                                    >
-                                                        View
-                                                    </Link>
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {/* Every request here is the viewer's own, so the
+                                                            status alone decides if it can be resubmitted. */}
+                                                        {item.status === 'changes_requested' && (
+                                                            <button
+                                                                onClick={() => router.post(
+                                                                    route('approval-projects.items.resubmit', [item.approval_project_id, item.id]),
+                                                                    {},
+                                                                    { preserveScroll: true },
+                                                                )}
+                                                                className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition"
+                                                            >
+                                                                Resubmit
+                                                            </button>
+                                                        )}
+                                                        <Link
+                                                            href={route('approval-projects.items.show', [item.approval_project_id, item.id]) + backParam}
+                                                            className="inline-flex items-center gap-1 px-3 py-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm font-medium rounded transition"
+                                                        >
+                                                            View
+                                                        </Link>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );

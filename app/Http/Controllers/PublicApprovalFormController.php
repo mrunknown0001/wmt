@@ -297,6 +297,15 @@ class PublicApprovalFormController extends Controller
         // Start the approval workflow
         ApprovalWorkflowEngine::submit($item);
 
+        // API/mobile clients get JSON; the web form follows the success redirect.
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'item' => ['id' => $item->id, 'title' => $item->title, 'status' => $item->status],
+                'message' => $form->success_message ?? 'Your submission has been received and is now in review.',
+            ], 201);
+        }
+
         return redirect()->route('forms-approval.success', $form->uuid);
     }
 

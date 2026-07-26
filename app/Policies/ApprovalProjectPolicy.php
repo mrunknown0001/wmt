@@ -9,19 +9,25 @@ class ApprovalProjectPolicy
 {
     public function viewAny(User $user): bool
     {
-        // The Approvals area is only available to users granted the approver capability.
-        return $user->can_approve && $user->hasPermissionTo('view-approval-projects');
+        // Admins/executives always have access. Ordinary users need the approver
+        // capability plus the view permission. (can() instead of hasPermissionTo()
+        // so a missing permission returns false rather than throwing.)
+        if ($user->hasRole('admin') || $user->hasRole('executive')) {
+            return true;
+        }
+        return $user->can_approve && $user->can('view-approval-projects');
     }
 
     public function view(User $user, ApprovalProject $project): bool
     {
+        // Admins/executives always have access.
+        if ($user->hasRole('admin') || $user->hasRole('executive')) {
+            return true;
+        }
         if (!$user->can_approve) {
             return false;
         }
-        if ($user->hasPermissionTo('manage-approval-projects')) {
-            return true;
-        }
-        if ($user->hasRole('executive')) {
+        if ($user->can('manage-approval-projects')) {
             return true;
         }
         if ($project->owner_id === $user->id) {

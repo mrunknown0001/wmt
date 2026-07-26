@@ -27,6 +27,23 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
     const handleTurnstileVerify = useCallback((token) => setTurnstileToken(token), []);
     const handleTurnstileExpire = useCallback(() => setTurnstileToken(''), []);
 
+    // Reject oversized files at selection so the user isn't left waiting for a
+    // failed upload. Caps mirror the server: 100MB video, 50MB otherwise.
+    const checkFileSize = (e, field) => {
+        const maxMb = field.type === 'capture_video' ? 100 : 50;
+        const tooBig = Array.from(e.target.files).filter((f) => f.size > maxMb * 1024 * 1024);
+        if (tooBig.length) {
+            setErrors((prev) => ({ ...prev, [`field_${field.id}`]: [`Each file must be ${maxMb}MB or smaller.`] }));
+            e.target.value = '';
+        } else {
+            setErrors((prev) => {
+                const next = { ...prev };
+                delete next[`field_${field.id}`];
+                return next;
+            });
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -199,6 +216,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 placeholder={field.help_text || ''}
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
+                                                maxLength={255}
                                             />
                                             {renderFieldError(field.id)}
                                         </div>
@@ -216,6 +234,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 rows="4"
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
+                                                maxLength={10000}
                                             />
                                             {renderFieldError(field.id)}
                                         </div>
@@ -233,6 +252,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 placeholder={field.help_text || ''}
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
+                                                maxLength={255}
                                             />
                                             {renderFieldError(field.id)}
                                         </div>
@@ -333,6 +353,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept=".pdf,.doc,.docx,.xls,.xlsx,.zip"
+                                                onChange={(e) => checkFileSize(e, field)}
                                                 multiple
                                             />
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -354,6 +375,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept="image/jpeg,image/jpg,image/png"
+                                                onChange={(e) => checkFileSize(e, field)}
                                                 capture="environment"
                                             />
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -375,6 +397,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept="video/mp4,video/quicktime,video/webm"
+                                                onChange={(e) => checkFileSize(e, field)}
                                                 capture="environment"
                                             />
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">

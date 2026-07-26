@@ -156,9 +156,16 @@ class ApprovalItemController extends Controller
     {
         $this->authorizeRequestCreation($approvalProject);
 
+        // Validate the chosen section belongs to this project (ignore otherwise).
+        $sectionId = $request->input('approval_section_id');
+        if ($sectionId && !$approvalProject->sections()->whereKey($sectionId)->exists()) {
+            $sectionId = null;
+        }
+
         $item = $approvalProject->approvalItems()->create([
             'title' => $request->title,
             'description' => $request->description,
+            'approval_section_id' => $sectionId,
             'requested_by' => auth()->id(),
             'status' => 'pending',
             'position' => $approvalProject->approvalItems()->max('position') + 1,
@@ -241,10 +248,12 @@ class ApprovalItemController extends Controller
             // Field definitions come from the project so every custom field is shown
             // on the request, including ones added after it was submitted (which
             // have no stored value yet).
-            'project' => $approvalProject->load('customFields.options'),
+            'project' => $approvalProject->load('customFields.options', 'sections'),
             'item' => $item,
             'canDecide' => auth()->user()->can('decide', $item),
             'canEdit' => auth()->user()->can('update', $item),
+            // Requester-only, and only while the request is awaiting their changes.
+            'canResubmit' => auth()->user()->can('resubmit', $item),
         ]);
     }
 
@@ -284,6 +293,22 @@ class ApprovalItemController extends Controller
 
         return redirect()->route('approval-projects.items.show', [$approvalProject, $item])
             ->with('success', 'Approval request updated successfully.');
+    }
+
+    /** Move a request into a section (or ungroup it with a null value). */
+    public function setSection(Request $request, ApprovalProject $approvalProject, ApprovalItem $item)
+    {
+        $this->authorize('update', $item);
+        abort_if($item->approval_project_id !== $approvalProject->id, 404);
+
+        $sectionId = $request->input('approval_section_id') ?: null;
+        if ($sectionId && !$approvalProject->sections()->whereKey($sectionId)->exists()) {
+            abort(422, 'Invalid section.');
+        }
+
+        $item->update(['approval_section_id' => $sectionId]);
+
+        return back()->with('success', 'Request section updated.');
     }
 
     /** Toggle a request between archived and active. */

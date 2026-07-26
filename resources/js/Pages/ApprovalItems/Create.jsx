@@ -6,6 +6,7 @@ export default function Create({ project }) {
     const { data, setData, post, processing, errors } = useForm({
         title: '',
         description: '',
+        approval_section_id: '',
         customFieldValues: {},
         attachments: [],
     });
@@ -62,6 +63,24 @@ export default function Create({ project }) {
                             />
                             {errors.description && <p className="text-red-600 text-sm mt-1">{errors.description}</p>}
                         </div>
+
+                        {project.sections?.length > 0 && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Section
+                                </label>
+                                <select
+                                    value={data.approval_section_id}
+                                    onChange={(e) => setData('approval_section_id', e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                >
+                                    <option value="">— No section —</option>
+                                    {project.sections.map((s) => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

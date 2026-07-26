@@ -144,6 +144,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('approval-projects', ApprovalProjectController::class);
     Route::patch('/approval-projects/{approvalProject}/archive', [ApprovalProjectController::class, 'archive'])->name('approval-projects.archive');
     Route::patch('/approval-projects/{approvalProject}/items/{item}/archive', [ApprovalItemController::class, 'archive'])->name('approval-projects.items.archive');
+    Route::patch('/approval-projects/{approvalProject}/items/{item}/section', [ApprovalItemController::class, 'setSection'])->name('approval-projects.items.section');
     Route::get('/approval-projects/{approvalProject}/custom-fields', [ApprovalCustomFieldController::class, 'index'])->name('approval-projects.custom-fields.index');
     Route::post('/approval-projects/{approvalProject}/custom-fields', [ApprovalCustomFieldController::class, 'store'])->name('approval-projects.custom-fields.store');
     Route::put('/approval-projects/{approvalProject}/custom-fields/{customField}', [ApprovalCustomFieldController::class, 'update'])->name('approval-projects.custom-fields.update');
@@ -220,6 +221,7 @@ Route::middleware('auth')->group(function () {
     // Executive Dashboard (admin + executive)
     Route::get('/executive-dashboard', [ExecutiveDashboardController::class, 'index'])->name('executive-dashboard');
     Route::get('/executive-dashboard/tasks', [ExecutiveDashboardController::class, 'tasks'])->name('executive-dashboard.tasks');
+    Route::get('/executive-dashboard/projects', [ExecutiveDashboardController::class, 'projects'])->name('executive-dashboard.projects');
     Route::get('/executive-dashboard/divisions/{division}', [ExecutiveDashboardController::class, 'division'])->name('executive-dashboard.division');
     Route::get('/executive-dashboard/departments/{department}', [ExecutiveDashboardController::class, 'department'])->name('executive-dashboard.department');
     Route::get('/executive-dashboard/teams/{team}', [ExecutiveDashboardController::class, 'team'])->name('executive-dashboard.team');

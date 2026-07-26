@@ -90,6 +90,16 @@ class User extends Authenticatable
         return $this->belongsToMany(LinkGroup::class, 'link_group_user');
     }
 
+    /**
+     * Whether the user may reach the Approvals area. Admins and executives always
+     * can (so they're never locked out), independent of the can_approve flag which
+     * governs ordinary approvers.
+     */
+    public function canAccessApprovals(): bool
+    {
+        return $this->can_approve || $this->hasRole('admin') || $this->hasRole('executive');
+    }
+
     /** True if this user heads a division/department or leads a team. */
     public function headsAnyOrgUnit(): bool
     {

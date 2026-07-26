@@ -162,7 +162,7 @@ class SearchController extends Controller
      */
     private function approvalProjects(User $user, string $like)
     {
-        if (!$user->can_approve) {
+        if (!$user->canAccessApprovals()) {
             return collect();
         }
 

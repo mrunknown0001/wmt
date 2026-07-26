@@ -29,10 +29,21 @@ const formatDecisionDate = (value) => {
     });
 };
 
-export default function Show({ item, project, canDecide, canEdit, auth }) {
+export default function Show({ item, project, canDecide, canEdit, canResubmit, auth }) {
     const [isDeciding, setIsDeciding] = useState(false);
     const [decisionComment, setDecisionComment] = useState('');
     const [decidingAction, setDecidingAction] = useState(null);
+    const [isResubmitting, setIsResubmitting] = useState(false);
+
+    const handleResubmit = () => {
+        if (isResubmitting) return;
+        setIsResubmitting(true);
+        router.post(
+            route('approval-projects.items.resubmit', [project.id, item.id]),
+            {},
+            { preserveScroll: true, onFinish: () => setIsResubmitting(false) },
+        );
+    };
 
     // Custom fields: definitions from the project, values keyed by field id.
     // (Eloquent serialises these relations in snake_case.)
@@ -270,6 +281,60 @@ export default function Show({ item, project, canDecide, canEdit, auth }) {
 
                     {/* Sidebar */}
                     <div className="space-y-6">
+                        {/* Changes requested — the requester's way back into the workflow.
+                            Resubmitting restarts the chain from step 1. */}
+                        {canResubmit && (
+                            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Changes Requested</h3>
+                                <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                                    An approver sent this request back to you. Update it as needed, then
+                                    resubmit — the approval chain will start again from the first step.
+                                </p>
+                                <div className="flex flex-col gap-2">
+                                    <Link
+                                        href={route('approval-projects.items.edit', [project.id, item.id])}
+                                        className="w-full text-center px-4 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition"
+                                    >
+                                        Edit Request
+                                    </Link>
+                                    <button
+                                        onClick={handleResubmit}
+                                        disabled={isResubmitting}
+                                        className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+                                    >
+                                        {isResubmitting ? 'Resubmitting...' : 'Resubmit for Approval'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Section — assign or move the request between project sections. */}
+                        {project.sections?.length > 0 && (
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Section</h3>
+                                {canEdit ? (
+                                    <select
+                                        value={item.approval_section_id || ''}
+                                        onChange={(e) => router.patch(
+                                            route('approval-projects.items.section', [project.id, item.id]),
+                                            { approval_section_id: e.target.value || null },
+                                            { preserveScroll: true },
+                                        )}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    >
+                                        <option value="">— No section —</option>
+                                        {project.sections.map((s) => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <p className="text-gray-700 dark:text-gray-300">
+                                        {project.sections.find((s) => s.id === item.approval_section_id)?.name || 'No section'}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         {/* Current Step Info — only while a step is actually active.
                             Once the chain is fully decided the history tells the story. */}
                         {isActiveStep && (

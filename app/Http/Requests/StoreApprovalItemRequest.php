@@ -16,6 +16,7 @@ class StoreApprovalItemRequest extends FormRequest
         return [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string|max:10000',
+            'approval_section_id' => 'nullable|integer',
             'customFieldValues' => 'nullable|array',
             'customFieldValues.*' => 'nullable',
             'attachments' => 'nullable|array|max:5',

@@ -283,6 +283,52 @@ class ExecutiveDashboardController extends Controller
         ]);
     }
 
+    /**
+     * Scope-aware project list backing the "Active Projects" card. Matches the
+     * metric: projects that the scope's users have tasks in, so the drill-through
+     * count lines up with the card.
+     */
+    public function projects(Request $request): Response
+    {
+        $scope = $request->input('scope', 'org');
+        $scopeId = $request->input('scope_id');
+        $this->authorizeTaskScope($request->user(), $scope, $scopeId);
+
+        [$userIds, $scopeLabel] = $this->resolveTaskScope($scope, $scopeId);
+        $status = $request->input('status', 'active'); // card defaults to active
+
+        $projectIds = Task::whereIn('assigned_to', $userIds)->distinct()->pluck('project_id')->filter();
+
+        $query = Project::with('owner:id,name')
+            ->whereIn('id', $projectIds)
+            ->withCount('tasks')
+            ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
+            ->withCount(['tasks as overdue_tasks_count' => fn ($q) => $q
+                ->whereNotIn('status', ['done', 'cancelled'])
+                ->whereNotNull('due_date')
+                ->where('due_date', '<', now())]);
+
+        if (in_array($status, ['active', 'on_hold', 'completed', 'archived'], true)) {
+            $query->where('status', $status);
+        }
+        if ($search = trim((string) $request->input('search', ''))) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        $projects = $query->orderByDesc('updated_at')->paginate(25)->withQueryString();
+
+        return Inertia::render('ExecutiveDashboard/Projects', [
+            'projects' => $projects,
+            'scopeLabel' => $scopeLabel,
+            'filters' => [
+                'scope' => $scope,
+                'scope_id' => $scopeId,
+                'status' => $status,
+                'search' => $request->input('search', ''),
+            ],
+        ]);
+    }
+
     /** Gate the task list by the requested scope, honouring the org hierarchy. */
     private function authorizeTaskScope(User $user, string $scope, $scopeId): void
     {

@@ -111,8 +111,21 @@ export default function PublicForm() {
     }, []);
 
     const handleFileChange = (fieldId, files) => {
-        const fileArray = Array.from(files).slice(0, MAX_FILES);
+        const all = Array.from(files);
+        const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
+        const withinSize = all.filter(f => f.size <= maxBytes);
+        const tooBig = all.length - withinSize.length;
+        const fileArray = withinSize.slice(0, MAX_FILES);
+
         setAttachments(prev => ({ ...prev, [fieldId]: fileArray }));
+
+        // Flag oversized files at selection instead of failing on the server.
+        setErrors(prev => ({
+            ...prev,
+            [`fields.${fieldId}`]: tooBig > 0
+                ? `${tooBig} file(s) over ${MAX_FILE_SIZE_MB}MB were skipped.`
+                : undefined,
+        }));
     };
 
     const removeFile = (fieldId, index) => {

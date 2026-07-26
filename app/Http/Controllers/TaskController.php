@@ -21,6 +21,7 @@ use App\Services\TaskActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -653,27 +654,40 @@ class TaskController extends Controller
                 if (!in_array($status, ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'])) {
                     return response()->json(['success' => false, 'message' => 'Invalid status.'], 422);
                 }
-                foreach ($tasks as $task) {
-                    $oldStatus = $task->status;
-                    if ($oldStatus === $status) continue;
-                    $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
-                    $oldValues['start_date'] = $task->start_date?->toDateString();
-                    $oldValues['due_date'] = $task->due_date?->toDateString();
-                    $task->update(['status' => $status]);
-                    TaskActivityLogger::logChanges($task, $oldValues, $user);
-                    ActivityLogger::logChanges($task, $oldValues, $user);
-                    if (in_array($status, ['done', 'cancelled']) && $task->escalation_level > 0) {
-                        $task->update(['escalation_level' => 0]);
-                    }
-                    AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
-                    if ($status === 'done') {
-                        AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
-                    }
-                    $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $user);
-                    if ($newTask) {
-                        $newTask->load('assignee', 'collaborators');
-                        $newTasks[] = $newTask;
-                    }
+                // All-or-nothing: a project rule can reject a close (e.g. requires a
+                // comment attachment). Without a transaction the tasks processed before
+                // the rejection would be saved, leaving the batch half-applied.
+                try {
+                    DB::transaction(function () use ($tasks, $status, $user, &$newTasks) {
+                        foreach ($tasks as $task) {
+                            $oldStatus = $task->status;
+                            if ($oldStatus === $status) continue;
+                            $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);
+                            $oldValues['start_date'] = $task->start_date?->toDateString();
+                            $oldValues['due_date'] = $task->due_date?->toDateString();
+                            $task->update(['status' => $status]);
+                            TaskActivityLogger::logChanges($task, $oldValues, $user);
+                            ActivityLogger::logChanges($task, $oldValues, $user);
+                            if (in_array($status, ['done', 'cancelled']) && $task->escalation_level > 0) {
+                                $task->update(['escalation_level' => 0]);
+                            }
+                            AutomationRuleEngine::evaluate($task, 'task_status_changed', $oldValues);
+                            if ($status === 'done') {
+                                AutomationRuleEngine::evaluate($task, 'task_completed', $oldValues);
+                            }
+                            $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $user);
+                            if ($newTask) {
+                                $newTask->load('assignee', 'collaborators');
+                                $newTasks[] = $newTask;
+                            }
+                        }
+                    });
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => ($e->validator->errors()->first() ?: 'Some tasks could not be updated.')
+                            . ' No changes were made.',
+                    ], 422);
                 }
                 break;
 

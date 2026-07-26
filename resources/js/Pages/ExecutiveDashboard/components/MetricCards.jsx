@@ -7,7 +7,7 @@ import Card from '../../../Components/Card';
  * drill-through matches the exact number on the card. Active Projects goes to the
  * projects list (which isn't org-scopeable).
  */
-const buildTasksHref = (scope, scopeId, extra = {}) => {
+const buildHref = (path, scope, scopeId, extra = {}) => {
     const params = new URLSearchParams();
     if (scope && scope !== 'org') {
         params.set('scope', scope);
@@ -15,12 +15,13 @@ const buildTasksHref = (scope, scopeId, extra = {}) => {
     }
     Object.entries(extra).forEach(([k, v]) => v && params.set(k, v));
     const qs = params.toString();
-    return '/executive-dashboard/tasks' + (qs ? `?${qs}` : '');
+    return path + (qs ? `?${qs}` : '');
 };
+const buildTasksHref = (scope, scopeId, extra = {}) => buildHref('/executive-dashboard/tasks', scope, scopeId, extra);
 
 export default function MetricCards({ data, scope = 'org', scopeId = null }) {
     const metrics = [
-        { key: 'activeProjects', label: 'Active Projects', href: '/projects?status=active', title: 'View active projects', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
+        { key: 'activeProjects', label: 'Active Projects', href: buildHref('/executive-dashboard/projects', scope, scopeId), title: 'View active projects in this scope', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
         { key: 'totalTasks', label: 'Total Tasks', href: buildTasksHref(scope, scopeId), title: 'View all tasks in this scope', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
         { key: 'completionRate', label: 'Completion Rate', href: buildTasksHref(scope, scopeId, { status: 'done' }), title: 'View completed tasks', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', suffix: '%' },
         { key: 'overdueTasks', label: 'Overdue Tasks', href: buildTasksHref(scope, scopeId, { due: 'overdue' }), title: 'View overdue tasks', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30', icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
