@@ -64,9 +64,9 @@ class ApprovalItemCustomFieldValue extends Model
         return match ($type) {
             'text', 'textarea' => $this->value_text,
             'number' => $this->value_number,
-            'date' => $this->value_date,
+            'date', 'week_of_year' => $this->value_date,
             'single_select' => $this->value_option_id,
-            'multi_select' => $this->value_json,
+            'multi_select', 'people' => $this->value_json,
             default => null,
         };
     }
@@ -87,10 +87,29 @@ class ApprovalItemCustomFieldValue extends Model
                 ? null
                 : rtrim(rtrim((string) $this->value_number, '0'), '.'),
             'date' => $this->value_date?->format('M j, Y'),
+            // ISO week of the stored reference date, e.g. "Week 31, 2026".
+            'week_of_year' => $this->value_date
+                ? 'Week ' . $this->value_date->isoWeek() . ', ' . $this->value_date->isoWeekYear()
+                : null,
             'single_select' => $this->optionLabels([$this->value_option_id]),
             'multi_select' => $this->optionLabels($this->value_json ?? []),
+            'people' => $this->peopleNames($this->value_json ?? []),
             default => null,
         };
+    }
+
+    /** Resolve stored user ids to names for display. */
+    private function peopleNames(array $ids): ?string
+    {
+        $ids = array_values(array_filter($ids, fn ($id) => $id !== null && $id !== ''));
+
+        if (empty($ids)) {
+            return null;
+        }
+
+        $names = User::whereIn('id', $ids)->orderBy('name')->pluck('name')->all();
+
+        return $names ? implode(', ', $names) : null;
     }
 
     /** Map option IDs to labels, falling back to the raw values if they aren't IDs. */
@@ -126,9 +145,15 @@ class ApprovalItemCustomFieldValue extends Model
             'text' => $this->value_text = substr((string) $rawValue, 0, ApprovalCustomField::TEXT_MAX_LENGTH),
             'textarea' => $this->value_text = substr((string) $rawValue, 0, ApprovalCustomField::TEXTAREA_MAX_LENGTH),
             'number' => $this->value_number = max(ApprovalCustomField::NUMBER_MIN, min(ApprovalCustomField::NUMBER_MAX, (float) $rawValue)),
-            'date' => $this->value_date = $rawValue,
+            // Week of year stores the reference date; the week is derived on read.
+            'date', 'week_of_year' => $this->value_date = $rawValue,
             'single_select' => $this->value_option_id = (int) $rawValue,
             'multi_select' => $this->value_json = is_array($rawValue) ? $rawValue : [$rawValue],
+            // People: a list of user ids, normalised to ints so lookups are exact.
+            'people' => $this->value_json = collect(is_array($rawValue) ? $rawValue : [$rawValue])
+                ->filter(fn ($id) => $id !== null && $id !== '')
+                ->map(fn ($id) => (int) $id)
+                ->unique()->values()->all(),
             default => null,
         };
 

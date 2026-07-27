@@ -13,15 +13,16 @@ export default function ProjectRules({ requireAttachment, onChange }) {
             </p>
 
             <Checkbox
-                label="Require a comment attachment before closing a task"
+                label="Require an attachment before closing a task"
                 id="require_comment_attachment_on_close"
                 checked={!!requireAttachment}
                 onChange={(e) => onChange(e.target.checked)}
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-6">
                 A task can't be marked <span className="font-medium">Done</span> or{' '}
-                <span className="font-medium">Cancelled</span> until at least one of its comments
-                has a file attached — useful when completion needs proof of work.
+                <span className="font-medium">Cancelled</span> until it has a file attached —
+                either on the task itself (including files submitted through a form) or on one
+                of its comments. Useful when completion needs proof of work.
             </p>
         </div>
     );

@@ -3047,7 +3047,9 @@ export default function Show() {
 
             {/* Automation Rules Panel */}
             {showAutomation && canManageTasks && (
-                <div className="shrink-0 max-h-64 overflow-y-auto">
+                // No outer scroll cap: the builder scrolls its own rule list beneath
+                // a fixed header, so a second scroll container here would nest.
+                <div className="shrink-0">
                     <Card className="mb-4">
                         <AutomationRuleBuilder
                             projectId={project.id}

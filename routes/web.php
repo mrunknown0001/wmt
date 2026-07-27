@@ -32,6 +32,7 @@ use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\TaskCustomFieldValueController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkGroupController;
+use App\Http\Controllers\PeopleOptionsController;
 use App\Http\Controllers\TrashController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ApprovalProjectController;
@@ -75,6 +76,8 @@ Route::middleware('auth')->group(function () {
 
     // Global search
     Route::get('/api/search', SearchController::class)->name('search');
+    // Options for the People custom-field picker (users + org units).
+    Route::get('/api/people-options', PeopleOptionsController::class)->name('people-options');
 
     // Device tokens (FCM web push)
     Route::post('/api/device-tokens', [\App\Http\Controllers\Api\DeviceTokenController::class, 'store'])->name('device-tokens.store');

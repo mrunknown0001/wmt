@@ -112,7 +112,12 @@ class PublicFormController extends Controller
             $attributes[$key] = $field->label;
 
             if (in_array($field->type, ['attachment', 'capture_photo', 'capture_video'])) {
-                $maxFiles = $field->type === 'capture_video' ? 1 : 5;
+                // Per-field limit from the form editor, clamped to 1..5 — config is
+                // author-supplied, so it can't be trusted to stay in range. Video
+                // stays single-file.
+                $maxFiles = $field->type === 'capture_video'
+                    ? 1
+                    : max(1, min(5, (int) ($field->config['max_files'] ?? 5)));
                 $mimes = match ($field->type) {
                     'capture_photo' => 'jpg,jpeg,png,webp',
                     'capture_video' => 'mp4,webm,mov',

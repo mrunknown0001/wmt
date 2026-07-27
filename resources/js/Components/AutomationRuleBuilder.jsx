@@ -619,8 +619,8 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
 
     return (
         <div>
-            {/* Sticky so "Add Rule" stays reachable while the rule list scrolls
-                inside its capped-height container. */}
+            {/* Header sits outside the scrolling list below, so it stays put while
+                only the rules scroll — matching the Custom Fields panel. */}
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-white dark:bg-gray-800 pb-3 mb-1 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     Automation Rules ({rules.length})
@@ -629,7 +629,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
             </div>
 
             {rules.length > 0 ? (
-                <div className="space-y-2 pt-3">
+                <div className="space-y-2 max-h-96 overflow-y-auto pt-3 pr-1 scrollbar-thin">
                     {rules.map((rule) => (
                         <div key={rule.id} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40 hover:border-gray-300 dark:hover:border-gray-600">
                             <button

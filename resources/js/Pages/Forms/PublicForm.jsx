@@ -11,6 +11,11 @@ import ThemeToggle from '../../Components/ThemeToggle';
 const ACCEPTED_FILE_TYPES = '.pdf,image/*,video/*,.xlsx,.xls,.csv';
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILES = 5;
+
+// Per-field limit set in the form editor, clamped to the same 1..5 range the
+// server enforces.
+const fieldMaxFiles = (field) =>
+    Math.max(1, Math.min(MAX_FILES, parseInt(field?.config?.max_files ?? MAX_FILES, 10) || MAX_FILES));
 const NUMBER_MIN = -99999999999;
 const NUMBER_MAX = 99999999999;
 
@@ -110,12 +115,12 @@ export default function PublicForm() {
         setTurnstileToken('');
     }, []);
 
-    const handleFileChange = (fieldId, files) => {
+    const handleFileChange = (fieldId, files, maxFiles = MAX_FILES) => {
         const all = Array.from(files);
         const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
         const withinSize = all.filter(f => f.size <= maxBytes);
         const tooBig = all.length - withinSize.length;
-        const fileArray = withinSize.slice(0, MAX_FILES);
+        const fileArray = withinSize.slice(0, maxFiles);
 
         setAttachments(prev => ({ ...prev, [fieldId]: fileArray }));
 
@@ -341,8 +346,9 @@ export default function PublicForm() {
 
             case 'attachment': {
                 const files = attachments[field.id] || [];
+                const maxFiles = fieldMaxFiles(field);
                 const fileErrors = [];
-                for (let i = 0; i < MAX_FILES; i++) {
+                for (let i = 0; i < maxFiles; i++) {
                     if (errors[`fields.${field.id}.${i}`]) {
                         fileErrors.push(errors[`fields.${field.id}.${i}`]);
                     }
@@ -356,8 +362,8 @@ export default function PublicForm() {
                             <input
                                 type="file"
                                 accept={ACCEPTED_FILE_TYPES}
-                                multiple
-                                onChange={(e) => handleFileChange(field.id, e.target.files)}
+                                multiple={maxFiles > 1}
+                                onChange={(e) => handleFileChange(field.id, e.target.files, maxFiles)}
                                 className="block w-full text-sm text-gray-500 dark:text-gray-400
                                     file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0
                                     file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700
@@ -366,7 +372,7 @@ export default function PublicForm() {
                                     file:cursor-pointer file:transition-colors"
                             />
                             <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                                PDF, images, videos, or Excel files. Max {MAX_FILES} files, {MAX_FILE_SIZE_MB}MB each.
+                                PDF, images, videos, or Excel files. Max {maxFiles} {maxFiles === 1 ? 'file' : 'files'}, {MAX_FILE_SIZE_MB}MB each.
                             </p>
                             {files.length > 0 && (
                                 <div className="mt-3 space-y-1">
@@ -398,6 +404,7 @@ export default function PublicForm() {
 
             case 'capture_photo': {
                 const files = attachments[field.id] || [];
+                const maxPhotos = fieldMaxFiles(field);
                 return (
                     <div key={field.id}>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
@@ -405,12 +412,12 @@ export default function PublicForm() {
                         </label>
                         <CameraCapture
                             mode="photo"
-                            maxPhotos={5}
+                            maxPhotos={maxPhotos}
                             existingFiles={files}
                             onCapture={(file) => {
                                 setAttachments(prev => {
                                     const existing = prev[field.id] || [];
-                                    if (existing.length >= 5) return prev;
+                                    if (existing.length >= maxPhotos) return prev;
                                     return { ...prev, [field.id]: [...existing, file] };
                                 });
                             }}

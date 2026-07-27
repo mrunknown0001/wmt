@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import Pagination from '../../Components/Pagination';
@@ -36,6 +36,67 @@ export default function Index({ pendingApprovals, stats, filters = {}, trail, tr
     const filteredStatus = filters.status || 'all';
     const [search, setSearch] = useState(filters.search || '');
     const searchTimeout = useRef(null);
+
+    // Live queue: refresh in place when a new approval lands, so an approver sitting
+    // on this page sees it without reloading. NotificationBell owns the Echo
+    // subscription and re-broadcasts each notification as a `wmt:notification`
+    // window event, so we piggyback on that rather than opening a second socket.
+    const refreshTimeout = useRef(null);
+    const refreshing = useRef(false);
+    // Seeded at mount: the page already arrived with fresh data, so the refocus
+    // catch-up shouldn't fire immediately after load.
+    const lastRefresh = useRef(Date.now());
+
+    const refreshQueue = () => {
+        if (refreshing.current) return;
+        refreshing.current = true;
+        lastRefresh.current = Date.now();
+
+        // Partial reload: re-requests the current URL, so the active filter,
+        // search term and page are carried through untouched.
+        router.reload({
+            only: ['pendingApprovals', 'stats', 'trail', 'trailStats'],
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => { refreshing.current = false; },
+        });
+    };
+
+    useEffect(() => {
+        const handler = (e) => {
+            const n = e.detail;
+            // Approval traffic only — comments, mentions and task events must not
+            // churn this page. Matched on the `approval_` prefix rather than an
+            // explicit list so new notification types are picked up automatically.
+            const isApproval = n && (
+                (typeof n.type === 'string' && n.type.startsWith('approval_'))
+                || n.approval_item_id != null
+            );
+            if (!isApproval) return;
+
+            // A single decision can fan out several notifications; coalesce them
+            // into one request instead of reloading once per event.
+            clearTimeout(refreshTimeout.current);
+            refreshTimeout.current = setTimeout(refreshQueue, 600);
+        };
+
+        // Catch-up on refocus. If the socket dropped while the tab was hidden or the
+        // machine asleep, the missed notifications are gone — this resyncs on return.
+        // Throttled so quick tab-flicking doesn't hammer the server.
+        const onVisible = () => {
+            if (document.visibilityState !== 'visible') return;
+            if (Date.now() - lastRefresh.current < 30000) return;
+            refreshQueue();
+        };
+
+        window.addEventListener('wmt:notification', handler);
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearTimeout(refreshTimeout.current);
+            window.removeEventListener('wmt:notification', handler);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, []);
 
     // The queue and the approval trail each own their own query params, so every
     // navigation carries the other section's params through untouched.

@@ -439,6 +439,8 @@ class ApprovalWorkflowEngine
             ->where('status', 'active')
             ->update(['status' => 'rejected', 'completed_at' => now()]);
 
+        self::notifyRequester($item, 'changes_requested');
+
         // Fire automation on changes requested
         ApprovalAutomationRuleEngine::evaluate($item, 'approval_changes_requested');
     }
@@ -451,11 +453,39 @@ class ApprovalWorkflowEngine
             'current_step_number' => null,
         ]);
 
+        // Tell the requester the outcome before automation runs — an automation
+        // rule that throws must not swallow the requester's own notification.
+        self::notifyRequester($item, $status);
+
         // Fire automation on final transitions
         if ($status === 'approved') {
             ApprovalAutomationRuleEngine::evaluate($item, 'approval_completed');
         } elseif ($status === 'rejected') {
             ApprovalAutomationRuleEngine::evaluate($item, 'approval_rejected');
+        }
+    }
+
+    /**
+     * Notify the requester that their item reached a terminal state. Failures are
+     * swallowed: a dead mail/queue connection must not roll back a decision that
+     * has already been recorded.
+     */
+    private static function notifyRequester(ApprovalItem $item, string $outcome): void
+    {
+        if (!in_array($outcome, \App\Notifications\ApprovalDecisionNotification::OUTCOMES, true)) {
+            return;
+        }
+
+        $requester = $item->requester;
+
+        if (!$requester) {
+            return; // e.g. an item raised through a public form with no account behind it
+        }
+
+        try {
+            $requester->notify(new \App\Notifications\ApprovalDecisionNotification($item, $outcome));
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

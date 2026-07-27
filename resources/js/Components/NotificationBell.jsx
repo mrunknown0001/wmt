@@ -27,6 +27,12 @@ function notificationMessage(data) {
             return <>Task <strong>{data.task_title}</strong> escalated — {data.escalation_label}</>;
         case 'approval_requested':
             return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in <strong>{data.approval_project_name}</strong></> : null}</>;
+        case 'approval_approved':
+            return <>Your request <strong>{data.item_title}</strong> was approved</>;
+        case 'approval_rejected':
+            return <>Your request <strong>{data.item_title}</strong> was rejected{data.decided_by ? <> by {data.decided_by}</> : null}</>;
+        case 'approval_changes_requested':
+            return <>Changes requested on <strong>{data.item_title}</strong>{data.decided_by ? <> by {data.decided_by}</> : null}</>;
         case 'approval_automation':
             return <>{data.message || <>Update on <strong>{data.item_title}</strong></>}</>;
         case 'external_webhook':
@@ -146,9 +152,12 @@ export default function NotificationBell({ onToast }) {
 
     const handleClick = (notification) => {
         const data = notification.data;
+        // Decision notifications go to the requester, so they belong on the item
+        // itself — /my-approvals is the approver's queue and would be empty here.
+        const itemTypes = ['approval_automation', 'approval_approved', 'approval_rejected', 'approval_changes_requested'];
         const target = data.type === 'approval_requested'
             ? '/my-approvals'
-            : data.type === 'approval_automation'
+            : itemTypes.includes(data.type)
                 ? `/approval-projects/${data.approval_project_id}/items/${data.approval_item_id}`
                 : data.url
                     ? data.url

@@ -87,13 +87,20 @@ class Task extends Model
     public const CLOSING_STATUSES = ['done', 'cancelled'];
 
     /** True when at least one of this task's comments has an attachment. */
-    public function hasCommentAttachment(): bool
+    /**
+     * Proof-of-work attachment for the close rule. Satisfied by a file on one of
+     * the task's comments, or by a file on the task itself — which is how form
+     * submissions arrive, so a task raised from a form with an attachment already
+     * counts as evidenced.
+     */
+    public function hasSupportingAttachment(): bool
     {
         if (!$this->exists) {
             return false;
         }
 
-        return $this->comments()->whereHas('attachments')->exists();
+        return $this->comments()->whereHas('attachments')->exists()
+            || $this->attachments()->exists();
     }
 
     /**
@@ -116,12 +123,12 @@ class Task extends Model
 
         $project = $this->relationLoaded('project') ? $this->project : Project::find($this->project_id);
 
-        if (!$project?->require_comment_attachment_on_close || $this->hasCommentAttachment()) {
+        if (!$project?->require_comment_attachment_on_close || $this->hasSupportingAttachment()) {
             return;
         }
 
         $label = $newStatus === 'done' ? 'Done' : 'Cancelled';
-        $message = "This task needs a comment with at least one attachment before it can be marked {$label}.";
+        $message = "This task needs at least one attachment — on the task or on a comment — before it can be marked {$label}.";
 
         // Flash so the user gets a toast on Inertia form/redirect paths. JSON callers
         // are skipped deliberately — nothing would render it there, and it would

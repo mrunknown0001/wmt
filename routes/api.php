@@ -116,6 +116,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Global search (mobile path to avoid web.php /api/search shadow)
     Route::get('/mobile/search', SearchController::class);
 
+    // People picker options (custom field type "people").
+    Route::get('/people-options', \App\Http\Controllers\PeopleOptionsController::class);
+
     // App settings for clients
     Route::get('/settings', SettingController::class);
 

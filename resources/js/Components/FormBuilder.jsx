@@ -205,15 +205,28 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                         />
                     )}
 
-                    {field.type === 'attachment' && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Accepts images, videos, and Excel files. Max 5 files, 50MB each.
-                        </p>
-                    )}
-                    {field.type === 'capture_photo' && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Opens device camera. User can capture up to 5 photos.
-                        </p>
+                    {/* Attachment and photo fields accept several files; how many is
+                        configurable per field, capped at 5 to match the server rule. */}
+                    {(field.type === 'attachment' || field.type === 'capture_photo') && (
+                        <div className="space-y-1">
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                Maximum files
+                            </label>
+                            <select
+                                value={field.config?.max_files ?? 5}
+                                onChange={(e) => update('config', { ...field.config, max_files: parseInt(e.target.value, 10) })}
+                                className="w-32 px-2 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                            >
+                                {[1, 2, 3, 4, 5].map((n) => (
+                                    <option key={n} value={n}>{n} {n === 1 ? 'file' : 'files'}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {field.type === 'attachment'
+                                    ? 'Accepts PDF, images, videos and Excel files — 50MB each.'
+                                    : 'Opens the device camera — 50MB each.'}
+                            </p>
+                        </div>
                     )}
                     {field.type === 'capture_video' && (
                         <p className="text-xs text-gray-500 dark:text-gray-400">

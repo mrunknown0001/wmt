@@ -11,7 +11,7 @@ class ApprovalCustomField extends Model
 {
     use HasFactory;
 
-    public const TYPES = ['text', 'textarea', 'number', 'date', 'single_select', 'multi_select', 'formula'];
+    public const TYPES = ['text', 'textarea', 'number', 'date', 'single_select', 'multi_select', 'people', 'week_of_year', 'formula'];
     public const TEXT_MAX_LENGTH = 255;
     public const TEXTAREA_MAX_LENGTH = 10000;
     public const NUMBER_MIN = -99999999999;

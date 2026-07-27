@@ -16,6 +16,8 @@ const FIELD_TYPES = [
     { value: 'date', label: 'Date' },
     { value: 'single_select', label: 'Single Select' },
     { value: 'multi_select', label: 'Multi Select' },
+    { value: 'people', label: 'People' },
+    { value: 'week_of_year', label: 'Week of Year' },
     { value: 'formula', label: 'Formula' },
 ];
 
@@ -334,9 +336,22 @@ function FormulaEditor({ config, onChange, availableFields }) {
                 <div className="flex-1">
                     <Select label="Result Type" id="formula-result-type" value={config.result_type || 'number'}
                         onChange={(e) => onChange({ ...config, result_type: e.target.value })}
-                        options={[{ value: 'number', label: 'Number' }, { value: 'date', label: 'Date' }]}
+                        options={[
+                            { value: 'number', label: 'Number' },
+                            { value: 'date', label: 'Date' },
+                            { value: 'boolean', label: 'Yes / No' },
+                        ]}
                     />
                 </div>
+                {(config.result_type || 'number') === 'boolean' && (
+                    <div className="flex-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-6">
+                            Shows <span className="font-medium">Yes</span> when the formula is true.
+                            Comparisons work directly, e.g. <code>[Budget] &gt; 1000</code>. Combine
+                            with <code>*</code> for “and”, <code>+</code> for “or”.
+                        </p>
+                    </div>
+                )}
                 {(config.result_type || 'number') === 'number' && (
                     <div className="w-32">
                         <Input label="Decimals" id="formula-decimals" type="number"

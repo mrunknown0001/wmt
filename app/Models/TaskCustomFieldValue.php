@@ -44,14 +44,39 @@ class TaskCustomFieldValue extends Model
     /**
      * Get the typed value based on the custom field type.
      */
+    /**
+     * Human-readable value for people fields, so the UI doesn't have to resolve
+     * user ids itself. Appended so it reaches the front end.
+     */
+    protected $appends = ['people_names'];
+
+    public function getPeopleNamesAttribute(): ?string
+    {
+        if (!$this->relationLoaded('customField')) {
+            $this->load('customField');
+        }
+        if (($this->customField?->type) !== 'people') {
+            return null;
+        }
+
+        $ids = array_values(array_filter((array) ($this->value_json ?? [])));
+        if (empty($ids)) {
+            return null;
+        }
+
+        $names = User::whereIn('id', $ids)->orderBy('name')->pluck('name')->all();
+
+        return $names ? implode(', ', $names) : null;
+    }
+
     public function getValueAttribute(): mixed
     {
         return match ($this->customField?->type) {
             'text', 'textarea' => $this->value_text,
             'number' => $this->value_number,
-            'date' => $this->value_date,
+            'date', 'week_of_year' => $this->value_date,
             'single_select' => $this->value_option_id,
-            'multi_select' => $this->value_json,
+            'multi_select', 'people' => $this->value_json,
             default => null,
         };
     }
@@ -76,9 +101,15 @@ class TaskCustomFieldValue extends Model
             'text' => $this->value_text = mb_substr((string) $rawValue, 0, CustomField::TEXT_MAX_LENGTH),
             'textarea' => $this->value_text = mb_substr((string) $rawValue, 0, CustomField::TEXTAREA_MAX_LENGTH),
             'number' => $this->value_number = max(CustomField::NUMBER_MIN, min(CustomField::NUMBER_MAX, (float) $rawValue)),
-            'date' => $this->value_date = $rawValue,
+            // Week of year stores the reference date; the week is derived on read.
+            'date', 'week_of_year' => $this->value_date = $rawValue,
             'single_select' => $this->value_option_id = (int) $rawValue,
             'multi_select' => $this->value_json = is_array($rawValue) ? $rawValue : [$rawValue],
+            // People: a list of user ids, normalised to ints so lookups are exact.
+            'people' => $this->value_json = collect(is_array($rawValue) ? $rawValue : [$rawValue])
+                ->filter(fn ($id) => $id !== null && $id !== '')
+                ->map(fn ($id) => (int) $id)
+                ->unique()->values()->all(),
             default => null,
         };
     }

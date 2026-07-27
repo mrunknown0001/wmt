@@ -622,6 +622,15 @@ export function formatFormulaResult(value, config) {
 
     const resultType = config?.result_type || 'number';
 
+    // Yes/No. Comparisons evaluate to 1/0 rather than true/false, so numerics are
+    // the normal input here; real booleans and strings are handled for safety.
+    if (resultType === 'boolean') {
+        if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+        if (typeof value === 'number') return value !== 0 ? 'Yes' : 'No';
+        const s = String(value).trim().toLowerCase();
+        return ['', '0', 'no', 'false'].includes(s) ? 'No' : 'Yes';
+    }
+
     if (resultType === 'date') {
         const d = toDate(value);
         if (!d) return '—';

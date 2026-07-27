@@ -45,6 +45,12 @@ function notificationMessage(data) {
             return <>Task <strong>{data.task_title}</strong> in {data.project_name} has been escalated ({data.escalation_label}) — assigned to {data.assigned_to_name}</>;
         case 'approval_requested':
             return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in {data.approval_project_name}</> : null}{data.requester ? <> — submitted by {data.requester}</> : null}</>;
+        case 'approval_approved':
+            return <>Your request <strong>{data.item_title}</strong>{data.approval_project_name ? <> in {data.approval_project_name}</> : null} was approved</>;
+        case 'approval_rejected':
+            return <>Your request <strong>{data.item_title}</strong> was rejected{data.decided_by ? <> by {data.decided_by}</> : null}{data.decision_comment ? <> — “{data.decision_comment}”</> : null}</>;
+        case 'approval_changes_requested':
+            return <>Changes requested on <strong>{data.item_title}</strong>{data.decided_by ? <> by {data.decided_by}</> : null}{data.decision_comment ? <> — “{data.decision_comment}”</> : null}</>;
         case 'approval_automation':
             return <>{data.message || <>Update on <strong>{data.item_title}</strong></>}</>;
         case 'external_webhook':
@@ -119,6 +125,32 @@ function notificationIcon(type) {
                 <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
                     <svg className="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            );
+        // Outcome icons are colour-coded so the requester can read the result of a
+        // request from the inbox list without opening it.
+        case 'approval_approved':
+            return (
+                <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+            );
+        case 'approval_rejected':
+            return (
+                <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </div>
+            );
+        case 'approval_changes_requested':
+            return (
+                <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                 </div>
             );
@@ -222,9 +254,12 @@ export default function Index({ notifications, filter = 'inbox' }) {
 
     function handleNotificationClick(notification) {
         const data = notification.data;
+        // Decision notifications go to the requester, so they belong on the item
+        // itself — /my-approvals is the approver's queue and would be empty here.
+        const itemTypes = ['approval_automation', 'approval_approved', 'approval_rejected', 'approval_changes_requested'];
         const target = data.type === 'approval_requested'
             ? '/my-approvals'
-            : data.type === 'approval_automation'
+            : itemTypes.includes(data.type)
                 ? `/approval-projects/${data.approval_project_id}/items/${data.approval_item_id}`
                 : data.url
                     ? data.url

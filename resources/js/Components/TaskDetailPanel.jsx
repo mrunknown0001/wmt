@@ -671,6 +671,21 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                                     const ids = cfv.value_json || [];
                                                     const labels = ids.map(id => cf.options?.find(o => o.id === id)?.label).filter(Boolean);
                                                     displayValue = labels.join(', ') || '—';
+                                                } else if (cf.type === 'week_of_year') {
+                                                    // Reference date is stored; show the ISO week.
+                                                    const d = cfv.value_date;
+                                                    if (d) {
+                                                        const t = new Date(d + 'T00:00:00');
+                                                        const u = new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()));
+                                                        u.setUTCDate(u.getUTCDate() - ((u.getUTCDay() + 6) % 7) + 3);
+                                                        const iy = u.getUTCFullYear();
+                                                        const ft = new Date(Date.UTC(iy, 0, 4));
+                                                        ft.setUTCDate(ft.getUTCDate() - ((ft.getUTCDay() + 6) % 7) + 3);
+                                                        displayValue = `Week ${1 + Math.round((u - ft) / 604800000)}, ${iy}`;
+                                                    } else displayValue = '—';
+                                                } else if (cf.type === 'people') {
+                                                    // Names are resolved server-side (people_names accessor).
+                                                    displayValue = cfv.people_names || '—';
                                                 }
                                             }
                                         }
