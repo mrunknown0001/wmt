@@ -119,9 +119,9 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                 }
             }
 
-            // Handle successful submission (200 OK)
-            if (response.status === 200) {
-                console.log('Submission successful! Navigating to success page');
+            // Any 2xx is a success — the submit endpoint returns 201 Created, so
+            // matching on 200 alone reported a false error on a saved request.
+            if (response.ok) {
                 // Use window.location to properly initialize Inertia on the success page
                 window.location.href = `/forms-approval/${form.uuid}/success`;
                 return;
