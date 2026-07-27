@@ -1473,15 +1473,19 @@ export default function Show() {
         const { active, over } = event;
         setActiveColumnId(null);
         if (!over || active.id === over.id) return;
-        setColumnOrder(prev => {
-            const order = prev ? [...prev] : [...effectiveColumnOrder];
-            const oldIdx = order.indexOf(active.id);
-            const newIdx = order.indexOf(over.id);
-            if (oldIdx === -1 || newIdx === -1) return prev;
-            const newOrder = arrayMove(order, oldIdx, newIdx);
-            try { localStorage.setItem(`wmt-col-order-${project.id}`, JSON.stringify(newOrder)); } catch {}
-            return newOrder;
-        });
+        // Reorder against effectiveColumnOrder rather than the persisted order.
+        // The saved order only contains the columns that existed the last time one
+        // was dragged; fields added since live in effectiveColumnOrder's appended
+        // tail. Indexing into the stale saved array returned -1 for those, so the
+        // drag was silently dropped and the column appeared undraggable.
+        const order = [...effectiveColumnOrder];
+        const oldIdx = order.indexOf(active.id);
+        const newIdx = order.indexOf(over.id);
+        if (oldIdx === -1 || newIdx === -1) return;
+
+        const newOrder = arrayMove(order, oldIdx, newIdx);
+        try { localStorage.setItem(`wmt-col-order-${project.id}`, JSON.stringify(newOrder)); } catch {}
+        setColumnOrder(newOrder);
     }, [effectiveColumnOrder, project.id]);
 
     // Sync local state when server data changes (after Inertia navigation)
