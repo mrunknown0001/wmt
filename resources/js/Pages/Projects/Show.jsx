@@ -2021,7 +2021,7 @@ export default function Show() {
     }, [localTasks, project.id, serverTasks, handleInlineUpdate]);
 
     // Inline custom field value update (optimistic)
-    const handleCustomFieldUpdate = useCallback((taskId, fieldId, fieldType, value) => {
+    const handleCustomFieldUpdate = useCallback((taskId, fieldId, fieldType, value, meta) => {
         // Build optimistic custom_field_values entry
         const buildOptimisticCfv = (existingValues) => {
             const values = [...(existingValues || [])];
@@ -2030,13 +2030,19 @@ export default function Show() {
                 custom_field_id: fieldId,
                 value_text: (fieldType === 'text' || fieldType === 'textarea') ? value : null,
                 value_number: fieldType === 'number' ? value : null,
-                value_date: fieldType === 'date' ? value : null,
+                // Week of year stores its reference date in the same column as date.
+                value_date: (fieldType === 'date' || fieldType === 'week_of_year') ? value : null,
                 value_option_id: fieldType === 'single_select' ? value : null,
-                value_json: fieldType === 'multi_select' ? value : null,
+                value_json: (fieldType === 'multi_select' || fieldType === 'people') ? value : null,
                 selected_option: fieldType === 'single_select' && value
                     ? (localCustomFields.find(cf => cf.id === fieldId)?.options || []).find(o => o.id === Number(value)) || null
                     : null,
             };
+            // people_names is a server-side accessor; the PATCH response isn't merged
+            // back, so carry the names from the editor or the cell would blank out.
+            if (fieldType === 'people') {
+                entry.people_names = meta?.people_names ?? null;
+            }
             if (idx >= 0) { values[idx] = { ...values[idx], ...entry }; }
             else { values.push(entry); }
             return values;
@@ -2600,12 +2606,12 @@ export default function Show() {
         handleSubtaskInlineUpdate(taskId, field, value);
     }, [editAppliesToSelection, handleBulkAction, handleSubtaskInlineUpdate]);
 
-    const handleRowCustomFieldUpdate = useCallback((taskId, fieldId, fieldType, value) => {
+    const handleRowCustomFieldUpdate = useCallback((taskId, fieldId, fieldType, value, meta) => {
         if (editAppliesToSelection(taskId)) {
             handleBulkAction('update_custom_field', { field_id: fieldId, value }, { keepSelection: true });
             return;
         }
-        handleCustomFieldUpdate(taskId, fieldId, fieldType, value);
+        handleCustomFieldUpdate(taskId, fieldId, fieldType, value, meta);
     }, [editAppliesToSelection, handleBulkAction, handleCustomFieldUpdate]);
 
     // Handle bulk delete confirmation

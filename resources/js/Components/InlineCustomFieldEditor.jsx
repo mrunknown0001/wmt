@@ -2,7 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import InlinePopover from './InlinePopover';
 import InlineDatePicker from './InlineDatePicker';
 import Tooltip from './Tooltip';
+import PeoplePicker, { loadPeopleOptions } from './PeoplePicker';
 import { formatFormulaResult } from '../formulaEngine';
+
+/** ISO-8601 week of a date, matching Carbon's isoWeek()/isoWeekYear(). */
+function isoWeekLabel(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return null;
+    // Shift to the Thursday of this week — the ISO year is whichever year holds it.
+    const target = new Date(d.getTime());
+    target.setDate(target.getDate() - ((d.getDay() + 6) % 7) + 3);
+    const isoYear = target.getFullYear();
+    const firstThursday = new Date(isoYear, 0, 4);
+    firstThursday.setDate(firstThursday.getDate() - ((firstThursday.getDay() + 6) % 7) + 3);
+    const week = 1 + Math.round((target - firstThursday) / (7 * 24 * 60 * 60 * 1000));
+    return `Week ${week}, ${isoYear}`;
+}
 
 function SelectOptions({ options, selectedId, onSelect }) {
     return (
@@ -186,6 +202,18 @@ function DisplayValue({ customField, cfv, formatDate }) {
                 : cfv.value_number}</span>;
         case 'date':
             return <span>{cfv.value_date ? formatDate(cfv.value_date) : '—'}</span>;
+        case 'week_of_year': {
+            const label = isoWeekLabel(cfv.value_date);
+            if (!label) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+            // The underlying date is worth surfacing — the week alone is ambiguous.
+            return <Tooltip content={formatDate(cfv.value_date)}><span>{label}</span></Tooltip>;
+        }
+        case 'people': {
+            // people_names is a comma-joined string appended by the value model.
+            const names = cfv.people_names;
+            if (!names) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+            return <Tooltip content={names}><span className="truncate block max-w-xs mx-auto">{names}</span></Tooltip>;
+        }
         case 'single_select': {
             const opt = cfv.selected_option;
             if (!opt) return <span className="text-gray-300 dark:text-gray-600">—</span>;
@@ -237,13 +265,14 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
         );
     }
 
-    const handleSave = (value) => {
+    const handleSave = (value, meta) => {
         onToggle(false);
-        onUpdate(task.id, customField.id, customField.type, value);
+        onUpdate(task.id, customField.id, customField.type, value, meta);
     };
 
     // Date uses its own InlineDatePicker
-    if (customField.type === 'date') {
+    // Week of year stores a reference date, so it edits with the same picker.
+    if (customField.type === 'date' || customField.type === 'week_of_year') {
         return (
             <InlineDatePicker
                 currentDate={cfv?.value_date || null}
@@ -261,6 +290,7 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
             case 'number': return cfv.value_number;
             case 'single_select': return cfv.value_option_id;
             case 'multi_select': return cfv.value_json || [];
+            case 'people': return cfv.value_json || [];
             default: return null;
         }
     })();
@@ -293,6 +323,14 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
                         onSelect={handleSave}
                     />
                 )}
+                {customField.type === 'people' && (
+                    <PeopleEditor
+                        scope={customField.config}
+                        selectedIds={currentValue || []}
+                        onSave={handleSave}
+                        onClose={() => onToggle(false)}
+                    />
+                )}
                 {customField.type === 'multi_select' && (
                     <MultiSelectEditor
                         options={[...(customField.options || [])].sort((a, b) =>
@@ -305,6 +343,55 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
                 )}
             </InlinePopover>
         </>
+    );
+}
+
+/**
+ * Inline people editor for the list view. Reuses PeoplePicker so the scope
+ * configured on the field applies here exactly as it does on the task.
+ */
+function PeopleEditor({ scope, selectedIds, onSave, onClose }) {
+    const [draft, setDraft] = useState((selectedIds || []).map(Number));
+    const [directory, setDirectory] = useState(null);
+
+    // Same cached fetch the picker uses, so this costs nothing extra.
+    useEffect(() => {
+        let alive = true;
+        loadPeopleOptions().then((d) => alive && setDirectory(d)).catch(() => {});
+        return () => { alive = false; };
+    }, []);
+
+    // Server sorts names alphabetically; match that so the cell doesn't reshuffle
+    // on the next page load.
+    const namesFor = (ids) => {
+        if (!directory || !ids.length) return null;
+        const names = directory.users
+            .filter((u) => ids.includes(u.id))
+            .map((u) => u.name)
+            .sort((a, b) => a.localeCompare(b));
+        return names.length ? names.join(', ') : null;
+    };
+
+    return (
+        <div className="p-2 w-72 space-y-2">
+            <PeoplePicker value={draft} onChange={setDraft} scope={scope} />
+            <div className="flex justify-end gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:underline"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={() => onSave(draft.length ? draft : null, { people_names: namesFor(draft) })}
+                    className="px-3 py-1 text-xs rounded-lg bg-primary-600 text-white hover:bg-primary-700"
+                >
+                    Save
+                </button>
+            </div>
+        </div>
     );
 }
 

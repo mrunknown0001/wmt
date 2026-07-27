@@ -32,10 +32,14 @@ class StoreCustomFieldRequest extends FormRequest
                     }
                 },
             ],
-            'config.result_type' => ['required_if:type,formula', 'string', 'in:number,date'],
+            'config.result_type' => ['required_if:type,formula', 'string', 'in:number,date,boolean'],
             'config.decimal_places' => ['nullable', 'integer', 'min:0', 'max:10'],
             'config.sort_mode' => ['nullable', 'string', 'in:alphabetical,manual'],
             'config.default_value' => ['nullable'],
+            // People fields carry an optional org scope, set on the field definition.
+            'config.division_id' => ['nullable', 'integer', 'exists:divisions,id'],
+            'config.department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'config.team_id' => ['nullable', 'integer', 'exists:teams,id'],
             'default_option_indexes' => ['nullable', 'array'],
             'default_option_indexes.*' => ['integer', 'min:0'],
             'options' => ['required_if:type,single_select,multi_select', 'array', 'min:1'],

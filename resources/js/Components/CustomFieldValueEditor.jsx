@@ -167,6 +167,7 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
                     <PeoplePicker
                         value={Array.isArray(value) ? value : (value ? [value] : [])}
                         onChange={(ids) => handleChange(ids)}
+                        scope={field.config}
                     />
                     {error && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>}
                 </div>

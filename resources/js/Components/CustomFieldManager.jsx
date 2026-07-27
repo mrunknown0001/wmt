@@ -8,6 +8,7 @@ import { ConfirmModal } from './Modal';
 import Tooltip from './Tooltip';
 import { apiFetch } from '../utils';
 import { validateFormula } from '../formulaEngine';
+import { loadPeopleOptions } from './PeoplePicker';
 
 const FIELD_TYPES = [
     { value: 'text', label: 'Text' },
@@ -370,6 +371,86 @@ function FormulaEditor({ config, onChange, availableFields }) {
     );
 }
 
+/**
+ * Scope selector for a People field. Chosen once here, on the field definition,
+ * so everyone filling the field in gets an already-narrowed list instead of
+ * having to filter the whole directory themselves. Leave all three as "Any" to
+ * offer every active user.
+ */
+function PeopleScopeConfig({ config, onChange }) {
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        loadPeopleOptions()
+            .then((d) => alive && setData(d))
+            .catch(() => alive && setError(true));
+        return () => { alive = false; };
+    }, []);
+
+    const divisionId = config.division_id ? String(config.division_id) : '';
+    const departmentId = config.department_id ? String(config.department_id) : '';
+    const teamId = config.team_id ? String(config.team_id) : '';
+
+    // Each dropdown only offers what fits the one above it.
+    const departments = useMemo(() => {
+        if (!data) return [];
+        return divisionId
+            ? data.departments.filter((d) => String(d.division_id) === divisionId)
+            : data.departments;
+    }, [data, divisionId]);
+
+    const teams = useMemo(() => {
+        if (!data) return [];
+        const deptIds = departmentId ? [departmentId] : departments.map((d) => String(d.id));
+        return data.teams.filter((t) => deptIds.includes(String(t.department_id)));
+    }, [data, departmentId, departments]);
+
+    const matchCount = useMemo(() => {
+        if (!data) return null;
+        return data.users.filter((u) => {
+            if (divisionId && String(u.division_id) !== divisionId) return false;
+            if (departmentId && String(u.department_id) !== departmentId) return false;
+            if (teamId && String(u.team_id) !== teamId) return false;
+            return true;
+        }).length;
+    }, [data, divisionId, departmentId, teamId]);
+
+    if (error) return <p className="text-sm text-red-600 dark:text-red-400">Could not load the org list.</p>;
+    if (!data) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading org list…</p>;
+
+    // Narrowing a level invalidates anything chosen below it.
+    const set = (patch) => onChange({ ...config, ...patch });
+
+    return (
+        <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                Limit people to <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+                <Select label="Division" id="cf-people-division" value={divisionId}
+                    onChange={(e) => set({ division_id: e.target.value || null, department_id: null, team_id: null })}
+                    options={[{ value: '', label: 'Any' }, ...data.divisions.map((d) => ({ value: String(d.id), label: d.name }))]}
+                />
+                <Select label="Department" id="cf-people-department" value={departmentId}
+                    onChange={(e) => set({ department_id: e.target.value || null, team_id: null })}
+                    options={[{ value: '', label: 'Any' }, ...departments.map((d) => ({ value: String(d.id), label: d.name }))]}
+                />
+                <Select label="Team" id="cf-people-team" value={teamId}
+                    onChange={(e) => set({ team_id: e.target.value || null })}
+                    options={[{ value: '', label: 'Any' }, ...teams.map((t) => ({ value: String(t.id), label: t.name }))]}
+                />
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                {matchCount === 0
+                    ? 'No active users match this scope — the field would have nothing to pick from.'
+                    : `${matchCount} active ${matchCount === 1 ? 'person' : 'people'} match this scope.`}
+            </p>
+        </div>
+    );
+}
+
 export default forwardRef(function CustomFieldManager({ projectId, initialFields = [], onFieldsChange, baseUrl }, ref) {
     // Approval projects expose the same custom-field API under a different prefix;
     // pass baseUrl to point this manager at it. Defaults to regular projects.
@@ -464,6 +545,15 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 config = { sort_mode: form.config.sort_mode };
             } else if (form.type === 'number') {
                 config = { decimal_places: form.config.decimal_places };
+            } else if (form.type === 'people') {
+                // Empty selects come through as '' — normalise to null so the
+                // server sees "no scope" rather than an unparseable id.
+                const num = (v) => (v === '' || v == null ? null : Number(v));
+                config = {
+                    division_id: num(form.config.division_id),
+                    department_id: num(form.config.department_id),
+                    team_id: num(form.config.team_id),
+                };
             }
 
             // Optional default value (selects send option indexes instead —
@@ -661,6 +751,12 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                         options={FIELD_TYPES}
                         disabled={!!editingField}
                     />
+                    {form.type === 'people' && (
+                        <PeopleScopeConfig
+                            config={form.config}
+                            onChange={(next) => setForm(prev => ({ ...prev, config: { ...prev.config, ...next } }))}
+                        />
+                    )}
                     {form.type === 'number' && (
                         <div className="w-32">
                             <Input label="Decimal Places" id="cf-number-decimals" type="number"
