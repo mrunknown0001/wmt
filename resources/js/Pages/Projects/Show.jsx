@@ -2184,14 +2184,16 @@ export default function Show() {
                 targetSectionId = overTask.section_id;
             }
 
-            // Compute new state and persist payload separately
-            let toPersist = null;
-            setLocalTasks((prev) => {
-                const activeTask = prev.find((t) => t.id === active.id);
-                if (!activeTask) return prev;
+            // Computed from localTasks, not inside a setLocalTasks updater: React
+            // defers the updater when another update is already queued (setActiveId
+            // above), so toPersist stayed null and the reorder was never saved.
+            const activeTask = localTasks.find((t) => t.id === active.id);
+            if (!activeTask) return;
 
+            let toPersist = null;
+            {
                 // Ensure the task has the target section_id
-                const updated = prev.map((t) =>
+                const updated = localTasks.map((t) =>
                     t.id === active.id ? { ...t, section_id: targetSectionId } : { ...t }
                 );
 
@@ -2225,37 +2227,33 @@ export default function Show() {
                     toPersist = targetTasks;
                 }
 
-                return updated;
-            });
+                setLocalTasks(updated);
+            }
             if (toPersist) persistReorder(toPersist);
         } else {
-            // Flat list mode (no sections)
-            let toPersist = null;
-            setLocalTasks((prev) => {
-                const filtered = prev.filter(matchesFilters);
-                const unfilteredIds = new Set(filtered.map((t) => t.id));
+            // Flat list mode (no sections) — same synchronous computation.
+            const filtered = localTasks.filter(matchesFilters);
+            const unfilteredIds = new Set(filtered.map((t) => t.id));
 
-                const oldIndex = filtered.findIndex((t) => t.id === active.id);
-                const newIndex = filtered.findIndex((t) => t.id === over.id);
-                if (oldIndex === -1 || newIndex === -1) return prev;
+            const oldIndex = filtered.findIndex((t) => t.id === active.id);
+            const newIndex = filtered.findIndex((t) => t.id === over.id);
+            if (oldIndex === -1 || newIndex === -1) return;
 
-                const reordered = arrayMove(filtered, oldIndex, newIndex);
+            const reordered = arrayMove(filtered, oldIndex, newIndex);
 
-                const result = [];
-                let filteredIdx = 0;
-                for (const t of prev) {
-                    if (unfilteredIds.has(t.id)) {
-                        result.push({ ...reordered[filteredIdx], position: filteredIdx });
-                        filteredIdx++;
-                    } else {
-                        result.push(t);
-                    }
+            const result = [];
+            let filteredIdx = 0;
+            for (const t of localTasks) {
+                if (unfilteredIds.has(t.id)) {
+                    result.push({ ...reordered[filteredIdx], position: filteredIdx });
+                    filteredIdx++;
+                } else {
+                    result.push(t);
                 }
+            }
 
-                toPersist = reordered;
-                return result;
-            });
-            if (toPersist) persistReorder(toPersist);
+            setLocalTasks(result);
+            persistReorder(reordered);
         }
     }, [tasksBySection, localTasks, localSections, matchesFilters, persistReorder, persistSectionReorder]);
 
@@ -2305,63 +2303,66 @@ export default function Show() {
 
         const sameColumn = activeTask.status === targetStatus;
 
+        // Computed from localTasks directly rather than from inside a setLocalTasks
+        // updater. React only runs an updater eagerly when nothing else is queued
+        // on the fiber, and the setActiveId(null) above guarantees something is —
+        // so the updater ran *after* this function returned, leaving toPersist null
+        // and the drag never reaching the server at all. The card moved on screen
+        // and nothing was saved, which is why no rule could refuse it.
+        const updated = localTasks.map((t) => ({ ...t }));
+        const activeIdx = updated.findIndex((t) => t.id === active.id);
         let toPersist = null;
-        setLocalTasks((prev) => {
-            const updated = prev.map((t) => ({ ...t }));
-            const activeIdx = updated.findIndex((t) => t.id === active.id);
 
-            if (sameColumn) {
-                // Reorder within column
-                const columnTasks = updated.filter((t) => t.status === targetStatus);
-                const oldIdx = columnTasks.findIndex((t) => t.id === active.id);
-                const newIdx = columnTasks.findIndex((t) => t.id === over.id);
-                if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return prev;
+        if (sameColumn) {
+            // Reorder within column
+            const columnTasks = updated.filter((t) => t.status === targetStatus);
+            const oldIdx = columnTasks.findIndex((t) => t.id === active.id);
+            const newIdx = columnTasks.findIndex((t) => t.id === over.id);
+            if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
 
-                const reordered = arrayMove(columnTasks, oldIdx, newIdx);
-                reordered.forEach((t, i) => {
+            const reordered = arrayMove(columnTasks, oldIdx, newIdx);
+            reordered.forEach((t, i) => {
+                const idx = updated.findIndex((u) => u.id === t.id);
+                updated[idx].position = i;
+            });
+
+            toPersist = reordered;
+        } else {
+            // Move to different column
+            updated[activeIdx].status = targetStatus;
+
+            // Recalculate positions in the target column
+            const targetTasks = updated.filter((t) => t.status === targetStatus);
+
+            // If dropping on a specific task, insert before/after it
+            if (!overId.startsWith('column-')) {
+                const overIdx = targetTasks.findIndex((t) => t.id === over.id);
+                const movedTask = targetTasks.find((t) => t.id === active.id);
+                const withoutMoved = targetTasks.filter((t) => t.id !== active.id);
+                withoutMoved.splice(overIdx, 0, movedTask);
+                withoutMoved.forEach((t, i) => {
                     const idx = updated.findIndex((u) => u.id === t.id);
                     updated[idx].position = i;
                 });
-
-                toPersist = reordered;
-                return updated;
+                toPersist = withoutMoved;
             } else {
-                // Move to different column
-                updated[activeIdx].status = targetStatus;
-
-                // Recalculate positions in the target column
-                const targetTasks = updated.filter((t) => t.status === targetStatus);
-
-                // If dropping on a specific task, insert before/after it
-                if (!overId.startsWith('column-')) {
-                    const overIdx = targetTasks.findIndex((t) => t.id === over.id);
-                    const movedTask = targetTasks.find((t) => t.id === active.id);
-                    const withoutMoved = targetTasks.filter((t) => t.id !== active.id);
-                    withoutMoved.splice(overIdx, 0, movedTask);
-                    withoutMoved.forEach((t, i) => {
-                        const idx = updated.findIndex((u) => u.id === t.id);
-                        updated[idx].position = i;
-                    });
-                    toPersist = withoutMoved;
-                } else {
-                    // Dropped on empty column area — append to end
-                    targetTasks.forEach((t, i) => {
-                        const idx = updated.findIndex((u) => u.id === t.id);
-                        updated[idx].position = i;
-                    });
-                    toPersist = targetTasks;
-                }
-
-                // Reindex the source column
-                const sourceTasks = updated.filter((t) => t.status === activeTask.status);
-                sourceTasks.forEach((t, i) => {
+                // Dropped on empty column area — append to end
+                targetTasks.forEach((t, i) => {
                     const idx = updated.findIndex((u) => u.id === t.id);
                     updated[idx].position = i;
                 });
-
-                return updated;
+                toPersist = targetTasks;
             }
-        });
+
+            // Reindex the source column
+            const sourceTasks = updated.filter((t) => t.status === activeTask.status);
+            sourceTasks.forEach((t, i) => {
+                const idx = updated.findIndex((u) => u.id === t.id);
+                updated[idx].position = i;
+            });
+        }
+
+        setLocalTasks(updated);
         if (toPersist) persistReorder(toPersist);
     }, [localTasks, persistReorder]);
 
