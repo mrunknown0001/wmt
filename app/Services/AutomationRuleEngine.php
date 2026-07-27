@@ -17,6 +17,9 @@ class AutomationRuleEngine
 {
     private static bool $executing = false;
 
+    /** Task columns that hold dates and must be compared as such, not as strings. */
+    private const DATE_FIELDS = ['due_date', 'start_date', 'completed_at'];
+
     public static function evaluate(Task $task, string $triggerType, array $oldValues = [], array $changedFieldIds = [], array $context = []): void
     {
         // Guard against infinite loops — don't re-trigger rules from rule-caused changes
@@ -87,6 +90,51 @@ class AutomationRuleEngine
         }
     }
 
+    /**
+     * Run a single rule against a single task. Used by the scheduled trigger,
+     * where there is no originating event to hang evaluate() off.
+     *
+     * Returns true when the conditions matched and the actions ran.
+     */
+    public static function runRuleForTask(ProjectAutomationRule $rule, Task $task): bool
+    {
+        if (self::$executing) {
+            return false;
+        }
+
+        if (!self::conditionsMet($task, $rule->conditions)) {
+            return false;
+        }
+
+        self::$executing = true;
+
+        try {
+            self::executeActions($task, $rule->actions ?? []);
+
+            $task->refresh();
+            $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
+
+            broadcast(new TaskUpdated(
+                $task->project_id,
+                $task->toArray(),
+                'updated',
+                $task->created_by ?? 0,
+            ));
+
+            $actionSummaries = collect($rule->actions ?? [])->map(fn ($a) => $a['type'] ?? 'unknown')->all();
+            broadcast(new AutomationRuleExecuted(
+                $task->project_id,
+                $rule->name,
+                ['id' => $task->id, 'title' => $task->title],
+                $actionSummaries,
+            ));
+        } finally {
+            self::$executing = false;
+        }
+
+        return true;
+    }
+
     private static function conditionsMet(Task $task, ?array $conditions): bool
     {
         if (empty($conditions)) {
@@ -108,6 +156,17 @@ class AutomationRuleEngine
 
             if ($field === 'custom_field') {
                 $met = self::evaluateCustomFieldCondition($task, $condition);
+            } elseif (in_array($field, self::DATE_FIELDS, true)) {
+                // Built-in dates need real date comparison; the string match below
+                // would treat every operator other than equals as "always true".
+                $raw = $task->getAttribute($field);
+                $isEmpty = $raw === null || $raw === '';
+
+                $met = match ($operator) {
+                    'is_empty' => $isEmpty,
+                    'is_not_empty' => !$isEmpty,
+                    default => self::evaluateDateCondition($raw, $operator, $condition['value'] ?? null),
+                };
             } else {
                 $taskValue = $task->getAttribute($field);
 
@@ -217,22 +276,45 @@ class AutomationRuleEngine
         };
     }
 
+    /** Date operators that compare against today and carry no value of their own. */
+    private const TODAY_RELATIVE_OPERATORS = ['is_today', 'before_today', 'after_today'];
+
     private static function evaluateDateCondition($value, string $operator, $expected): bool
     {
         if ($value === null || $value === '') return false;
 
         try {
-            $date = Carbon::parse($value);
-            $expectedDate = Carbon::parse($expected);
+            // Compared at day granularity: a due date of "today" should not fail
+            // an is_today check because the stored value carries a time.
+            $date = Carbon::parse($value)->startOfDay();
+        } catch (\Exception) {
+            return false;
+        }
+
+        if (in_array($operator, self::TODAY_RELATIVE_OPERATORS, true)) {
+            $today = Carbon::today();
+
+            return match ($operator) {
+                'is_today' => $date->equalTo($today),
+                'before_today' => $date->lessThan($today),
+                'after_today' => $date->greaterThan($today),
+            };
+        }
+
+        // Everything below compares against a fixed date supplied on the rule.
+        if ($expected === null || $expected === '') return false;
+
+        try {
+            $expectedDate = Carbon::parse($expected)->startOfDay();
         } catch (\Exception) {
             return false;
         }
 
         return match ($operator) {
-            'equals' => $date->isSameDay($expectedDate),
-            'not_equals' => !$date->isSameDay($expectedDate),
-            'before' => $date->isBefore($expectedDate),
-            'after' => $date->isAfter($expectedDate),
+            'equals' => $date->equalTo($expectedDate),
+            'not_equals' => !$date->equalTo($expectedDate),
+            'before' => $date->lessThan($expectedDate),
+            'after' => $date->greaterThan($expectedDate),
             default => true,
         };
     }

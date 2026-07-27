@@ -10,6 +10,10 @@ Artisan::command('inspire', function () {
 
 Schedule::command('tasks:send-reminders')->dailyAt('08:00');
 
+// Scheduled automation rules pick their own hour, so this has to run every hour
+// and match rules against the current one.
+Schedule::command('automation:run-scheduled')->hourlyAt(5)->withoutOverlapping();
+
 Schedule::command('backup:run --only-db')->dailyAt('02:00');
 Schedule::command('backup:clean')->dailyAt('02:30');
 Schedule::command('attachments:purge')->dailyAt('03:00');

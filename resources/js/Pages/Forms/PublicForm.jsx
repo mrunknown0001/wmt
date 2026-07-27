@@ -16,6 +16,10 @@ const MAX_FILES = 5;
 // server enforces.
 const fieldMaxFiles = (field) =>
     Math.max(1, Math.min(MAX_FILES, parseInt(field?.config?.max_files ?? MAX_FILES, 10) || MAX_FILES));
+
+// Identity for de-duplication across separate picks. The File object differs
+// between dialogs even for the same file on disk, so compare its properties.
+const fileKey = (file) => `${file.name}::${file.size}::${file.lastModified}`;
 const NUMBER_MIN = -99999999999;
 const NUMBER_MAX = 99999999999;
 
@@ -115,21 +119,57 @@ export default function PublicForm() {
         setTurnstileToken('');
     }, []);
 
+    /**
+     * Files accumulate across picks rather than replacing what is already there.
+     * A file dialog only ever reports the files chosen in that one session, so
+     * overwriting the list meant a second trip — to another folder — silently
+     * discarded everything picked the first time.
+     */
     const handleFileChange = (fieldId, files, maxFiles = MAX_FILES) => {
-        const all = Array.from(files);
+        const picked = Array.from(files);
+        if (picked.length === 0) return;
+
         const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
-        const withinSize = all.filter(f => f.size <= maxBytes);
-        const tooBig = all.length - withinSize.length;
-        const fileArray = withinSize.slice(0, maxFiles);
+        const withinSize = picked.filter(f => f.size <= maxBytes);
+        const tooBig = picked.length - withinSize.length;
 
-        setAttachments(prev => ({ ...prev, [fieldId]: fileArray }));
+        const existing = attachments[fieldId] || [];
+        const seen = new Set(existing.map(fileKey));
 
-        // Flag oversized files at selection instead of failing on the server.
+        // Re-picking the same file from the same folder shouldn't add it twice.
+        const fresh = [];
+        let duplicates = 0;
+        for (const file of withinSize) {
+            const key = fileKey(file);
+            if (seen.has(key)) {
+                duplicates++;
+                continue;
+            }
+            seen.add(key);
+            fresh.push(file);
+        }
+
+        const room = Math.max(0, maxFiles - existing.length);
+        const accepted = fresh.slice(0, room);
+        const overCap = fresh.length - accepted.length;
+
+        if (accepted.length > 0) {
+            setAttachments(prev => ({
+                ...prev,
+                [fieldId]: [...(prev[fieldId] || []), ...accepted],
+            }));
+        }
+
+        // Report everything that was dropped, at selection time rather than on
+        // the server, so nothing disappears without explanation.
+        const notes = [];
+        if (tooBig > 0) notes.push(`${tooBig} file(s) over ${MAX_FILE_SIZE_MB}MB were skipped.`);
+        if (duplicates > 0) notes.push(`${duplicates} already-added file(s) were skipped.`);
+        if (overCap > 0) notes.push(`Limit is ${maxFiles} — ${overCap} file(s) were not added.`);
+
         setErrors(prev => ({
             ...prev,
-            [`fields.${fieldId}`]: tooBig > 0
-                ? `${tooBig} file(s) over ${MAX_FILE_SIZE_MB}MB were skipped.`
-                : undefined,
+            [`fields.${fieldId}`]: notes.length ? notes.join(' ') : undefined,
         }));
     };
 
@@ -139,6 +179,10 @@ export default function PublicForm() {
             files.splice(index, 1);
             return { ...prev, [fieldId]: files };
         });
+
+        // Drop any "limit reached" / "skipped" note — removing a file makes room,
+        // so leaving the old message up would contradict the field's actual state.
+        setErrors(prev => ({ ...prev, [`fields.${fieldId}`]: undefined }));
     };
 
     const handleSubmit = (e) => {
@@ -363,16 +407,31 @@ export default function PublicForm() {
                                 type="file"
                                 accept={ACCEPTED_FILE_TYPES}
                                 multiple={maxFiles > 1}
-                                onChange={(e) => handleFileChange(field.id, e.target.files, maxFiles)}
+                                disabled={files.length >= maxFiles}
+                                onChange={(e) => {
+                                    handleFileChange(field.id, e.target.files, maxFiles);
+                                    // Clear the native selection so the same file can be
+                                    // picked again after being removed — the accumulated
+                                    // list below is the source of truth, not this input.
+                                    e.target.value = '';
+                                }}
                                 className="block w-full text-sm text-gray-500 dark:text-gray-400
                                     file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0
                                     file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700
                                     dark:file:bg-primary-900/20 dark:file:text-primary-400
                                     hover:file:bg-primary-100 dark:hover:file:bg-primary-900/30
-                                    file:cursor-pointer file:transition-colors"
+                                    file:cursor-pointer file:transition-colors
+                                    disabled:opacity-50 disabled:file:cursor-not-allowed"
                             />
                             <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
                                 PDF, images, videos, or Excel files. Max {maxFiles} {maxFiles === 1 ? 'file' : 'files'}, {MAX_FILE_SIZE_MB}MB each.
+                                {maxFiles > 1 && (
+                                    files.length >= maxFiles
+                                        ? ' Limit reached — remove a file to add another.'
+                                        : files.length > 0
+                                            ? ` ${maxFiles - files.length} more can be added — pick again to add from another folder.`
+                                            : ' You can add files from more than one folder.'
+                                )}
                             </p>
                             {files.length > 0 && (
                                 <div className="mt-3 space-y-1">

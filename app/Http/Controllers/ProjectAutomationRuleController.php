@@ -31,7 +31,8 @@ class ProjectAutomationRuleController extends Controller
     {
         return [
             'name' => 'required|string|max:255',
-            'trigger_type' => 'required|string|in:task_created,task_status_changed,task_priority_changed,task_assigned,task_completed,custom_field_changed,form_submitted',
+            'trigger_type' => 'required|string|in:task_created,task_status_changed,task_priority_changed,task_assigned,task_completed,custom_field_changed,form_submitted,scheduled',
+            'trigger_config.hour' => 'nullable|integer|min:0|max:23',
             'trigger_config' => 'nullable|array',
             'trigger_config.custom_field_id' => 'nullable|integer',
             'trigger_config.form_id' => 'nullable|integer',

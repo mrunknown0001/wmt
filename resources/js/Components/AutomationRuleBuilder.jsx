@@ -15,15 +15,32 @@ const TRIGGER_TYPES = [
     { value: 'task_completed', label: 'Task Completed' },
     { value: 'custom_field_changed', label: 'Custom Field Changed' },
     { value: 'form_submitted', label: 'Form Submitted' },
+    { value: 'scheduled', label: 'Scheduled (Time of Day)' },
 ];
+
+// Hours offered by the scheduled trigger. The runner sweeps hourly, so a rule
+// can only pick the hour, not the minute.
+const HOURS = Array.from({ length: 24 }, (_, h) => ({
+    value: h,
+    label: `${String(h).padStart(2, '0')}:00`,
+}));
 
 const CONDITION_FIELDS = [
     { value: 'status', label: 'Status' },
     { value: 'priority', label: 'Priority' },
     { value: 'assigned_to', label: 'Assignee' },
     { value: 'section_id', label: 'Section' },
+    { value: 'due_date', label: 'Due Date' },
+    { value: 'start_date', label: 'Start Date' },
     { value: 'custom_field', label: 'Custom Field' },
 ];
+
+// Built-in task columns holding dates — these get the date operators rather than
+// the plain equals/not-equals pair.
+const DATE_CONDITION_FIELDS = ['due_date', 'start_date'];
+
+// Operators that compare against today, so the value input is hidden for them.
+const NO_VALUE_OPERATORS = ['is_empty', 'is_not_empty', 'is_today', 'before_today', 'after_today'];
 
 const ACTION_TYPES = [
     { value: 'change_status', label: 'Change Status' },
@@ -59,14 +76,7 @@ function getOperatorsForCustomFieldType(cfType) {
                 { value: 'is_not_empty', label: 'is not empty' },
             ];
         case 'date':
-            return [
-                { value: 'equals', label: 'equals' },
-                { value: 'not_equals', label: 'does not equal' },
-                { value: 'before', label: 'is before' },
-                { value: 'after', label: 'is after' },
-                { value: 'is_empty', label: 'is empty' },
-                { value: 'is_not_empty', label: 'is not empty' },
-            ];
+            return DATE_OPERATORS;
         case 'single_select':
             return [
                 { value: 'equals', label: 'equals' },
@@ -91,6 +101,18 @@ function getOperatorsForCustomFieldType(cfType) {
     }
 }
 
+const DATE_OPERATORS = [
+    { value: 'equals', label: 'equals' },
+    { value: 'not_equals', label: 'does not equal' },
+    { value: 'before', label: 'is before' },
+    { value: 'after', label: 'is after' },
+    { value: 'before_today', label: 'is earlier than today' },
+    { value: 'after_today', label: 'is later than today' },
+    { value: 'is_today', label: 'is today' },
+    { value: 'is_empty', label: 'is empty' },
+    { value: 'is_not_empty', label: 'is not empty' },
+];
+
 const STANDARD_OPERATORS = [
     { value: 'equals', label: 'equals' },
     { value: 'not_equals', label: 'does not equal' },
@@ -105,6 +127,7 @@ function triggerColor(type) {
         case 'task_completed': return 'green';
         case 'custom_field_changed': return 'cyan';
         case 'form_submitted': return 'indigo';
+        case 'scheduled': return 'orange';
         default: return 'gray';
     }
 }
@@ -117,13 +140,14 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections, c
     const isCustomField = field === 'custom_field';
     const selectedCfId = condition.custom_field_id;
     const selectedCf = isCustomField ? customFields.find(cf => cf.id === Number(selectedCfId)) : null;
-    const needsValue = !['is_empty', 'is_not_empty'].includes(condition.operator);
+    const needsValue = !NO_VALUE_OPERATORS.includes(condition.operator);
 
     const operators = useMemo(() => {
+        if (DATE_CONDITION_FIELDS.includes(field)) return DATE_OPERATORS;
         if (!isCustomField) return STANDARD_OPERATORS;
         if (!selectedCf) return STANDARD_OPERATORS;
         return getOperatorsForCustomFieldType(selectedCf.type);
-    }, [isCustomField, selectedCf]);
+    }, [field, isCustomField, selectedCf]);
 
     const getStandardValueOptions = () => {
         switch (field) {
@@ -151,6 +175,18 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections, c
 
     const renderValueInput = () => {
         if (!needsValue) return null;
+
+        // Built-in date columns compare against a picked date.
+        if (DATE_CONDITION_FIELDS.includes(field)) {
+            return (
+                <input
+                    type="date"
+                    value={condition.value || ''}
+                    onChange={(e) => onChange(index, { ...condition, value: e.target.value })}
+                    className={inputClass}
+                />
+            );
+        }
 
         if (isCustomField && selectedCf) {
             const cfType = selectedCf.type;
@@ -244,7 +280,7 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections, c
                 {/* Operator */}
                 <select
                     value={condition.operator || 'equals'}
-                    onChange={(e) => onChange(index, { ...condition, operator: e.target.value, ...((['is_empty', 'is_not_empty'].includes(e.target.value)) ? { value: '' } : {}) })}
+                    onChange={(e) => onChange(index, { ...condition, operator: e.target.value, ...(NO_VALUE_OPERATORS.includes(e.target.value) ? { value: '' } : {}) })}
                     className={selectClass}
                 >
                     {operators.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -503,7 +539,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
             if (cond.field === 'custom_field' && !cond.custom_field_id) {
                 errors.push(`Condition ${n}: Select a custom field.`);
             }
-            const noValueNeeded = ['is_empty', 'is_not_empty'].includes(cond.operator);
+            const noValueNeeded = NO_VALUE_OPERATORS.includes(cond.operator);
             if (!noValueNeeded && (cond.value === '' || cond.value === undefined || cond.value === null)) {
                 errors.push(`Condition ${n}: Value is required.`);
             }
@@ -652,6 +688,9 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                         {rule.trigger_type === 'custom_field_changed' && rule.trigger_config?.custom_field_id && (
                                             <> &middot; {customFields.find(cf => cf.id === rule.trigger_config.custom_field_id)?.name || 'Unknown'}</>
                                         )}
+                                        {rule.trigger_type === 'scheduled' && (
+                                            <> &middot; {String(rule.trigger_config?.hour ?? 9).padStart(2, '0')}:00 daily</>
+                                        )}
                                         {rule.trigger_type === 'form_submitted' && rule.trigger_config?.form_id && (
                                             <> &middot; {forms.find(f => f.id === rule.trigger_config.form_id)?.name || 'Unknown'}</>
                                         )}
@@ -745,7 +784,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
 
                     <div>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Trigger</label>
-                        <div className={`grid gap-2 ${['custom_field_changed', 'form_submitted'].includes(form.trigger_type) ? 'grid-cols-2' : ''}`}>
+                        <div className={`grid gap-2 ${['custom_field_changed', 'form_submitted', 'scheduled'].includes(form.trigger_type) ? 'grid-cols-2' : ''}`}>
                             <select
                                 value={form.trigger_type}
                                 onChange={(e) => setForm(prev => ({ ...prev, trigger_type: e.target.value, trigger_config: null }))}
@@ -766,6 +805,18 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     {customFields.map(cf => (
                                         <option key={cf.id} value={cf.id}>{cf.name}</option>
                                     ))}
+                                </select>
+                            )}
+                            {form.trigger_type === 'scheduled' && (
+                                <select
+                                    value={form.trigger_config?.hour ?? 9}
+                                    onChange={(e) => setForm(prev => ({
+                                        ...prev,
+                                        trigger_config: { hour: Number(e.target.value) },
+                                    }))}
+                                    className={selectClass}
+                                >
+                                    {HOURS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
                                 </select>
                             )}
                             {form.trigger_type === 'form_submitted' && (
