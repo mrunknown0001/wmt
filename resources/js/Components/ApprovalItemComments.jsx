@@ -29,7 +29,12 @@ const Tooltip = ({ content, children }) => (
     </div>
 );
 
-export default function ApprovalItemComments({ project, item, comments, auth }) {
+/**
+ * `resubmitOnPost` turns the comment box into the requester's way back into the
+ * workflow: the comment (and any attachments) is saved first, then the request is
+ * resubmitted — so approvers always see the explanation alongside the new attempt.
+ */
+export default function ApprovalItemComments({ project, item, comments, auth, resubmitOnPost = false }) {
     const [isAdding, setIsAdding] = useState(false);
     const [commentBody, setCommentBody] = useState('');
     const [attachments, setAttachments] = useState([]);
@@ -52,6 +57,17 @@ export default function ApprovalItemComments({ project, item, comments, auth }) 
             formData,
             {
                 onStart: () => setIsAdding(true),
+                // Only resubmit once the comment has actually saved, so a failed
+                // comment can't silently push the request back into the chain.
+                onSuccess: () => {
+                    if (resubmitOnPost) {
+                        router.post(
+                            route('approval-projects.items.resubmit', [project.id, item.id]),
+                            {},
+                            { preserveScroll: true },
+                        );
+                    }
+                },
                 onFinish: () => {
                     setIsAdding(false);
                     setCommentBody('');
@@ -172,7 +188,9 @@ export default function ApprovalItemComments({ project, item, comments, auth }) 
                             disabled={isAdding || (!commentBody.trim() && attachments.length === 0)}
                             className="ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition"
                         >
-                            {isAdding ? 'Posting...' : 'Post Comment'}
+                            {isAdding
+                                ? (resubmitOnPost ? 'Posting & resubmitting...' : 'Posting...')
+                                : (resubmitOnPost ? 'Post Comment and Resubmit' : 'Post Comment')}
                         </button>
                     </div>
                 </form>

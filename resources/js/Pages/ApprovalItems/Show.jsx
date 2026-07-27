@@ -294,17 +294,21 @@ export default function Show({ item, project, canDecide, canEdit, canResubmit, a
                                 </h3>
                                 <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
                                     {item.status === 'rejected'
-                                        ? 'An approver rejected this request. If you can address the reason, add a comment below — attaching any supporting files — then resubmit.'
+                                        ? 'An approver rejected this request. To try again, add a comment below with any supporting files and use “Post Comment and Resubmit”.'
                                         : 'An approver sent this request back to you. Add a comment below — attaching any supporting files — then resubmit.'}
                                     {' '}The approval chain will start again from the first step.
                                 </p>
-                                <button
-                                    onClick={handleResubmit}
-                                    disabled={isResubmitting}
-                                    className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
-                                >
-                                    {isResubmitting ? 'Resubmitting...' : 'Resubmit for Approval'}
-                                </button>
+                                {/* Rejected requests resubmit through the comment box instead,
+                                    so the explanation always travels with the new attempt. */}
+                                {item.status !== 'rejected' && (
+                                    <button
+                                        onClick={handleResubmit}
+                                        disabled={isResubmitting}
+                                        className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+                                    >
+                                        {isResubmitting ? 'Resubmitting...' : 'Resubmit for Approval'}
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -459,6 +463,9 @@ export default function Show({ item, project, canDecide, canEdit, canResubmit, a
                             item={item}
                             comments={item.comments}
                             auth={auth}
+                            // A rejected request is revived through the comment box, so the
+                            // approvers get the requester's explanation with the new attempt.
+                            resubmitOnPost={canResubmit && item.status === 'rejected'}
                         />
                     </div>
                 </div>

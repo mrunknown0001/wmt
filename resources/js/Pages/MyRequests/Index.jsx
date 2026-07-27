@@ -202,8 +202,10 @@ export default function Index({ items, stats, projects = [], availableProjects =
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex items-center justify-end gap-2">
                                                         {/* Every request here is the viewer's own, so the
-                                                            status alone decides if it can be resubmitted. */}
-                                                        {['changes_requested', 'rejected'].includes(item.status) && (
+                                                            status alone decides if it can be resubmitted.
+                                                            Rejected is excluded on purpose — those resubmit
+                                                            from the request page so a comment goes with it. */}
+                                                        {item.status === 'changes_requested' && (
                                                             <button
                                                                 onClick={() => router.post(
                                                                     route('approval-projects.items.resubmit', [item.approval_project_id, item.id]),
