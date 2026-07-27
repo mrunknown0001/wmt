@@ -8,7 +8,7 @@ use App\Notifications\ExternalWebhookNotification;
 use App\Services\FcmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Inbound webhook: an external platform raises an in-app notification for a user.
@@ -56,20 +56,32 @@ class WebhookNotificationController extends Controller
             ], 404);
         }
 
+        // `message` is optional, so it is absent from $validated when not sent —
+        // resolve it once rather than indexing the array again below.
+        $message = $validated['message'] ?? null;
+
         foreach ($users as $user) {
             $user->notify(new ExternalWebhookNotification(
                 $validated['platform'],
                 $validated['url'],
-                $validated['message'] ?? null,
+                $message,
             ));
 
-            // Mirror to mobile push so the notification reaches the device too.
-            FcmService::sendToUser($user, [
-                'title' => $validated['platform'],
-                'body' => $validated['message'] ?: 'You have a new item to review.',
-                'type' => 'external_webhook',
-                'url' => $validated['url'],
-            ]);
+            // Mirror to mobile push. Best-effort: a push failure must not fail the
+            // webhook, since the in-app notification has already been created.
+            try {
+                FcmService::sendToUser($user, [
+                    'title' => $validated['platform'],
+                    'body' => $message ?: 'You have a new item to review.',
+                    'type' => 'external_webhook',
+                    'url' => $validated['url'],
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Webhook push notification failed', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return response()->json([
