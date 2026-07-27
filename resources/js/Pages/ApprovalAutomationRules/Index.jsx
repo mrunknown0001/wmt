@@ -38,13 +38,17 @@ export default function Index({ project, rules }) {
         <AuthenticatedLayout title="Automation Rules">
             <Head title="Automation Rules" />
             <div className="space-y-6">
-                <div className="flex items-center justify-between">
+                {/* Sticky so "Create Rule" stays reachable while the list scrolls.
+                    The opaque background keeps rows from showing through. */}
+                <div className="sticky top-0 z-10 flex items-center justify-between bg-gray-50 dark:bg-gray-900 py-3 -my-1">
                     <div className="flex items-center gap-4">
                         <Link href={route('approval-projects.show', project.id)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                             <span className="inline-flex items-center gap-1"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>Back</span>
                         </Link>
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Automation Rules</h1>
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                                Automation Rules ({rules?.length || 0})
+                            </h1>
                             <p className="text-gray-600 dark:text-gray-400 mt-1">{project.name}</p>
                         </div>
                     </div>

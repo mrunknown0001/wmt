@@ -3032,7 +3032,9 @@ export default function Show() {
             )}
 
             {/* Custom Fields Panel — always mounted so column header edit/delete works via ref */}
-            <div className={showCustomFields ? 'shrink-0 max-h-64 overflow-y-auto' : 'hidden'}>
+            {/* No outer scroll cap: CustomFieldManager scrolls its own list under a
+                sticky header, so a second scroll container here would nest. */}
+            <div className={showCustomFields ? 'shrink-0' : 'hidden'}>
                 <Card className="mb-4">
                     <CustomFieldManager
                         ref={cfManagerRef}

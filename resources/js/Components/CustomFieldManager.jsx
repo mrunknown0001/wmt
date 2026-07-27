@@ -555,16 +555,20 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
     const typeLabel = (type) => FIELD_TYPES.find(t => t.value === type)?.label || type;
 
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Custom Fields</h3>
-                <Button variant="secondary" size="sm" onClick={openCreate}>+ Add Field</Button>
+        <div>
+            {/* Sticky so "Add Field" stays reachable while a long list scrolls
+                underneath. Needs an opaque background to cover the rows. */}
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-white dark:bg-gray-800 pb-3 mb-1 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    Custom Fields ({fields.length})
+                </h3>
+                <Button size="sm" onClick={openCreate}>+ Add Field</Button>
             </div>
 
             {fields.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No custom fields yet. Add one to track additional data on tasks.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 pt-3">No custom fields yet. Add one to track additional data on tasks.</p>
             ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-96 overflow-y-auto pt-3 pr-1 scrollbar-thin">
                     {fields.map((field, index) => (
                         <div
                             key={field.id}
