@@ -137,11 +137,15 @@ class ApprovalWorkflowEngine
         self::$executing = true;
 
         try {
-            if ($item->status !== 'changes_requested') {
-                abort(409, 'Item must be in changes_requested status to resubmit.');
+            // A requester can revive a request that was sent back for changes or
+            // outright rejected.
+            if (!in_array($item->status, ['changes_requested', 'rejected'], true)) {
+                abort(409, 'Only a rejected or changes-requested item can be resubmitted.');
             }
 
-            $item->update(['status' => 'pending']);
+            // decided_at is set when a request is finalised as rejected; clear it so
+            // the revived request isn't reported as already decided.
+            $item->update(['status' => 'pending', 'decided_at' => null]);
 
             // Re-enter at step 1 with new attempt number
             $maxAttempt = $item->stepInstances()

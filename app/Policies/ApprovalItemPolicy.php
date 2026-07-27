@@ -88,7 +88,9 @@ class ApprovalItemPolicy
 
     public function resubmit(User $user, ApprovalItem $item): bool
     {
-        // Only requester can resubmit
-        return $item->requested_by === $user->id && $item->status === 'changes_requested';
+        // Only the requester, and only for a request that was sent back for
+        // changes or rejected.
+        return $item->requested_by === $user->id
+            && in_array($item->status, ['changes_requested', 'rejected'], true);
     }
 }

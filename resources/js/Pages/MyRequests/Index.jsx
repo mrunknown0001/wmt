@@ -203,7 +203,7 @@ export default function Index({ items, stats, projects = [], availableProjects =
                                                     <div className="flex items-center justify-end gap-2">
                                                         {/* Every request here is the viewer's own, so the
                                                             status alone decides if it can be resubmitted. */}
-                                                        {item.status === 'changes_requested' && (
+                                                        {['changes_requested', 'rejected'].includes(item.status) && (
                                                             <button
                                                                 onClick={() => router.post(
                                                                     route('approval-projects.items.resubmit', [item.approval_project_id, item.id]),

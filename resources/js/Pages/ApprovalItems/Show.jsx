@@ -284,12 +284,19 @@ export default function Show({ item, project, canDecide, canEdit, canResubmit, a
                         {/* Changes requested — the requester's way back into the workflow.
                             Resubmitting restarts the chain from step 1. */}
                         {canResubmit && (
-                            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Changes Requested</h3>
+                            <div className={`rounded-lg p-6 border ${
+                                item.status === 'rejected'
+                                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                    : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+                            }`}>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                    {item.status === 'rejected' ? 'Request Rejected' : 'Changes Requested'}
+                                </h3>
                                 <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
-                                    An approver sent this request back to you. Add a comment below —
-                                    attaching any supporting files — then resubmit. The approval chain
-                                    will start again from the first step.
+                                    {item.status === 'rejected'
+                                        ? 'An approver rejected this request. If you can address the reason, add a comment below — attaching any supporting files — then resubmit.'
+                                        : 'An approver sent this request back to you. Add a comment below — attaching any supporting files — then resubmit.'}
+                                    {' '}The approval chain will start again from the first step.
                                 </p>
                                 <button
                                     onClick={handleResubmit}
