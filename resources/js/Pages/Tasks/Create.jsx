@@ -20,7 +20,7 @@ export default function Create() {
         const values = {};
         customFields.forEach((f) => {
             const dv = f.config?.default_value;
-            if (f.type === 'formula' || dv === undefined || dv === null || dv === '') return;
+            if (['formula', 'week_of_year'].includes(f.type) || dv === undefined || dv === null || dv === '') return;
             if (f.type === 'multi_select') {
                 values[f.id] = (Array.isArray(dv) ? dv : [dv]).map(Number);
             } else {
@@ -177,7 +177,7 @@ export default function Create() {
                         {customFields.length > 0 && (
                             <div className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                                 <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Custom Fields</h4>
-                                {customFields.filter(f => f.type !== 'formula').map(field => (
+                                {customFields.filter(f => !['formula', 'week_of_year'].includes(f.type)).map(field => (
                                     <CustomFieldValueEditor
                                         key={field.id}
                                         field={field}

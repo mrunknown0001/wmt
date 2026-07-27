@@ -673,7 +673,7 @@ export default function Edit() {
                             {customFields.length > 0 && (
                                 <div className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                                     <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Custom Fields</h4>
-                                    {customFields.filter(f => f.type !== 'formula').map(field => (
+                                    {customFields.filter(f => !['formula', 'week_of_year'].includes(f.type)).map(field => (
                                         <CustomFieldValueEditor
                                             key={field.id}
                                             field={field}

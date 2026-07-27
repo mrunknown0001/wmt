@@ -8,6 +8,7 @@ import Tooltip from './Tooltip';
 import SearchableSelect from './SearchableSelect';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom } from '../utils';
 import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
+import { weekOfYearLabel } from '../weekOfYear';
 
 function formatFileSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
@@ -652,6 +653,17 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                             const results = computeAllFormulas(taskForFormula, customFields);
                                             const val = results[cf.id];
                                             displayValue = val != null ? formatFormulaResult(val, cf.config) : '—';
+                                        } else if (cf.type === 'week_of_year') {
+                                            // Derived from the date field it follows, so it reads the
+                                            // task rather than a stored value of its own.
+                                            const record = {
+                                                ...taskData,
+                                                custom_field_values: Object.entries(customFieldValues).map(([fieldId, val]) => ({
+                                                    custom_field_id: Number(fieldId),
+                                                    ...val,
+                                                })),
+                                            };
+                                            displayValue = weekOfYearLabel(record, cf.config) || '—';
                                         } else {
                                             const cfv = customFieldValues[cf.id];
                                             if (cfv) {
@@ -671,18 +683,6 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                                     const ids = cfv.value_json || [];
                                                     const labels = ids.map(id => cf.options?.find(o => o.id === id)?.label).filter(Boolean);
                                                     displayValue = labels.join(', ') || '—';
-                                                } else if (cf.type === 'week_of_year') {
-                                                    // Reference date is stored; show the ISO week.
-                                                    const d = cfv.value_date;
-                                                    if (d) {
-                                                        const t = new Date(d + 'T00:00:00');
-                                                        const u = new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()));
-                                                        u.setUTCDate(u.getUTCDate() - ((u.getUTCDay() + 6) % 7) + 3);
-                                                        const iy = u.getUTCFullYear();
-                                                        const ft = new Date(Date.UTC(iy, 0, 4));
-                                                        ft.setUTCDate(ft.getUTCDate() - ((ft.getUTCDay() + 6) % 7) + 3);
-                                                        displayValue = `Week ${1 + Math.round((u - ft) / 604800000)}, ${iy}`;
-                                                    } else displayValue = '—';
                                                 } else if (cf.type === 'people') {
                                                     // Names are resolved server-side (people_names accessor).
                                                     displayValue = cfv.people_names || '—';

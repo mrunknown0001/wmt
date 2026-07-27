@@ -5,21 +5,6 @@ import Tooltip from './Tooltip';
 import PeoplePicker, { loadPeopleOptions } from './PeoplePicker';
 import { formatFormulaResult } from '../formulaEngine';
 
-/** ISO-8601 week of a date, matching Carbon's isoWeek()/isoWeekYear(). */
-function isoWeekLabel(dateStr) {
-    if (!dateStr) return null;
-    const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
-    if (Number.isNaN(d.getTime())) return null;
-    // Shift to the Thursday of this week — the ISO year is whichever year holds it.
-    const target = new Date(d.getTime());
-    target.setDate(target.getDate() - ((d.getDay() + 6) % 7) + 3);
-    const isoYear = target.getFullYear();
-    const firstThursday = new Date(isoYear, 0, 4);
-    firstThursday.setDate(firstThursday.getDate() - ((firstThursday.getDay() + 6) % 7) + 3);
-    const week = 1 + Math.round((target - firstThursday) / (7 * 24 * 60 * 60 * 1000));
-    return `Week ${week}, ${isoYear}`;
-}
-
 function SelectOptions({ options, selectedId, onSelect }) {
     return (
         <div className="py-1 min-w-[160px] max-w-xs max-h-60 overflow-y-auto scrollbar-thin">
@@ -202,12 +187,6 @@ function DisplayValue({ customField, cfv, formatDate }) {
                 : cfv.value_number}</span>;
         case 'date':
             return <span>{cfv.value_date ? formatDate(cfv.value_date) : '—'}</span>;
-        case 'week_of_year': {
-            const label = isoWeekLabel(cfv.value_date);
-            if (!label) return <span className="text-gray-300 dark:text-gray-600">—</span>;
-            // The underlying date is worth surfacing — the week alone is ambiguous.
-            return <Tooltip content={formatDate(cfv.value_date)}><span>{label}</span></Tooltip>;
-        }
         case 'people': {
             // people_names is a comma-joined string appended by the value model.
             const names = cfv.people_names;
@@ -271,8 +250,7 @@ export default function InlineCustomFieldEditor({ task, customField, isOpen, onT
     };
 
     // Date uses its own InlineDatePicker
-    // Week of year stores a reference date, so it edits with the same picker.
-    if (customField.type === 'date' || customField.type === 'week_of_year') {
+    if (customField.type === 'date') {
         return (
             <InlineDatePicker
                 currentDate={cfv?.value_date || null}

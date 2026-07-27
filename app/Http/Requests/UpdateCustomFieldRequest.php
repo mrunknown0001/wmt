@@ -36,6 +36,9 @@ class UpdateCustomFieldRequest extends FormRequest
             'config.decimal_places' => ['nullable', 'integer', 'min:0', 'max:10'],
             'config.sort_mode' => ['nullable', 'string', 'in:alphabetical,manual'],
             'config.default_value' => ['nullable'],
+            // Week of Year names the date field it derives from: a built-in
+            // column name, or 'cf:<id>' for a date custom field.
+            'config.reference_field' => ['nullable', 'string', 'max:64', 'regex:/^(cf:[0-9]+|[a-z_]+)$/'],
             // People fields carry an optional org scope, set on the field definition.
             'config.division_id' => ['nullable', 'integer', 'exists:divisions,id'],
             'config.department_id' => ['nullable', 'integer', 'exists:departments,id'],

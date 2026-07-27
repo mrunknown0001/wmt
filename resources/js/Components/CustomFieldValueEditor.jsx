@@ -3,24 +3,6 @@ import Select from './Select';
 import Textarea from './Textarea';
 import PeoplePicker from './PeoplePicker';
 
-// ISO-8601 week number, matching Carbon's isoWeek()/isoWeekYear() on the server.
-function isoWeek(dateStr) {
-    if (!dateStr) return null;
-    const d = new Date(dateStr + 'T00:00:00');
-    if (Number.isNaN(d.getTime())) return null;
-    // Shift to the Thursday of this week: the ISO year is whichever year that
-    // Thursday falls in.
-    const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    const dayNum = (target.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
-    target.setUTCDate(target.getUTCDate() - dayNum + 3);
-    const isoYear = target.getUTCFullYear();
-    const firstThursday = new Date(Date.UTC(isoYear, 0, 4));
-    const firstDayNum = (firstThursday.getUTCDay() + 6) % 7;
-    firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNum + 3);
-    const week = 1 + Math.round((target - firstThursday) / (7 * 24 * 60 * 60 * 1000));
-    return { week, year: isoYear };
-}
-
 export default function CustomFieldValueEditor({ field, value, onChange, error }) {
     const handleChange = (newValue) => {
         onChange(field.id, newValue);
@@ -139,24 +121,11 @@ export default function CustomFieldValueEditor({ field, value, onChange, error }
             );
         }
 
-        case 'week_of_year': {
-            const wk = isoWeek(value);
-            return (
-                <div>
-                    <Input
-                        label={field.name}
-                        id={`cf-${field.id}`}
-                        type="date"
-                        value={value || ''}
-                        onChange={(e) => handleChange(e.target.value)}
-                        error={error}
-                    />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {wk ? `Week ${wk.week}, ${wk.year}` : 'Pick a reference date to set the week.'}
-                    </p>
-                </div>
-            );
-        }
+        // Week of year is derived from the date field it follows, so it has no
+        // input of its own. Callers filter it out of forms alongside formula
+        // fields; this branch only guards against one slipping through.
+        case 'week_of_year':
+            return null;
 
         case 'people':
             return (

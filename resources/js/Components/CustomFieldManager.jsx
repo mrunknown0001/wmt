@@ -9,6 +9,7 @@ import Tooltip from './Tooltip';
 import { apiFetch } from '../utils';
 import { validateFormula } from '../formulaEngine';
 import { loadPeopleOptions } from './PeoplePicker';
+import { dateSourceOptions } from '../weekOfYear';
 
 const FIELD_TYPES = [
     { value: 'text', label: 'Text' },
@@ -451,7 +452,7 @@ function PeopleScopeConfig({ config, onChange }) {
     );
 }
 
-export default forwardRef(function CustomFieldManager({ projectId, initialFields = [], onFieldsChange, baseUrl }, ref) {
+export default forwardRef(function CustomFieldManager({ projectId, initialFields = [], onFieldsChange, baseUrl, builtInDateFields = [] }, ref) {
     // Approval projects expose the same custom-field API under a different prefix;
     // pass baseUrl to point this manager at it. Defaults to regular projects.
     const fieldsUrl = baseUrl || `/projects/${projectId}/custom-fields`;
@@ -536,6 +537,14 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 }
             }
 
+            // Without a reference the field has nothing to calculate from and would
+            // read as blank on every record.
+            if (form.type === 'week_of_year' && !form.config.reference_field) {
+                alert('Pick the date field this Week of Year should follow.');
+                setSaving(false);
+                return;
+            }
+
             const isSelect = ['single_select', 'multi_select'].includes(form.type);
 
             let config;
@@ -545,6 +554,8 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 config = { sort_mode: form.config.sort_mode };
             } else if (form.type === 'number') {
                 config = { decimal_places: form.config.decimal_places };
+            } else if (form.type === 'week_of_year') {
+                config = { reference_field: form.config.reference_field || null };
             } else if (form.type === 'people') {
                 // Empty selects come through as '' — normalise to null so the
                 // server sees "no scope" rather than an unparseable id.
@@ -751,6 +762,29 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                         options={FIELD_TYPES}
                         disabled={!!editingField}
                     />
+                    {form.type === 'week_of_year' && (() => {
+                        const sources = dateSourceOptions(builtInDateFields, fields, editingField?.id ?? null);
+                        return (
+                            <div>
+                                <Select
+                                    label="Reference date field"
+                                    id="cf-week-reference"
+                                    value={form.config.reference_field || ''}
+                                    onChange={(e) => setForm(prev => ({ ...prev, config: { ...prev.config, reference_field: e.target.value || null } }))}
+                                    options={[
+                                        { value: '', label: sources.length ? 'Select a date field…' : 'No date fields available' },
+                                        ...sources,
+                                    ]}
+                                    disabled={sources.length === 0}
+                                />
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {sources.length
+                                        ? 'The week is calculated from this date — it is not entered by hand.'
+                                        : 'Add a Date custom field first, or pick one of the built-in dates.'}
+                                </p>
+                            </div>
+                        );
+                    })()}
                     {form.type === 'people' && (
                         <PeopleScopeConfig
                             config={form.config}

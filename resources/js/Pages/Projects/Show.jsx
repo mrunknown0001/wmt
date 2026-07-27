@@ -49,6 +49,12 @@ import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
+import { weekOfYearLabel } from '../../weekOfYear';
+
+// Types whose value is computed from other data rather than entered. They are
+// read-only everywhere: no inline editor, no bulk edit, no filtering.
+const DERIVED_FIELD_TYPES = ['formula', 'week_of_year'];
+const isDerivedField = (type) => DERIVED_FIELD_TYPES.includes(type);
 import echo from '../../echo';
 
 const TASK_STATUSES = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
@@ -151,6 +157,14 @@ function renderCustomFieldValue(task, customField) {
         const val = customField._formulaValue;
         if (val == null) return <span className="text-gray-300 dark:text-gray-600">—</span>;
         return <span>{formatFormulaResult(val, customField.config)}</span>;
+    }
+
+    // Derived from whichever date the field was configured to follow, so it reads
+    // from the task rather than from a stored value of its own.
+    if (customField.type === 'week_of_year') {
+        const label = weekOfYearLabel(task, customField.config);
+        if (!label) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+        return <span>{label}</span>;
     }
 
     const cfValues = task.custom_field_values || [];
@@ -421,7 +435,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     return (
                         <td key={colId} className="px-6 py-3 text-sm text-center text-gray-700 dark:text-gray-300 overflow-hidden" style={cStyle}>
                             <div className="truncate">
-                            {canEditTask && cf.type !== 'formula' ? (
+                            {canEditTask && !isDerivedField(cf.type) ? (
                                 <InlineCustomFieldEditor task={task} customField={cfDisplay} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
                             ) : (
                                 renderCustomFieldValue(task, cfDisplay)
@@ -845,7 +859,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     return (
                         <td key={colId} className="px-6 py-4 text-sm text-center text-gray-700 dark:text-gray-300 overflow-hidden" style={cStyle}>
                             <div className="truncate">
-                            {canEditTask && cf.type !== 'formula' ? (
+                            {canEditTask && !isDerivedField(cf.type) ? (
                                 <InlineCustomFieldEditor task={task} customField={cfDisplay} isOpen={openPopover === `cf-${cf.id}`} onToggle={togglePopover(`cf-${cf.id}`)} onUpdate={onCustomFieldUpdate} formatDate={formatDate} />
                             ) : (
                                 renderCustomFieldValue(task, cfDisplay)
@@ -1567,7 +1581,7 @@ export default function Show() {
             { id: 'assignee', name: 'Assignee', fieldType: 'select', options: assignees.map(a => ({ id: String(a.id), label: a.name })) },
             { id: 'due_date', name: 'Due Date', fieldType: 'date' },
         ];
-        const custom = localCustomFields.filter(cf => cf.type !== 'formula').map(cf => ({
+        const custom = localCustomFields.filter(cf => !isDerivedField(cf.type)).map(cf => ({
             id: `cf_${cf.id}`, name: cf.name, fieldType: cf.type, options: cf.options, config: cf.config, cfId: cf.id,
         }));
         return [...builtIn, ...custom];
@@ -2030,8 +2044,7 @@ export default function Show() {
                 custom_field_id: fieldId,
                 value_text: (fieldType === 'text' || fieldType === 'textarea') ? value : null,
                 value_number: fieldType === 'number' ? value : null,
-                // Week of year stores its reference date in the same column as date.
-                value_date: (fieldType === 'date' || fieldType === 'week_of_year') ? value : null,
+                value_date: fieldType === 'date' ? value : null,
                 value_option_id: fieldType === 'single_select' ? value : null,
                 value_json: (fieldType === 'multi_select' || fieldType === 'people') ? value : null,
                 selected_option: fieldType === 'single_select' && value
@@ -3051,6 +3064,10 @@ export default function Show() {
                         projectId={project.id}
                         initialFields={localCustomFields}
                         onFieldsChange={setLocalCustomFields}
+                        builtInDateFields={[
+                            { value: 'due_date', label: 'Due Date' },
+                            { value: 'start_date', label: 'Start Date' },
+                        ]}
                     />
                 </Card>
             </div>
@@ -4240,7 +4257,7 @@ export default function Show() {
                     </div>
 
                     {/* Custom field editor */}
-                    {localCustomFields.some((cf) => cf.type !== 'formula') && (
+                    {localCustomFields.some((cf) => !isDerivedField(cf.type)) && (
                         <div className="relative">
                             <Tooltip content="Custom Field"><button onClick={() => { setBulkDropdown(bulkDropdown === 'custom_field' ? null : 'custom_field'); setBulkCustomField(null); }} className="p-1.5 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
                                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>
@@ -4250,7 +4267,7 @@ export default function Show() {
                                     {!bulkCustomField ? (
                                         <div className="py-1 max-h-60 overflow-y-auto">
                                             <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Set custom field</div>
-                                            {localCustomFields.filter((cf) => cf.type !== 'formula').map((cf) => (
+                                            {localCustomFields.filter((cf) => !isDerivedField(cf.type)).map((cf) => (
                                                 <button key={cf.id} onClick={() => setBulkCustomField(cf)} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between gap-3">
                                                     <span className="truncate">{cf.name}</span>
                                                     <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{formatLabel(cf.type)}</span>
