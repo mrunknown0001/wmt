@@ -40,7 +40,7 @@ export default function Index({ project, rules }) {
             <div className="space-y-6">
                 {/* Sticky so "Create Rule" stays reachable while the list scrolls.
                     The opaque background keeps rows from showing through. */}
-                <div className="sticky top-0 z-10 flex items-center justify-between bg-gray-50 dark:bg-gray-900 py-3 -my-1">
+                <div className="sticky top-0 z-20 flex items-center justify-between bg-gray-50 dark:bg-gray-900 py-3 -my-1">
                     <div className="flex items-center gap-4">
                         <Link href={route('approval-projects.show', project.id)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                             <span className="inline-flex items-center gap-1"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>Back</span>
@@ -57,16 +57,20 @@ export default function Index({ project, rules }) {
                     </Link>
                 </div>
 
+                {/* The list owns its own scrolling and is capped to the viewport, so
+                    the heading and Create Rule button above it never scroll away —
+                    rather than relying on sticky, which only holds while the page
+                    itself is the scrolling element. */}
                 {rules && rules.length > 0 ? (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-y-auto max-h-[calc(100vh-16rem)] scrollbar-thin">
                         <table className="w-full">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Name</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Trigger</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Actions</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Status</th>
-                                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Options</th>
+                                    <th className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Name</th>
+                                    <th className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Trigger</th>
+                                    <th className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Actions</th>
+                                    <th className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Status</th>
+                                    <th className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Options</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
