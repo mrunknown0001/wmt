@@ -1303,6 +1303,15 @@ export default function Show() {
     const [showCustomFields, setShowCustomFields] = useState(false);
     const [celebration, setCelebration] = useState(null); // { x, y } or null
     const [automationToasts, setAutomationToasts] = useState([]);
+    // Why a status change was refused (project close rule), shown as a toast.
+    const [blockedMessage, setBlockedMessage] = useState(null);
+
+    // Auto-dismiss so it doesn't linger over the board.
+    useEffect(() => {
+        if (!blockedMessage) return;
+        const t = setTimeout(() => setBlockedMessage(null), 6000);
+        return () => clearTimeout(t);
+    }, [blockedMessage]);
     const [contextMenu, setContextMenu] = useState(null); // { task, x, y } or null
     const [detailTaskId, setDetailTaskId] = useState(null); // task ID for detail panel
 
@@ -1950,6 +1959,12 @@ export default function Show() {
         }).then(async (res) => {
             if (!res.ok) {
                 setLocalTasks(serverTasks);
+                // A 422 here is the project's close rule refusing the move. Without
+                // a message the card just springs back and looks like a broken drag.
+                if (res.status === 422) {
+                    const body = await res.json().catch(() => null);
+                    setBlockedMessage(body?.message || 'That task needs an attachment before it can be completed.');
+                }
                 return;
             }
             const data = await res.json();
@@ -1991,7 +2006,16 @@ export default function Show() {
             method: 'PATCH',
             body: JSON.stringify({ [field]: value }),
         }).then(async (res) => {
-            if (!res.ok) { setLocalTasks(serverTasks); return; }
+            if (!res.ok) {
+                setLocalTasks(serverTasks);
+                // Same close rule, reached from the list view's inline status edit.
+                if (res.status === 422) {
+                    const body = await res.json().catch(() => null);
+                    const msg = body?.errors?.status?.[0] || body?.message;
+                    if (msg) setBlockedMessage(msg);
+                }
+                return;
+            }
             const data = await res.json();
             if (data.recurring_task_created && data.new_task) {
                 setLocalTasks((prev) => [...prev, data.new_task]);
@@ -4358,6 +4382,27 @@ export default function Show() {
                 />
             )}
 
+            {/* Blocked status change (project attachment rule) */}
+            {blockedMessage && (
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-md">
+                    <div className="flex items-start gap-3 rounded-lg bg-red-600 text-white px-4 py-3 shadow-lg">
+                        <svg className="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                        <p className="text-sm flex-1">{blockedMessage}</p>
+                        <button
+                            type="button"
+                            onClick={() => setBlockedMessage(null)}
+                            aria-label="Dismiss"
+                            className="shrink-0 opacity-80 hover:opacity-100"
+                        >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
             {/* Automation rule execution toasts */}
             {automationToasts.length > 0 && (
                 <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">

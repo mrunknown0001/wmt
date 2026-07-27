@@ -22,6 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -818,23 +819,58 @@ class TaskController extends Controller
                 ->keyBy('id');
         }
 
-        // Pre-fetch current statuses for automation rule evaluation
+        // Load the models rather than mass-updating. A query-builder update skips
+        // Eloquent events entirely, which meant board drags bypassed the project's
+        // "attachment required before completing" rule *and* never stamped
+        // completed_at — so a task finished on the board looked done but counted
+        // as incomplete in every metric.
         $taskIds = collect($validated['tasks'])->pluck('id')->toArray();
-        $oldStatuses = Task::where('project_id', $project->id)
+        $models = Task::where('project_id', $project->id)
             ->whereIn('id', $taskIds)
-            ->pluck('status', 'id');
+            ->get()
+            ->keyBy('id');
+
+        // Snapshot before anything is mutated, for the automation pass below.
+        $oldStatuses = $models->map(fn (Task $t) => $t->status);
+
+        // Check the whole batch before writing any of it. A single drag carries a
+        // column's worth of tasks, so failing midway would leave the rest applied
+        // while the UI rolled everything back.
+        $blocked = [];
+        foreach ($validated['tasks'] as $item) {
+            $task = $models->get($item['id']);
+            if (!$task) {
+                continue;
+            }
+
+            try {
+                $task->assertClosableUnderProjectRules($item['status'], $task->status);
+            } catch (ValidationException $e) {
+                $blocked[] = $task->title;
+            }
+        }
+
+        if (!empty($blocked)) {
+            return response()->json([
+                'message' => count($blocked) === 1
+                    ? "\"{$blocked[0]}\" needs at least one attachment before it can be completed."
+                    : count($blocked) . ' tasks need an attachment before they can be completed.',
+                'blocked' => $blocked,
+            ], 422);
+        }
 
         foreach ($validated['tasks'] as $item) {
-            $updateData = [
-                'status' => $item['status'],
-                'position' => $item['position'],
-            ];
-            if (array_key_exists('section_id', $item)) {
-                $updateData['section_id'] = $item['section_id'];
+            $task = $models->get($item['id']);
+            if (!$task) {
+                continue;
             }
-            Task::where('id', $item['id'])
-                ->where('project_id', $project->id)
-                ->update($updateData);
+
+            $task->status = $item['status'];
+            $task->position = $item['position'];
+            if (array_key_exists('section_id', $item)) {
+                $task->section_id = $item['section_id'];
+            }
+            $task->save();
         }
 
         // Fire automation rules for tasks whose status changed
