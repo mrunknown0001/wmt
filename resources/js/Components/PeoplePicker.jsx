@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../utils';
 import Avatar from './Avatar';
+import { normalizeScopes, filterUsersByScopes, describeScopes } from '../peopleScope';
 
 /**
  * Multi-select picker for the "People" custom field.
@@ -32,10 +33,6 @@ const loadOptions = () => {
 /** Shared so the field editor can build its scope dropdowns from the same fetch. */
 export const loadPeopleOptions = loadOptions;
 
-/** True when a field config actually narrows anything. */
-export const hasPeopleScope = (config) =>
-    !!(config && (config.division_id || config.department_id || config.team_id));
-
 export default function PeoplePicker({ value = [], onChange, disabled = false, scope = null }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState(false);
@@ -44,11 +41,9 @@ export default function PeoplePicker({ value = [], onChange, disabled = false, s
     const [departmentId, setDepartmentId] = useState('');
     const [teamId, setTeamId] = useState('');
 
-    // A configured scope replaces the interactive filters entirely.
-    const scoped = hasPeopleScope(scope);
-    const effDivision = scoped ? (scope.division_id ? String(scope.division_id) : '') : divisionId;
-    const effDepartment = scoped ? (scope.department_id ? String(scope.department_id) : '') : departmentId;
-    const effTeam = scoped ? (scope.team_id ? String(scope.team_id) : '') : teamId;
+    // Configured scope rules replace the interactive filters entirely.
+    const scopes = useMemo(() => normalizeScopes(scope), [scope]);
+    const scoped = scopes.length > 0;
 
     useEffect(() => {
         let alive = true;
@@ -81,26 +76,29 @@ export default function PeoplePicker({ value = [], onChange, disabled = false, s
 
     const visibleUsers = useMemo(() => {
         if (!data) return [];
-        const q = search.trim().toLowerCase();
-        return data.users.filter((u) => {
-            if (effDivision && String(u.division_id) !== String(effDivision)) return false;
-            if (effDepartment && String(u.department_id) !== String(effDepartment)) return false;
-            if (effTeam && String(u.team_id) !== String(effTeam)) return false;
-            if (q && !`${u.name} ${u.position || ''}`.toLowerCase().includes(q)) return false;
-            return true;
-        });
-    }, [data, search, effDivision, effDepartment, effTeam]);
 
-    /** Human-readable description of a configured scope, e.g. "Finance · Payroll". */
-    const scopeLabel = useMemo(() => {
-        if (!scoped || !data) return null;
-        const parts = [
-            data.divisions.find((d) => String(d.id) === effDivision)?.name,
-            data.departments.find((d) => String(d.id) === effDepartment)?.name,
-            data.teams.find((t) => String(t.id) === effTeam)?.name,
-        ].filter(Boolean);
-        return parts.length ? parts.join(' · ') : null;
-    }, [scoped, data, effDivision, effDepartment, effTeam]);
+        // Configured rules first (union), then the interactive filters, which
+        // only exist when the field carries no rules of its own.
+        const base = scoped
+            ? filterUsersByScopes(data.users, scopes)
+            : data.users.filter((u) => {
+                if (divisionId && String(u.division_id) !== divisionId) return false;
+                if (departmentId && String(u.department_id) !== departmentId) return false;
+                if (teamId && String(u.team_id) !== teamId) return false;
+                return true;
+            });
+
+        const q = search.trim().toLowerCase();
+        if (!q) return base;
+
+        return base.filter((u) => `${u.name} ${u.position || ''}`.toLowerCase().includes(q));
+    }, [data, search, scoped, scopes, divisionId, departmentId, teamId]);
+
+    /** e.g. "Finance · Payroll, Operations" across every configured rule. */
+    const scopeLabel = useMemo(
+        () => (scoped && data ? describeScopes(scopes, data) || null : null),
+        [scoped, data, scopes]
+    );
 
     const selectedUsers = useMemo(
         () => (data ? data.users.filter((u) => selected.has(u.id)) : []),

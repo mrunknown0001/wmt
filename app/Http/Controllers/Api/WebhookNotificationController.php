@@ -5,10 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Notifications\ExternalWebhookNotification;
-use App\Services\FcmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Inbound webhook: an external platform raises an in-app notification for a user.
@@ -61,27 +59,14 @@ class WebhookNotificationController extends Controller
         $message = $validated['message'] ?? null;
 
         foreach ($users as $user) {
+            // Push is not sent here: SendFcmNotification already fires off the
+            // database channel, so pushing again produced two notifications per
+            // webhook — one of them from this call, the other from the listener.
             $user->notify(new ExternalWebhookNotification(
                 $validated['platform'],
                 $validated['url'],
                 $message,
             ));
-
-            // Mirror to mobile push. Best-effort: a push failure must not fail the
-            // webhook, since the in-app notification has already been created.
-            try {
-                FcmService::sendToUser($user, [
-                    'title' => $validated['platform'],
-                    'body' => $message ?: 'You have a new item to review.',
-                    'type' => 'external_webhook',
-                    'url' => $validated['url'],
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('Webhook push notification failed', [
-                    'user_id' => $user->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
         }
 
         return response()->json([

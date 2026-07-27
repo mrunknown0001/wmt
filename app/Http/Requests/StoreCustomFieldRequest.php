@@ -39,7 +39,14 @@ class StoreCustomFieldRequest extends FormRequest
             // Week of Year names the date field it derives from: a built-in
             // column name, or 'cf:<id>' for a date custom field.
             'config.reference_field' => ['nullable', 'string', 'max:64', 'regex:/^(cf:[0-9]+|[a-z_]+)$/'],
-            // People fields carry an optional org scope, set on the field definition.
+            // People fields carry optional org scope rules, set on the field
+            // definition. A person is offered if they match any rule.
+            'config.scopes' => ['nullable', 'array', 'max:20'],
+            'config.scopes.*.division_id' => ['nullable', 'integer', 'exists:divisions,id'],
+            'config.scopes.*.department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'config.scopes.*.team_id' => ['nullable', 'integer', 'exists:teams,id'],
+            // Original single-rule shape, still accepted so fields defined before
+            // multiple rules existed can be saved unchanged.
             'config.division_id' => ['nullable', 'integer', 'exists:divisions,id'],
             'config.department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'config.team_id' => ['nullable', 'integer', 'exists:teams,id'],

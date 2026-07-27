@@ -10,6 +10,7 @@ import { apiFetch } from '../utils';
 import { validateFormula } from '../formulaEngine';
 import { loadPeopleOptions } from './PeoplePicker';
 import { dateSourceOptions } from '../weekOfYear';
+import { normalizeScopes, filterUsersByScopes } from '../peopleScope';
 
 const FIELD_TYPES = [
     { value: 'text', label: 'Text' },
@@ -372,27 +373,11 @@ function FormulaEditor({ config, onChange, availableFields }) {
     );
 }
 
-/**
- * Scope selector for a People field. Chosen once here, on the field definition,
- * so everyone filling the field in gets an already-narrowed list instead of
- * having to filter the whole directory themselves. Leave all three as "Any" to
- * offer every active user.
- */
-function PeopleScopeConfig({ config, onChange }) {
-    const [data, setData] = useState(null);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        let alive = true;
-        loadPeopleOptions()
-            .then((d) => alive && setData(d))
-            .catch(() => alive && setError(true));
-        return () => { alive = false; };
-    }, []);
-
-    const divisionId = config.division_id ? String(config.division_id) : '';
-    const departmentId = config.department_id ? String(config.department_id) : '';
-    const teamId = config.team_id ? String(config.team_id) : '';
+/** One division/department/team rule inside a People field's scope. */
+function PeopleScopeRow({ data, scope, index, onChange, onRemove, canRemove }) {
+    const divisionId = scope.division_id ? String(scope.division_id) : '';
+    const departmentId = scope.department_id ? String(scope.department_id) : '';
+    const teamId = scope.team_id ? String(scope.team_id) : '';
 
     // Each dropdown only offers what fits the one above it.
     const departments = useMemo(() => {
@@ -408,45 +393,122 @@ function PeopleScopeConfig({ config, onChange }) {
         return data.teams.filter((t) => deptIds.includes(String(t.department_id)));
     }, [data, departmentId, departments]);
 
+    // Narrowing a level invalidates anything chosen below it.
+    const set = (patch) => onChange(index, { ...scope, ...patch });
+
+    return (
+        <div className="flex items-end gap-2">
+            <div className="grid grid-cols-3 gap-2 flex-1">
+                <Select label={index === 0 ? 'Division' : undefined} id={`cf-people-division-${index}`} value={divisionId}
+                    onChange={(e) => set({ division_id: e.target.value || null, department_id: null, team_id: null })}
+                    options={[{ value: '', label: 'Any' }, ...data.divisions.map((d) => ({ value: String(d.id), label: d.name }))]}
+                />
+                <Select label={index === 0 ? 'Department' : undefined} id={`cf-people-department-${index}`} value={departmentId}
+                    onChange={(e) => set({ department_id: e.target.value || null, team_id: null })}
+                    options={[{ value: '', label: 'Any' }, ...departments.map((d) => ({ value: String(d.id), label: d.name }))]}
+                />
+                <Select label={index === 0 ? 'Team' : undefined} id={`cf-people-team-${index}`} value={teamId}
+                    onChange={(e) => set({ team_id: e.target.value || null })}
+                    options={[{ value: '', label: 'Any' }, ...teams.map((t) => ({ value: String(t.id), label: t.name }))]}
+                />
+            </div>
+            <button
+                type="button"
+                onClick={() => onRemove(index)}
+                disabled={!canRemove}
+                title="Remove this rule"
+                className="mb-1 p-1.5 text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+            >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    );
+}
+
+/**
+ * Scope editor for a People field. Rules are set here, on the field definition,
+ * so everyone filling the field in gets an already-narrowed list.
+ *
+ * Several rules can be added to widen coverage: a person is offered if they
+ * match ANY rule, so "Payroll team" plus "the whole Operations division" covers
+ * both. Within one rule the three levels narrow together. Leave a single rule
+ * entirely on "Any" to offer every active user.
+ */
+function PeopleScopeConfig({ config, onChange }) {
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        loadPeopleOptions()
+            .then((d) => alive && setData(d))
+            .catch(() => alive && setError(true));
+        return () => { alive = false; };
+    }, []);
+
+    // Always render at least one row. Legacy single-scope configs are lifted into
+    // the array shape so an older field opens in the new editor unchanged.
+    const scopes = useMemo(() => {
+        if (Array.isArray(config.scopes) && config.scopes.length) return config.scopes;
+        if (config.division_id || config.department_id || config.team_id) {
+            return [{ division_id: config.division_id, department_id: config.department_id, team_id: config.team_id }];
+        }
+        return [{ division_id: null, department_id: null, team_id: null }];
+    }, [config]);
+
+    const commit = (next) => onChange({ scopes: next });
+
+    const updateRow = (index, next) => commit(scopes.map((s, i) => (i === index ? next : s)));
+    const removeRow = (index) => commit(scopes.filter((_, i) => i !== index));
+    const addRow = () => commit([...scopes, { division_id: null, department_id: null, team_id: null }]);
+
+    // Union across rules, deduplicated — the count people will actually see.
     const matchCount = useMemo(() => {
         if (!data) return null;
-        return data.users.filter((u) => {
-            if (divisionId && String(u.division_id) !== divisionId) return false;
-            if (departmentId && String(u.department_id) !== departmentId) return false;
-            if (teamId && String(u.team_id) !== teamId) return false;
-            return true;
-        }).length;
-    }, [data, divisionId, departmentId, teamId]);
+        return filterUsersByScopes(data.users, normalizeScopes({ scopes })).length;
+    }, [data, scopes]);
+
+    const anyRuleSet = normalizeScopes({ scopes }).length > 0;
 
     if (error) return <p className="text-sm text-red-600 dark:text-red-400">Could not load the org list.</p>;
     if (!data) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading org list…</p>;
-
-    // Narrowing a level invalidates anything chosen below it.
-    const set = (patch) => onChange({ ...config, ...patch });
 
     return (
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
                 Limit people to <span className="font-normal text-gray-400">(optional)</span>
             </label>
-            <div className="grid grid-cols-3 gap-2">
-                <Select label="Division" id="cf-people-division" value={divisionId}
-                    onChange={(e) => set({ division_id: e.target.value || null, department_id: null, team_id: null })}
-                    options={[{ value: '', label: 'Any' }, ...data.divisions.map((d) => ({ value: String(d.id), label: d.name }))]}
-                />
-                <Select label="Department" id="cf-people-department" value={departmentId}
-                    onChange={(e) => set({ department_id: e.target.value || null, team_id: null })}
-                    options={[{ value: '', label: 'Any' }, ...departments.map((d) => ({ value: String(d.id), label: d.name }))]}
-                />
-                <Select label="Team" id="cf-people-team" value={teamId}
-                    onChange={(e) => set({ team_id: e.target.value || null })}
-                    options={[{ value: '', label: 'Any' }, ...teams.map((t) => ({ value: String(t.id), label: t.name }))]}
-                />
+
+            <div className="space-y-2">
+                {scopes.map((scope, i) => (
+                    <PeopleScopeRow
+                        key={i}
+                        data={data}
+                        scope={scope}
+                        index={i}
+                        onChange={updateRow}
+                        onRemove={removeRow}
+                        canRemove={scopes.length > 1}
+                    />
+                ))}
             </div>
+
+            <button
+                type="button"
+                onClick={addRow}
+                className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+                + Add another group
+            </button>
+
             <p className="text-xs text-gray-500 dark:text-gray-400">
-                {matchCount === 0
-                    ? 'No active users match this scope — the field would have nothing to pick from.'
-                    : `${matchCount} active ${matchCount === 1 ? 'person' : 'people'} match this scope.`}
+                {!anyRuleSet
+                    ? `No limit set — all ${matchCount} active people can be picked.`
+                    : matchCount === 0
+                        ? 'No active users match these rules — the field would have nothing to pick from.'
+                        : `${matchCount} active ${matchCount === 1 ? 'person' : 'people'} match ${scopes.length > 1 ? 'these rules' : 'this rule'}.`}
             </p>
         </div>
     );
@@ -558,12 +620,16 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 config = { reference_field: form.config.reference_field || null };
             } else if (form.type === 'people') {
                 // Empty selects come through as '' — normalise to null so the
-                // server sees "no scope" rather than an unparseable id.
+                // server sees "no rule" rather than an unparseable id. Rules that
+                // name nothing are dropped: one would match everyone and make the
+                // whole union unscoped.
                 const num = (v) => (v === '' || v == null ? null : Number(v));
                 config = {
-                    division_id: num(form.config.division_id),
-                    department_id: num(form.config.department_id),
-                    team_id: num(form.config.team_id),
+                    scopes: normalizeScopes(form.config).map((s) => ({
+                        division_id: num(s.division_id),
+                        department_id: num(s.department_id),
+                        team_id: num(s.team_id),
+                    })),
                 };
             }
 

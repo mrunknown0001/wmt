@@ -31,8 +31,42 @@ class SendFcmNotification
             'type' => $data['type'] ?? 'general',
             'task_id' => $data['task_id'] ?? null,
             'project_id' => $data['project_id'] ?? null,
+            'url' => $this->buildUrl($data),
             'notification_id' => $event->response ?? '',
         ]);
+    }
+
+    /**
+     * Deep link for the push. The service worker prefers data.url and only falls
+     * back to its project/task guess, which approval and webhook notifications
+     * do not carry — without this they all open the dashboard.
+     */
+    private function buildUrl(array $data): ?string
+    {
+        $type = $data['type'] ?? null;
+
+        // Webhooks carry the destination from the calling system.
+        if ($type === 'external_webhook') {
+            return $data['url'] ?? null;
+        }
+
+        // The approver's queue, not the item: they may not be able to view it yet.
+        if ($type === 'approval_requested') {
+            return '/my-approvals';
+        }
+
+        if (is_string($type) && str_starts_with($type, 'approval_')) {
+            $projectId = $data['approval_project_id'] ?? null;
+            $itemId = $data['approval_item_id'] ?? null;
+
+            if ($projectId && $itemId) {
+                return "/approval-projects/{$projectId}/items/{$itemId}";
+            }
+
+            return '/my-requests';
+        }
+
+        return $data['url'] ?? null;
     }
 
     private function buildTitle(array $data): string
@@ -52,6 +86,8 @@ class SendFcmNotification
             'approval_approved' => 'Request Approved',
             'approval_rejected' => 'Request Rejected',
             'approval_changes_requested' => 'Changes Requested',
+            'approval_automation' => 'Approval Update',
+            'external_webhook' => $data['platform'] ?? config('app.name'),
             default => config('app.name'),
         };
     }
@@ -80,6 +116,10 @@ class SendFcmNotification
                 . (($data['decided_by'] ?? null) ? " by {$data['decided_by']}" : ''),
             'approval_changes_requested' => ($data['item_title'] ?? 'Your request') . ' was returned for changes'
                 . (($data['decided_by'] ?? null) ? " by {$data['decided_by']}" : ''),
+            'approval_automation' => ($data['message'] ?? null)
+                ?: 'Update on ' . ($data['item_title'] ?? 'an approval request'),
+            'external_webhook' => ($data['message'] ?? null)
+                ?: 'You have an item to review' . (($data['platform'] ?? null) ? " in {$data['platform']}" : ''),
             default => $taskTitle,
         };
     }
