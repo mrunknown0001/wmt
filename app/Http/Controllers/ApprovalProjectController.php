@@ -72,6 +72,10 @@ class ApprovalProjectController extends Controller
             'status' => $request->status ?? 'active',
             'owner_id' => $request->owner_id,
             'is_pinned' => $request->is_pinned ?? false,
+            // Blank prefix means "no numbering" — stored as null so hasSeries()
+            // doesn't treat an empty string as a configured series.
+            'series_prefix' => $request->filled('series_prefix') ? $request->series_prefix : null,
+            'series_padding' => $request->input('series_padding') ?: 5,
         ]);
 
         $this->syncCoOwners($project, $request->input('co_owner_ids', []), $request->owner_id);
@@ -103,13 +107,23 @@ class ApprovalProjectController extends Controller
     {
         $this->authorize('update', $approvalProject);
 
-        $approvalProject->update([
+        $data = [
             'name' => $request->name,
             'description' => $request->description,
             'status' => $request->status,
             'owner_id' => $request->owner_id,
             'is_pinned' => $request->is_pinned ?? false,
-        ]);
+            'series_padding' => $request->input('series_padding') ?: $approvalProject->series_padding,
+        ];
+
+        // The prefix is write-once: settable while the project has none, ignored
+        // afterwards. The request rejects an actual change; this makes sure a
+        // resubmitted form can't quietly clear one either.
+        if (!$approvalProject->hasSeries() && $request->filled('series_prefix')) {
+            $data['series_prefix'] = $request->series_prefix;
+        }
+
+        $approvalProject->update($data);
 
         $this->syncCoOwners($approvalProject, $request->input('co_owner_ids', []), $request->owner_id);
 
