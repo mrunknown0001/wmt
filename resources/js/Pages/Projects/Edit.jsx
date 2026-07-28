@@ -24,6 +24,7 @@ export default function Edit() {
         folder_id: project.folder_id || '',
         due_date: project.due_date ? project.due_date.split('T')[0] : '',
         require_comment_attachment_on_close: project.require_comment_attachment_on_close ?? false,
+        hide_completed_tasks: project.hide_completed_tasks ?? false,
         members: (project.members || []).map((m) => ({ user_id: m.id, role: m.pivot.role })),
     });
 
@@ -86,6 +87,8 @@ export default function Edit() {
                         <ProjectRules
                             requireAttachment={data.require_comment_attachment_on_close}
                             onChange={(val) => setData('require_comment_attachment_on_close', val)}
+                            hideCompleted={data.hide_completed_tasks}
+                            onHideCompletedChange={(val) => setData('hide_completed_tasks', val)}
                         />
 
                         <UserMultiSelect

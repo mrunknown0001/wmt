@@ -24,6 +24,7 @@ export default function Create() {
         folder_id: defaultFolderId || '',
         due_date: '',
         require_comment_attachment_on_close: false,
+        hide_completed_tasks: false,
         members: [],
     });
 
@@ -85,6 +86,8 @@ export default function Create() {
                         <ProjectRules
                             requireAttachment={data.require_comment_attachment_on_close}
                             onChange={(val) => setData('require_comment_attachment_on_close', val)}
+                            hideCompleted={data.hide_completed_tasks}
+                            onHideCompletedChange={(val) => setData('hide_completed_tasks', val)}
                         />
 
                         <UserMultiSelect

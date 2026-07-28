@@ -26,6 +26,7 @@ class Project extends Model
         'is_pinned',
         'position',
         'require_comment_attachment_on_close',
+        'hide_completed_tasks',
     ];
 
     protected function casts(): array
@@ -34,6 +35,7 @@ class Project extends Model
             'due_date' => 'date',
             'is_pinned' => 'boolean',
             'require_comment_attachment_on_close' => 'boolean',
+            'hide_completed_tasks' => 'boolean',
         ];
     }
 

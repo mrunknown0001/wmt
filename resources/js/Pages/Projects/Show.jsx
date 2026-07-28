@@ -54,6 +54,9 @@ import { weekOfYearLabel } from '../../weekOfYear';
 // Types whose value is computed from other data rather than entered. They are
 // read-only everywhere: no inline editor, no bulk edit, no filtering.
 const DERIVED_FIELD_TYPES = ['formula', 'week_of_year'];
+
+// Statuses that count as closed — mirrors Task::CLOSING_STATUSES on the server.
+const CLOSING_TASK_STATUSES = ['done', 'cancelled'];
 const isDerivedField = (type) => DERIVED_FIELD_TYPES.includes(type);
 import echo from '../../echo';
 
@@ -973,6 +976,38 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
 }
 
 // Droppable zone for sections (allows dropping tasks into/between sections)
+/** "Show N completed" row shown under a section that has closed tasks hidden. */
+function CompletedToggleRow({ hiddenCount, isRevealed, onToggle, closedCount }) {
+    if (!isRevealed && hiddenCount === 0) return null;
+    if (isRevealed && !closedCount) return null;
+
+    const count = isRevealed ? closedCount : hiddenCount;
+
+    return (
+        <tr>
+            <td colSpan={99} className="px-0 py-1">
+                <div className="sticky left-0 pl-14 w-fit">
+                    <button
+                        type="button"
+                        onClick={onToggle}
+                        className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                    >
+                        <svg
+                            className={`h-3 w-3 transition-transform ${isRevealed ? 'rotate-180' : ''}`}
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        {isRevealed
+                            ? `Hide ${count} completed`
+                            : `Show ${count} completed ${count === 1 ? 'task' : 'tasks'}`}
+                    </button>
+                </div>
+            </td>
+        </tr>
+    );
+}
+
 function SectionDropZone({ sectionId, minHeight = false }) {
     const { setNodeRef, isOver } = useDroppable({ id: `section-${sectionId ?? 'null'}` });
     return (
@@ -1355,6 +1390,23 @@ export default function Show() {
         return new Set();
     });
 
+    // Project rule: collapse closed tasks out of the list, with a per-section
+    // reveal. Deliberately list-view only — the board has a Done column, and
+    // emptying it would hide the tasks in the one place they belong.
+    const hideCompleted = !!project.hide_completed_tasks;
+    const [revealedGroups, setRevealedGroups] = useState(() => new Set());
+
+    const groupKey = (id) => (id === null || id === undefined ? '__unsectioned' : String(id));
+
+    const toggleGroupRevealed = useCallback((id) => {
+        setRevealedGroups((prev) => {
+            const next = new Set(prev);
+            const key = groupKey(id);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
+    }, []);
+
     // Sort config { key, direction }
     const [sortConfig, setSortConfig] = useState(null);
 
@@ -1724,20 +1776,39 @@ export default function Show() {
         return grouped;
     }, [filteredTasks]);
 
+    /**
+     * Split a group's tasks into what to show and how many were held back.
+     * Revealing a section is per-section and resets on reload — it's a peek at
+     * finished work, not a change to the project's setting.
+     */
+    const splitCompleted = useCallback((tasks, groupId) => {
+        if (!hideCompleted || revealedGroups.has(groupKey(groupId))) {
+            return { tasks, hiddenCount: 0 };
+        }
+        const open = tasks.filter((t) => !CLOSING_TASK_STATUSES.includes(t.status));
+        return { tasks: open, hiddenCount: tasks.length - open.length };
+    }, [hideCompleted, revealedGroups]);
+
     // Group filtered tasks by section for list view
     const tasksBySection = useMemo(() => {
         if (localSections.length === 0) return null; // No sections — render flat list
         const groups = [];
         // Unsectioned tasks first
-        const unsectioned = filteredTasks.filter((t) => !t.section_id);
-        groups.push({ id: null, name: 'Unsectioned', tasks: sortTasks(unsectioned) });
+        const unsectioned = sortTasks(filteredTasks.filter((t) => !t.section_id));
+        groups.push({ id: null, name: 'Unsectioned', ...splitCompleted(unsectioned, null) });
         // Then each section in order
         localSections.forEach((s) => {
-            const sectionTasks = filteredTasks.filter((t) => t.section_id === s.id);
-            groups.push({ id: s.id, name: s.name, color: s.color, tasks: sortTasks(sectionTasks) });
+            const sectionTasks = sortTasks(filteredTasks.filter((t) => t.section_id === s.id));
+            groups.push({ id: s.id, name: s.name, color: s.color, ...splitCompleted(sectionTasks, s.id) });
         });
         return groups;
-    }, [filteredTasks, localSections, sortTasks]);
+    }, [filteredTasks, localSections, sortTasks, splitCompleted]);
+
+    // Flat list (no sections) gets the same treatment as a single group.
+    const flatList = useMemo(
+        () => splitCompleted(filteredTasks, '__flat'),
+        [filteredTasks, splitCompleted]
+    );
 
     // Flat ordered list of visible task IDs (for shift+click range & arrow key nav)
     const flatVisibleTaskIds = useMemo(() => {
@@ -3323,6 +3394,12 @@ export default function Show() {
                                                                 </React.Fragment>
                                                             ))}
                                                         </SortableContext>
+                                                        <CompletedToggleRow
+                                                            hiddenCount={group.hiddenCount}
+                                                            isRevealed={revealedGroups.has(groupKey(group.id))}
+                                                            closedCount={group.tasks.filter((t) => CLOSING_TASK_STATUSES.includes(t.status)).length}
+                                                            onToggle={() => toggleGroupRevealed(group.id)}
+                                                        />
                                                         <SectionDropZone sectionId={group.id} minHeight={group.id === null} />
                                                         </>
                                                     )}
@@ -3361,8 +3438,8 @@ export default function Show() {
                                         </SortableContext>
                                     ) : (
                                         <>
-                                            <SortableContext items={filteredTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                                                {filteredTasks.map((task) => (
+                                            <SortableContext items={flatList.tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                                                {flatList.tasks.map((task) => (
                                                     <React.Fragment key={task.id}>
                                                         <SortableRow
                                                             task={task}
@@ -3436,6 +3513,12 @@ export default function Show() {
                                                     </React.Fragment>
                                                 ))}
                                             </SortableContext>
+                                            <CompletedToggleRow
+                                                hiddenCount={flatList.hiddenCount}
+                                                isRevealed={revealedGroups.has('__flat')}
+                                                closedCount={flatList.tasks.filter((t) => CLOSING_TASK_STATUSES.includes(t.status)).length}
+                                                onToggle={() => toggleGroupRevealed('__flat')}
+                                            />
                                             {/* Add section button when no sections exist yet */}
                                             {canManageTasks && (
                                                 <tr>
