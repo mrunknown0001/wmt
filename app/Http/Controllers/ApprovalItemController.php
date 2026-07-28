@@ -62,12 +62,17 @@ class ApprovalItemController extends Controller
             : $query->whereNull('archived_at');
 
         // Sorting — whitelist of sortable columns to keep this injection-safe.
-        $sortable = ['title', 'requester', 'status', 'chain', 'created_at'];
+        $sortable = ['title', 'requester', 'status', 'chain', 'created_at', 'submitted_at', 'series'];
+
+        // Queue order by default: the request waiting longest sits at the top.
         $sort = in_array($request->input('sort'), $sortable, true)
             ? $request->input('sort')
-            : 'created_at';
+            : 'submitted_at';
+
         $direction = strtolower($request->input('direction')) === 'asc' ? 'asc' : 'desc';
+
         // Default a fresh sort to a sensible direction when none is supplied.
+        // Oldest-first for the queue columns; newest-first for created_at.
         if (!$request->filled('direction')) {
             $direction = $sort === 'created_at' ? 'desc' : 'asc';
         }
@@ -92,6 +97,18 @@ class ApprovalItemController extends Controller
                 ->leftJoin('approval_chains', 'approval_chains.id', '=', 'approval_chain_versions.approval_chain_id')
                 ->select('approval_items.*')
                 ->orderBy('approval_chains.name', $direction),
+            // Sorted on the numeric sequence, not the formatted string: if the
+            // padding is ever widened, "SP-9" and "SP-00010" would sort wrongly as
+            // text but correctly as numbers.
+            'series' => $query
+                ->orderByRaw('approval_items.series_sequence IS NULL')
+                ->orderBy('approval_items.series_sequence', $direction),
+            // Never-submitted drafts have no submitted_at; keep them after the
+            // real queue rather than letting NULLs float to the top.
+            'submitted_at' => $query
+                ->orderByRaw('approval_items.submitted_at IS NULL')
+                ->orderBy('approval_items.submitted_at', $direction)
+                ->orderBy('approval_items.series_sequence', $direction),
             default => $query->orderBy('approval_items.' . $sort, $direction),
         };
 

@@ -32,7 +32,7 @@ export default function Index({ project, items, auth, chains = [], sections = []
     const [status, setStatus] = useState(filters.status || '');
     const [chainId, setChainId] = useState(filters.chain_id || '');
     const [requesterId, setRequesterId] = useState(filters.requester_id || '');
-    const [sort, setSort] = useState(filters.sort || 'created_at');
+    const [sort, setSort] = useState(filters.sort || 'submitted_at');
     const [direction, setDirection] = useState(filters.direction || 'desc');
     const [sectionId, setSectionId] = useState(filters.section_id || '');
     const debounceRef = useRef(null);
@@ -263,10 +263,12 @@ export default function Index({ project, items, auth, chains = [], sections = []
                         <table className="w-full">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
+                                    <SortHeader column="series">Ref #</SortHeader>
                                     <SortHeader column="title">Title</SortHeader>
                                     <SortHeader column="requester">Requester</SortHeader>
                                     <SortHeader column="status">Status</SortHeader>
                                     <SortHeader column="chain">Chain</SortHeader>
+                                    <SortHeader column="submitted_at">Submitted</SortHeader>
                                     <SortHeader column="created_at">Created</SortHeader>
                                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Action</th>
                                 </tr>
@@ -282,7 +284,7 @@ export default function Index({ project, items, auth, chains = [], sections = []
                                 <Fragment key={item.id}>
                                 {startsGroup && (
                                     <tr className="bg-gray-50 dark:bg-gray-900/50">
-                                        <td colSpan={6} className="px-6 py-2">
+                                        <td colSpan={8} className="px-6 py-2">
                                             <div className="flex items-center gap-2">
                                                 <span
                                                     className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -296,6 +298,11 @@ export default function Index({ project, items, auth, chains = [], sections = []
                                     </tr>
                                 )}
                                     <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {item.series_number
+                                                ? <span className="font-mono text-sm text-gray-700 dark:text-gray-300">{item.series_number}</span>
+                                                : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <p className="font-medium text-gray-900 dark:text-white">{item.title || 'Untitled'}</p>
                                         </td>
@@ -309,6 +316,13 @@ export default function Index({ project, items, auth, chains = [], sections = []
                                         </td>
                                         <td className="px-6 py-4">
                                             <p className="text-gray-700 dark:text-gray-300">{item.chain_version?.chain?.name || 'N/A'}</p>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                {item.submitted_at
+                                                    ? new Date(item.submitted_at).toLocaleDateString()
+                                                    : <span className="text-gray-300 dark:text-gray-600">Not submitted</span>}
+                                            </p>
                                         </td>
                                         <td className="px-6 py-4">
                                             <p className="text-sm text-gray-600 dark:text-gray-400">
