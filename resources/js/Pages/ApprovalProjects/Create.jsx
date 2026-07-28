@@ -124,6 +124,14 @@ export default function Create({ users = [] }) {
                             </label>
                         </div>
 
+                        <SeriesNumberConfig
+                            prefix={data.series_prefix}
+                            padding={data.series_padding}
+                            onPrefixChange={(v) => setData('series_prefix', v)}
+                            onPaddingChange={(v) => setData('series_padding', v)}
+                            errors={errors}
+                        />
+
                         <div className="flex gap-2 pt-4">
                             <Button type="submit" disabled={processing} processing={processing} processingText="Creating...">
                                 Create Project
