@@ -199,20 +199,34 @@ class TaskController extends Controller
             'section_id' => $task->section_id,
             'parent_id' => $task->parent_id,
             'position' => $maxPosition + 1,
+            // Recurrence is part of the task's configuration, so a copy of a
+            // recurring task recurs too. recurring_source_id is deliberately not
+            // copied: the duplicate starts its own series rather than joining the
+            // original's chain.
+            'is_recurring' => $task->is_recurring,
+            'recurrence_frequency' => $task->recurrence_frequency,
+            'recurrence_interval' => $task->recurrence_interval,
         ]);
 
         if ($task->collaborators()->count() > 0) {
             $newTask->collaborators()->sync($task->collaborators->pluck('id'));
         }
 
+        // Every value column is copied, not a hand-picked subset. The previous
+        // list omitted value_json and named value_option_id as
+        // "selected_option_id" — a key that isn't a column and isn't fillable, so
+        // it was silently dropped. Between them, single-select, multi-select and
+        // People values were all lost on duplicate.
+        $task->loadMissing('customFieldValues');
+
         foreach ($task->customFieldValues as $cfv) {
-            TaskCustomFieldValue::create([
-                'task_id' => $newTask->id,
+            $newTask->customFieldValues()->create([
                 'custom_field_id' => $cfv->custom_field_id,
                 'value_text' => $cfv->value_text,
                 'value_number' => $cfv->value_number,
                 'value_date' => $cfv->value_date,
-                'selected_option_id' => $cfv->selected_option_id,
+                'value_json' => $cfv->value_json,
+                'value_option_id' => $cfv->value_option_id,
             ]);
         }
 

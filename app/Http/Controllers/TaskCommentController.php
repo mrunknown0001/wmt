@@ -22,8 +22,31 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TaskCommentController extends Controller
 {
+    /**
+     * Commenting is participation, not viewing — so project viewers are excluded.
+     *
+     * Assignees and collaborators are allowed even without task-management
+     * rights: they are the people doing the work, and being able to respond on
+     * their own task is the point of assigning it to them.
+     */
+    private function assertCanComment(Project $project, Task $task, \App\Models\User $user): void
+    {
+        $task->loadMissing('collaborators');
+
+        abort_unless(
+            $project->userCanManageTasks($user)
+                || $task->assigned_to === $user->id
+                || $task->collaborators->contains('id', $user->id),
+            403,
+            'You do not have permission to comment on this task.'
+        );
+    }
+
     public function store(StoreTaskCommentRequest $request, Project $project, Task $task): RedirectResponse
     {
+        abort_if($task->project_id !== $project->id, 404);
+        $this->assertCanComment($project, $task, $request->user());
+
         $comment = $task->comments()->create([
             'user_id' => $request->user()->id,
             'body' => $request->body ?? '',
