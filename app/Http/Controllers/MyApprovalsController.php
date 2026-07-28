@@ -177,6 +177,7 @@ class MyApprovalsController extends Controller
                 'step_name' => $d->instance?->step?->name,
                 'item_id' => $d->instance?->item?->id,
                 'item_title' => $d->instance?->item?->title,
+                'series_number' => $d->instance?->item?->series_number,
                 'item_status' => $d->instance?->item?->status,
                 'requester' => $d->instance?->item?->requester?->name,
                 'project_id' => $d->instance?->item?->approval_project_id,

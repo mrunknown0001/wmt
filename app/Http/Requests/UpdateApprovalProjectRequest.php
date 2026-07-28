@@ -21,6 +21,20 @@ class UpdateApprovalProjectRequest extends FormRequest
             'co_owner_ids' => 'nullable|array',
             'co_owner_ids.*' => 'integer|exists:users,id',
             'is_pinned' => 'nullable|boolean',
+            // Padding may change; the prefix may not once it has been set, so it
+            // is only accepted while the project still has none.
+            'series_padding' => 'nullable|integer|min:1|max:10',
+            'series_prefix' => [
+                'nullable', 'string', 'max:20',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9\-_\/]*$/',
+                function ($attribute, $value, $fail) {
+                    $project = $this->route('approvalProject');
+
+                    if ($project && $project->hasSeries() && $value !== $project->series_prefix) {
+                        $fail('The series prefix cannot be changed once numbers have been issued under it.');
+                    }
+                },
+            ],
         ];
     }
 }

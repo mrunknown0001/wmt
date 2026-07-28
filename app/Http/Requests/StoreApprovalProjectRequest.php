@@ -21,6 +21,9 @@ class StoreApprovalProjectRequest extends FormRequest
             'co_owner_ids' => 'nullable|array',
             'co_owner_ids.*' => 'integer|exists:users,id',
             'is_pinned' => 'nullable|boolean',
+            // Series prefix is accepted only on creation — see the update request.
+            'series_prefix' => ['nullable', 'string', 'max:20', 'regex:/^[A-Za-z0-9][A-Za-z0-9\-_\/]*$/'],
+            'series_padding' => 'nullable|integer|min:1|max:10',
         ];
     }
 }

@@ -2,6 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import SeriesNumberConfig from '../../Components/SeriesNumberConfig';
 
 export default function Create({ users = [] }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -11,6 +12,8 @@ export default function Create({ users = [] }) {
         owner_id: '',
         co_owner_ids: [],
         is_pinned: false,
+        series_prefix: '',
+        series_padding: 5,
     });
 
     const handleSubmit = (e) => {

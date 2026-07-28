@@ -2,6 +2,7 @@ import { Head, useForm, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import SeriesNumberConfig from '../../Components/SeriesNumberConfig';
 
 export default function Edit({ project, users = [] }) {
     const { data, setData, put, processing, errors } = useForm({
@@ -13,6 +14,8 @@ export default function Edit({ project, users = [] }) {
             .filter((m) => m.pivot?.role === 'co-owner')
             .map((m) => m.id),
         is_pinned: project.is_pinned || false,
+        series_prefix: project.series_prefix || '',
+        series_padding: project.series_padding ?? 5,
     });
 
     const handleSubmit = (e) => {
@@ -127,6 +130,16 @@ export default function Edit({ project, users = [] }) {
                                 Pin this project
                             </label>
                         </div>
+
+                        <SeriesNumberConfig
+                            prefix={data.series_prefix}
+                            padding={data.series_padding}
+                            onPrefixChange={(v) => setData('series_prefix', v)}
+                            onPaddingChange={(v) => setData('series_padding', v)}
+                            locked={!!project.series_prefix}
+                            nextSequence={project.series_next ?? 1}
+                            errors={errors}
+                        />
 
                         <div className="flex gap-2 pt-4">
                             <Button type="submit" disabled={processing} processing={processing} processingText="Updating...">

@@ -178,6 +178,9 @@ export default function Index({ items, stats, projects = [], availableProjects =
                                         return (
                                             <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                                                 <td className="px-6 py-4">
+                                                    {item.series_number && (
+                                                        <p className="font-mono text-xs text-gray-500 dark:text-gray-400">{item.series_number}</p>
+                                                    )}
                                                     <p className="font-medium text-gray-900 dark:text-white">{item.title || 'Untitled'}</p>
                                                     {item.description && (
                                                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-md">{item.description}</p>

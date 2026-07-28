@@ -53,6 +53,23 @@ class ApprovalItem extends Model
 
     protected static function booted(): void
     {
+        // Assign the project's series number.
+        //
+        // Done on the model rather than in the controllers because items are
+        // created from three places — the app, the API and public approval forms
+        // — and a number issued by only some of them would leave gaps.
+        static::creating(function (ApprovalItem $item) {
+            if ($item->series_number || !$item->approval_project_id) {
+                return;
+            }
+
+            $claim = ApprovalProject::claimNextSeries((int) $item->approval_project_id);
+
+            if ($claim !== null) {
+                [$item->series_number, $item->series_sequence] = $claim;
+            }
+        });
+
         // When an approval item is soft-deleted, auto-cancel any open step
         // instances so the item never lingers in an approver's pending queue.
         // Force-deletes remove the rows outright, so there's nothing to cancel.

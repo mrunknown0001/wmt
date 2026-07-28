@@ -141,7 +141,14 @@ export default function Show({ item, project, canDecide, canEdit, canResubmit, a
                     <div className="lg:col-span-2 space-y-6">
                         {/* Request Details */}
                         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Request Details</h2>
+                            <div className="flex items-center justify-between gap-3 mb-4">
+                                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Request Details</h2>
+                                {item.series_number && (
+                                    <span className="font-mono text-sm px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                                        {item.series_number}
+                                    </span>
+                                )}
+                            </div>
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Requested By</label>

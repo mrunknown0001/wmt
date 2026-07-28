@@ -469,6 +469,9 @@ export default function Index({ pendingApprovals, stats, filters = {}, trail, tr
                                                             title={row.item_title || `Request #${row.item_id}`}
                                                             className="block truncate font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
                                                         >
+                                                            {row.series_number && (
+                                                                <span className="font-mono text-xs text-gray-500 dark:text-gray-400 mr-2">{row.series_number}</span>
+                                                            )}
                                                             {row.item_title || `Request #${row.item_id}`}
                                                         </Link>
                                                     ) : (
