@@ -30,7 +30,7 @@ class TaskController extends Controller
 {
     public function create(Request $request, Project $project): Response
     {
-        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id() && !$project->isProjectAdmin(auth()->user())) {
+        if (!$project->userCanManageTasks(auth()->user())) {
             abort(403);
         }
 
@@ -128,7 +128,7 @@ class TaskController extends Controller
      */
     public function quickStore(Request $request, Project $project): JsonResponse
     {
-        if (!$request->user()->can('manage-tasks') && $project->owner_id !== $request->user()->id && !$project->isProjectAdmin($request->user())) {
+        if (!$project->userCanManageTasks($request->user())) {
             abort(403);
         }
 
@@ -178,7 +178,7 @@ class TaskController extends Controller
 
     public function duplicate(Request $request, Project $project, Task $task): JsonResponse
     {
-        if (!$request->user()->can('manage-tasks') && $project->owner_id !== $request->user()->id && !$project->isProjectAdmin($request->user())) {
+        if (!$project->userCanManageTasks($request->user())) {
             abort(403);
         }
 
@@ -305,9 +305,7 @@ class TaskController extends Controller
                 ->toArray();
         }
 
-        $canManageTaskDetails = auth()->user()->can('manage-tasks')
-            || $project->owner_id === auth()->id()
-            || $project->isProjectAdmin(auth()->user());
+        $canManageTaskDetails = $project->userCanManageTasks(auth()->user());
 
         $taskAttachments = $task->attachments->map(fn ($a) => [
             'id' => $a->id,
@@ -626,7 +624,7 @@ class TaskController extends Controller
 
     public function bulkAction(Request $request, Project $project): JsonResponse
     {
-        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id() && !$project->isProjectAdmin(auth()->user())) {
+        if (!$project->userCanManageTasks(auth()->user())) {
             abort(403);
         }
 
@@ -795,7 +793,7 @@ class TaskController extends Controller
     public function reorder(Request $request, Project $project): JsonResponse
     {
         // Authorize: must be able to manage tasks, be the project owner, or be a project admin
-        if (!auth()->user()->can('manage-tasks') && $project->owner_id !== auth()->id() && !$project->isProjectAdmin(auth()->user())) {
+        if (!$project->userCanManageTasks(auth()->user())) {
             abort(403);
         }
 

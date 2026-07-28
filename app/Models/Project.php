@@ -71,9 +71,59 @@ class Project extends Model
             ->withTimestamps();
     }
 
+    /**
+     * Membership roles, from most to least privileged.
+     *
+     *  admin  — manage the project itself and everything in it
+     *  editor — work on tasks, but cannot change the project's settings,
+     *           members, custom fields, forms or automation rules
+     *  viewer — read only
+     */
+    public const MEMBER_ROLES = ['admin', 'editor', 'viewer'];
+
+    /** Roles allowed to create and change tasks. */
+    public const TASK_EDITING_ROLES = ['admin', 'editor'];
+
     public function isProjectAdmin(User $user): bool
     {
-        return $this->members()->where('user_id', $user->id)->where('role', 'admin')->exists();
+        return $this->memberRole($user) === 'admin';
+    }
+
+    /** This user's role on the project, or null if they are not a member. */
+    public function memberRole(User $user): ?string
+    {
+        // Resolved from a loaded members collection when one is available, so a
+        // page that already eager-loaded members doesn't re-query per check.
+        if ($this->relationLoaded('members')) {
+            return $this->members->firstWhere('id', $user->id)?->pivot?->role;
+        }
+
+        return $this->members()->where('user_id', $user->id)->value('role');
+    }
+
+    /**
+     * Can this user create and change tasks in the project?
+     *
+     * The single definition used by every task endpoint — previously each one
+     * repeated "global permission or owner or project admin", which left member
+     * roles enforcing nothing.
+     */
+    public function userCanManageTasks(User $user): bool
+    {
+        return $user->can('manage-tasks')
+            || $this->owner_id === $user->id
+            || in_array($this->memberRole($user), self::TASK_EDITING_ROLES, true);
+    }
+
+    /**
+     * Can this user change the project itself — settings, members, custom
+     * fields, forms, automation rules? Editors deliberately cannot.
+     */
+    public function userCanManageProject(User $user): bool
+    {
+        return $user->can('manage-projects')
+            || $this->owner_id === $user->id
+            || $this->isProjectAdmin($user);
     }
 
     public function customFields(): HasMany

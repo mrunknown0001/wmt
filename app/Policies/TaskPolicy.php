@@ -33,8 +33,9 @@ class TaskPolicy
                 || $task->assigned_to === $user->id;
         }
 
-        return $task->project->owner_id === $user->id
-            || $task->project->isProjectAdmin($user)
+        // Editors and admins can change any task in the project; everyone else
+        // only the ones assigned to them.
+        return $task->project->userCanManageTasks($user)
             || $task->assigned_to === $user->id;
     }
 
@@ -48,7 +49,8 @@ class TaskPolicy
             return $task->created_by === $user->id;
         }
 
-        return $task->project->owner_id === $user->id
-            || $task->project->isProjectAdmin($user);
+        // Deleting is task management, so editors qualify — but being merely
+        // assigned to a task does not let you delete it.
+        return $task->project->userCanManageTasks($user);
     }
 }

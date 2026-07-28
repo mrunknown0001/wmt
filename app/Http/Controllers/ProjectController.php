@@ -324,13 +324,10 @@ class ProjectController extends Controller
                 ->get();
         }
 
-        $canManageProject = auth()->user()->can('manage-projects')
-            || $project->owner_id === auth()->id()
-            || $isProjectAdmin;
-
-        $canManageTasks = auth()->user()->can('manage-tasks')
-            || $project->owner_id === auth()->id()
-            || $isProjectAdmin;
+        // Editors work on tasks but must not reach project settings, members,
+        // custom fields, forms or automation rules — hence two separate checks.
+        $canManageProject = $project->userCanManageProject(auth()->user());
+        $canManageTasks = $project->userCanManageTasks(auth()->user());
 
         // Dashboard charts: admins, executives (all projects), project owner,
         // and project admin members can add/edit/remove charts

@@ -16,6 +16,13 @@ class TaskCustomFieldValueController extends Controller
     {
         abort_if($task->project_id !== $project->id, 404);
 
+        // This endpoint had no permission check at all, so anyone who could reach
+        // the route could rewrite a task's field values — including viewers.
+        abort_unless(
+            $project->userCanManageTasks($request->user()) || $task->assigned_to === $request->user()->id,
+            403
+        );
+
         $request->validate([
             'values' => ['required', 'array'],
         ]);
