@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
+use App\Services\CustomFieldDefaults;
 
 class RecurringTaskService
 {
@@ -52,7 +53,14 @@ class RecurringTaskService
             }
         }
 
-        $positionQuery = Task::whereNull('parent_id')->where('status', 'to_do');
+        // Position is measured among the task's own siblings — a recurring subtask
+        // belongs under its parent, not at the top level of the project.
+        $positionQuery = Task::where('status', 'to_do');
+        if ($task->parent_id) {
+            $positionQuery->where('parent_id', $task->parent_id);
+        } else {
+            $positionQuery->whereNull('parent_id');
+        }
         if ($task->project_id) {
             $positionQuery->where('project_id', $task->project_id);
         } else {
@@ -62,6 +70,10 @@ class RecurringTaskService
 
         $newTask = Task::create([
             'project_id' => $task->project_id,
+            // Placement carries over: without these the next occurrence appeared in
+            // Unsectioned, and a recurring subtask was reborn as a top-level task.
+            'section_id' => $task->section_id,
+            'parent_id' => $task->parent_id,
             'title' => $task->title,
             'description' => $task->description,
             'status' => 'to_do',
@@ -81,6 +93,29 @@ class RecurringTaskService
         if (!empty($collaboratorIds)) {
             $newTask->collaborators()->sync($collaboratorIds);
         }
+
+        // Carry the custom field values forward. Every value column is copied
+        // rather than a chosen few, so field types added later come along without
+        // this needing to change.
+        $task->loadMissing('customFieldValues');
+        $carried = [];
+
+        foreach ($task->customFieldValues as $cfv) {
+            $newTask->customFieldValues()->create([
+                'custom_field_id' => $cfv->custom_field_id,
+                'value_text' => $cfv->value_text,
+                'value_number' => $cfv->value_number,
+                'value_date' => $cfv->value_date,
+                'value_json' => $cfv->value_json,
+                'value_option_id' => $cfv->value_option_id,
+            ]);
+            $carried[] = $cfv->custom_field_id;
+        }
+
+        // Fields the previous occurrence never held fall back to their default,
+        // the same as any other newly created task. Carried values are passed as
+        // "already provided" so a default can't overwrite one.
+        CustomFieldDefaults::apply($newTask, $carried);
 
         TaskActivityLogger::logCreated($newTask, $actor);
         ActivityLogger::logCreated($newTask, $actor);
