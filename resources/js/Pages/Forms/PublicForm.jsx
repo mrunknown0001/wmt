@@ -352,6 +352,27 @@ export default function PublicForm() {
                     </div>
                 );
 
+            // People is a single-select dropdown: one person per field. The
+            // option list is the staff directory narrowed by the field's scope,
+            // which reads far better as a dropdown than as a wall of checkboxes.
+            case 'people':
+                return (
+                    <div key={field.id}>
+                        <Select
+                            label={field.label + (field.is_required ? ' *' : '')}
+                            id={`field-${field.id}`}
+                            value={Array.isArray(value) ? (value[0] ?? '') : (value || '')}
+                            onChange={(e) => setFieldValue(field.id, e.target.value)}
+                            options={[...(field.options || [])]
+                                .sort((a, b) => a.label.localeCompare(b.label))
+                                .map(opt => ({ value: String(opt.id), label: opt.label }))}
+                            placeholder={(field.options || []).length ? '— Select —' : 'No one available'}
+                            error={fieldError}
+                        />
+                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                    </div>
+                );
+
             case 'multi_select': {
                 const selected = Array.isArray(value) ? value.map(String) : [];
                 return (

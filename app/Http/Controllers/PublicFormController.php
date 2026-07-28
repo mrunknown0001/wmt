@@ -176,6 +176,8 @@ class PublicFormController extends Controller
                     'number' => $fieldRules[] = 'numeric',
                     'date' => $fieldRules[] = 'date',
                     'select' => array_push($fieldRules, 'string', 'max:255'),
+                    // One person per field; the id is checked against the scope below.
+                    'people' => array_push($fieldRules, 'string', 'max:255'),
                     'multi_select' => $fieldRules[] = 'array',
                     default => null,
                 };
@@ -189,10 +191,10 @@ class PublicFormController extends Controller
                 // Restrict select/multi_select submissions to the field's configured
                 // options so arbitrary values can't be injected. Only enforced when the
                 // field actually has options defined (otherwise Rule::in would reject all).
-                if (in_array($field->effectiveType(), ['select', 'multi_select'], true)) {
+                if (in_array($field->effectiveType(), ['select', 'multi_select', 'people'], true)) {
                     $optionValues = $this->optionValues($field);
                     if (!empty($optionValues)) {
-                        if ($field->effectiveType() === 'select') {
+                        if (in_array($field->effectiveType(), ['select', 'people'], true)) {
                             $fieldRules[] = Rule::in($optionValues);
                         } else {
                             // Validate each selected element against the allowed options.
@@ -286,7 +288,7 @@ class PublicFormController extends Controller
                     if ($val === null || $val === '') continue;
 
                     // Resolve option IDs to labels for select/multi_select fields
-                    if (in_array($field->effectiveType(), ['select', 'multi_select'])) {
+                    if (in_array($field->effectiveType(), ['select', 'multi_select', 'people'])) {
                         $val = $this->resolveOptionLabels($field, $val);
                     }
 

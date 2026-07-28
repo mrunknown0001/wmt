@@ -54,9 +54,10 @@ const CUSTOM_FIELD_TYPE_MAP = {
     'date': 'date',
     'single_select': 'select',
     'multi_select': 'multi_select',
-    // People renders as a multi-select; its choices are the users in the field's
-    // configured scope, supplied by the server when the form is served.
-    'people': 'multi_select',
+    // People renders as a single-select dropdown; its choices are the users in
+    // the field's configured scope, supplied by the server when the form is
+    // served rather than stored on the form.
+    'people': 'select',
 };
 
 function getFieldIcon(type) {
