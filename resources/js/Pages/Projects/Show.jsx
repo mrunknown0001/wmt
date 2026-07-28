@@ -2103,6 +2103,21 @@ export default function Show() {
         apiFetch(`/projects/${project.id}/tasks/${taskId}/custom-field-values`, {
             method: 'PATCH',
             body: JSON.stringify({ values: { [fieldId]: value } }),
+        }).then(async (res) => {
+            // fetch doesn't reject on 4xx, so without this a rejected save left the
+            // optimistic value on screen as though it had been stored.
+            if (!res.ok) {
+                setLocalTasks(serverTasks);
+                const body = await res.json().catch(() => null);
+                const msg = body?.errors?.status?.[0] || body?.message;
+                if (msg) setBlockedMessage(msg);
+                return;
+            }
+            // The value saved, but an automation rule may have been refused.
+            const body = await res.json().catch(() => null);
+            if (body?.automation_warning) {
+                setBlockedMessage(`Automation could not complete: ${body.automation_warning}`);
+            }
         }).catch(() => {
             setLocalTasks(serverTasks);
         });

@@ -45,6 +45,8 @@ function notificationMessage(data) {
             return <>Task <strong>{data.task_title}</strong> in {data.project_name} has been escalated ({data.escalation_label}) — assigned to {data.assigned_to_name}</>;
         case 'approval_requested':
             return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in {data.approval_project_name}</> : null}{data.requester ? <> — submitted by {data.requester}</> : null}</>;
+        case 'automation_blocked':
+            return <>Automation <strong>{data.rule_name}</strong> could not complete <strong>{data.task_title}</strong>{data.project_name ? <> in {data.project_name}</> : null} — {data.reason}</>;
         case 'approval_approved':
             return <>Your request <strong>{data.item_title}</strong>{data.approval_project_name ? <> in {data.approval_project_name}</> : null} was approved</>;
         case 'approval_rejected':
@@ -125,6 +127,14 @@ function notificationIcon(type) {
                 <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
                     <svg className="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            );
+        case 'automation_blocked':
+            return (
+                <div className="h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                     </svg>
                 </div>
             );

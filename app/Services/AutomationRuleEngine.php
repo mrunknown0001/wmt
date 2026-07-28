@@ -10,12 +10,19 @@ use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\TaskCustomFieldValue;
 use App\Models\User;
+use App\Notifications\AutomationBlockedNotification;
 use App\Notifications\TaskAssignedNotification;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class AutomationRuleEngine
 {
     private static bool $executing = false;
+
+    /** Actions a project rule refused during this request. */
+    private static array $skippedActions = [];
 
     /** Task columns that hold dates and must be compared as such, not as strings. */
     private const DATE_FIELDS = ['due_date', 'start_date', 'completed_at'];
@@ -62,7 +69,7 @@ class AutomationRuleEngine
                 }
 
                 if (self::conditionsMet($task, $rule->conditions)) {
-                    self::executeActions($task, $rule->actions);
+                    self::executeActions($task, $rule->actions, $rule->name);
 
                     // Refresh and broadcast the updated task for real-time UI sync
                     $task->refresh();
@@ -109,7 +116,7 @@ class AutomationRuleEngine
         self::$executing = true;
 
         try {
-            self::executeActions($task, $rule->actions ?? []);
+            self::executeActions($task, $rule->actions ?? [], $rule->name);
 
             $task->refresh();
             $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
@@ -350,23 +357,81 @@ class AutomationRuleEngine
         };
     }
 
-    private static function executeActions(Task $task, array $actions): void
+    private static function executeActions(Task $task, array $actions, string $ruleName = ''): void
     {
         foreach ($actions as $action) {
             $type = $action['type'] ?? null;
             $params = $action['params'] ?? [];
 
-            match ($type) {
-                'change_status' => self::actionChangeStatus($task, $params),
-                'change_priority' => self::actionChangePriority($task, $params),
-                'assign_user' => self::actionAssignUser($task, $params),
-                'move_to_section' => self::actionMoveToSection($task, $params),
-                'send_notification' => self::actionSendNotification($task, $params),
-                'add_comment' => self::actionAddComment($task, $params),
-                'set_custom_field' => self::actionSetCustomField($task, $params),
-                default => null,
-            };
+            try {
+                match ($type) {
+                    'change_status' => self::actionChangeStatus($task, $params),
+                    'change_priority' => self::actionChangePriority($task, $params),
+                    'assign_user' => self::actionAssignUser($task, $params),
+                    'move_to_section' => self::actionMoveToSection($task, $params),
+                    'send_notification' => self::actionSendNotification($task, $params),
+                    'add_comment' => self::actionAddComment($task, $params),
+                    'set_custom_field' => self::actionSetCustomField($task, $params),
+                    default => null,
+                };
+            } catch (ValidationException $e) {
+                // A project rule refused this action — typically "change status to
+                // Done" on a task with no attachment. Skip it and carry on: the
+                // user's own change has already been applied and committed, so
+                // letting this bubble would fail their request with a 422 for
+                // something they did not do, and would strand the remaining
+                // actions of this rule unexecuted.
+                self::$skippedActions[] = [
+                    'task_id' => $task->id,
+                    'action' => $type,
+                    'reason' => $e->validator->errors()->first(),
+                ];
+
+                Log::warning('Automation action skipped by a project rule', end(self::$skippedActions));
+
+                self::notifyBlocked($task, $ruleName, $e->validator->errors()->first());
+            }
         }
+    }
+
+    /**
+     * Tell whoever owns the task that the automation could not close it.
+     *
+     * Throttled per task per recipient per day: the scheduled trigger
+     * re-evaluates every hour, so an unattached task would otherwise generate a
+     * notification every hour until someone uploads a file.
+     */
+    private static function notifyBlocked(Task $task, string $ruleName, string $reason): void
+    {
+        $recipient = $task->assignee ?: User::find($task->created_by);
+
+        if (!$recipient) {
+            return;
+        }
+
+        if (!Cache::add("automation-blocked:{$task->id}:{$recipient->id}", true, now()->addDay())) {
+            return; // already told them today
+        }
+
+        try {
+            $task->loadMissing('project');
+            $recipient->notify(new AutomationBlockedNotification($task, $ruleName, $reason));
+        } catch (\Throwable $e) {
+            // A notification failure must not break the surrounding action.
+            report($e);
+        }
+    }
+
+    /**
+     * Actions refused by a project rule during this request, so the caller can
+     * tell the user why the automation did not do what they expected.
+     */
+    public static function takeSkippedActions(): array
+    {
+        $skipped = self::$skippedActions;
+        self::$skippedActions = [];
+
+        return $skipped;
     }
 
     private static function actionChangeStatus(Task $task, array $params): void

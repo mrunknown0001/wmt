@@ -27,6 +27,8 @@ function notificationMessage(data) {
             return <>Task <strong>{data.task_title}</strong> escalated — {data.escalation_label}</>;
         case 'approval_requested':
             return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in <strong>{data.approval_project_name}</strong></> : null}</>;
+        case 'automation_blocked':
+            return <>Could not complete <strong>{data.task_title}</strong> — it needs an attachment</>;
         case 'approval_approved':
             return <>Your request <strong>{data.item_title}</strong> was approved</>;
         case 'approval_rejected':

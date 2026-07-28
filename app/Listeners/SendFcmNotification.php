@@ -87,6 +87,7 @@ class SendFcmNotification
             'approval_rejected' => 'Request Rejected',
             'approval_changes_requested' => 'Changes Requested',
             'approval_automation' => 'Approval Update',
+            'automation_blocked' => 'Task Could Not Be Completed',
             'external_webhook' => $data['platform'] ?? config('app.name'),
             default => config('app.name'),
         };
@@ -116,6 +117,7 @@ class SendFcmNotification
                 . (($data['decided_by'] ?? null) ? " by {$data['decided_by']}" : ''),
             'approval_changes_requested' => ($data['item_title'] ?? 'Your request') . ' was returned for changes'
                 . (($data['decided_by'] ?? null) ? " by {$data['decided_by']}" : ''),
+            'automation_blocked' => ($data['task_title'] ?? 'A task') . ' could not be completed automatically — it needs an attachment',
             'approval_automation' => ($data['message'] ?? null)
                 ?: 'Update on ' . ($data['item_title'] ?? 'an approval request'),
             'external_webhook' => ($data['message'] ?? null)

@@ -44,8 +44,14 @@ class TaskCustomFieldValueController extends Controller
         $task->load('customFieldValues.customField');
         AutomationRuleEngine::evaluate($task, 'custom_field_changed', [], $changedFieldIds);
 
+        // An automation action a project rule refused isn't an error for this
+        // request — the value saved fine — but the user should be told why the
+        // rule didn't do what they expected.
+        $skipped = AutomationRuleEngine::takeSkippedActions();
+
         return response()->json([
             'values' => $task->customFieldValues()->get()->keyBy('custom_field_id'),
+            'automation_warning' => $skipped ? $skipped[0]['reason'] : null,
         ]);
     }
 }
