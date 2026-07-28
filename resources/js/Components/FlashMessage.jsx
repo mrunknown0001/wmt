@@ -1,14 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
+import SuccessCheck from './SuccessCheck';
 
 const types = {
     success: {
         bg: 'bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-700',
         text: 'text-green-800 dark:text-green-300',
-        icon: (
-            <svg className="h-5 w-5 text-green-500 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        ),
+        icon: <SuccessCheck className="text-green-500 dark:text-green-400" />,
     },
     error: {
         bg: 'bg-red-50 border-red-200 dark:bg-red-900/30 dark:border-red-700',
