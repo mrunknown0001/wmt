@@ -26,8 +26,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Render JSON for api/* and for anything that actually asked for JSON.
+        //
+        // Limiting this to api/* meant a failed validation on a web route answered
+        // a fetch() call with a 302 instead of a 422. The browser then followed the
+        // redirect chain and reported ERR_TOO_MANY_REDIRECTS, so the real cause —
+        // an invalid field — never reached the UI.
+        //
+        // Inertia is unaffected: it sends Accept: text/html, so expectsJson() is
+        // false for it and its validation errors keep coming back as redirects,
+        // which is how Inertia surfaces the `errors` prop.
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
 
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {

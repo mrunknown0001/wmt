@@ -12,6 +12,7 @@ use App\Services\ActivityLogger;
 use App\Services\AutomationRuleEngine;
 use App\Services\CustomFieldDefaults;
 use App\Services\TaskActivityLogger;
+use App\Support\PeopleScope;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -60,6 +61,14 @@ class PublicFormController extends Controller
                             'position' => $o->position,
                         ]);
                         $data['sort_mode'] = $field->customField->config['sort_mode'] ?? 'alphabetical';
+                    } elseif ($field->customField && $field->customField->type === 'people') {
+                        // People have no stored options — the choices are the users
+                        // inside the field's configured scope, resolved per request
+                        // so joiners and leavers are reflected without editing the
+                        // form. Names only; nothing else about a user is exposed.
+                        $data['options'] = PeopleScope::users($field->customField->config)
+                            ->map(fn ($u) => ['id' => $u['id'], 'label' => $u['name']]);
+                        $data['sort_mode'] = 'alphabetical';
                     } elseif (in_array($field->type, ['select', 'multi_select']) && !empty($field->config['options'])) {
                         $data['options'] = $field->config['options'];
                     }
@@ -437,6 +446,14 @@ class PublicFormController extends Controller
      */
     private function optionValues($field): array
     {
+        // People fields have no stored options; the permitted values are the user
+        // ids inside the field's scope. Resolved here so the existing Rule::in
+        // check covers them — this endpoint is public, so a submission cannot be
+        // trusted to contain only ids the picker offered.
+        if ($field->customField && $field->customField->type === 'people') {
+            return array_map('strval', PeopleScope::allowedIds($field->customField->config));
+        }
+
         if ($field->customField && $field->customField->options) {
             return $field->customField->options
                 ->map(fn ($o) => (string) $o->id)
@@ -458,7 +475,13 @@ class PublicFormController extends Controller
     {
         // Build option ID → label map
         $optionMap = [];
-        if ($field->customField && $field->customField->options) {
+        if ($field->customField && $field->customField->type === 'people') {
+            // Without this the generated task title would read "3, 7" instead of
+            // the selected people's names.
+            foreach (PeopleScope::users($field->customField->config) as $u) {
+                $optionMap[(string) $u['id']] = $u['name'];
+            }
+        } elseif ($field->customField && $field->customField->options) {
             foreach ($field->customField->options as $opt) {
                 $optionMap[(string) $opt->id] = $opt->label;
             }
