@@ -124,39 +124,91 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Page navigation progress bar
-let progressBar = null;
-let progressTimeout = null;
+/**
+ * Page navigation progress indicator.
+ *
+ * Three things make this read better than a bar that simply appears:
+ *
+ *  - Nothing is shown for the first 180ms. Most navigations in this app finish
+ *    faster than that, and a bar that flashes on every click is what makes a
+ *    loading indicator feel cheap.
+ *  - Progress trickles forward in shrinking steps instead of parking at a fixed
+ *    percentage, so a slow request still looks like it is moving.
+ *  - It completes to 100% and fades, rather than vanishing mid-bar.
+ */
+const NAV_SHOW_DELAY = 180;
+const NAV_TRICKLE_INTERVAL = 300;
+const NAV_TRICKLE_CEILING = 92;
 
-function createProgressBar() {
+let navBar = null;
+let navShowTimer = null;
+let navTrickleTimer = null;
+let navDoneTimer = null;
+let navProgress = 0;
+
+function mountNavBar() {
     const bar = document.createElement('div');
     bar.id = 'nav-progress';
-    bar.style.cssText = 'position:fixed;top:0;left:0;height:2px;z-index:9999;pointer-events:none;transition:width 300ms ease;';
-    bar.style.width = '0%';
-    bar.style.background = 'var(--color-primary-500, #6366f1)';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', 'Loading page');
     document.body.appendChild(bar);
+    // Force a reflow so the first width change animates from 0 rather than
+    // snapping straight to its target.
+    bar.offsetWidth;
     return bar;
 }
 
+function setNavProgress(value) {
+    navProgress = value;
+    if (navBar) {
+        navBar.style.width = `${value}%`;
+        navBar.setAttribute('aria-valuenow', String(Math.round(value)));
+    }
+}
+
+function clearNavTimers() {
+    clearTimeout(navShowTimer);
+    clearTimeout(navDoneTimer);
+    clearInterval(navTrickleTimer);
+    navShowTimer = navDoneTimer = navTrickleTimer = null;
+}
+
 router.on('start', () => {
-    clearTimeout(progressTimeout);
-    if (progressBar) progressBar.remove();
-    progressBar = createProgressBar();
-    // Force reflow then animate to 70%
-    progressBar.offsetWidth;
-    progressBar.style.width = '70%';
+    clearNavTimers();
+    if (navBar) {
+        navBar.remove();
+        navBar = null;
+    }
+
+    navShowTimer = setTimeout(() => {
+        navBar = mountNavBar();
+        setNavProgress(18);
+
+        // Each step covers a shrinking slice of what is left, so the bar keeps
+        // moving without ever implying it is nearly done.
+        navTrickleTimer = setInterval(() => {
+            const remaining = NAV_TRICKLE_CEILING - navProgress;
+            if (remaining <= 0.5) return;
+            setNavProgress(navProgress + remaining * 0.25);
+        }, NAV_TRICKLE_INTERVAL);
+    }, NAV_SHOW_DELAY);
 });
 
 router.on('finish', () => {
-    if (!progressBar) return;
-    progressBar.style.width = '100%';
-    const bar = progressBar;
-    progressTimeout = setTimeout(() => {
-        bar.style.transition = 'opacity 200ms ease';
-        bar.style.opacity = '0';
-        setTimeout(() => bar.remove(), 200);
-    }, 100);
-    progressBar = null;
+    clearNavTimers();
+
+    // Finished inside the delay window — nothing was ever shown, so there is
+    // nothing to tidy up.
+    if (!navBar) return;
+
+    const bar = navBar;
+    navBar = null;
+
+    setNavProgress(100);
+    bar.style.width = '100%';
+    bar.classList.add('is-complete');
+
+    navDoneTimer = setTimeout(() => bar.remove(), 400);
 });
 
 createInertiaApp({
