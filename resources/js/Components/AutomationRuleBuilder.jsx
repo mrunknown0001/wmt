@@ -596,10 +596,17 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                 body: JSON.stringify(form),
             });
 
-            const data = await res.json();
+            // Tolerate a non-JSON body: if the server ever answers with a redirect
+            // or an HTML error page, parsing would throw and the real status would
+            // be reported as a network failure.
+            const data = await res.json().catch(() => null);
 
             if (!res.ok) {
-                setError(data.message || 'Failed to save rule.');
+                setError(data?.message || `Failed to save rule (HTTP ${res.status}).`);
+                return;
+            }
+            if (!data?.rule) {
+                setError('The server returned an unexpected response. Please try again.');
                 return;
             }
 

@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\ProjectAutomationRule;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class ProjectAutomationRuleController extends Controller
 {
@@ -27,6 +29,31 @@ class ProjectAutomationRuleController extends Controller
         }
     }
 
+    /**
+     * Validate and return JSON errors.
+     *
+     * The app only renders exceptions as JSON for api/* paths
+     * (see bootstrap/app.php), so a plain $request->validate() here answers a
+     * failed rule save with a redirect. The fetch that made the call then chases
+     * that redirect instead of reading an error, which surfaces in the browser as
+     * ERR_TOO_MANY_REDIRECTS rather than "trigger type is invalid".
+     *
+     * @throws \Illuminate\Http\Exceptions\HttpResponseException
+     */
+    private function validateRule(Request $request): array
+    {
+        $validator = Validator::make($request->all(), $this->ruleValidationRules());
+
+        if ($validator->fails()) {
+            throw new HttpResponseException(response()->json([
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors()->toArray(),
+            ], 422));
+        }
+
+        return $validator->validated();
+    }
+
     private function ruleValidationRules(): array
     {
         return [
@@ -37,8 +64,10 @@ class ProjectAutomationRuleController extends Controller
             'trigger_config.custom_field_id' => 'nullable|integer',
             'trigger_config.form_id' => 'nullable|integer',
             'conditions' => 'nullable|array',
-            'conditions.*.field' => 'required|string|in:status,priority,assigned_to,section_id,custom_field',
-            'conditions.*.operator' => 'required|string|in:equals,not_equals,in,not_in,contains,not_contains,is_empty,is_not_empty,greater_than,less_than,before,after',
+            // due_date / start_date are built-in date columns; the *_today
+            // operators compare against today and carry no value of their own.
+            'conditions.*.field' => 'required|string|in:status,priority,assigned_to,section_id,due_date,start_date,custom_field',
+            'conditions.*.operator' => 'required|string|in:equals,not_equals,in,not_in,contains,not_contains,is_empty,is_not_empty,greater_than,less_than,before,after,before_today,after_today,is_today',
             'conditions.*.value' => 'present',
             'conditions.*.custom_field_id' => 'nullable|integer',
             'actions' => 'required|array|min:1',
@@ -64,7 +93,7 @@ class ProjectAutomationRuleController extends Controller
         $this->authorizeProject($project);
         $this->authorizeRuleManagement();
 
-        $validated = $request->validate($this->ruleValidationRules());
+        $validated = $this->validateRule($request);
 
         $rule = $project->automationRules()->create([
             ...$validated,
@@ -83,7 +112,7 @@ class ProjectAutomationRuleController extends Controller
         $this->authorizeRuleManagement();
         abort_if($rule->project_id !== $project->id, 404);
 
-        $validated = $request->validate($this->ruleValidationRules());
+        $validated = $this->validateRule($request);
 
         $rule->update($validated);
         $rule->load('creator:id,name');
