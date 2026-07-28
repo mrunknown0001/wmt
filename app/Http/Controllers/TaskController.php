@@ -116,7 +116,7 @@ class TaskController extends Controller
 
         AutomationRuleEngine::evaluate($task, 'task_created');
 
-        $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
+        $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption', 'customFieldValues.customField');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'created', $request->user()->id))->toOthers();
 
         return redirect("/projects/{$project->id}")
@@ -219,7 +219,7 @@ class TaskController extends Controller
         TaskActivityLogger::logCreated($newTask, $request->user());
         ActivityLogger::logCreated($newTask, $request->user());
 
-        $newTask->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
+        $newTask->load('assignee', 'collaborators', 'customFieldValues.selectedOption', 'customFieldValues.customField');
         $newTask->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
 
         broadcast(new TaskUpdated($project->id, $newTask->toArray(), 'created', $request->user()->id))->toOthers();
@@ -410,7 +410,7 @@ class TaskController extends Controller
 
         $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
 
-        $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption');
+        $task->load('assignee', 'collaborators', 'customFieldValues.selectedOption', 'customFieldValues.customField');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'updated', $request->user()->id))->toOthers();
 
         return redirect("/projects/{$project->id}")
@@ -576,7 +576,7 @@ class TaskController extends Controller
             }
         }
 
-        $task->loadMissing('assignee', 'collaborators', 'customFieldValues.selectedOption');
+        $task->loadMissing('assignee', 'collaborators', 'customFieldValues.selectedOption', 'customFieldValues.customField');
         broadcast(new TaskUpdated($project->id, $task->toArray(), 'updated', $request->user()->id))->toOthers();
 
         return response()->json($response);

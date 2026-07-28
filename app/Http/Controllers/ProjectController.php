@@ -289,7 +289,11 @@ class ProjectController extends Controller
                     'assignee', 'creator', 'collaborators',
                     'subtasks' => fn ($q) => $q->withCount(['comments', 'attachments']),
                     'subtasks.assignee', 'subtasks.collaborators',
-                    'customFieldValues.selectedOption', 'subtasks.customFieldValues.selectedOption',
+                    // customField is eager loaded because the value model appends
+                    // people_names, whose accessor otherwise lazy-loads it once per
+                    // value — an N+1 across every task on the page.
+                    'customFieldValues.selectedOption', 'customFieldValues.customField',
+                    'subtasks.customFieldValues.selectedOption', 'subtasks.customFieldValues.customField',
                 ])
                 ->withCount('subtasks')
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')])
@@ -309,8 +313,8 @@ class ProjectController extends Controller
                     'assignee', 'creator', 'collaborators',
                     'subtasks' => fn ($q) => $q->where('assigned_to', $userId)->withCount(['comments', 'attachments']),
                     'subtasks.assignee', 'subtasks.collaborators',
-                    'customFieldValues.selectedOption',
-                    'subtasks.customFieldValues.selectedOption',
+                    'customFieldValues.selectedOption', 'customFieldValues.customField',
+                    'subtasks.customFieldValues.selectedOption', 'subtasks.customFieldValues.customField',
                 ])
                 ->withCount(['subtasks' => fn ($q) => $q->where('assigned_to', $userId)])
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('assigned_to', $userId)->where('status', 'done')])
