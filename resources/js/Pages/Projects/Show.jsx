@@ -50,6 +50,7 @@ import ProjectCharts from '../../Components/ProjectCharts';
 import { formatLabel, formatDate, apiFetch } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
+import InlinePopover from '../../Components/InlinePopover';
 
 // Types whose value is computed from other data rather than entered. They are
 // read-only everywhere: no inline editor, no bulk edit, no filtering.
@@ -976,32 +977,89 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
 }
 
 // Droppable zone for sections (allows dropping tasks into/between sections)
-/** "Show N completed" row shown under a section that has closed tasks hidden. */
-function CompletedToggleRow({ hiddenCount, isRevealed, onToggle, closedCount }) {
-    if (!isRevealed && hiddenCount === 0) return null;
-    if (isRevealed && !closedCount) return null;
+/**
+ * Reveal control for a section's completed tasks.
+ *
+ * A plain "show all" isn't enough once a project has recurring work: a weekly
+ * task accumulates an occurrence every week, and revealing everything buries the
+ * handful of one-off tasks someone actually wanted to look back at. So the
+ * recurring series are offered individually, by title, with their counts.
+ */
+function CompletedToggleRow({ hiddenCount, closedCount, reveal, recurringTitles, onSelect }) {
+    const [open, setOpen] = useState(false);
+    const anchorRef = useRef(null);
 
-    const count = isRevealed ? closedCount : hiddenCount;
+    // Nothing completed in this section at all — no control to show.
+    if (!closedCount) return null;
+
+    const label = reveal === 'all'
+        ? `Hide ${closedCount} completed`
+        : reveal !== null
+            ? `Showing “${reveal}” — ${hiddenCount} still hidden`
+            : `Show ${hiddenCount} completed ${hiddenCount === 1 ? 'task' : 'tasks'}`;
+
+    const choose = (value) => { onSelect(value); setOpen(false); };
+
+    const itemClass = 'w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between gap-3';
 
     return (
         <tr>
             <td colSpan={99} className="px-0 py-1">
                 <div className="sticky left-0 pl-14 w-fit">
                     <button
+                        ref={anchorRef}
                         type="button"
-                        onClick={onToggle}
+                        onClick={() => (recurringTitles.length === 0 && reveal === null
+                            ? choose('all')
+                            : setOpen((o) => !o))}
                         className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                     >
                         <svg
-                            className={`h-3 w-3 transition-transform ${isRevealed ? 'rotate-180' : ''}`}
+                            className={`h-3 w-3 transition-transform ${reveal !== null ? 'rotate-180' : ''}`}
                             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                         >
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
-                        {isRevealed
-                            ? `Hide ${count} completed`
-                            : `Show ${count} completed ${count === 1 ? 'task' : 'tasks'}`}
+                        {label}
                     </button>
+
+                    <InlinePopover isOpen={open} onClose={() => setOpen(false)} anchorRef={anchorRef}>
+                        <div className="py-1 min-w-[220px] max-w-xs">
+                            <button type="button" onClick={() => choose('all')} className={itemClass}>
+                                <span>Show all completed</span>
+                                <span className="text-xs text-gray-400">{closedCount}</span>
+                            </button>
+
+                            {recurringTitles.length > 0 && (
+                                <>
+                                    <div className="px-3 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-700 mt-1">
+                                        Completed recurring tasks
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto scrollbar-thin">
+                                        {recurringTitles.map(({ title, count }) => (
+                                            <button
+                                                key={title}
+                                                type="button"
+                                                onClick={() => choose(title)}
+                                                className={`${itemClass} ${reveal === title ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`}
+                                            >
+                                                <span className="truncate">{title}</span>
+                                                <span className="text-xs text-gray-400 shrink-0">{count}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
+                            {reveal !== null && (
+                                <div className="border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
+                                    <button type="button" onClick={() => choose(null)} className={itemClass}>
+                                        <span>Hide completed again</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </InlinePopover>
                 </div>
             </td>
         </tr>
@@ -1394,15 +1452,23 @@ export default function Show() {
     // reveal. Deliberately list-view only — the board has a Done column, and
     // emptying it would hide the tasks in the one place they belong.
     const hideCompleted = !!project.hide_completed_tasks;
-    const [revealedGroups, setRevealedGroups] = useState(() => new Set());
+
+    // groupKey -> reveal selection: 'all', a recurring task title, or absent for
+    // "still hidden". A title is stored rather than an id because a recurring
+    // series is a chain of separate tasks that share a name.
+    const [revealedGroups, setRevealedGroups] = useState(() => new Map());
 
     const groupKey = (id) => (id === null || id === undefined ? '__unsectioned' : String(id));
 
-    const toggleGroupRevealed = useCallback((id) => {
+    const setGroupReveal = useCallback((id, value) => {
         setRevealedGroups((prev) => {
-            const next = new Set(prev);
+            const next = new Map(prev);
             const key = groupKey(id);
-            next.has(key) ? next.delete(key) : next.add(key);
+            if (value === null) {
+                next.delete(key);
+            } else {
+                next.set(key, value);
+            }
             return next;
         });
     }, []);
@@ -1782,11 +1848,38 @@ export default function Show() {
      * finished work, not a change to the project's setting.
      */
     const splitCompleted = useCallback((tasks, groupId) => {
-        if (!hideCompleted || revealedGroups.has(groupKey(groupId))) {
-            return { tasks, hiddenCount: 0 };
+        if (!hideCompleted) {
+            return { tasks, hiddenCount: 0, reveal: null, recurringTitles: [] };
         }
-        const open = tasks.filter((t) => !CLOSING_TASK_STATUSES.includes(t.status));
-        return { tasks: open, hiddenCount: tasks.length - open.length };
+
+        const reveal = revealedGroups.get(groupKey(groupId)) ?? null;
+        const closed = tasks.filter((t) => CLOSING_TASK_STATUSES.includes(t.status));
+
+        // Filtered in place rather than concatenated so revealed tasks keep their
+        // position in the section's sort order instead of jumping to the end.
+        const visible = reveal === 'all'
+            ? tasks
+            : tasks.filter((t) => !CLOSING_TASK_STATUSES.includes(t.status)
+                || (reveal !== null && t.title === reveal));
+
+        // Recurring occurrences among the closed tasks, grouped by title — a
+        // finished weekly task can otherwise bury everything else in the section.
+        const counts = new Map();
+        closed.forEach((t) => {
+            if (!t.is_recurring && !t.recurring_source_id) return;
+            counts.set(t.title, (counts.get(t.title) ?? 0) + 1);
+        });
+        const recurringTitles = [...counts.entries()]
+            .map(([title, count]) => ({ title, count }))
+            .sort((a, b) => a.title.localeCompare(b.title));
+
+        return {
+            tasks: visible,
+            hiddenCount: closed.length - visible.filter((t) => CLOSING_TASK_STATUSES.includes(t.status)).length,
+            closedCount: closed.length,
+            reveal,
+            recurringTitles,
+        };
     }, [hideCompleted, revealedGroups]);
 
     // Group filtered tasks by section for list view
@@ -3396,9 +3489,10 @@ export default function Show() {
                                                         </SortableContext>
                                                         <CompletedToggleRow
                                                             hiddenCount={group.hiddenCount}
-                                                            isRevealed={revealedGroups.has(groupKey(group.id))}
-                                                            closedCount={group.tasks.filter((t) => CLOSING_TASK_STATUSES.includes(t.status)).length}
-                                                            onToggle={() => toggleGroupRevealed(group.id)}
+                                                            closedCount={group.closedCount}
+                                                            reveal={group.reveal}
+                                                            recurringTitles={group.recurringTitles}
+                                                            onSelect={(value) => setGroupReveal(group.id, value)}
                                                         />
                                                         <SectionDropZone sectionId={group.id} minHeight={group.id === null} />
                                                         </>
@@ -3515,9 +3609,10 @@ export default function Show() {
                                             </SortableContext>
                                             <CompletedToggleRow
                                                 hiddenCount={flatList.hiddenCount}
-                                                isRevealed={revealedGroups.has('__flat')}
-                                                closedCount={flatList.tasks.filter((t) => CLOSING_TASK_STATUSES.includes(t.status)).length}
-                                                onToggle={() => toggleGroupRevealed('__flat')}
+                                                closedCount={flatList.closedCount}
+                                                reveal={flatList.reveal}
+                                                recurringTitles={flatList.recurringTitles}
+                                                onSelect={(value) => setGroupReveal('__flat', value)}
                                             />
                                             {/* Add section button when no sections exist yet */}
                                             {canManageTasks && (
