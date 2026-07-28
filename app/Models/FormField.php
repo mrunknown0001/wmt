@@ -36,6 +36,23 @@ class FormField extends Model
         ];
     }
 
+    /**
+     * How this field should actually behave, which is not always the stored type.
+     *
+     * A field mapped to a People custom field must render and validate as a
+     * multi-select over the scoped users. The stored type is whatever the field
+     * was created as — fields added before People was supported were saved as
+     * 'text', and would otherwise keep rendering as a free-text box forever.
+     */
+    public function effectiveType(): string
+    {
+        if ($this->customField?->type === 'people') {
+            return 'multi_select';
+        }
+
+        return $this->type;
+    }
+
     public function form(): BelongsTo
     {
         return $this->belongsTo(Form::class);

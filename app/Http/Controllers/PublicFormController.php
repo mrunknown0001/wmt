@@ -42,7 +42,10 @@ class PublicFormController extends Controller
                 'fields' => $form->fields->map(function ($field) {
                     $data = [
                         'id' => $field->id,
-                        'type' => $field->type,
+                        // effectiveType, not the stored type: a field mapped to a
+                        // People custom field renders as a multi-select even when it
+                        // was created before People existed and was saved as 'text'.
+                        'type' => $field->effectiveType(),
                         'label' => $field->label,
                         'help_text' => $field->help_text,
                         'is_required' => $field->is_required,
@@ -167,7 +170,7 @@ class PublicFormController extends Controller
                 }
             } else {
                 // Cap text length so a submission can't bloat the DB or DoS the form.
-                match ($field->type) {
+                match ($field->effectiveType()) {
                     'text' => array_push($fieldRules, 'string', 'max:255'),
                     'textarea' => array_push($fieldRules, 'string', 'max:10000'),
                     'number' => $fieldRules[] = 'numeric',
@@ -186,10 +189,10 @@ class PublicFormController extends Controller
                 // Restrict select/multi_select submissions to the field's configured
                 // options so arbitrary values can't be injected. Only enforced when the
                 // field actually has options defined (otherwise Rule::in would reject all).
-                if (in_array($field->type, ['select', 'multi_select'], true)) {
+                if (in_array($field->effectiveType(), ['select', 'multi_select'], true)) {
                     $optionValues = $this->optionValues($field);
                     if (!empty($optionValues)) {
-                        if ($field->type === 'select') {
+                        if ($field->effectiveType() === 'select') {
                             $fieldRules[] = Rule::in($optionValues);
                         } else {
                             // Validate each selected element against the allowed options.
@@ -283,7 +286,7 @@ class PublicFormController extends Controller
                     if ($val === null || $val === '') continue;
 
                     // Resolve option IDs to labels for select/multi_select fields
-                    if (in_array($field->type, ['select', 'multi_select'])) {
+                    if (in_array($field->effectiveType(), ['select', 'multi_select'])) {
                         $val = $this->resolveOptionLabels($field, $val);
                     }
 
