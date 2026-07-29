@@ -12,6 +12,7 @@ use App\Models\TaskCustomFieldValue;
 use App\Models\User;
 use App\Notifications\AutomationBlockedNotification;
 use App\Notifications\TaskAssignedNotification;
+use App\Services\RecurringTaskService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -442,7 +443,24 @@ class AutomationRuleEngine
         $validStatuses = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
         if (!in_array($status, $validStatuses)) return;
 
+        $oldStatus = $task->status;
         $task->update(['status' => $status]);
+
+        // Completing through a rule has to spawn the next occurrence, exactly as
+        // completing by hand does. Every controller calls this after its own
+        // status write; this engine was the only path that didn't, so a recurring
+        // task closed by automation simply ended.
+        //
+        // The service itself no-ops unless the task is recurring, actually moved
+        // into "done", and has no successor yet — so this is safe to call for any
+        // status change.
+        $actor = auth()->user()
+            ?: User::find($task->created_by)
+            ?: User::find($task->assigned_to);
+
+        if ($actor) {
+            RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $actor);
+        }
     }
 
     private static function actionChangePriority(Task $task, array $params): void
