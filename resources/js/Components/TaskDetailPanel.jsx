@@ -542,6 +542,9 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                     <div className="flex-1 overflow-y-auto">
                         {/* Title */}
                         <div className="px-6 pt-5 pb-3">
+                            {taskData.series_number && (
+                                <p className="font-mono text-xs text-gray-500 dark:text-gray-400 mb-1">{taskData.series_number}</p>
+                            )}
                             <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">
                                 {taskData.title}
                             </h1>

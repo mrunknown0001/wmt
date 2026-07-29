@@ -10,6 +10,7 @@ import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import ProjectRules from '../../Components/ProjectRules';
+import TaskSeriesConfig from '../../Components/TaskSeriesConfig';
 import { flattenFolders } from '../../Components/FolderTree';
 import { formatLabel } from '../../utils';
 
@@ -25,6 +26,9 @@ export default function Edit() {
         due_date: project.due_date ? project.due_date.split('T')[0] : '',
         require_comment_attachment_on_close: project.require_comment_attachment_on_close ?? false,
         hide_completed_tasks: project.hide_completed_tasks ?? false,
+        task_series_enabled: project.task_series_enabled ?? false,
+        task_series_prefix: project.task_series_prefix || '',
+        task_series_padding: project.task_series_padding ?? 4,
         members: (project.members || []).map((m) => ({ user_id: m.id, role: m.pivot.role })),
     });
 
@@ -89,6 +93,19 @@ export default function Edit() {
                             onChange={(val) => setData('require_comment_attachment_on_close', val)}
                             hideCompleted={data.hide_completed_tasks}
                             onHideCompletedChange={(val) => setData('hide_completed_tasks', val)}
+                        />
+
+                        <TaskSeriesConfig
+                            enabled={data.task_series_enabled}
+                            prefix={data.task_series_prefix}
+                            padding={data.task_series_padding}
+                            onEnabledChange={(val) => setData('task_series_enabled', val)}
+                            onPrefixChange={(val) => setData('task_series_prefix', val)}
+                            onPaddingChange={(val) => setData('task_series_padding', val)}
+                            started={project.task_series_started ?? false}
+                            nextSequence={project.task_series_next ?? 1}
+                            taskCount={project.unnumbered_task_count ?? 0}
+                            errors={errors}
                         />
 
                         <UserMultiSelect

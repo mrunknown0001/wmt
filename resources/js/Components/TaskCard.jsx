@@ -83,6 +83,9 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                     )}
                 </div>
             </div>
+            {task.series_number && (
+                <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500 mb-0.5">{task.series_number}</p>
+            )}
             <div className={`flex items-start gap-1 mb-2 ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
                 <button
                     className="text-sm font-medium line-clamp-2 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"

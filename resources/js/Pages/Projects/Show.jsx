@@ -480,6 +480,9 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
+                    {task.series_number && (
+                        <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">{task.series_number}</span>
+                    )}
                     <Tooltip content={task.title}>
                         <button
                             className="truncate text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
@@ -928,6 +931,9 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                                 </svg>
                             </button>
                         </Tooltip>
+                    )}
+                    {task.series_number && (
+                        <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">{task.series_number}</span>
                     )}
                     <Tooltip content={task.title}>
                         <button
@@ -1760,7 +1766,13 @@ export default function Show() {
 
     // Filter tasks
     const matchesFilters = useCallback((t) => {
-        if (filterSearch && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false;
+        // Search the reference number as well as the title — a number nobody can
+        // look up is not much of a reference.
+        if (filterSearch) {
+            const needle = filterSearch.toLowerCase();
+            const haystack = `${t.title} ${t.series_number || ''}`.toLowerCase();
+            if (!haystack.includes(needle)) return false;
+        }
 
         // Dynamic filters
         for (const filter of dynamicFilters) {

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use App\Observers\ProjectObserver;
 
 #[ObservedBy(ProjectObserver::class)]
@@ -27,6 +28,9 @@ class Project extends Model
         'position',
         'require_comment_attachment_on_close',
         'hide_completed_tasks',
+        'task_series_enabled',
+        'task_series_prefix',
+        'task_series_padding',
     ];
 
     protected function casts(): array
@@ -36,7 +40,83 @@ class Project extends Model
             'is_pinned' => 'boolean',
             'require_comment_attachment_on_close' => 'boolean',
             'hide_completed_tasks' => 'boolean',
+            'task_series_enabled' => 'boolean',
+            'task_series_padding' => 'integer',
+            'task_series_next' => 'integer',
         ];
+    }
+
+    /** Widest sequence the padding setting may be asked to produce. */
+    public const SERIES_MIN_PADDING = 1;
+    public const SERIES_MAX_PADDING = 10;
+
+    /** True once numbering is switched on for this project's tasks. */
+    public function hasTaskSeries(): bool
+    {
+        return (bool) $this->task_series_enabled;
+    }
+
+    /**
+     * True once at least one number has been issued.
+     *
+     * From this point the prefix is fixed — numbers already in circulation would
+     * otherwise start referring to a prefix that no longer exists.
+     */
+    public function taskSeriesStarted(): bool
+    {
+        return (int) $this->task_series_next > 1;
+    }
+
+    /** e.g. "TASK-" + 42 => "TASK-0042". A blank prefix gives bare numbers. */
+    public function formatTaskSeries(int $sequence): string
+    {
+        $padding = max(
+            self::SERIES_MIN_PADDING,
+            min(self::SERIES_MAX_PADDING, (int) $this->task_series_padding)
+        );
+
+        return ($this->task_series_prefix ?? '') . str_pad((string) $sequence, $padding, '0', STR_PAD_LEFT);
+    }
+
+    /** What the next number will look like — used for the live preview. */
+    public function previewTaskSeries(): ?string
+    {
+        return $this->hasTaskSeries()
+            ? $this->formatTaskSeries(max(1, (int) $this->task_series_next))
+            : null;
+    }
+
+    /**
+     * Claim the next task number for this project.
+     *
+     * The row is locked for the read-modify-write, so two tasks created at the
+     * same moment cannot be handed the same number. That is not hypothetical
+     * here: tasks arrive from the UI, the API, public forms and automation
+     * rules, and a bulk import creates many in quick succession.
+     *
+     * Returns null when the project has numbering switched off, in which case
+     * the task simply carries no number.
+     *
+     * @return array{0: string, 1: int}|null [formatted number, sequence]
+     */
+    public static function claimNextTaskSeries(int $projectId): ?array
+    {
+        return DB::transaction(function () use ($projectId) {
+            $project = static::query()->whereKey($projectId)->lockForUpdate()->first();
+
+            if (!$project || !$project->hasTaskSeries()) {
+                return null;
+            }
+
+            $sequence = max(1, (int) $project->task_series_next);
+
+            // saveQuietly: advancing the counter is bookkeeping, not a project
+            // edit, and must not fire observers or bump the project's timestamps.
+            $project->task_series_next = $sequence + 1;
+            $project->saveQuietly();
+
+            return [$project->formatTaskSeries($sequence), $sequence];
+        });
     }
 
     public function owner(): BelongsTo

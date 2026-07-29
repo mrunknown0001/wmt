@@ -32,6 +32,22 @@ class UpdateProjectRequest extends FormRequest
             'due_date' => ['nullable', 'date'],
             'require_comment_attachment_on_close' => ['sometimes', 'boolean'],
             'hide_completed_tasks' => ['sometimes', 'boolean'],
+            'task_series_enabled' => ['sometimes', 'boolean'],
+            'task_series_prefix' => [
+                'nullable', 'string', 'max:20',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9\-_\/]*$/',
+                function ($attribute, $value, $fail) {
+                    $project = $this->route('project');
+
+                    // Once numbers are in circulation the prefix is fixed —
+                    // changing it would strand every number already issued.
+                    if ($project && $project->taskSeriesStarted()
+                        && (string) $value !== (string) $project->task_series_prefix) {
+                        $fail('The task number prefix cannot be changed once numbers have been issued.');
+                    }
+                },
+            ],
+            'task_series_padding' => ['sometimes', 'integer', 'min:1', 'max:10'],
             'members' => ['nullable', 'array'],
             'members.*.user_id' => ['required', 'exists:users,id'],
             'members.*.role' => ['required', 'string', 'in:viewer,editor,admin'],

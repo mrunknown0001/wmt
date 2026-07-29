@@ -69,6 +69,24 @@ class Task extends Model
     {
         parent::boot();
 
+        // Assign the project's task number.
+        //
+        // Done on the model rather than in the controllers because tasks are
+        // created from nine places — the UI, the API, public forms, duplication,
+        // project duplication, recurrence and automation — and a number issued
+        // by only some of them would leave gaps in the sequence.
+        static::creating(function (Task $task) {
+            if ($task->series_number || !$task->project_id) {
+                return; // already numbered, or a standalone task with no project
+            }
+
+            $claim = Project::claimNextTaskSeries((int) $task->project_id);
+
+            if ($claim !== null) {
+                [$task->series_number, $task->series_sequence] = $claim;
+            }
+        });
+
         static::saving(function (Task $task) {
             if ($task->isDirty('status')) {
                 $newStatus = $task->status;

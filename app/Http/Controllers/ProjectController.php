@@ -13,6 +13,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\FolderService;
+use App\Services\TaskSeriesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -365,7 +366,12 @@ class ProjectController extends Controller
         $project->load('owner', 'members');
 
         return Inertia::render('Projects/Edit', [
-            'project' => $project,
+            'project' => array_merge($project->toArray(), [
+                // Drives the write-once lock on the prefix, and the "n existing
+                // tasks will be numbered" note shown before numbering is on.
+                'task_series_started' => $project->taskSeriesStarted(),
+                'unnumbered_task_count' => $project->tasks()->whereNull('series_sequence')->count(),
+            ]),
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['active', 'on_hold', 'completed', 'archived'],
             'memberRoles' => ['viewer', 'editor', 'admin'],
@@ -380,7 +386,16 @@ class ProjectController extends Controller
         $oldValues = $project->only(['name', 'description', 'status', 'owner_id', 'folder_id', 'due_date']);
         $oldValues['due_date'] = $project->due_date?->toDateString();
 
+        $seriesWasOff = !$project->hasTaskSeries();
+
         $project->update(collect($validated)->except('members')->toArray());
+
+        // Turning numbering on gives the tasks that are already here a number
+        // too — the ones people refer to most are the ones already in flight.
+        $backfilled = 0;
+        if ($seriesWasOff && $project->hasTaskSeries()) {
+            $backfilled = TaskSeriesService::backfill($project);
+        }
 
         ActivityLogger::logChanges($project, $oldValues, $request->user());
 
@@ -388,8 +403,11 @@ class ProjectController extends Controller
             ->mapWithKeys(fn ($m) => [$m['user_id'] => ['role' => $m['role'] ?? 'viewer']]);
         $project->members()->sync($members);
 
-        return redirect("/projects/{$project->id}")
-            ->with('success', 'Project updated successfully.');
+        $message = $backfilled > 0
+            ? "Project updated. {$backfilled} existing " . str('task')->plural($backfilled) . ' numbered.'
+            : 'Project updated successfully.';
+
+        return redirect("/projects/{$project->id}")->with('success', $message);
     }
 
     public function moveToFolder(Request $request, Project $project): RedirectResponse
