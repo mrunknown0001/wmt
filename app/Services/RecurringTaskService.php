@@ -53,20 +53,14 @@ class RecurringTaskService
             }
         }
 
-        // Position is measured among the task's own siblings — a recurring subtask
-        // belongs under its parent, not at the top level of the project.
-        $positionQuery = Task::where('status', 'to_do');
-        if ($task->parent_id) {
-            $positionQuery->where('parent_id', $task->parent_id);
-        } else {
-            $positionQuery->whereNull('parent_id');
-        }
-        if ($task->project_id) {
-            $positionQuery->where('project_id', $task->project_id);
-        } else {
-            $positionQuery->whereNull('project_id');
-        }
-        $maxPosition = $positionQuery->max('position') ?? -1;
+        // The occurrence takes over the slot its predecessor just vacated, rather
+        // than being appended to the end of the list. A weekly task that lives
+        // near the top of its section should still be there next week — pushing
+        // it to the bottom each cycle buries recurring work under everything else.
+        //
+        // The predecessor keeps its own position value, but it has just moved to
+        // "done", so it is no longer ordered against the open tasks.
+        $position = $task->position ?? 0;
 
         $newTask = Task::create([
             'project_id' => $task->project_id,
@@ -82,7 +76,7 @@ class RecurringTaskService
             'created_by' => $actor->id,
             'start_date' => $nextStartDate,
             'due_date' => $nextDueDate,
-            'position' => $maxPosition + 1,
+            'position' => $position,
             'is_recurring' => true,
             'recurrence_frequency' => $task->recurrence_frequency,
             'recurrence_interval' => $task->recurrence_interval,
