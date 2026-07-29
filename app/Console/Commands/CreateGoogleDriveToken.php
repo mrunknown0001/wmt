@@ -58,6 +58,26 @@ class CreateGoogleDriveToken extends Command
         $client->setPrompt('consent');
 
         $this->line('');
+        $this->warn('Before opening the link, the OAuth client must list this redirect URI');
+        $this->warn('character for character — this is the usual cause of a rejected request:');
+        $this->line('');
+        $this->line('    ' . $redirect);
+        $this->line('');
+        $this->line('  Google Cloud console → Credentials → your OAuth 2.0 Client ID →');
+        $this->line('  Authorised redirect URIs. No trailing slash: "' . $redirect . '/" is a');
+        $this->line('  different URI to Google and will be refused. Changes can take a');
+        $this->line('  minute to take effect.');
+        $this->line('');
+
+        if (! $this->confirm('Is ' . $redirect . ' registered on the client?', true)) {
+            $this->line('');
+            $this->line('Add it, then run this again. To use a different one:');
+            $this->line('  php artisan backup:drive-token --redirect=http://localhost:8000/oauth');
+
+            return self::FAILURE;
+        }
+
+        $this->line('');
         $this->info('1. Open this URL and approve access:');
         $this->line('');
         $this->line($client->createAuthUrl());
@@ -86,6 +106,7 @@ class CreateGoogleDriveToken extends Command
             $this->line('');
             $this->warn('Most often: the code was already used (each one works once),');
             $this->warn('or the redirect URI here does not exactly match the one registered.');
+            $this->line('  this request used: ' . $redirect);
 
             return self::FAILURE;
         }
