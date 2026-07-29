@@ -582,7 +582,12 @@ class TaskController extends Controller
         if ($request->has('status')) {
             $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldValues['status'] ?? null, $request->user());
             if ($newTask) {
-                $newTask->load('assignee', 'collaborators');
+                // The generated occurrence is inserted straight into the list, so it
+                    // needs the same relations a server-rendered row has. Without
+                    // customFieldValues its carried-over values render blank until a
+                    // page refresh fetches the real record.
+                    $newTask->load('assignee', 'collaborators', 'customFieldValues.selectedOption', 'customFieldValues.customField');
+                    $newTask->loadCount(['subtasks', 'comments', 'attachments']);
                 $response['recurring_task_created'] = true;
                 $response['new_task'] = $newTask;
             }
@@ -690,7 +695,12 @@ class TaskController extends Controller
                             }
                             $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $user);
                             if ($newTask) {
-                                $newTask->load('assignee', 'collaborators');
+                                // The generated occurrence is inserted straight into the list, so it
+                    // needs the same relations a server-rendered row has. Without
+                    // customFieldValues its carried-over values render blank until a
+                    // page refresh fetches the real record.
+                    $newTask->load('assignee', 'collaborators', 'customFieldValues.selectedOption', 'customFieldValues.customField');
+                    $newTask->loadCount(['subtasks', 'comments', 'attachments']);
                                 $newTasks[] = $newTask;
                             }
                         }
@@ -907,7 +917,12 @@ class TaskController extends Controller
             $candidate->status = 'done';
             $newTask = RecurringTaskService::generateNextIfCompleted($candidate, $oldStatus, $request->user());
             if ($newTask) {
-                $newTask->load('assignee', 'collaborators');
+                // The generated occurrence is inserted straight into the list, so it
+                    // needs the same relations a server-rendered row has. Without
+                    // customFieldValues its carried-over values render blank until a
+                    // page refresh fetches the real record.
+                    $newTask->load('assignee', 'collaborators', 'customFieldValues.selectedOption', 'customFieldValues.customField');
+                    $newTask->loadCount(['subtasks', 'comments', 'attachments']);
                 $newTasks[] = $newTask;
             }
         }
