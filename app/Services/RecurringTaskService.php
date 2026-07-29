@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\User;
@@ -29,6 +30,33 @@ class RecurringTaskService
         }
 
         return self::createNextOccurrence($task, $actor);
+    }
+
+    /**
+     * Custom fields in this project that have a usable default configured.
+     *
+     * Mirrors the emptiness test in CustomFieldDefaults so the two agree on what
+     * counts as "has a default" — otherwise a field could be skipped here and
+     * then not filled there, leaving it blank.
+     */
+    private static function fieldIdsWithDefaults(?int $projectId): array
+    {
+        if (!$projectId) {
+            return [];
+        }
+
+        return CustomField::where('project_id', $projectId)
+            ->where('type', '!=', 'formula')
+            ->whereNotNull('config')
+            ->get(['id', 'config'])
+            ->filter(function ($field) {
+                $default = $field->config['default_value'] ?? null;
+
+                return $default !== null && $default !== '' && !(is_array($default) && empty($default));
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     private static function createNextOccurrence(Task $task, User $actor): Task
@@ -88,13 +116,26 @@ class RecurringTaskService
             $newTask->collaborators()->sync($collaboratorIds);
         }
 
-        // Carry the custom field values forward. Every value column is copied
-        // rather than a chosen few, so field types added later come along without
-        // this needing to change.
+        // Custom fields on a new occurrence:
+        //
+        //   - a field with a default value is reset to that default. A default is
+        //     what the field should start each cycle as, so carrying last cycle's
+        //     answer over the top of it would make the setting meaningless.
+        //   - a field with no default carries its previous value, so context that
+        //     has nowhere else to come from isn't lost.
+        //
+        // Every value column is copied rather than a chosen few, so field types
+        // added later come along without this needing to change.
         $task->loadMissing('customFieldValues');
+
+        $defaulted = self::fieldIdsWithDefaults($task->project_id);
         $carried = [];
 
         foreach ($task->customFieldValues as $cfv) {
+            if (in_array((int) $cfv->custom_field_id, $defaulted, true)) {
+                continue; // the default below owns this field
+            }
+
             $newTask->customFieldValues()->create([
                 'custom_field_id' => $cfv->custom_field_id,
                 'value_text' => $cfv->value_text,
@@ -106,9 +147,8 @@ class RecurringTaskService
             $carried[] = $cfv->custom_field_id;
         }
 
-        // Fields the previous occurrence never held fall back to their default,
-        // the same as any other newly created task. Carried values are passed as
-        // "already provided" so a default can't overwrite one.
+        // Carried values are passed as "already provided" so a default can't
+        // overwrite one — only the fields skipped above get defaults.
         CustomFieldDefaults::apply($newTask, $carried);
 
         TaskActivityLogger::logCreated($newTask, $actor);

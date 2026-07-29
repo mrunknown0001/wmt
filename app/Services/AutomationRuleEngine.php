@@ -459,7 +459,27 @@ class AutomationRuleEngine
             ?: User::find($task->assigned_to);
 
         if ($actor) {
-            RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $actor);
+            $newTask = RecurringTaskService::generateNextIfCompleted($task, $oldStatus, $actor);
+
+            // Announce the new occurrence. Unlike the controllers, this path has no
+            // response to attach it to — the rule runs server-side — so a broadcast
+            // is the only way any open page learns the task exists. Without it the
+            // occurrence only appeared after a manual refresh.
+            //
+            // Not ->toOthers(): the person whose action triggered the rule needs it
+            // as much as anyone. The client's 'created' handler ignores ids it
+            // already has, so a duplicate is harmless.
+            if ($newTask) {
+                $newTask->load('assignee', 'collaborators', 'customFieldValues.selectedOption', 'customFieldValues.customField');
+                $newTask->loadCount(['subtasks', 'comments', 'attachments']);
+
+                broadcast(new TaskUpdated(
+                    $newTask->project_id,
+                    $newTask->toArray(),
+                    'created',
+                    $actor->id,
+                ));
+            }
         }
     }
 
