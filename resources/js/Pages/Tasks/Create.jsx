@@ -9,6 +9,7 @@ import RichTextEditor from '../../Components/RichTextEditor';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import RecurrenceOptions from '../../Components/RecurrenceOptions';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import { formatLabel } from '../../utils';
 
@@ -43,6 +44,7 @@ export default function Create() {
         is_recurring: false,
         recurrence_frequency: 'weekly',
         recurrence_interval: 1,
+        recurrence_config: null,
         custom_field_values: defaultCustomFieldValues(),
     });
 
@@ -158,6 +160,13 @@ export default function Create() {
                                                 error={errors.recurrence_frequency}
                                             />
                                         </div>
+                                        <RecurrenceOptions
+                                            frequency={data.recurrence_frequency}
+                                            interval={data.recurrence_interval}
+                                            config={data.recurrence_config}
+                                            onChange={(cfg) => setData('recurrence_config', cfg)}
+                                            errors={errors}
+                                        />
                                         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                             A new task will be created automatically when this task is marked as done.
                                             {data.due_date && ' Next due date will be calculated from the current due date.'}

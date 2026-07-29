@@ -11,6 +11,7 @@ import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
+import RecurrenceOptions from '../../Components/RecurrenceOptions';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
 import { formatLabel, formatDate, apiFetch, taskEditUrl } from '../../utils';
@@ -298,6 +299,7 @@ export default function Edit() {
         is_recurring: task.is_recurring || false,
         recurrence_frequency: task.recurrence_frequency || 'weekly',
         recurrence_interval: task.recurrence_interval || 1,
+        recurrence_config: task.recurrence_config || null,
         ...(isStandalone ? { project_id: task.project_id || '' } : {}),
         custom_field_values: (() => {
             const vals = {};
@@ -653,6 +655,13 @@ export default function Edit() {
                                                     error={errors.recurrence_frequency}
                                                 />
                                             </div>
+                                            <RecurrenceOptions
+                                                frequency={data.recurrence_frequency}
+                                                interval={data.recurrence_interval}
+                                                config={data.recurrence_config}
+                                                onChange={(cfg) => setData('recurrence_config', cfg)}
+                                                errors={errors}
+                                            />
                                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                                 A new task will be created automatically when this task is marked as done.
                                                 {data.due_date && ' Next due date will be calculated from the current due date.'}

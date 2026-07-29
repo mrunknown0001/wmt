@@ -744,7 +744,7 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     Custom Fields ({fields.length})
                 </h3>
-                <Button size="sm" onClick={openCreate}>+ Add Field</Button>
+                <Button size="sm" variant="violet" onClick={openCreate}>+ Add Field</Button>
             </div>
 
             {fields.length === 0 ? (

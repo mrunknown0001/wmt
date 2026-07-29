@@ -668,7 +668,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     Automation Rules ({rules.length})
                 </h3>
-                {canCreateRules && <Button size="sm" onClick={openCreate}>Add Rule</Button>}
+                {canCreateRules && <Button size="sm" variant="amber" onClick={openCreate}>Add Rule</Button>}
             </div>
 
             {rules.length > 0 ? (

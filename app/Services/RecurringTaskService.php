@@ -108,6 +108,7 @@ class RecurringTaskService
             'is_recurring' => true,
             'recurrence_frequency' => $task->recurrence_frequency,
             'recurrence_interval' => $task->recurrence_interval,
+            'recurrence_config' => $task->recurrence_config,
             'recurring_source_id' => $task->id,
         ]);
 

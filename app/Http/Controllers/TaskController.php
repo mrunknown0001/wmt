@@ -206,6 +206,7 @@ class TaskController extends Controller
             'is_recurring' => $task->is_recurring,
             'recurrence_frequency' => $task->recurrence_frequency,
             'recurrence_interval' => $task->recurrence_interval,
+            'recurrence_config' => $task->recurrence_config,
         ]);
 
         if ($task->collaborators()->count() > 0) {

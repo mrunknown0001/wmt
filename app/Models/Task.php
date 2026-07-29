@@ -42,6 +42,7 @@ class Task extends Model
         'is_recurring',
         'recurrence_frequency',
         'recurrence_interval',
+        'recurrence_config',
         'recurring_source_id',
         'section_id',
         'escalation_level',
@@ -56,6 +57,7 @@ class Task extends Model
             'position' => 'integer',
             'is_recurring' => 'boolean',
             'recurrence_interval' => 'integer',
+            'recurrence_config' => 'array',
             'escalation_level' => 'integer',
         ];
     }
@@ -144,18 +146,120 @@ class Task extends Model
         ]);
     }
 
+    /** Monthly recurrence variants stored in recurrence_config['mode']. */
+    public const MONTHLY_MODES = ['day_of_month', 'last_day', 'nth_weekday'];
+
+    /** "Last" week of the month, stored as the week number. */
+    public const LAST_WEEK = -1;
+
     public function calculateNextDueDate(): ?\Carbon\Carbon
     {
         if (!$this->due_date) {
             return null;
         }
 
+        $interval = max(1, (int) $this->recurrence_interval);
+        $config = $this->recurrence_config ?? [];
+        $from = $this->due_date->copy();
+
         return match ($this->recurrence_frequency) {
-            'daily' => $this->due_date->copy()->addDays($this->recurrence_interval),
-            'weekly' => $this->due_date->copy()->addWeeks($this->recurrence_interval),
-            'monthly' => $this->due_date->copy()->addMonths($this->recurrence_interval),
-            'yearly' => $this->due_date->copy()->addYears($this->recurrence_interval),
+            'daily' => $from->addDays($interval),
+            'weekly' => $this->nextWeeklyDate($from, $interval, $config),
+            'monthly' => $this->nextMonthlyDate($from, $interval, $config),
+            'yearly' => $from->addYears($interval),
             default => null,
+        };
+    }
+
+    /**
+     * Weekly, optionally restricted to particular weekdays.
+     *
+     * With days chosen, the next occurrence is the next selected weekday after
+     * the current due date. Only once the week is exhausted does it jump forward
+     * by the interval — so "every 2 weeks on Mon and Thu" gives Mon, Thu, then a
+     * fortnight later, not two separate fortnightly series.
+     */
+    private function nextWeeklyDate(\Carbon\Carbon $from, int $interval, array $config): \Carbon\Carbon
+    {
+        $days = collect($config['days'] ?? [])
+            ->map(fn ($d) => (int) $d)
+            ->filter(fn ($d) => $d >= 1 && $d <= 7)
+            ->unique()->sort()->values();
+
+        if ($days->isEmpty()) {
+            return $from->addWeeks($interval);
+        }
+
+        // A later selected day in the same week?
+        $current = (int) $from->isoWeekday();
+        $later = $days->first(fn ($d) => $d > $current);
+
+        if ($later !== null) {
+            return $from->copy()->addDays($later - $current);
+        }
+
+        // Otherwise the earliest selected day, `interval` weeks on.
+        return $from->copy()
+            ->addWeeks($interval)
+            ->startOfWeek(\Carbon\CarbonInterface::MONDAY)
+            ->addDays($days->first() - 1);
+    }
+
+    /**
+     * Monthly, in one of three shapes.
+     *
+     * Each is anchored to the target month rather than to the previous date, so
+     * a short month can't drag the series earlier permanently — the classic bug
+     * where the 31st becomes the 28th and then stays there.
+     */
+    private function nextMonthlyDate(\Carbon\Carbon $from, int $interval, array $config): \Carbon\Carbon
+    {
+        $mode = $config['mode'] ?? null;
+
+        // startOfMonth first: adding months to the 31st would otherwise overflow
+        // into the following month on the way past February.
+        $target = $from->copy()->startOfMonth()->addMonthsNoOverflow($interval);
+
+        return match ($mode) {
+            'last_day' => $target->endOfMonth()->startOfDay(),
+
+            'day_of_month' => (function () use ($target, $config, $from) {
+                $day = (int) ($config['day'] ?? $from->day);
+                $day = max(1, min(31, $day));
+
+                // Clamp to the month's length: the 31st in a 30-day month means
+                // the 30th, and the following month still gets the 31st.
+                return $target->copy()->day(min($day, $target->daysInMonth));
+            })(),
+
+            'nth_weekday' => (function () use ($target, $config, $from) {
+                $week = (int) ($config['week'] ?? 1);
+                $weekday = (int) ($config['weekday'] ?? $from->isoWeekday());
+                $weekday = max(1, min(7, $weekday));
+
+                if ($week === self::LAST_WEEK) {
+                    $last = $target->copy()->endOfMonth()->startOfDay();
+
+                    return $last->subDays((7 + $last->isoWeekday() - $weekday) % 7);
+                }
+
+                $week = max(1, min(5, $week));
+                $first = $target->copy()->startOfMonth();
+                $offset = (7 + $weekday - $first->isoWeekday()) % 7;
+                $candidate = $first->copy()->addDays($offset + ($week - 1) * 7);
+
+                // A 5th occurrence doesn't exist every month — fall back to the
+                // last one rather than spilling into the next month.
+                if ($candidate->month !== $target->month) {
+                    $last = $target->copy()->endOfMonth()->startOfDay();
+
+                    return $last->subDays((7 + $last->isoWeekday() - $weekday) % 7);
+                }
+
+                return $candidate;
+            })(),
+
+            default => $from->copy()->addMonthsNoOverflow($interval),
         };
     }
 

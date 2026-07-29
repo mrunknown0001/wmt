@@ -40,6 +40,17 @@ class UpdateTaskRequest extends FormRequest
             'is_recurring' => ['sometimes', 'boolean'],
             'recurrence_frequency' => ['required_if:is_recurring,true', 'nullable', 'string', 'in:daily,weekly,monthly,yearly'],
             'recurrence_interval' => ['required_if:is_recurring,true', 'nullable', 'integer', 'min:1', 'max:365'],
+            // Variance for the recurrence. Shape depends on the frequency:
+            //   weekly  -> days: ISO weekdays 1..7
+            //   monthly -> mode + its own parameters
+            'recurrence_config' => ['nullable', 'array'],
+            'recurrence_config.days' => ['nullable', 'array', 'max:7'],
+            'recurrence_config.days.*' => ['integer', 'min:1', 'max:7'],
+            'recurrence_config.mode' => ['nullable', 'string', 'in:day_of_month,last_day,nth_weekday'],
+            'recurrence_config.day' => ['nullable', 'integer', 'min:1', 'max:31'],
+            // -1 is "last week of the month"; 1..5 are the ordinals.
+            'recurrence_config.week' => ['nullable', 'integer', 'min:-1', 'max:5', 'not_in:0'],
+            'recurrence_config.weekday' => ['nullable', 'integer', 'min:1', 'max:7'],
             'section_id' => ['nullable', 'exists:task_sections,id'],
             'custom_field_values' => ['nullable', 'array'],
         ];
