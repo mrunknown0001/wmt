@@ -295,6 +295,7 @@ export default function Edit() {
         assigned_to: task.assigned_to || '',
         start_date: task.start_date ? task.start_date.split('T')[0] : '',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
+        due_time: (task.due_time || '').slice(0, 5),
         collaborator_ids: (task.collaborators || []).map((c) => c.id),
         is_recurring: task.is_recurring || false,
         recurrence_frequency: task.recurrence_frequency || 'weekly',
@@ -594,6 +595,7 @@ export default function Edit() {
                                         <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} error={errors.start_date} disabled={!canManageTaskDetails} />
                                     )}
                                     <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} disabled={!canManageTaskDetails} />
+                                    <Input label="Due Time" id="due_time" type="time" value={data.due_time} onChange={(e) => setData('due_time', e.target.value)} error={errors.due_time} disabled={!canManageTaskDetails} />
                                 </div>
                                 {!showStartDate && canManageTaskDetails && (
                                     <button

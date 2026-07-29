@@ -38,6 +38,7 @@ export default function Create() {
         priority: 'medium',
         start_date: '',
         due_date: '',
+        due_time: '',
         collaborator_ids: [],
         parent_id: parentTask?.id || '',
         section_id: defaultSectionId || '',
@@ -92,6 +93,7 @@ export default function Create() {
                                     <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} error={errors.start_date} />
                                 )}
                                 <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
+                                <Input label="Due Time" id="due_time" type="time" value={data.due_time} onChange={(e) => setData('due_time', e.target.value)} error={errors.due_time}  />
                             </div>
                             {!showStartDate && (
                                 <button

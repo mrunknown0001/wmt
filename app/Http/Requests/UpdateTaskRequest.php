@@ -34,6 +34,9 @@ class UpdateTaskRequest extends FormRequest
             'project_id' => ['nullable', 'exists:projects,id'],
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
+            // Optional clock time for the due date. H:i from the browser's time
+            // input; H:i:s accepted so a value read back from the DB round-trips.
+            'due_time' => ['nullable', 'date_format:H:i,H:i:s'],
             'parent_id' => ['nullable', 'exists:tasks,id'],
             'collaborator_ids' => ['nullable', 'array'],
             'collaborator_ids.*' => ['exists:users,id'],

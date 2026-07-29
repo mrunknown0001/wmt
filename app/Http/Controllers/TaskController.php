@@ -196,6 +196,7 @@ class TaskController extends Controller
             'created_by' => $request->user()->id,
             'start_date' => $task->start_date,
             'due_date' => $task->due_date,
+            'due_time' => $task->due_time,
             'section_id' => $task->section_id,
             'parent_id' => $task->parent_id,
             'position' => $maxPosition + 1,

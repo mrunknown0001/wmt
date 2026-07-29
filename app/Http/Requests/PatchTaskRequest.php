@@ -31,6 +31,9 @@ class PatchTaskRequest extends FormRequest
             'assigned_to' => ['sometimes', 'nullable', 'exists:users,id'],
             'start_date' => ['sometimes', 'nullable', 'date'],
             'due_date' => ['sometimes', 'nullable', 'date'],
+            // Optional clock time for the due date. H:i from the browser's time
+            // input; H:i:s accepted so a value read back from the DB round-trips.
+            'due_time' => ['nullable', 'date_format:H:i,H:i:s'],
             'section_id' => ['sometimes', 'nullable', 'exists:task_sections,id'],
             'collaborator_ids' => ['sometimes', 'array'],
             'collaborator_ids.*' => ['integer', 'exists:users,id'],

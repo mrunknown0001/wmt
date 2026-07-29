@@ -26,6 +26,8 @@ class Task extends Model
         4 => ['days' => 14, 'label' => 'Executives'],
     ];
 
+    protected $appends = ['due_time_label'];
+
     protected $fillable = [
         'project_id',
         'parent_id',
@@ -37,6 +39,7 @@ class Task extends Model
         'created_by',
         'start_date',
         'due_date',
+        'due_time',
         'completed_at',
         'position',
         'is_recurring',
@@ -144,6 +147,41 @@ class Task extends Model
         throw \Illuminate\Validation\ValidationException::withMessages([
             'status' => $message,
         ]);
+    }
+
+    /**
+     * The due date with its time applied, or null when there is no due date.
+     *
+     * Use this for "is it late yet?" — due_date alone puts everything at
+     * midnight, which would make a task due at 17:00 read as overdue all day.
+     * Without a time set this returns the end of the day, so a dateless-time
+     * task is only late once the day is out.
+     */
+    public function dueAt(): ?\Carbon\Carbon
+    {
+        if (!$this->due_date) {
+            return null;
+        }
+
+        if (!$this->due_time) {
+            return $this->due_date->copy()->endOfDay();
+        }
+
+        [$h, $m] = array_pad(explode(':', (string) $this->due_time), 2, 0);
+
+        return $this->due_date->copy()->setTime((int) $h, (int) $m);
+    }
+
+    /** "5:00 PM", or null when no time was set. */
+    public function getDueTimeLabelAttribute(): ?string
+    {
+        if (!$this->due_time) {
+            return null;
+        }
+
+        [$h, $m] = array_pad(explode(':', (string) $this->due_time), 2, 0);
+
+        return \Carbon\Carbon::createFromTime((int) $h, (int) $m)->format('g:i A');
     }
 
     /** Monthly recurrence variants stored in recurrence_config['mode']. */

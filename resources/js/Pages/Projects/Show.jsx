@@ -425,6 +425,9 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                             ) : (
                                 <span className={`text-xs truncate ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
                                     {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
+                                    {task.due_time_label && (
+                                        <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">{task.due_time_label}</span>
+                                    )}
                                 </span>
                             )}
                         </div>
@@ -849,6 +852,9 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             ) : (
                                 <span className={`text-sm truncate ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
                                     {task.start_date && task.due_date ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : formatDate(task.due_date) || formatDate(task.start_date) || '—'}
+                                    {task.due_time_label && (
+                                        <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">{task.due_time_label}</span>
+                                    )}
                                 </span>
                             )}
                         </div>

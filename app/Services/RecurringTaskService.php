@@ -104,6 +104,7 @@ class RecurringTaskService
             'created_by' => $actor->id,
             'start_date' => $nextStartDate,
             'due_date' => $nextDueDate,
+            'due_time' => $task->due_time,
             'position' => $position,
             'is_recurring' => true,
             'recurrence_frequency' => $task->recurrence_frequency,
