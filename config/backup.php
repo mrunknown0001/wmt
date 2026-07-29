@@ -298,7 +298,13 @@ return [
     'monitor_backups' => [
         [
             'name' => env('APP_NAME', 'laravel-backup'),
-            'disks' => ['local'],
+            // Mirrors the destination list: monitoring only local storage meant a
+            // Drive upload could fail or go stale for weeks without backup:monitor
+            // saying anything, because the local copy was still fresh.
+            'disks' => array_filter([
+                'local',
+                env('GOOGLE_DRIVE_CLIENT_ID') ? 'google' : null,
+            ]),
             'health_checks' => [
                 MaximumAgeInDays::class => 1,
                 MaximumStorageInMegabytes::class => 5000,
