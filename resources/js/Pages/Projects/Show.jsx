@@ -1579,8 +1579,33 @@ export default function Show() {
         }
     }, [localCustomFields]);
 
+    // Drag indices are taken from what the user sees, and the list is displayed in
+    // position order. Filtering the raw array would use insertion order instead,
+    // which drifts from position order after the first reorder and would make the
+    // next drag land in the wrong slot.
+    const inDisplayOrder = useCallback(
+        (tasks) => [...tasks].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+        []
+    );
+
     const sortTasks = useCallback((tasks) => {
-        if (!sortConfig) return tasks;
+        // No column sort chosen: order by position, mirroring the server's
+        // `orderBy('position')->orderBy('created_at', 'desc')`.
+        //
+        // Returning the array untouched here is why a reorder inside a section
+        // needed a refresh: dragging rewrites each task's `position`, but the
+        // array itself keeps its old order, so nothing moved on screen until the
+        // server re-sent the rows already sorted.
+        if (!sortConfig) {
+            return [...tasks].sort((a, b) => {
+                const ap = a.position ?? 0;
+                const bp = b.position ?? 0;
+                if (ap !== bp) return ap - bp;
+                // Same position — fall back to the server's tiebreak.
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+        }
+
         const { key, direction } = sortConfig;
         const sorted = [...tasks].sort((a, b) => {
             const av = getTaskSortValue(a, key);
@@ -2389,7 +2414,7 @@ export default function Show() {
                     t.id === active.id ? { ...t, section_id: targetSectionId } : { ...t }
                 );
 
-                const targetTasks = updated.filter((t) => t.section_id === targetSectionId && matchesFilters(t));
+                const targetTasks = inDisplayOrder(updated.filter((t) => t.section_id === targetSectionId && matchesFilters(t)));
 
                 if (!isOverSection && over.id !== active.id) {
                     // Dropped on a specific task — reorder relative to it
@@ -2424,7 +2449,7 @@ export default function Show() {
             if (toPersist) persistReorder(toPersist);
         } else {
             // Flat list mode (no sections) — same synchronous computation.
-            const filtered = localTasks.filter(matchesFilters);
+            const filtered = inDisplayOrder(localTasks.filter(matchesFilters));
             const unfilteredIds = new Set(filtered.map((t) => t.id));
 
             const oldIndex = filtered.findIndex((t) => t.id === active.id);
@@ -2507,7 +2532,7 @@ export default function Show() {
 
         if (sameColumn) {
             // Reorder within column
-            const columnTasks = updated.filter((t) => t.status === targetStatus);
+            const columnTasks = inDisplayOrder(updated.filter((t) => t.status === targetStatus));
             const oldIdx = columnTasks.findIndex((t) => t.id === active.id);
             const newIdx = columnTasks.findIndex((t) => t.id === over.id);
             if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
@@ -2524,7 +2549,7 @@ export default function Show() {
             updated[activeIdx].status = targetStatus;
 
             // Recalculate positions in the target column
-            const targetTasks = updated.filter((t) => t.status === targetStatus);
+            const targetTasks = inDisplayOrder(updated.filter((t) => t.status === targetStatus));
 
             // If dropping on a specific task, insert before/after it
             if (!overId.startsWith('column-')) {
