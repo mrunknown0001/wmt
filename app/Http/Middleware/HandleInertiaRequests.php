@@ -41,7 +41,10 @@ class HandleInertiaRequests extends Middleware
                 ...(new \Tighten\Ziggy\Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
-            'auth' => [
+            // Lazy: a plain array is evaluated on every request, including partial
+            // reloads that filter this prop out. Inertia keeps previously-sent
+            // props client-side, so deferring it costs nothing.
+            'auth' => fn () => [
                 'user' => $request->user() ? [
                     'id' => $request->user()->id,
                     'name' => $request->user()->name,

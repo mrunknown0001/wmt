@@ -1629,12 +1629,25 @@ export default function Show() {
         setColumnOrder(newOrder);
     }, [effectiveColumnOrder, project.id]);
 
-    // Sync local state when server data changes (after Inertia navigation)
-    useMemo(() => {
+    // Sync local state when server data changes (Inertia navigation, and the
+    // partial reloads triggered by real-time events).
+    //
+    // This must be an effect, not a useMemo. useMemo is a caching hint — React
+    // gives no guarantee it runs, and setting state from it is a render-phase
+    // side effect. When it didn't fire, localTasks kept whatever it was seeded
+    // with at mount, so another user's reorder only appeared after a full page
+    // refresh remounted the component.
+    useEffect(() => {
         setLocalTasks(serverTasks);
+    }, [serverTasks]);
+
+    useEffect(() => {
         setLocalSections(serverSections);
+    }, [serverSections]);
+
+    useEffect(() => {
         setLocalCustomFields(initialCustomFields);
-    }, [serverTasks, serverSections, initialCustomFields]);
+    }, [initialCustomFields]);
 
     // Real-time task updates via Echo
     useEffect(() => {

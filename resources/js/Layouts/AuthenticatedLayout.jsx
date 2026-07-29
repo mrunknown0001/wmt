@@ -1,6 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { registerPushToken } from '../firebase';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import NavLink from '../Components/NavLink';
 import NavSection from '../Components/NavSection';
 import Avatar from '../Components/Avatar';
@@ -9,8 +8,11 @@ import FlashMessage from '../Components/FlashMessage';
 import ThemeToggle from '../Components/ThemeToggle';
 import NotificationBell from '../Components/NotificationBell';
 import NotificationToast from '../Components/NotificationToast';
-import AiChatWidget from '../Components/AiChat/AiChatWidget';
 import GlobalSearch from '../Components/GlobalSearch';
+
+// Code-split: the assistant is a floating widget, so its panel, conversation
+// list and message rendering should not be downloaded by every page view.
+const AiChatWidget = lazy(() => import('../Components/AiChat/AiChatWidget'));
 import SidebarTodoWidget from '../Components/SidebarTodoWidget';
 import Tooltip from '../Components/Tooltip';
 
@@ -172,7 +174,20 @@ export default function AuthenticatedLayout({ children, title, contained = false
         const key = 'wmt_push_registered';
         if (sessionStorage.getItem(key)) return;
         sessionStorage.setItem(key, '1');
-        registerPushToken().catch(() => {});
+
+        // Imported on demand: the Firebase SDK is a large dependency that is only
+        // needed once per session, and never for the first paint. Deferred to idle
+        // so it cannot compete with rendering the page.
+        const register = () => import('../firebase')
+            .then(({ registerPushToken }) => registerPushToken())
+            .catch(() => {});
+
+        if ('requestIdleCallback' in window) {
+            const handle = window.requestIdleCallback(register, { timeout: 4000 });
+            return () => window.cancelIdleCallback(handle);
+        }
+        const timer = setTimeout(register, 2000);
+        return () => clearTimeout(timer);
     }, [auth.user]);
 
     const handleToast = useCallback((notification) => {
@@ -443,7 +458,9 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     <FlashMessage key={appToast.key} type={appToast.type} message={appToast.message} />
                 )}
                 <NotificationToast toasts={toasts} onDismiss={dismissToast} />
-                <AiChatWidget />
+                <Suspense fallback={null}>
+                    <AiChatWidget />
+                </Suspense>
             </div>
         </>
     );

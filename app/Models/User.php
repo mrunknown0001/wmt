@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -101,11 +102,28 @@ class User extends Authenticatable
     }
 
     /** True if this user heads a division/department or leads a team. */
+    /**
+     * Cached: this is read from the shared Inertia props on every request, and
+     * uncached it costs three EXISTS queries each time. Org headship changes when
+     * someone is appointed, so a short TTL is ample.
+     */
     public function headsAnyOrgUnit(): bool
     {
-        return Division::where('head_id', $this->id)->exists()
-            || Department::where('head_id', $this->id)->exists()
-            || Team::where('leader_id', $this->id)->exists();
+        return Cache::remember(
+            "user:{$this->id}:heads-org-unit",
+            now()->addMinutes(30),
+            fn () => Division::where('head_id', $this->id)->exists()
+                || Department::where('head_id', $this->id)->exists()
+                || Team::where('leader_id', $this->id)->exists()
+        );
+    }
+
+    /** Drop the cached headship flag — call after changing an org unit's head. */
+    public static function forgetOrgHeadCache(?int $userId): void
+    {
+        if ($userId) {
+            Cache::forget("user:{$userId}:heads-org-unit");
+        }
     }
 
     public function team(): BelongsTo
