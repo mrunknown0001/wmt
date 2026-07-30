@@ -111,6 +111,8 @@ export default function Edit() {
                             started={project.task_series_started ?? false}
                             nextSequence={project.task_series_next ?? 1}
                             taskCount={project.unnumbered_task_count ?? 0}
+                            trashedCount={project.trashed_series_count ?? 0}
+                            projectId={project.id}
                             errors={errors}
                         />
 

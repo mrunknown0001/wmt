@@ -123,7 +123,7 @@ class Project extends Model
                 return null;
             }
 
-            $sequence = max(1, (int) $project->task_series_next);
+            $sequence = self::nextFreeSequence($projectId, max(1, (int) $project->task_series_next));
 
             // saveQuietly: advancing the counter is bookkeeping, not a project
             // edit, and must not fire observers or bump the project's timestamps.
@@ -132,6 +132,41 @@ class Project extends Model
 
             return [$project->formatTaskSeries($sequence), $sequence];
         });
+    }
+
+    /**
+     * The first sequence at or after $from that no task is holding.
+     *
+     * Normally $from is already free and this returns it unchanged. It matters
+     * after the counter has been reset: numbering restarts low, and without
+     * this the first claim would collide with a task that still holds that
+     * number — including one sitting in the trash, whose row still occupies
+     * the unique index.
+     *
+     * One query, then a walk over the contiguous run, rather than a query per
+     * candidate.
+     */
+    public static function nextFreeSequence(int $projectId, int $from): int
+    {
+        $taken = Task::withTrashed()
+            ->where('project_id', $projectId)
+            ->whereNotNull('series_sequence')
+            ->where('series_sequence', '>=', $from)
+            ->orderBy('series_sequence')
+            ->pluck('series_sequence');
+
+        $sequence = $from;
+
+        foreach ($taken as $held) {
+            if ((int) $held > $sequence) {
+                break; // found a gap
+            }
+            if ((int) $held === $sequence) {
+                $sequence++;
+            }
+        }
+
+        return $sequence;
     }
 
     public function owner(): BelongsTo

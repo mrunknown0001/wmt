@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Project;
 use App\Models\ProjectEscalationRule;
 use App\Services\FolderService;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,7 +12,10 @@ class StoreProjectRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        // This was open: the create *page* checked the policy but the POST that
+        // actually creates the project did not, so the gate could be walked
+        // straight past.
+        return $this->user()->can('create', Project::class);
     }
 
     public function rules(): array

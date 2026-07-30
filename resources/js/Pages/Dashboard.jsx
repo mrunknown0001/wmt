@@ -102,7 +102,7 @@ export default function Dashboard() {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        {preferences.showQuickActions && (
+                        {preferences.showQuickActions && auth.user?.can_create_project !== false && (
                             <div className="flex items-center gap-2">
                                 <LinkButton href="/projects/create" size="sm" variant="secondary">
                                     <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -237,7 +237,9 @@ export default function Dashboard() {
                                 illustration="projects"
                                 title="No projects yet"
                                 description="Create your first project to get started"
-                                action={<LinkButton href="/projects/create" size="sm">New Project</LinkButton>}
+                                action={auth.user?.can_create_project !== false
+                                    ? <LinkButton href="/projects/create" size="sm">New Project</LinkButton>
+                                    : null}
                             />
                         )}
                     </Card>

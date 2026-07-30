@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import { router } from '@inertiajs/react';
+import { ConfirmModal } from './Modal';
+
 /**
  * Optional reference numbering for a project's tasks, e.g. TASK-0001.
  *
@@ -17,10 +21,13 @@ export default function TaskSeriesConfig({
     started = false,
     nextSequence = 1,
     taskCount = null,
+    trashedCount = 0,
+    projectId = null,
     errors = {},
 }) {
     const pad = Math.max(1, Math.min(10, Number(padding) || 4));
     const preview = `${prefix || ''}${String(nextSequence).padStart(pad, '0')}`;
+    const [confirmReset, setConfirmReset] = useState(false);
 
     return (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
@@ -104,6 +111,26 @@ export default function TaskSeriesConfig({
                         </p>
                     )}
 
+                    {/* Only offered once numbers exist — there is nothing to
+                        reset before that, and it needs a saved project to post to. */}
+                    {started && projectId && (
+                        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmReset(true)}
+                                className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                            >
+                                Reset the counter
+                            </button>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Start numbering again from the lowest unused number.
+                                {trashedCount > 0
+                                    ? ` ${trashedCount} number${trashedCount === 1 ? '' : 's'} held by deleted tasks will be freed for reuse.`
+                                    : ' Numbers held by live tasks are skipped, so nothing is ever duplicated.'}
+                            </p>
+                        </div>
+                    )}
+
                     <label className="flex items-start gap-2 cursor-pointer mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
                         <input
                             type="checkbox"
@@ -123,6 +150,23 @@ export default function TaskSeriesConfig({
                     </label>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={confirmReset}
+                onClose={() => setConfirmReset(false)}
+                onConfirm={() => {
+                    router.post(`/projects/${projectId}/task-series/reset`, {}, { preserveScroll: true });
+                    setConfirmReset(false);
+                }}
+                title="Reset Numbering Counter"
+                confirmLabel="Reset counter"
+                variant="primary"
+                message={
+                    trashedCount > 0
+                        ? `Free the ${trashedCount} number${trashedCount === 1 ? '' : 's'} held by deleted tasks and start again from the lowest unused one. If one of those tasks is later restored from the trash, it keeps its number with “(restored)” added, so you can tell it apart from whatever took the number in the meantime.`
+                        : 'Start numbering again from the lowest unused number. Numbers held by existing tasks are skipped, so nothing is duplicated.'
+                }
+            />
         </div>
     );
 }

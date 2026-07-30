@@ -47,6 +47,7 @@ class User extends Authenticatable
         'is_active',
         'can_create_rules',
         'can_approve',
+        'can_create_project',
         'can_request',
         'dashboard_preferences',
         'notification_preferences',
@@ -65,6 +66,7 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'can_create_rules' => 'boolean',
             'can_approve' => 'boolean',
+            'can_create_project' => 'boolean',
             'can_request' => 'boolean',
             'dashboard_preferences' => 'array',
             'notification_preferences' => 'array',
@@ -99,6 +101,18 @@ class User extends Authenticatable
     public function canAccessApprovals(): bool
     {
         return $this->can_approve || $this->hasRole('admin') || $this->hasRole('executive');
+    }
+
+    /**
+     * Whether this user may start a new project.
+     *
+     * Anyone who administers projects can, without needing the flag set —
+     * mirroring how canAccessApprovals() treats admins, so nobody who is
+     * supposed to be running the place can be locked out by a checkbox.
+     */
+    public function canCreateProjects(): bool
+    {
+        return (bool) $this->can_create_project || $this->can('manage-projects');
     }
 
     /** True if this user heads a division/department or leads a team. */

@@ -196,6 +196,7 @@ class UserController extends Controller
             'is_active' => $request->boolean('is_active', true),
             'can_create_rules' => $request->boolean('can_create_rules', false),
             'can_approve' => $request->boolean('can_approve', false),
+            'can_create_project' => $request->boolean('can_create_project', false),
             'can_request' => $request->boolean('can_request', false),
         ]);
 
@@ -224,7 +225,7 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
-        $oldValues = $user->only(['name', 'email', 'position', 'department_id', 'team_id', 'is_active', 'can_create_rules', 'can_approve', 'can_request']);
+        $oldValues = $user->only(['name', 'email', 'position', 'department_id', 'team_id', 'is_active', 'can_create_rules', 'can_approve', 'can_request', 'can_create_project']);
 
         $data = [
             'name' => $request->name,
@@ -235,6 +236,7 @@ class UserController extends Controller
             'is_active' => $request->boolean('is_active', true),
             'can_create_rules' => $request->boolean('can_create_rules', false),
             'can_approve' => $request->boolean('can_approve', false),
+            'can_create_project' => $request->boolean('can_create_project', false),
             'can_request' => $request->boolean('can_request', false),
         ];
 

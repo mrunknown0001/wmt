@@ -90,6 +90,36 @@ class Task extends Model
             }
         });
 
+        // Coming back out of the trash.
+        //
+        // While a task sits in the trash its number can be handed to someone
+        // else — either because the counter was reset, or because the sequence
+        // it held was released. Restoring it must not resurrect a number that
+        // now means something else, and must not fail on the unique index.
+        //
+        // The number itself is kept, marked, because it is what people quoted
+        // while the task was alive. The sequence is given up: two tasks cannot
+        // both hold it, and the live one has the better claim.
+        static::restoring(function (Task $task) {
+            if (!$task->project_id || !$task->series_number) {
+                return;
+            }
+
+            // Read the sequence from the database rather than trusting the
+            // instance: a reset releases it with a query-builder update, so an
+            // object loaded before that still believes it holds a number.
+            $task->series_sequence = static::withTrashed()
+                ->whereKey($task->getKey())
+                ->value('series_sequence');
+
+            if ($task->series_sequence !== null && !$task->sequenceTakenByAnother()) {
+                return; // nothing happened while it was away
+            }
+
+            $task->series_sequence = null;
+            $task->series_number = self::markRestored($task->series_number);
+        });
+
         static::saving(function (Task $task) {
             if ($task->isDirty('status')) {
                 $newStatus = $task->status;
@@ -203,6 +233,31 @@ class Task extends Model
         [$h, $m] = array_pad(explode(':', (string) $this->due_time), 2, 0);
 
         return \Carbon\Carbon::createFromTime((int) $h, (int) $m)->format('g:i A');
+    }
+
+    /** Appended to a restored task's number when its sequence has been reissued. */
+    public const RESTORED_SUFFIX = ' (restored)';
+
+    /** Idempotent: restoring twice must not read "(restored) (restored)". */
+    public static function markRestored(string $number): string
+    {
+        return str_ends_with($number, self::RESTORED_SUFFIX)
+            ? $number
+            : $number . self::RESTORED_SUFFIX;
+    }
+
+    /** True when another task in this project already holds this sequence. */
+    public function sequenceTakenByAnother(): bool
+    {
+        if ($this->series_sequence === null || !$this->project_id) {
+            return false;
+        }
+
+        return static::withTrashed()
+            ->where('project_id', $this->project_id)
+            ->where('series_sequence', $this->series_sequence)
+            ->whereKeyNot($this->getKey())
+            ->exists();
     }
 
     /** Monthly recurrence variants stored in recurrence_config['mode']. */

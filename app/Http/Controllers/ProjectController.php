@@ -109,6 +109,25 @@ class ProjectController extends Controller
         ]);
     }
 
+    /** Reset the task-number counter and free the numbers held in the trash. */
+    public function resetTaskSeries(Request $request, Project $project): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        $result = TaskSeriesService::resetCounter($project);
+
+        $message = 'Numbering counter reset — the next task will be '
+            . $project->formatTaskSeries($result['next']) . '.';
+
+        if ($result['released'] > 0) {
+            $message .= ' ' . $result['released'] . ' '
+                . str('number')->plural($result['released'])
+                . ' held by deleted tasks were freed for reuse.';
+        }
+
+        return back()->with('success', $message);
+    }
+
     /**
      * The global tiers in plain terms, so the settings page can show what
      * "use the global rules" actually means without the reader having to open
@@ -422,6 +441,9 @@ class ProjectController extends Controller
                 // tasks will be numbered" note shown before numbering is on.
                 'task_series_started' => $project->taskSeriesStarted(),
                 'unnumbered_task_count' => $project->tasks()->whereNull('series_sequence')->count(),
+                // Drives the "n numbers are held by deleted tasks" note on the
+                // reset control.
+                'trashed_series_count' => TaskSeriesService::heldByTrashed($project),
                 'escalation_rules' => $project->escalationRules()->get()
                     ->map(fn ($r) => [
                         'name' => $r->name,

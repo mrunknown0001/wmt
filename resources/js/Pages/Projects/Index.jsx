@@ -21,6 +21,10 @@ const PROJECT_STATUSES = ['active', 'on_hold', 'completed'];
 
 export default function Index() {
     const { projects, auth, filters, owners = [], folders = [] } = usePage().props;
+
+    // Hiding the button is courtesy, not the gate — ProjectPolicy::create and
+    // StoreProjectRequest are what actually stop the request.
+    const canCreateProject = auth.user?.can_create_project !== false;
     const canManageAll = auth.user?.permissions?.includes('manage-projects');
     const canManage = (project) => canManageAll || project.owner_id === auth.user?.id || project.user_is_admin;
     const [deleteTarget, setDeleteTarget] = useState(null);
@@ -327,7 +331,7 @@ export default function Index() {
                                 ? 'Move projects here or create a new one.'
                                 : 'Create your first project to get started'
                     }
-                    action={!hasActiveFilters && <LinkButton href={newProjectHref} size="sm">New Project</LinkButton>}
+                    action={!hasActiveFilters && canCreateProject && <LinkButton href={newProjectHref} size="sm">New Project</LinkButton>}
                 />
             )}
         </Card>
@@ -342,7 +346,7 @@ export default function Index() {
                         { label: 'Dashboard', href: '/dashboard' },
                         { label: 'Projects' },
                     ]}
-                    actions={<LinkButton href={newProjectHref}>New Project</LinkButton>}
+                    actions={canCreateProject && <LinkButton href={newProjectHref}>New Project</LinkButton>}
                 />
 
                 {/* View tabs + Filter Bar */}
