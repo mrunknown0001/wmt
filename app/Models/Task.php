@@ -17,7 +17,10 @@ class Task extends Model
 {
     use HasFactory, SoftDeletes;
 
-    public const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
+    public const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly', 'semi_annual', 'yearly'];
+
+    /** Semi-annual is monthly recurrence on a six-month stride. */
+    public const MONTHS_PER_SEMI_ANNUAL = 6;
 
     public const ESCALATION_TIERS = [
         1 => ['days' => 1,  'label' => 'Assignee Reminder'],
@@ -222,6 +225,10 @@ class Task extends Model
             'daily' => $from->addDays($interval),
             'weekly' => $this->nextWeeklyDate($from, $interval, $config),
             'monthly' => $this->nextMonthlyDate($from, $interval, $config),
+            // Six months at a time, but otherwise monthly: "the last day of the
+            // month" and "the second Tuesday" are exactly as useful twice a year
+            // as they are every month, so the same variants apply.
+            'semi_annual' => $this->nextMonthlyDate($from, $interval * self::MONTHS_PER_SEMI_ANNUAL, $config),
             'yearly' => $from->addYears($interval),
             default => null,
         };

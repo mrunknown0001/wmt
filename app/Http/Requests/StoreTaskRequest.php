@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTaskRequest extends FormRequest
 {
@@ -36,7 +38,10 @@ class StoreTaskRequest extends FormRequest
             'collaborator_ids' => ['nullable', 'array'],
             'collaborator_ids.*' => ['exists:users,id'],
             'is_recurring' => ['sometimes', 'boolean'],
-            'recurrence_frequency' => ['required_if:is_recurring,true', 'nullable', 'string', 'in:daily,weekly,monthly,yearly'],
+            'recurrence_frequency' => ['required_if:is_recurring,true', 'nullable', 'string',
+                // Off the model constant rather than an inline list, so adding
+                // a frequency can't leave validation rejecting it.
+                Rule::in(Task::RECURRENCE_FREQUENCIES)],
             'recurrence_interval' => ['required_if:is_recurring,true', 'nullable', 'integer', 'min:1', 'max:365'],
             // Variance for the recurrence. Shape depends on the frequency:
             //   weekly  -> days: ISO weekdays 1..7

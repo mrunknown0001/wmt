@@ -21,11 +21,19 @@ const WEEKDAYS = [
 ];
 
 const MONTHLY_MODES = [
-    { value: '', label: 'Same date each month' },
+    { value: '', label: 'Same date each time' },
     { value: 'day_of_month', label: 'On a specific date' },
     { value: 'last_day', label: 'On the last day of the month' },
     { value: 'nth_weekday', label: 'On a weekday of the month' },
 ];
+
+/**
+ * Frequencies that land on a month and so can pick a shape within it.
+ *
+ * Semi-annual is monthly on a six-month stride — "the last day of the month"
+ * is just as meaningful twice a year as it is every month.
+ */
+const MONTH_SHAPED = ['monthly', 'semi_annual'];
 
 const WEEK_ORDINALS = [
     { value: 1, label: 'First' },
@@ -50,8 +58,13 @@ function describe(frequency, interval, config) {
         return `Repeats ${every}week${Number(interval) > 1 ? 's' : ''} on ${names.join(', ')}`;
     }
 
-    if (frequency === 'monthly') {
-        const unit = `${every}month${Number(interval) > 1 ? 's' : ''}`;
+    if (MONTH_SHAPED.includes(frequency)) {
+        const plural = Number(interval) > 1;
+        // Semi-annual reads better counted in months than in "periods":
+        // "every six months", or "every 12 months" at an interval of 2.
+        const unit = frequency === 'semi_annual'
+            ? `every ${plural ? Number(interval) * 6 : 'six'} months`
+            : `${every}month${plural ? 's' : ''}`;
         switch (config?.mode) {
             case 'last_day':
                 return `Repeats ${unit} on the last day`;
@@ -115,7 +128,7 @@ export default function RecurrenceOptions({ frequency, interval, config, onChang
                 </div>
             )}
 
-            {frequency === 'monthly' && (
+            {MONTH_SHAPED.includes(frequency) && (
                 <div className="space-y-3">
                     <Select
                         label="Repeat"

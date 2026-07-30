@@ -75,6 +75,8 @@ class RecurringTaskService
                     'daily' => $task->start_date->copy()->addDays($task->recurrence_interval),
                     'weekly' => $task->start_date->copy()->addWeeks($task->recurrence_interval),
                     'monthly' => $task->start_date->copy()->addMonths($task->recurrence_interval),
+                    'semi_annual' => $task->start_date->copy()
+                        ->addMonths($task->recurrence_interval * Task::MONTHS_PER_SEMI_ANNUAL),
                     'yearly' => $task->start_date->copy()->addYears($task->recurrence_interval),
                     default => null,
                 };
