@@ -32,6 +32,7 @@ class Project extends Model
         'task_series_prefix',
         'task_series_padding',
         'show_task_series_column',
+        'use_global_escalation',
     ];
 
     protected function casts(): array
@@ -45,6 +46,7 @@ class Project extends Model
             'task_series_padding' => 'integer',
             'task_series_next' => 'integer',
             'show_task_series_column' => 'boolean',
+            'use_global_escalation' => 'boolean',
         ];
     }
 
@@ -155,6 +157,17 @@ class Project extends Model
     public function automationRules(): HasMany
     {
         return $this->hasMany(ProjectAutomationRule::class);
+    }
+
+    public function escalationRules(): HasMany
+    {
+        return $this->hasMany(ProjectEscalationRule::class)->orderBy('position');
+    }
+
+    /** True when this project's tasks follow the tiers set in admin settings. */
+    public function usesGlobalEscalation(): bool
+    {
+        return (bool) $this->use_global_escalation;
     }
 
     public function members(): BelongsToMany

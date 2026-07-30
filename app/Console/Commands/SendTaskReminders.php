@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\TaskDueReminderNotification;
 use App\Notifications\TaskEscalatedNotification;
 use App\Notifications\TaskOverdueNotification;
+use App\Services\ProjectEscalationService;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\DatabaseNotification;
 
@@ -61,37 +62,107 @@ class SendTaskReminders extends Command
             $overdueCount++;
         }
 
-        // Escalation tiers (configurable via admin settings)
+        // Escalation.
+        //
+        // Two ladders: the tiers in admin settings, and per-project rules for
+        // projects that have opted out. A task uses one or the other, never
+        // both — being escalated twice for the same lateness, by two systems
+        // with different labels, is worse than not being escalated at all.
+        //
+        // Tasks due today are included here, unlike the day-based query above:
+        // an hours-based project rule can fire the same afternoon a task was
+        // due, so filtering to due_date < today would never let it run.
+        $escalationTasks = Task::with([
+                'assignee.department.division', 'assignee.team',
+                'project.escalationRules',
+            ])
+            ->whereNotNull('assigned_to')
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<=', $today)
+            ->whereNotIn('status', ['done', 'cancelled'])
+            ->get();
+
         $escalatedCount = 0;
-        if ($settings->escalation_enabled && !empty($settings->escalation_tiers)) {
-            $escalationTasks = Task::with(['assignee.department.division', 'assignee.team', 'project'])
-                ->whereNotNull('assigned_to')
-                ->whereNotNull('due_date')
-                ->whereDate('due_date', '<', $today)
-                ->whereNotIn('status', ['done', 'cancelled'])
-                ->get();
 
-            foreach ($escalationTasks as $task) {
-                $daysOverdue = $today->diffInDays($task->due_date);
-                $newLevel = $this->calculateEscalationLevel($daysOverdue, $settings->escalation_tiers);
+        foreach ($escalationTasks as $task) {
+            // No project means no project rules, so those tasks stay on the
+            // global tiers.
+            $useProjectRules = $task->project && !$task->project->usesGlobalEscalation();
 
-                if ($newLevel > 0 && $newLevel > $task->escalation_level) {
-                    $label = Setting::ESCALATION_LABELS[$newLevel] ?? "Level {$newLevel}";
-                    $recipients = $this->getEscalationRecipients($task, $newLevel);
-
-                    foreach ($recipients as $recipient) {
-                        $recipient->notify(new TaskEscalatedNotification($task, $newLevel, $label));
-                    }
-
-                    $task->update(['escalation_level' => $newLevel]);
-                    $escalatedCount++;
-                }
-            }
+            $escalatedCount += $useProjectRules
+                ? $this->escalateByProjectRules($task)
+                : $this->escalateByGlobalTiers($task, $settings, $today);
         }
 
         $this->info("Sent {$reminderCount} reminder(s), {$overdueCount} overdue, and {$escalatedCount} escalation notifications.");
 
         return self::SUCCESS;
+    }
+
+    /** The global tiers, unchanged: whole days overdue against admin settings. */
+    private function escalateByGlobalTiers(Task $task, Setting $settings, \Carbon\Carbon $today): int
+    {
+        if (!$settings->escalation_enabled || empty($settings->escalation_tiers)) {
+            return 0;
+        }
+
+        // The global ladder is day-based, so a task due today is not yet late.
+        if (!$task->due_date || $task->due_date->copy()->startOfDay() >= $today) {
+            return 0;
+        }
+
+        // Operand order matters: Carbon returns a signed difference, so
+        // $today->diffInDays($dueDate) is *negative* for an overdue task and no
+        // tier ever matched. Counting forward from the due date is what the
+        // tiers are expressed in anyway.
+        $daysOverdue = (int) $task->due_date->copy()->startOfDay()->diffInDays($today);
+        $newLevel = $this->calculateEscalationLevel($daysOverdue, $settings->escalation_tiers);
+
+        if ($newLevel <= 0 || $newLevel <= $task->escalation_level) {
+            return 0;
+        }
+
+        $label = Setting::ESCALATION_LABELS[$newLevel] ?? "Level {$newLevel}";
+
+        foreach ($this->getEscalationRecipients($task, $newLevel) as $recipient) {
+            $recipient->notify(new TaskEscalatedNotification($task, $newLevel, $label));
+        }
+
+        $task->update(['escalation_level' => $newLevel]);
+
+        return 1;
+    }
+
+    /** The project's own ladder, which may be measured in days or in hours. */
+    private function escalateByProjectRules(Task $task): int
+    {
+        $rules = $task->project->escalationRules;
+
+        if ($rules->isEmpty()) {
+            return 0;
+        }
+
+        $reached = ProjectEscalationService::highestReached($task, $rules);
+
+        if ($reached === null || $reached['level'] <= $task->escalation_level) {
+            return 0;
+        }
+
+        $rule = $reached['rule'];
+        $recipients = ProjectEscalationService::recipients($task, $rule);
+
+        foreach ($recipients as $recipient) {
+            $recipient->notify(new TaskEscalatedNotification(
+                $task, $reached['level'], $rule->name, $rule->describeOffset(),
+            ));
+        }
+
+        // Recorded even when the rule resolved to nobody — otherwise a rung
+        // with a vacant supervisor would be retried on every run, and would
+        // block the rungs above it from ever being reached.
+        $task->update(['escalation_level' => $reached['level']]);
+
+        return $recipients === [] ? 0 : 1;
     }
 
     private function alreadyNotifiedToday(Task $task, string $type, ?int $daysBefore = null): bool

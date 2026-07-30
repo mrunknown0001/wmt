@@ -65,12 +65,42 @@ class ProjectEscalationRule extends Model
         return $this->belongsTo(Project::class);
     }
 
-    /** Hours past the due moment before this rung fires. */
-    public function thresholdHours(): int
+    /**
+     * Has this rung been reached for the given task?
+     *
+     * The two units deliberately measure differently, because people mean
+     * different things by them:
+     *
+     *  days  — whole calendar days past the due date, so a task due Monday is
+     *          "1 day overdue" from Tuesday morning. This matches the global
+     *          tiers exactly, so moving a project off them does not silently
+     *          shift when day-based escalations fire.
+     *
+     *  hours — measured from the due *moment*: the due time when one is set,
+     *          the end of the due day when it is not. This is the unit for
+     *          "chase it two hours after the 14:00 handover".
+     */
+    public function isReached(Task $task, ?\Carbon\Carbon $now = null): bool
     {
-        return $this->offset_unit === self::UNIT_HOURS
-            ? max(0, (int) $this->offset_value)
-            : max(0, (int) $this->offset_value) * 24;
+        $now ??= now();
+        $value = max(0, (int) $this->offset_value);
+
+        if ($this->offset_unit === self::UNIT_HOURS) {
+            $dueAt = $task->dueAt();
+
+            return $dueAt !== null && $now->greaterThanOrEqualTo($dueAt->copy()->addHours($value));
+        }
+
+        if (!$task->due_date) {
+            return false;
+        }
+
+        // Signed diff: a task not yet due gives a negative number rather than
+        // an absolute one, which would make every future task look overdue.
+        $daysOverdue = $task->due_date->copy()->startOfDay()
+            ->diffInDays($now->copy()->startOfDay(), false);
+
+        return $daysOverdue >= $value;
     }
 
     /** "2 days overdue", "6 hours overdue" — for the notification body. */

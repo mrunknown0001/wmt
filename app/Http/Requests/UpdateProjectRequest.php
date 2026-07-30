@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\ProjectEscalationRule;
 use App\Services\FolderService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateProjectRequest extends FormRequest
 {
@@ -51,6 +53,16 @@ class UpdateProjectRequest extends FormRequest
             // Who may set this is settled by authorize() above: the project
             // owner, a project admin, or someone with manage-projects.
             'show_task_series_column' => ['sometimes', 'boolean'],
+            'use_global_escalation' => ['sometimes', 'boolean'],
+            'escalation_rules' => ['nullable', 'array', 'max:10'],
+            'escalation_rules.*.name' => ['required', 'string', 'max:80'],
+            'escalation_rules.*.offset_unit' => ['required', Rule::in(ProjectEscalationRule::UNITS)],
+            'escalation_rules.*.offset_value' => ['required', 'integer', 'min:0', 'max:' . ProjectEscalationRule::MAX_HOURS],
+            // At least one audience: a rung that notifies nobody looks
+            // configured but does nothing.
+            'escalation_rules.*.recipients' => ['required', 'array', 'min:1'],
+            'escalation_rules.*.recipients.*' => [Rule::in(array_keys(ProjectEscalationRule::RECIPIENTS))],
+            'escalation_rules.*.is_active' => ['sometimes', 'boolean'],
             'members' => ['nullable', 'array'],
             'members.*.user_id' => ['required', 'exists:users,id'],
             'members.*.role' => ['required', 'string', 'in:viewer,editor,admin'],

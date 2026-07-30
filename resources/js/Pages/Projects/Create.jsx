@@ -11,11 +11,12 @@ import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import ProjectRules from '../../Components/ProjectRules';
 import TaskSeriesConfig from '../../Components/TaskSeriesConfig';
+import ProjectEscalationSettings from '../../Components/ProjectEscalationSettings';
 import { flattenFolders } from '../../Components/FolderTree';
 import { formatLabel } from '../../utils';
 
 export default function Create() {
-    const { users, statuses, memberRoles, auth, folders = [], defaultFolderId } = usePage().props;
+    const { users, statuses, memberRoles, auth, folders = [], defaultFolderId, escalationRecipients = {}, globalEscalation = null } = usePage().props;
 
     const { data, setData, post, processing, errors } = useForm({
         name: '',
@@ -30,6 +31,8 @@ export default function Create() {
         task_series_prefix: '',
         task_series_padding: 4,
         show_task_series_column: true,
+        use_global_escalation: true,
+        escalation_rules: [],
         members: [],
     });
 
@@ -104,6 +107,16 @@ export default function Create() {
                             onPaddingChange={(val) => setData('task_series_padding', val)}
                             showColumn={data.show_task_series_column}
                             onShowColumnChange={(val) => setData('show_task_series_column', val)}
+                            errors={errors}
+                        />
+
+                        <ProjectEscalationSettings
+                            useGlobal={data.use_global_escalation}
+                            onUseGlobalChange={(val) => setData('use_global_escalation', val)}
+                            rules={data.escalation_rules}
+                            onRulesChange={(val) => setData('escalation_rules', val)}
+                            recipientOptions={escalationRecipients}
+                            globalEscalation={globalEscalation}
                             errors={errors}
                         />
 

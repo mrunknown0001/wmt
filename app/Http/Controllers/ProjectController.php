@@ -7,6 +7,8 @@ use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Department;
 use App\Models\Folder;
 use App\Models\Project;
+use App\Models\ProjectEscalationRule;
+use App\Models\Setting;
 use App\Models\Task;
 use App\Models\TaskCustomFieldValue;
 use App\Models\Team;
@@ -105,6 +107,51 @@ class ProjectController extends Controller
                 ->orderBy('name')->get(['id', 'name']),
             'folders' => $this->folderTree($user),
         ]);
+    }
+
+    /**
+     * The global tiers in plain terms, so the settings page can show what
+     * "use the global rules" actually means without the reader having to open
+     * admin settings in another tab.
+     */
+    private function globalEscalationSummary(): array
+    {
+        $settings = Setting::current();
+
+        return [
+            'enabled' => (bool) $settings->escalation_enabled,
+            'tiers' => collect($settings->escalation_tiers ?? [])
+                ->map(fn ($tier, $i) => [
+                    'label' => Setting::ESCALATION_LABELS[$i + 1] ?? 'Level ' . ($i + 1),
+                    'days' => $tier['days'] ?? null,
+                    'enabled' => (bool) ($tier['enabled'] ?? false),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * Replace the project's escalation ladder with what the form sent.
+     *
+     * Replaced wholesale rather than diffed: it is a short ordered list edited
+     * as a unit, and position is what defines the ladder, so matching rows up
+     * by id would buy nothing but a chance to get the order wrong.
+     */
+    private function syncEscalationRules(Project $project, ?array $rules): void
+    {
+        $project->escalationRules()->delete();
+
+        foreach (array_values($rules ?? []) as $index => $rule) {
+            $project->escalationRules()->create([
+                'name' => $rule['name'],
+                'offset_unit' => $rule['offset_unit'],
+                'offset_value' => (int) $rule['offset_value'],
+                'recipients' => array_values(array_unique($rule['recipients'])),
+                'is_active' => $rule['is_active'] ?? true,
+                'position' => $index,
+            ]);
+        }
     }
 
     /**
@@ -239,6 +286,8 @@ class ProjectController extends Controller
             'memberRoles' => ['viewer', 'editor', 'admin'],
             'folders' => $this->folderTree($user),
             'defaultFolderId' => $defaultFolderId,
+            'escalationRecipients' => ProjectEscalationRule::RECIPIENTS,
+            'globalEscalation' => $this->globalEscalationSummary(),
         ]);
     }
 
@@ -250,7 +299,9 @@ class ProjectController extends Controller
             $data['owner_id'] = $request->user()->id;
         }
 
-        $project = Project::create(collect($data)->except('members')->toArray());
+        $project = Project::create(collect($data)->except(['members', 'escalation_rules'])->toArray());
+
+        $this->syncEscalationRules($project, $data['escalation_rules'] ?? null);
 
         ActivityLogger::logCreated($project, $request->user());
 
@@ -371,7 +422,17 @@ class ProjectController extends Controller
                 // tasks will be numbered" note shown before numbering is on.
                 'task_series_started' => $project->taskSeriesStarted(),
                 'unnumbered_task_count' => $project->tasks()->whereNull('series_sequence')->count(),
+                'escalation_rules' => $project->escalationRules()->get()
+                    ->map(fn ($r) => [
+                        'name' => $r->name,
+                        'offset_unit' => $r->offset_unit,
+                        'offset_value' => $r->offset_value,
+                        'recipients' => $r->recipients,
+                        'is_active' => $r->is_active,
+                    ])->values(),
             ]),
+            'escalationRecipients' => ProjectEscalationRule::RECIPIENTS,
+            'globalEscalation' => $this->globalEscalationSummary(),
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'statuses' => ['active', 'on_hold', 'completed', 'archived'],
             'memberRoles' => ['viewer', 'editor', 'admin'],
@@ -387,8 +448,23 @@ class ProjectController extends Controller
         $oldValues['due_date'] = $project->due_date?->toDateString();
 
         $seriesWasOff = !$project->hasTaskSeries();
+        $escalationWasGlobal = $project->usesGlobalEscalation();
 
-        $project->update(collect($validated)->except('members')->toArray());
+        $project->update(collect($validated)->except(['members', 'escalation_rules'])->toArray());
+
+        if (array_key_exists('escalation_rules', $validated)) {
+            $this->syncEscalationRules($project, $validated['escalation_rules']);
+        }
+
+        // Switching ladders resets how far each task has climbed. Without this
+        // a task already at global level 4 would sit above every rung of the
+        // project's new ladder and never escalate again — the rules would look
+        // broken. Rule edits within the same mode deliberately do not reset:
+        // renaming a rung should not re-notify every overdue task in the
+        // project.
+        if ($escalationWasGlobal !== $project->usesGlobalEscalation()) {
+            $project->tasks()->where('escalation_level', '>', 0)->update(['escalation_level' => 0]);
+        }
 
         // Turning numbering on gives the tasks that are already here a number
         // too — the ones people refer to most are the ones already in flight.

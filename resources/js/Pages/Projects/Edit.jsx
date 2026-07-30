@@ -11,11 +11,12 @@ import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import ProjectRules from '../../Components/ProjectRules';
 import TaskSeriesConfig from '../../Components/TaskSeriesConfig';
+import ProjectEscalationSettings from '../../Components/ProjectEscalationSettings';
 import { flattenFolders } from '../../Components/FolderTree';
 import { formatLabel } from '../../utils';
 
 export default function Edit() {
-    const { project, users, statuses, memberRoles, folders = [] } = usePage().props;
+    const { project, users, statuses, memberRoles, folders = [], escalationRecipients = {}, globalEscalation = null } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         name: project.name || '',
@@ -30,6 +31,8 @@ export default function Edit() {
         task_series_prefix: project.task_series_prefix || '',
         task_series_padding: project.task_series_padding ?? 4,
         show_task_series_column: project.show_task_series_column ?? true,
+        use_global_escalation: project.use_global_escalation ?? true,
+        escalation_rules: project.escalation_rules ?? [],
         members: (project.members || []).map((m) => ({ user_id: m.id, role: m.pivot.role })),
     });
 
@@ -108,6 +111,16 @@ export default function Edit() {
                             started={project.task_series_started ?? false}
                             nextSequence={project.task_series_next ?? 1}
                             taskCount={project.unnumbered_task_count ?? 0}
+                            errors={errors}
+                        />
+
+                        <ProjectEscalationSettings
+                            useGlobal={data.use_global_escalation}
+                            onUseGlobalChange={(val) => setData('use_global_escalation', val)}
+                            rules={data.escalation_rules}
+                            onRulesChange={(val) => setData('escalation_rules', val)}
+                            recipientOptions={escalationRecipients}
+                            globalEscalation={globalEscalation}
                             errors={errors}
                         />
 
