@@ -29,6 +29,7 @@ export default function Create() {
         task_series_enabled: false,
         task_series_prefix: '',
         task_series_padding: 4,
+        show_task_series_column: true,
         members: [],
     });
 
@@ -101,6 +102,8 @@ export default function Create() {
                             onEnabledChange={(val) => setData('task_series_enabled', val)}
                             onPrefixChange={(val) => setData('task_series_prefix', val)}
                             onPaddingChange={(val) => setData('task_series_padding', val)}
+                            showColumn={data.show_task_series_column}
+                            onShowColumnChange={(val) => setData('show_task_series_column', val)}
                             errors={errors}
                         />
 

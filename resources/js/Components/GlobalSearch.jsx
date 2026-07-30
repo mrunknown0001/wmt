@@ -66,7 +66,9 @@ const SECTIONS = [
     {
         key: 'tasks', label: 'Tasks', Icon: TaskIcon,
         title: (r) => r.title,
-        subtitle: (r) => r.project_name,
+        // The number goes in the subtitle rather than the title so it can't
+        // push a long task name out of view on a narrow result row.
+        subtitle: (r) => [r.series_number, r.project_name].filter(Boolean).join(' · '),
         badge: (r) => <StatusBadge status={r.status} type="task" />,
     },
     {

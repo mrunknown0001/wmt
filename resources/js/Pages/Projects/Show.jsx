@@ -361,6 +361,16 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     const renderCell = (colId) => {
         const cStyle = colStyle(colId);
         switch (colId) {
+            case 'series':
+                return (
+                    <td key="series" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
+                        {task.series_number ? (
+                            <span className="font-mono text-xs text-gray-600 dark:text-gray-300 truncate">{task.series_number}</span>
+                        ) : (
+                            <span className="text-gray-300 dark:text-gray-600">—</span>
+                        )}
+                    </td>
+                );
             case 'status':
                 return (
                     <td key="status" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
@@ -480,9 +490,6 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
-                    {task.series_number && (
-                        <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">{task.series_number}</span>
-                    )}
                     <Tooltip content={task.title}>
                         <button
                             className="truncate text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
@@ -779,6 +786,16 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     const renderCell = (colId) => {
         const cStyle = colStyle(colId);
         switch (colId) {
+            case 'series':
+                return (
+                    <td key="series" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
+                        {task.series_number ? (
+                            <span className="font-mono text-xs text-gray-600 dark:text-gray-300 truncate">{task.series_number}</span>
+                        ) : (
+                            <span className="text-gray-300 dark:text-gray-600">—</span>
+                        )}
+                    </td>
+                );
             case 'status':
                 return (
                     <td key="status" className="px-6 py-4 text-sm text-center overflow-hidden" style={cStyle}>
@@ -931,9 +948,6 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                                 </svg>
                             </button>
                         </Tooltip>
-                    )}
-                    {task.series_number && (
-                        <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">{task.series_number}</span>
                     )}
                     <Tooltip content={task.title}>
                         <button
@@ -1531,14 +1545,20 @@ export default function Show() {
         }
     }, []);
 
+    // The Series column exists only where the project both numbers its tasks and
+    // has the column switched on — a decision for the owner or a project admin,
+    // made on the project's edit page. Leaving it out of the id list entirely
+    // means nothing downstream has to know about the setting.
+    const showSeriesColumn = !!project.task_series_enabled && project.show_task_series_column !== false;
+
     const effectiveColumnOrder = useMemo(() => {
         const cfIds = localCustomFields.map(cf => `cf-${cf.id}`);
-        const allIds = [...DEFAULT_COLUMN_IDS, ...cfIds];
+        const allIds = [...(showSeriesColumn ? ['series'] : []), ...DEFAULT_COLUMN_IDS, ...cfIds];
         if (!columnOrder) return allIds;
         const valid = columnOrder.filter(id => allIds.includes(id));
         const missing = allIds.filter(id => !valid.includes(id));
         return [...valid, ...missing];
-    }, [columnOrder, localCustomFields]);
+    }, [columnOrder, localCustomFields, showSeriesColumn]);
 
     // Visible column order (filtered by hidden)
     const visibleColumnOrder = useMemo(() => {
@@ -1551,6 +1571,7 @@ export default function Show() {
 
     const getColumnLabel = useCallback((colId) => {
         switch (colId) {
+            case 'series': return 'Series';
             case 'status': return 'Status';
             case 'priority': return 'Priority';
             case 'assignee': return 'Assignee';
@@ -1570,6 +1591,10 @@ export default function Show() {
 
     const getTaskSortValue = useCallback((task, key) => {
         switch (key) {
+            // Sort on the sequence, not the formatted string: TASK-9 must come
+            // before TASK-10, which a text sort would reverse. Unnumbered tasks
+            // sort last, as every other column here treats "missing" as last.
+            case 'series': return task.series_sequence ?? Infinity;
             case 'title': return task.title?.toLowerCase() || '';
             case 'status': return STATUS_ORDER[task.status] ?? 99;
             case 'priority': return PRIORITY_ORDER[task.priority] ?? 99;

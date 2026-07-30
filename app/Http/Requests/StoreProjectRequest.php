@@ -30,6 +30,7 @@ class StoreProjectRequest extends FormRequest
             'task_series_enabled' => ['sometimes', 'boolean'],
             'task_series_prefix' => ['nullable', 'string', 'max:20', 'regex:/^[A-Za-z0-9][A-Za-z0-9\-_\/]*$/'],
             'task_series_padding' => ['sometimes', 'integer', 'min:1', 'max:10'],
+            'show_task_series_column' => ['sometimes', 'boolean'],
             'members' => ['nullable', 'array'],
             'members.*.user_id' => ['required', 'exists:users,id'],
             'members.*.role' => ['required', 'string', 'in:viewer,editor,admin'],

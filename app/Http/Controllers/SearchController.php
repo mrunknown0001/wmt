@@ -124,7 +124,13 @@ class SearchController extends Controller
      */
     private function tasks(User $user, string $like)
     {
-        $query = Task::where('title', 'like', $like);
+        // Match the reference number as well as the title. Numbers are what
+        // people paste in from an email or a chat message, and a number that
+        // can't be looked up is not much of a reference.
+        $query = Task::where(function ($q) use ($like) {
+            $q->where('title', 'like', $like)
+                ->orWhere('series_number', 'like', $like);
+        });
 
         if (!$this->seesAllProjects($user)) {
             $query->where(function ($q) use ($user) {
@@ -141,13 +147,17 @@ class SearchController extends Controller
         }
 
         return $query->with('project:id,name')
-            ->select('id', 'title', 'status', 'priority', 'project_id')
+            ->select('id', 'title', 'series_number', 'status', 'priority', 'project_id')
+            // An exact number match is almost certainly the thing being looked
+            // for, so float it above the recently-touched tasks.
+            ->orderByRaw('case when series_number = ? then 0 else 1 end', [trim($like, '%')])
             ->orderBy('updated_at', 'desc')
             ->take(5)
             ->get()
             ->map(fn ($t) => [
                 'id' => $t->id,
                 'title' => $t->title,
+                'series_number' => $t->series_number,
                 'status' => $t->status,
                 'priority' => $t->priority,
                 'project_name' => $t->project?->name,

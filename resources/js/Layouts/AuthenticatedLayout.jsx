@@ -13,7 +13,7 @@ import GlobalSearch from '../Components/GlobalSearch';
 // Code-split: the assistant is a floating widget, so its panel, conversation
 // list and message rendering should not be downloaded by every page view.
 const AiChatWidget = lazy(() => import('../Components/AiChat/AiChatWidget'));
-import SidebarTodoWidget from '../Components/SidebarTodoWidget';
+import TodoMenu from '../Components/TodoMenu';
 import Tooltip from '../Components/Tooltip';
 
 const HomeIcon = () => (
@@ -350,11 +350,6 @@ export default function AuthenticatedLayout({ children, title, contained = false
                 )}
             </nav>
 
-            {/* To-Do Widget */}
-            <div className="shrink-0 border-t border-gray-700/50">
-                <SidebarTodoWidget collapsed={collapsed} />
-            </div>
-
             {/* User area */}
             <div className="shrink-0 border-t border-gray-700/50 px-4 py-3">
                 <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
@@ -441,6 +436,7 @@ export default function AuthenticatedLayout({ children, title, contained = false
                             <GlobalSearch />
                         </div>
                         <ThemeToggle className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
+                        <TodoMenu />
                         <NotificationBell onToast={handleToast} />
                     </div>
 

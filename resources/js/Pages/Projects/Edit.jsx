@@ -29,6 +29,7 @@ export default function Edit() {
         task_series_enabled: project.task_series_enabled ?? false,
         task_series_prefix: project.task_series_prefix || '',
         task_series_padding: project.task_series_padding ?? 4,
+        show_task_series_column: project.show_task_series_column ?? true,
         members: (project.members || []).map((m) => ({ user_id: m.id, role: m.pivot.role })),
     });
 
@@ -102,6 +103,8 @@ export default function Edit() {
                             onEnabledChange={(val) => setData('task_series_enabled', val)}
                             onPrefixChange={(val) => setData('task_series_prefix', val)}
                             onPaddingChange={(val) => setData('task_series_padding', val)}
+                            showColumn={data.show_task_series_column}
+                            onShowColumnChange={(val) => setData('show_task_series_column', val)}
                             started={project.task_series_started ?? false}
                             nextSequence={project.task_series_next ?? 1}
                             taskCount={project.unnumbered_task_count ?? 0}

@@ -9,9 +9,11 @@ export default function TaskSeriesConfig({
     enabled,
     prefix,
     padding,
+    showColumn,
     onEnabledChange,
     onPrefixChange,
     onPaddingChange,
+    onShowColumnChange,
     started = false,
     nextSequence = 1,
     taskCount = null,
@@ -101,6 +103,24 @@ export default function TaskSeriesConfig({
                             The prefix cannot be changed once the first number has been issued.
                         </p>
                     )}
+
+                    <label className="flex items-start gap-2 cursor-pointer mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                        <input
+                            type="checkbox"
+                            checked={showColumn !== false}
+                            onChange={(e) => onShowColumnChange(e.target.checked)}
+                            className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span>
+                            <span className="text-sm text-gray-900 dark:text-gray-100">
+                                Show a <span className="font-medium">Series</span> column in the task list
+                            </span>
+                            <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Applies to everyone on the project. Numbers still show on the task
+                                card and detail panel either way, and stay searchable.
+                            </span>
+                        </span>
+                    </label>
                 </div>
             )}
         </div>

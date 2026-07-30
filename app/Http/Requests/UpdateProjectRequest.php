@@ -48,6 +48,9 @@ class UpdateProjectRequest extends FormRequest
                 },
             ],
             'task_series_padding' => ['sometimes', 'integer', 'min:1', 'max:10'],
+            // Who may set this is settled by authorize() above: the project
+            // owner, a project admin, or someone with manage-projects.
+            'show_task_series_column' => ['sometimes', 'boolean'],
             'members' => ['nullable', 'array'],
             'members.*.user_id' => ['required', 'exists:users,id'],
             'members.*.role' => ['required', 'string', 'in:viewer,editor,admin'],

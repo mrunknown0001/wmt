@@ -31,6 +31,7 @@ class Project extends Model
         'task_series_enabled',
         'task_series_prefix',
         'task_series_padding',
+        'show_task_series_column',
     ];
 
     protected function casts(): array
@@ -43,6 +44,7 @@ class Project extends Model
             'task_series_enabled' => 'boolean',
             'task_series_padding' => 'integer',
             'task_series_next' => 'integer',
+            'show_task_series_column' => 'boolean',
         ];
     }
 
@@ -54,6 +56,17 @@ class Project extends Model
     public function hasTaskSeries(): bool
     {
         return (bool) $this->task_series_enabled;
+    }
+
+    /**
+     * Whether the task list should carry a Series column.
+     *
+     * A column of blanks helps nobody, so this is false whenever numbering
+     * itself is off, regardless of how the toggle is set.
+     */
+    public function showsTaskSeriesColumn(): bool
+    {
+        return $this->hasTaskSeries() && (bool) $this->show_task_series_column;
     }
 
     /**
