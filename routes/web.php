@@ -11,6 +11,10 @@ use App\Http\Controllers\StandaloneTaskController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\MyTaskController;
+use App\Http\Controllers\NoteController;
+use App\Http\Controllers\NoteFolderController;
+use App\Http\Controllers\NoteFolderShareController;
+use App\Http\Controllers\NoteShareController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ActivityLogController;
@@ -293,6 +297,24 @@ Route::middleware('auth')->group(function () {
     Route::put('/links/groups/{linkGroup}', [LinkGroupController::class, 'update'])->name('link-groups.update');
     Route::delete('/links/groups/{linkGroup}', [LinkGroupController::class, 'destroy'])->name('link-groups.destroy');
     Route::resource('links', LinkController::class)->except(['show']);
+
+    // Notes. The static routes come before notes/{note} so "folders" and
+    // "share-options" aren't captured as a note id.
+    Route::get('/notes/share-options', [NoteController::class, 'shareOptions'])->name('notes.share-options');
+    Route::post('/notes/folders', [NoteFolderController::class, 'store'])->name('note-folders.store');
+    Route::put('/notes/folders/{noteFolder}', [NoteFolderController::class, 'update'])->name('note-folders.update');
+    Route::delete('/notes/folders/{noteFolder}', [NoteFolderController::class, 'destroy'])->name('note-folders.destroy');
+    Route::post('/notes/folders/{noteFolder}/shares', [NoteFolderShareController::class, 'store'])->name('note-folders.shares.store');
+    Route::put('/notes/folders/{noteFolder}/shares/{share}', [NoteFolderShareController::class, 'update'])->name('note-folders.shares.update');
+    Route::delete('/notes/folders/{noteFolder}/shares/{share}', [NoteFolderShareController::class, 'destroy'])->name('note-folders.shares.destroy');
+
+    Route::resource('notes', NoteController::class);
+    Route::post('/notes/{note}/autosave', [NoteController::class, 'autosave'])->name('notes.autosave');
+    Route::post('/notes/{note}/archive', [NoteController::class, 'archive'])->name('notes.archive');
+    Route::post('/notes/{note}/unarchive', [NoteController::class, 'unarchive'])->name('notes.unarchive');
+    Route::post('/notes/{note}/shares', [NoteShareController::class, 'store'])->name('notes.shares.store');
+    Route::put('/notes/{note}/shares/{share}', [NoteShareController::class, 'update'])->name('notes.shares.update');
+    Route::delete('/notes/{note}/shares/{share}', [NoteShareController::class, 'destroy'])->name('notes.shares.destroy');
 
     // Organization structure
     Route::resource('divisions', DivisionController::class)->except(['show']);

@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import NavLink from '../Components/NavLink';
 import NavSection from '../Components/NavSection';
@@ -436,6 +436,20 @@ export default function AuthenticatedLayout({ children, title, contained = false
                             <GlobalSearch />
                         </div>
                         <ThemeToggle className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
+                        <Tooltip content="Notes">
+                            <Link
+                                href="/notes"
+                                className={`p-2 rounded-lg transition-colors ${
+                                    isActive('/notes')
+                                        ? 'text-primary-600 bg-primary-50 dark:text-primary-400 dark:bg-primary-900/30'
+                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700/50'
+                                }`}
+                            >
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 14.25v4.125c0 1.243-1.007 2.25-2.25 2.25H5.625a2.25 2.25 0 01-2.25-2.25V7.875c0-1.243 1.007-2.25 2.25-2.25H9.75" />
+                                </svg>
+                            </Link>
+                        </Tooltip>
                         <TodoMenu />
                         <NotificationBell onToast={handleToast} />
                     </div>

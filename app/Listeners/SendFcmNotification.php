@@ -87,6 +87,8 @@ class SendFcmNotification
             'approval_rejected' => 'Request Rejected',
             'approval_changes_requested' => 'Changes Requested',
             'approval_automation' => 'Approval Update',
+            'note_shared' => 'Note Shared With You',
+            'note_folder_shared' => 'Notes Folder Shared With You',
             'automation_blocked' => 'Task Could Not Be Completed',
             'external_webhook' => $data['platform'] ?? config('app.name'),
             default => config('app.name'),
@@ -117,6 +119,12 @@ class SendFcmNotification
                 . (($data['decided_by'] ?? null) ? " by {$data['decided_by']}" : ''),
             'approval_changes_requested' => ($data['item_title'] ?? 'Your request') . ' was returned for changes'
                 . (($data['decided_by'] ?? null) ? " by {$data['decided_by']}" : ''),
+            // Notes carry note_title/folder_name, not task_title — without these
+            // every notes push would read "Unknown Task".
+            'note_shared' => ($data['shared_by'] ?? 'Someone') . ' shared "'
+                . ($data['note_title'] ?? 'a note') . '" with you',
+            'note_folder_shared' => ($data['shared_by'] ?? 'Someone') . ' shared the folder "'
+                . ($data['folder_name'] ?? 'Notes') . '" with you',
             'automation_blocked' => ($data['task_title'] ?? 'A task') . ' could not be completed automatically — it needs an attachment',
             'approval_automation' => ($data['message'] ?? null)
                 ?: 'Update on ' . ($data['item_title'] ?? 'an approval request'),
