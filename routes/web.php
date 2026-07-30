@@ -238,6 +238,9 @@ Route::middleware('auth')->group(function () {
 
     // Trash Bin (admin)
     Route::get('/trash', [TrashController::class, 'index'])->name('trash.index');
+    // Before the {type}/{id} routes so "bulk" is never read as a type.
+    Route::post('/trash/bulk/restore', [TrashController::class, 'bulkRestore'])->name('trash.bulk-restore');
+    Route::post('/trash/bulk/force-delete', [TrashController::class, 'bulkForceDelete'])->name('trash.bulk-destroy');
     Route::post('/trash/{type}/{id}/restore', [TrashController::class, 'restore'])->name('trash.restore');
     Route::delete('/trash/{type}/{id}', [TrashController::class, 'forceDelete'])->name('trash.destroy');
 

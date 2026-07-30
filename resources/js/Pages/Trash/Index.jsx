@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { ConfirmModal } from '@/Components/Modal';
 
 const TrashIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -25,6 +26,55 @@ export default function TrashIndex() {
     const [selectedType, setSelectedType] = useState(filters.type || '');
     const [deletingId, setDeletingId] = useState(null);
     const [restoringId, setRestoringId] = useState(null);
+
+    // Keyed "type-id", because ids are only unique within a type.
+    const [selected, setSelected] = useState(() => new Set());
+    const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const headerCheckbox = useRef(null);
+
+    const keyOf = (item) => `${item.type}-${item.id}`;
+
+    // Selection is per page. Carrying it across a page change would let someone
+    // press "Delete forever" on rows they can no longer see.
+    useEffect(() => {
+        setSelected(new Set());
+    }, [pagination.current_page, filters.type]);
+
+    const allOnPageSelected = items.length > 0 && items.every((i) => selected.has(keyOf(i)));
+
+    useEffect(() => {
+        if (headerCheckbox.current) {
+            headerCheckbox.current.indeterminate = selected.size > 0 && !allOnPageSelected;
+        }
+    }, [selected, allOnPageSelected]);
+
+    const toggleOne = (item) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            const key = keyOf(item);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
+    };
+
+    const toggleAll = () => {
+        setSelected(allOnPageSelected ? new Set() : new Set(items.map(keyOf)));
+    };
+
+    // Rebuilt from the rendered rows rather than parsed back out of the keys,
+    // so nothing can be submitted that isn't on screen.
+    const selectedItems = () =>
+        items.filter((i) => selected.has(keyOf(i))).map((i) => ({ type: i.type, id: i.id }));
+
+    const runBulk = (url) => {
+        setBulkBusy(true);
+        router.post(url, { items: selectedItems() }, {
+            preserveScroll: true,
+            onSuccess: () => setSelected(new Set()),
+            onFinish: () => { setBulkBusy(false); setConfirmBulkDelete(false); },
+        });
+    };
 
     const types = [
         { value: '', label: 'All Items' },
@@ -141,6 +191,37 @@ export default function TrashIndex() {
                     </div>
                 </div>
 
+                {selected.size > 0 && (
+                    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-900/20">
+                        <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                            {selected.size} selected
+                        </span>
+                        <button
+                            onClick={() => runBulk('/trash/bulk/restore')}
+                            disabled={bulkBusy}
+                            className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <div className="w-4 h-4"><RestoreIcon /></div>
+                            Restore selected
+                        </button>
+                        <button
+                            onClick={() => setConfirmBulkDelete(true)}
+                            disabled={bulkBusy}
+                            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <div className="w-4 h-4"><TrashIcon /></div>
+                            Delete forever
+                        </button>
+                        <button
+                            onClick={() => setSelected(new Set())}
+                            disabled={bulkBusy}
+                            className="text-sm text-blue-700 hover:underline dark:text-blue-300 disabled:opacity-50"
+                        >
+                            Clear selection
+                        </button>
+                    </div>
+                )}
+
                 {items.length === 0 ? (
                     <div className="text-center py-12">
                         <div className="mx-auto h-12 w-12 text-gray-400">
@@ -155,6 +236,16 @@ export default function TrashIndex() {
                         <table className="min-w-full border-collapse">
                             <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                                 <tr>
+                                    <th className="w-12 px-6 py-3 text-left">
+                                        <input
+                                            ref={headerCheckbox}
+                                            type="checkbox"
+                                            checked={allOnPageSelected}
+                                            onChange={toggleAll}
+                                            aria-label="Select all items on this page"
+                                            className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                        />
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Item
                                     </th>
@@ -176,8 +267,19 @@ export default function TrashIndex() {
                                 {items.map((item) => (
                                     <tr
                                         key={`${item.type}-${item.id}`}
-                                        className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                                        className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                                            selected.has(keyOf(item)) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                                        }`}
                                     >
+                                        <td className="w-12 px-6 py-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={selected.has(keyOf(item))}
+                                                onChange={() => toggleOne(item)}
+                                                aria-label={`Select ${item.label}`}
+                                                className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                            />
+                                        </td>
                                         <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white truncate">
                                             {item.label}
                                         </td>
@@ -298,6 +400,15 @@ export default function TrashIndex() {
                     </div>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={confirmBulkDelete}
+                onClose={() => setConfirmBulkDelete(false)}
+                onConfirm={() => runBulk('/trash/bulk/force-delete')}
+                title="Delete Forever"
+                confirmLabel="Delete forever"
+                message={`Permanently delete ${selected.size} ${selected.size === 1 ? 'item' : 'items'}? This cannot be undone, and anything belonging to them goes too.`}
+            />
         </AuthenticatedLayout>
     );
 }
