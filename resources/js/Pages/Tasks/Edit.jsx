@@ -662,6 +662,9 @@ export default function Edit() {
                                                 interval={data.recurrence_interval}
                                                 config={data.recurrence_config}
                                                 onChange={(cfg) => setData('recurrence_config', cfg)}
+                                                dueTime={data.due_time}
+                                                onDueTimeChange={(val) => setData('due_time', val)}
+                                                dueTimeDisabled={!canManageTaskDetails}
                                                 errors={errors}
                                             />
                                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">

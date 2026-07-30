@@ -35,6 +35,16 @@ const MONTHLY_MODES = [
  */
 const MONTH_SHAPED = ['monthly', 'semi_annual'];
 
+/**
+ * Frequencies that offer a time of day.
+ *
+ * These land on a specific day the user has chosen, so an hour on top of it is
+ * a real instruction — "every Monday and Thursday at 08:00". The month-shaped
+ * ones are left out for now; their date is already picked several ways and the
+ * Due Time field above still applies to them.
+ */
+const TIME_OF_DAY = ['daily', 'weekly'];
+
 const WEEK_ORDINALS = [
     { value: 1, label: 'First' },
     { value: 2, label: 'Second' },
@@ -47,15 +57,37 @@ const WEEK_ORDINALS = [
 const ordinalLabel = (n) => WEEK_ORDINALS.find((w) => w.value === Number(n))?.label ?? 'First';
 const weekdayLabel = (n) => WEEKDAYS.find((d) => d.value === Number(n))?.label ?? 'Monday';
 
+/** "17:00" -> "5:00 PM". Mirrors the due_time_label accessor on the server. */
+function timeLabel(value) {
+    if (!value) return null;
+    const [h, m] = String(value).split(':');
+    const hour = Number(h);
+    if (Number.isNaN(hour)) return null;
+    const suffix = hour < 12 ? 'AM' : 'PM';
+    const twelve = hour % 12 === 0 ? 12 : hour % 12;
+    return `${twelve}:${(m ?? '00').padStart(2, '0')} ${suffix}`;
+}
+
 /** Plain-English summary so the choice can be checked without saving. */
-function describe(frequency, interval, config) {
+function describe(frequency, interval, config, dueTime) {
     const every = Number(interval) > 1 ? `every ${interval} ` : 'every ';
+
+    if (frequency === 'daily') {
+        const unit = `${every}day${Number(interval) > 1 ? 's' : ''}`;
+        const at = timeLabel(dueTime);
+        return `Repeats ${unit}${at ? ` at ${at}` : ''}`;
+    }
 
     if (frequency === 'weekly') {
         const days = (config?.days ?? []).map(Number).sort((a, b) => a - b);
-        if (!days.length) return `Repeats ${every}week${Number(interval) > 1 ? 's' : ''}`;
+        const unit = `${every}week${Number(interval) > 1 ? 's' : ''}`;
+        const at = timeLabel(dueTime);
+        const suffix = at ? ` at ${at}` : '';
+
+        if (!days.length) return `Repeats ${unit}${suffix}`;
+
         const names = days.map((d) => WEEKDAYS.find((w) => w.value === d)?.short).filter(Boolean);
-        return `Repeats ${every}week${Number(interval) > 1 ? 's' : ''} on ${names.join(', ')}`;
+        return `Repeats ${unit} on ${names.join(', ')}${suffix}`;
     }
 
     if (MONTH_SHAPED.includes(frequency)) {
@@ -80,7 +112,7 @@ function describe(frequency, interval, config) {
     return null;
 }
 
-export default function RecurrenceOptions({ frequency, interval, config, onChange, errors = {} }) {
+export default function RecurrenceOptions({ frequency, interval, config, onChange, dueTime, onDueTimeChange, dueTimeDisabled = false, errors = {} }) {
     const cfg = config ?? {};
     const set = (patch) => onChange({ ...cfg, ...patch });
 
@@ -93,7 +125,7 @@ export default function RecurrenceOptions({ frequency, interval, config, onChang
         set({ days: next });
     };
 
-    const summary = describe(frequency, interval, cfg);
+    const summary = describe(frequency, interval, cfg, dueTime);
 
     return (
         <div className="mt-3 space-y-3">
@@ -192,6 +224,32 @@ export default function RecurrenceOptions({ frequency, interval, config, onChang
                             )}
                         </div>
                     )}
+                </div>
+            )}
+
+            {TIME_OF_DAY.includes(frequency) && onDueTimeChange && (
+                <div className="w-44">
+                    <label htmlFor="recurrence_time" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Time of day <span className="font-normal text-gray-400">(optional)</span>
+                    </label>
+                    <input
+                        id="recurrence_time"
+                        type="time"
+                        value={dueTime || ''}
+                        onChange={(e) => onDueTimeChange(e.target.value)}
+                        // Mirrors the gate on the Due Time field above — the same
+                        // value, so it must not be reachable here when it is
+                        // locked there.
+                        disabled={dueTimeDisabled}
+                        className="block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                    {/* Bound to the task's Due Time rather than a second stored
+                        value: one time per task, so an occurrence can never be
+                        due at one hour and claim another. Editing either input
+                        moves both. */}
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        This is the task&rsquo;s Due Time. Each new task is created due at this time.
+                    </p>
                 </div>
             )}
 
