@@ -96,7 +96,11 @@ export default function Edit() {
                                 )}
                             </div>
                             <div className="flex gap-3">
-                                <LinkButton href="/notes" variant="secondary">Close</LinkButton>
+                                {/* Leaving the editor goes back to reading the note,
+                                    not out to the list — that is where you came from. */}
+                                <LinkButton href={isNew ? '/notes' : `/notes/${note.id}`} variant="secondary">
+                                    {isNew ? 'Cancel' : 'Done'}
+                                </LinkButton>
                                 <Button type="submit" processing={processing} processingText="Saving...">
                                     {isNew ? 'Create Note' : 'Save'}
                                 </Button>

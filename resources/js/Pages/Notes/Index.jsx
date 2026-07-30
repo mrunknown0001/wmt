@@ -239,33 +239,53 @@ export default function Index() {
                     ) : (
                         <div className="space-y-2">
                             {notes.map((note) => (
-                                <Link
-                                    key={note.id}
-                                    href={note.can_edit ? `/notes/${note.id}/edit` : `/notes/${note.id}`}
-                                    className="block rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                            <Highlight text={note.title} term={q} />
-                                        </h3>
-                                        <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wide ${ROLE_BADGE[note.role] || ROLE_BADGE.viewer}`}>
-                                            {note.role}
-                                        </span>
-                                    </div>
+                                // Clicking the card opens the note to read. Editing is
+                                // the deliberate second step — landing in an editor is a
+                                // poor way to answer "what does this one say?", and on a
+                                // shared note it invites an accidental change.
+                                <div key={note.id} className="group relative">
+                                    <Link
+                                        href={`/notes/${note.id}`}
+                                        className="block rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                <Highlight text={note.title} term={q} />
+                                            </h3>
+                                            <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wide ${ROLE_BADGE[note.role] || ROLE_BADGE.viewer}`}>
+                                                {note.role}
+                                            </span>
+                                        </div>
 
-                                    {(note.snippet || note.excerpt) && (
-                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                                            <Highlight text={note.snippet || note.excerpt} term={q} />
-                                        </p>
+                                        {(note.snippet || note.excerpt) && (
+                                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                                                <Highlight text={note.snippet || note.excerpt} term={q} />
+                                            </p>
+                                        )}
+
+                                        <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-400">
+                                            {!note.is_mine && <span>from {note.owner}</span>}
+                                            {note.folder && <span>· {note.folder.name}</span>}
+                                            {note.archived && <span>· Archived</span>}
+                                            <span>· edited {timeAgo(note.updated_at)}</span>
+                                        </div>
+                                    </Link>
+
+                                    {/* Sits outside the card's Link — an anchor cannot be
+                                        nested inside another anchor. */}
+                                    {note.can_edit && (
+                                        <Tooltip content="Edit">
+                                            <Link
+                                                href={`/notes/${note.id}/edit`}
+                                                className="absolute bottom-2.5 right-3 p-1 rounded text-gray-400 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                                            >
+                                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                            </Link>
+                                        </Tooltip>
                                     )}
-
-                                    <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-400">
-                                        {!note.is_mine && <span>from {note.owner}</span>}
-                                        {note.folder && <span>· {note.folder.name}</span>}
-                                        {note.archived && <span>· Archived</span>}
-                                        <span>· edited {timeAgo(note.updated_at)}</span>
-                                    </div>
-                                </Link>
+                                </div>
                             ))}
                         </div>
                     )}
