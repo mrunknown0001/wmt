@@ -31,7 +31,7 @@ class ApprovalItemCustomFieldValue extends Model
     {
         return [
             'value_number' => 'decimal:4',
-            'value_date' => 'date',
+            'value_date' => 'date:Y-m-d',
             'value_json' => 'array',
         ];
     }

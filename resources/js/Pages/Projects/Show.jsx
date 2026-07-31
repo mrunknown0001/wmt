@@ -47,7 +47,7 @@ import ShareProjectModal from '../../Components/ShareProjectModal';
 import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
-import { formatLabel, formatDate, apiFetch } from '../../utils';
+import { formatLabel, formatDate, apiFetch, isPastDue } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import InlinePopover from '../../Components/InlinePopover';
@@ -334,7 +334,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
         opacity: isDragging ? 0.5 : 1,
     };
 
-    const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
+    const isOverdue = isPastDue(task.due_date) && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
     const stickyBg = isDragging
@@ -757,7 +757,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
         opacity: isDragging ? 0.5 : 1,
     };
 
-    const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
+    const isOverdue = isPastDue(task.due_date) && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
     const stickyBg = isDragging

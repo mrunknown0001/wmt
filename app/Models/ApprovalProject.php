@@ -29,7 +29,7 @@ class ApprovalProject extends Model
     protected function casts(): array
     {
         return [
-            'due_date' => 'date',
+            'due_date' => 'date:Y-m-d',
             'is_pinned' => 'boolean',
             'series_padding' => 'integer',
             'series_next' => 'integer',

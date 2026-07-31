@@ -14,7 +14,7 @@ import UserMultiSelect from '../../Components/UserMultiSelect';
 import RecurrenceOptions from '../../Components/RecurrenceOptions';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
-import { formatLabel, formatDate, apiFetch, taskEditUrl } from '../../utils';
+import { formatLabel, formatDate, apiFetch, taskEditUrl, isPastDue } from '../../utils';
 import echo from '../../echo';
 
 function timeAgo(dateString) {
@@ -762,7 +762,7 @@ export default function Edit() {
                                             {st.title}
                                         </Link>
                                         {st.due_date && (
-                                            <span className={`text-xs whitespace-nowrap ${new Date(st.due_date) < new Date() && st.status !== 'done' ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                                            <span className={`text-xs whitespace-nowrap ${isPastDue(st.due_date) && st.status !== 'done' ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
                                                 {formatDate(st.due_date)}
                                             </span>
                                         )}

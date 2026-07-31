@@ -38,7 +38,7 @@ class Project extends Model
     protected function casts(): array
     {
         return [
-            'due_date' => 'date',
+            'due_date' => 'date:Y-m-d',
             'is_pinned' => 'boolean',
             'require_comment_attachment_on_close' => 'boolean',
             'hide_completed_tasks' => 'boolean',

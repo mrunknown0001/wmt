@@ -15,7 +15,7 @@ import DonutChart from '../Components/Dashboard/DonutChart';
 import BarChart from '../Components/Dashboard/BarChart';
 import TrendLineChart from '../Components/Dashboard/TrendLineChart';
 import TeamWorkload from '../Components/Dashboard/TeamWorkload';
-import { formatDate, taskEditUrl } from '../utils';
+import { formatDate, taskEditUrl, isPastDue } from '../utils';
 
 function StatCard({ label, value, icon, color = 'blue', href }) {
     const gradients = {
@@ -134,7 +134,7 @@ export default function Dashboard() {
                             </div>
                             <div className="divide-y divide-gray-100 dark:divide-gray-700">
                                 {urgentItems.map((task) => {
-                                    const isOverdue = task.due_date && new Date(task.due_date) < new Date(new Date().toDateString());
+                                    const isOverdue = isPastDue(task.due_date);
                                     return (
                                         <Link
                                             key={task.id}
@@ -296,7 +296,7 @@ export default function Dashboard() {
                         {myRecentTasks?.length > 0 ? (
                             <div className="divide-y divide-gray-100 dark:divide-gray-700">
                                 {myRecentTasks.map((task) => {
-                                    const isOverdue = task.due_date && new Date(task.due_date) < new Date();
+                                    const isOverdue = isPastDue(task.due_date);
                                     return (
                                         <Link
                                             key={task.id}

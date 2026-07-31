@@ -4,6 +4,7 @@ import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Pagination from '../../Components/Pagination';
+import { isPastDue } from '../../utils';
 
 const STATUS_OPTIONS = [
     { value: 'backlog', label: 'Backlog' },
@@ -45,7 +46,7 @@ const priorityColor = (p) => ({
 
 const humanize = (s) => (s || '').split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
-const isOverdue = (t) => t.due_date && !['done', 'cancelled'].includes(t.status) && new Date(t.due_date) < new Date(new Date().toDateString());
+const isOverdue = (t) => !['done', 'cancelled'].includes(t.status) && isPastDue(t.due_date);
 
 export default function Tasks() {
     const { tasks, scopeLabel, filters = {} } = usePage().props;

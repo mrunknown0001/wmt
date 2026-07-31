@@ -57,8 +57,14 @@ class Task extends Model
     protected function casts(): array
     {
         return [
-            'start_date' => 'date',
-            'due_date' => 'date',
+            // Date-only columns, serialised as a plain calendar date.
+            //
+            // Plain 'date' serialises through Carbon::toJSON(), which converts
+            // to UTC: with app.timezone at Asia/Manila a due date of 3 Aug went
+            // over the wire as "2026-08-02T16:00:00Z", and every consumer that
+            // read the date part of that string was a day behind.
+            'start_date' => 'date:Y-m-d',
+            'due_date' => 'date:Y-m-d',
             'completed_at' => 'datetime',
             'position' => 'integer',
             'is_recurring' => 'boolean',

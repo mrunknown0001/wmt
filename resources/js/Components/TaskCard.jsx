@@ -4,10 +4,10 @@ import { CSS } from '@dnd-kit/utilities';
 import PriorityBadge from './PriorityBadge';
 import Avatar from './Avatar';
 import Tooltip from './Tooltip';
-import { formatDate } from '../utils';
+import { formatDate, isPastDue } from '../utils';
 
 export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete, onToggleComplete, isSelected, onToggleSelect, onContextMenu, onOpenDetail }) {
-    const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done' && task.status !== 'cancelled';
+    const isOverdue = isPastDue(task.due_date) && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
     const {

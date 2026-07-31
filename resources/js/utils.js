@@ -63,11 +63,47 @@ export async function errorMessageFrom(response, fallback = 'Something went wron
     }
 }
 
+/**
+ * Turn a stored date into a Date the browser will read as the intended day.
+ *
+ * A bare "YYYY-MM-DD" is parsed by JavaScript as UTC midnight, so west of
+ * Greenwich it renders as the day before. Building it from the parts instead
+ * pins it to local midnight, which is what a date-only value means: a day on a
+ * calendar, not an instant.
+ *
+ * Anything carrying a time (created_at, completed_at) is a real instant and is
+ * left to the normal parser.
+ */
+export const parseDate = (value) => {
+    if (!value) return null;
+
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+    if (dateOnly) {
+        const [, y, m, d] = dateOnly;
+        return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+
+    const parsed = new Date(value);
+    return isNaN(parsed) ? null : parsed;
+};
+
 export const formatDate = (value) => {
     if (!value) return null;
-    const date = new Date(value);
-    if (isNaN(date)) return value;
+    const date = parseDate(value);
+    if (!date) return value;
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+/** Local midnight at the start of today — the line a due date is late after. */
+export const startOfToday = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+/** True when a date-only due date has passed. */
+export const isPastDue = (value) => {
+    const date = parseDate(value);
+    return !!date && date < startOfToday();
 };
 
 export const timeAgo = (dateString) => {

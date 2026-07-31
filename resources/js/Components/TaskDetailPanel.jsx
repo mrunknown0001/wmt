@@ -6,7 +6,7 @@ import Avatar from './Avatar';
 import RichTextEditor from './RichTextEditor';
 import Tooltip from './Tooltip';
 import SearchableSelect from './SearchableSelect';
-import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom } from '../utils';
+import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom, isPastDue } from '../utils';
 import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
 import { weekOfYearLabel } from '../weekOfYear';
 
@@ -490,7 +490,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
 
     const comments = timeline.filter(i => i.type === 'comment');
     const activities = timeline.filter(i => i.type === 'activity');
-    const isOverdue = taskData?.due_date && new Date(taskData.due_date) < new Date() && taskData.status !== 'done' && taskData.status !== 'cancelled';
+    const isOverdue = isPastDue(taskData?.due_date) && taskData.status !== 'done' && taskData.status !== 'cancelled';
 
     return (
         <>
@@ -765,7 +765,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                                 {st.title}
                                             </Link>
                                             {st.due_date && (
-                                                <span className={`text-xs whitespace-nowrap ${new Date(st.due_date) < new Date() && st.status !== 'done' ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                                                <span className={`text-xs whitespace-nowrap ${isPastDue(st.due_date) && st.status !== 'done' ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
                                                     {formatDate(st.due_date)}
                                                 </span>
                                             )}
