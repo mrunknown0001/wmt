@@ -4,6 +4,7 @@ import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import PageHeader from '../Components/PageHeader';
 import StatusBadge from '../Components/StatusBadge';
 import Tooltip from '../Components/Tooltip';
+import OrgUnitFilter from '../Components/OrgUnitFilter';
 import { taskEditUrl } from '../utils';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -25,21 +26,31 @@ const PRIORITY_PILL = {
 
 const MAX_VISIBLE_TASKS = 3;
 
-function TaskPill({ task }) {
+function TaskPill({ task, showAssignee }) {
+    const owner = task.assignee?.name;
+    const tip = [
+        task.title,
+        `(${task.project?.name || 'No project'})`,
+        showAssignee && owner ? `— ${owner}` : '',
+    ].filter(Boolean).join(' ');
+
     return (
-        <Tooltip content={`${task.title} (${task.project?.name || 'No project'})`}>
+        <Tooltip content={tip}>
             <Link
                 href={taskEditUrl(task)}
                 onClick={(e) => e.stopPropagation()}
                 className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
             >
                 {task.title}
+                {showAssignee && owner && (
+                    <span className="opacity-60"> · {owner.split(' ')[0]}</span>
+                )}
             </Link>
         </Tooltip>
     );
 }
 
-function DayCell({ date, tasks, isToday, isOutside, month, year }) {
+function DayCell({ date, tasks, isToday, isOutside, month, year, showAssignee }) {
     const visible = tasks.slice(0, MAX_VISIBLE_TASKS);
     const overflow = tasks.length - MAX_VISIBLE_TASKS;
 
@@ -72,7 +83,7 @@ function DayCell({ date, tasks, isToday, isOutside, month, year }) {
             {!isOutside && (
                 <div className="space-y-0.5">
                     {visible.map((task) => (
-                        <TaskPill key={task.id} task={task} />
+                        <TaskPill key={task.id} task={task} showAssignee={showAssignee} />
                     ))}
                     {overflow > 0 && (
                         <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1">
@@ -85,9 +96,20 @@ function DayCell({ date, tasks, isToday, isOutside, month, year }) {
     );
 }
 
-export default function Calendar({ tasks, month, year }) {
+const EMPTY_ORG = { divisions: [], departments: [], teams: [], all: false };
+
+export default function Calendar({ tasks, month, year, orgUnits, orgFilters }) {
     const [filterProject, setFilterProject] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+
+    // Held locally so ticking several boxes in a row does not race: each
+    // request is built from the value just chosen rather than from whatever the
+    // last response happened to carry back. The picker only ever offers units
+    // the server already approved, so the two cannot drift apart.
+    const [org, setOrg] = useState(orgFilters || EMPTY_ORG);
+    const orgCount = org.divisions.length + org.departments.length + org.teams.length;
+    // Once the calendar covers more than one person, whose task it is matters.
+    const showAssignee = orgCount > 0 || !!org.all;
 
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -173,21 +195,45 @@ export default function Calendar({ tasks, month, year }) {
         return rows;
     }, [month, year]);
 
+    // Every navigation carries the org selection, or paging to the next month
+    // would silently drop back to a personal calendar.
+    const visit = (m, y, selection = org) => {
+        router.get(
+            '/calendar',
+            {
+                month: m,
+                year: y,
+                divisions: selection.divisions,
+                departments: selection.departments,
+                teams: selection.teams,
+                all: selection.all ? 1 : 0,
+            },
+            // orgUnits is left out — the list of units a person may pick from
+            // does not change as they page through months.
+            { preserveState: true, preserveScroll: true, only: ['tasks', 'month', 'year', 'orgFilters'] }
+        );
+    };
+
     const goToPrev = () => {
         const m = month === 1 ? 12 : month - 1;
         const y = month === 1 ? year - 1 : year;
-        router.get('/calendar', { month: m, year: y }, { preserveState: true });
+        visit(m, y);
     };
 
     const goToNext = () => {
         const m = month === 12 ? 1 : month + 1;
         const y = month === 12 ? year + 1 : year;
-        router.get('/calendar', { month: m, year: y }, { preserveState: true });
+        visit(m, y);
     };
 
     const goToToday = () => {
         const now = new Date();
-        router.get('/calendar', { month: now.getMonth() + 1, year: now.getFullYear() }, { preserveState: true });
+        visit(now.getMonth() + 1, now.getFullYear());
+    };
+
+    const changeOrg = (selection) => {
+        setOrg(selection);
+        visit(month, year, selection);
     };
 
     const hasActiveFilters = filterProject || filterPriority;
@@ -229,6 +275,7 @@ export default function Calendar({ tasks, month, year }) {
 
                 {/* Filters */}
                 <div className="flex items-center gap-2">
+                    <OrgUnitFilter units={orgUnits} value={org} onChange={changeOrg} />
                     {projects.length > 1 && (
                         <select
                             value={filterProject}
@@ -287,6 +334,7 @@ export default function Calendar({ tasks, month, year }) {
                                 isOutside={cell.outside}
                                 month={month}
                                 year={year}
+                                showAssignee={showAssignee}
                             />
                         ))}
                     </div>
