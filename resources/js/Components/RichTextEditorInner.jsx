@@ -1,7 +1,5 @@
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import Mention from '@tiptap/extension-mention';
 import { useEffect, useCallback, useMemo, useRef } from 'react';
@@ -128,17 +126,21 @@ export default function RichTextEditor({ label, id, value, onChange, error, plac
 
     const extensions = useMemo(() => {
         const exts = [
+            // Link and Underline ship inside StarterKit from v3, so they are
+            // configured here rather than added again. Registering them twice
+            // built a schema with duplicate marks — TipTap warned about it, and
+            // it left the editor in a state where a rebuild could null the
+            // schema out from under getHTML().
             StarterKit.configure({
                 heading: minimal ? false : { levels: [2, 3] },
                 codeBlock: false,
                 code: false,
                 blockquote: false,
                 horizontalRule: false,
-            }),
-            Underline,
-            Link.configure({
-                openOnClick: false,
-                HTMLAttributes: { class: 'text-primary-600 dark:text-primary-400 underline' },
+                link: {
+                    openOnClick: false,
+                    HTMLAttributes: { class: 'text-primary-600 dark:text-primary-400 underline' },
+                },
             }),
             Placeholder.configure({
                 placeholder: placeholder || '',
@@ -186,8 +188,15 @@ export default function RichTextEditor({ label, id, value, onChange, error, plac
     });
 
     // Sync external value changes (e.g. form reset)
+    //
+    // isDestroyed matters as much as the null check: useEditor replaces the
+    // instance whenever the extension list changes — which happens the moment
+    // the mention list arrives — and this effect can still fire holding the old
+    // one. A destroyed editor has no schema, so getHTML() threw
+    // "Cannot read properties of null (reading 'cached')" and took the task
+    // detail panel down with it.
     useEffect(() => {
-        if (editor && value !== undefined) {
+        if (editor && !editor.isDestroyed && value !== undefined) {
             const current = editor.getHTML();
             const normalizedValue = value || '';
             const normalizedCurrent = current === '<p></p>' ? '' : current;
