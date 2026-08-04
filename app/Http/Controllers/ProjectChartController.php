@@ -69,6 +69,15 @@ class ProjectChartController extends Controller
             ],
             'scope' => ['nullable', Rule::in(['all', 'active', 'done'])],
 
+            // A second dimension, splitting each bar or line into series —
+            // "status, broken down by assignee".
+            'stack_by' => ['nullable', Rule::in(self::CATEGORY_DIMENSIONS)],
+            'stack_custom_field_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('custom_fields', 'id')->where('project_id', $project->id),
+            ],
+
             'measure' => ['nullable', Rule::in(self::MEASURES)],
             'measure_custom_field_id' => [
                 'nullable',
@@ -108,6 +117,30 @@ class ProjectChartController extends Controller
             }
         }
 
+        $stackBy = $validated['stack_by'] ?? null;
+
+        if ($stackBy !== null) {
+            // A donut is already a breakdown of one whole; splitting its
+            // segments again has nowhere to go.
+            if ($validated['chart_type'] === 'donut') {
+                abort(422, 'A donut cannot be split by a second dimension.');
+            }
+
+            // Splitting a dimension by itself yields one series per bar and
+            // tells you nothing you could not read off the bar.
+            if ($stackBy === $validated['group_by']) {
+                abort(422, 'Choose a different dimension to split by.');
+            }
+
+            if ($stackBy === 'custom_field') {
+                $field = $project->customFields()->find($validated['stack_custom_field_id'] ?? null);
+
+                if (!$field || $field->type !== 'single_select') {
+                    abort(422, 'Splitting by a custom field needs a single-select field.');
+                }
+            }
+        }
+
         $measure = $validated['measure'] ?? 'count';
 
         if (in_array($measure, self::FIELD_MEASURES, true)) {
@@ -142,6 +175,10 @@ class ProjectChartController extends Controller
             'measure' => $measure,
             'measure_custom_field_id' => in_array($measure, self::FIELD_MEASURES, true)
                 ? (int) $validated['measure_custom_field_id']
+                : null,
+            'stack_by' => $validated['stack_by'] ?? null,
+            'stack_custom_field_id' => ($validated['stack_by'] ?? null) === 'custom_field'
+                ? (int) $validated['stack_custom_field_id']
                 : null,
             'x_label' => $validated['x_label'] ?? null,
             'y_label' => $validated['y_label'] ?? null,

@@ -313,6 +313,134 @@ function referenceLines(chart) {
         .map((r) => ({ label: r.label, value: Number(r.value) || 0 }));
 }
 
+/** Most series a stack can carry before the colours stop meaning anything. */
+const MAX_SERIES = 8;
+
+/**
+ * Which slice of a category dimension a task belongs to.
+ *
+ * Shared by the X axis and the split, so "by assignee" means the same thing
+ * whichever axis it is on — and a dimension added here works on both at once.
+ */
+function categorise(task, dimension, { sections, customFields, fieldId }) {
+    if (dimension === 'status') {
+        return { key: task.status, label: formatLabel(task.status), color: STATUS_HEX[task.status] };
+    }
+
+    if (dimension === 'priority') {
+        return { key: task.priority, label: formatLabel(task.priority), color: PRIORITY_HEX[task.priority] };
+    }
+
+    if (dimension === 'assignee') {
+        return task.assigned_to
+            ? { key: String(task.assigned_to), label: task.assignee?.name || 'Unknown' }
+            : { key: 'unassigned', label: 'Unassigned', color: 'var(--viz-other)' };
+    }
+
+    if (dimension === 'section') {
+        const section = (sections || []).find((sec) => sec.id === task.section_id);
+        return section
+            ? { key: String(section.id), label: section.name, color: section.color || undefined }
+            : { key: 'none', label: 'No section', color: 'var(--viz-other)' };
+    }
+
+    if (dimension === 'custom_field') {
+        const field = (customFields || []).find((f) => f.id === fieldId);
+        const value = (task.custom_field_values || []).find((v) => v.custom_field_id === fieldId);
+        const option = field?.options?.find((o) => o.id === value?.value_option_id);
+
+        return option
+            ? { key: String(option.id), label: option.label, color: option.color || undefined }
+            : { key: 'none', label: 'No value', color: 'var(--viz-other)' };
+    }
+
+    return { key: 'all', label: 'All', color: 'var(--viz-other)' };
+}
+
+/**
+ * Buckets along the X axis, each split into series.
+ *
+ * Colour belongs to the series, not the bucket: a given assignee has to be the
+ * same colour in every bar, or the legend is a lie.
+ */
+function computeStackedData(chart, allTasks, sections, customFields) {
+    const measure = chart.config?.measure || 'count';
+    const measureFieldId = chart.config?.measure_custom_field_id || null;
+    const groupBy = chart.group_by;
+    const stackBy = chart.config?.stack_by;
+
+    const tasks = scopeTasks(allTasks, chart.config?.scope || 'all');
+
+    const xOpts = { sections, customFields, fieldId: chart.config?.custom_field_id };
+    const sOpts = { sections, customFields, fieldId: chart.config?.stack_custom_field_id };
+
+    // bucketKey -> { label, series: Map(seriesKey -> tasks[]) }
+    const buckets = new Map();
+    const seriesMeta = new Map();
+
+    tasks.forEach((task) => {
+        const x = categorise(task, groupBy, xOpts);
+        const sSlice = categorise(task, stackBy, sOpts);
+
+        if (!buckets.has(x.key)) {
+            buckets.set(x.key, { key: x.key, label: x.label, series: new Map() });
+        }
+        if (!seriesMeta.has(sSlice.key)) {
+            seriesMeta.set(sSlice.key, { key: sSlice.key, label: sSlice.label, color: sSlice.color });
+        }
+
+        const bucket = buckets.get(x.key);
+        if (!bucket.series.has(sSlice.key)) bucket.series.set(sSlice.key, []);
+        bucket.series.get(sSlice.key).push(task);
+    });
+
+    // Rank series by their overall size, then keep the biggest and fold the
+    // tail — eight colours is about as many as anyone can tell apart.
+    const seriesTotals = new Map();
+    buckets.forEach((b) => {
+        b.series.forEach((group, key) => {
+            seriesTotals.set(key, (seriesTotals.get(key) || 0) + aggregate(group, measure, measureFieldId));
+        });
+    });
+
+    const ranked = [...seriesMeta.values()].sort(
+        (a, b) => (seriesTotals.get(b.key) || 0) - (seriesTotals.get(a.key) || 0)
+    );
+    const kept = ranked.slice(0, MAX_SERIES);
+    const folded = ranked.slice(MAX_SERIES);
+    const foldedKeys = new Set(folded.map((s) => s.key));
+
+    // Colours are handed out in a stable order so a scope change never
+    // repaints the legend.
+    const series = kept
+        .slice()
+        .sort((a, b) => a.label.localeCompare(b.label))
+        .map((s, i) => ({ ...s, color: s.color || `var(${SERIES_VARS[i % SERIES_VARS.length]})` }));
+
+    if (folded.length > 0) {
+        series.push({ key: '__other', label: `Other (${folded.length})`, color: 'var(--viz-other)' });
+    }
+
+    const rows = [...buckets.values()].map((b) => {
+        const segments = series.map((s) => {
+            const group = s.key === '__other'
+                ? [...b.series.entries()].filter(([k]) => foldedKeys.has(k)).flatMap(([, g]) => g)
+                : (b.series.get(s.key) || []);
+
+            return { key: s.key, label: s.label, color: s.color, value: aggregate(group, measure, measureFieldId) };
+        }).filter((seg) => seg.value !== 0);
+
+        return {
+            key: b.key,
+            label: b.label,
+            segments,
+            count: segments.reduce((sum, seg) => sum + seg.value, 0),
+        };
+    });
+
+    return { rows: rows.sort((a, b) => b.count - a.count), series };
+}
+
 // Fold anything past maxBuckets - 1 into a single "Other" bucket
 function foldBuckets(buckets, maxBuckets) {
     if (buckets.length <= maxBuckets) return buckets;
@@ -404,6 +532,71 @@ function computeTimeData(chart, allTasks) {
     return buckets;
 }
 
+/**
+ * A line per series, over the same time buckets.
+ *
+ * Built on top of computeTimeData so the bucketing — weekly, or monthly once
+ * the range gets long — stays in one place and both paths agree.
+ */
+function computeStackedTimeData(chart, allTasks, sections, customFields) {
+    const stackBy = chart.config?.stack_by;
+    const sOpts = { sections, customFields, fieldId: chart.config?.stack_custom_field_id };
+
+    // The shape of the axis, measured across everything.
+    const skeleton = computeTimeData(chart, allTasks);
+    if (skeleton.length === 0) return { rows: [], series: [] };
+
+    const groups = new Map();
+    const meta = new Map();
+
+    allTasks.forEach((task) => {
+        const slice = categorise(task, stackBy, sOpts);
+        if (!meta.has(slice.key)) meta.set(slice.key, { key: slice.key, label: slice.label, color: slice.color });
+        if (!groups.has(slice.key)) groups.set(slice.key, []);
+        groups.get(slice.key).push(task);
+    });
+
+    const ranked = [...meta.values()].sort(
+        (a, b) => (groups.get(b.key)?.length || 0) - (groups.get(a.key)?.length || 0)
+    );
+    const kept = ranked.slice(0, MAX_SERIES);
+    const folded = ranked.slice(MAX_SERIES);
+
+    const series = kept
+        .slice()
+        .sort((a, b) => a.label.localeCompare(b.label))
+        .map((sSeries, i) => ({
+            ...sSeries,
+            color: sSeries.color || `var(${SERIES_VARS[i % SERIES_VARS.length]})`,
+        }));
+
+    if (folded.length > 0) {
+        series.push({ key: '__other', label: `Other (${folded.length})`, color: 'var(--viz-other)' });
+    }
+
+    // Each series is bucketed over the same axis, so the points line up.
+    const valuesByKey = new Map();
+    series.forEach((sSeries) => {
+        const subset = sSeries.key === '__other'
+            ? folded.flatMap((f) => groups.get(f.key) || [])
+            : (groups.get(sSeries.key) || []);
+
+        const bucketed = computeTimeData(chart, subset);
+        const byLabel = new Map(bucketed.map((b) => [b.label, b.count]));
+
+        valuesByKey.set(sSeries.key, skeleton.map((b) => byLabel.get(b.label) || 0));
+    });
+
+    const rows = skeleton.map((b, i) => ({
+        label: b.label,
+        date: b.date,
+        values: series.map((sSeries) => valuesByKey.get(sSeries.key)[i]),
+        count: series.reduce((sum, sSeries) => sum + valuesByKey.get(sSeries.key)[i], 0),
+    }));
+
+    return { rows, series };
+}
+
 function niceMax(value) {
     if (value <= 5) return 5;
     const mag = Math.pow(10, Math.floor(Math.log10(value)));
@@ -414,6 +607,167 @@ function niceMax(value) {
 }
 
 /* ------------------------------- Renderers ------------------------------- */
+
+/** Shared legend for any split chart. */
+function SeriesLegend({ series }) {
+    return (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+            {series.map((s) => (
+                <span key={s.key} className="flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-300">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
+                    <span className="truncate max-w-32" title={s.label}>{s.label}</span>
+                </span>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * One bar per bucket, divided into series.
+ *
+ * Segments are drawn in legend order, so a given series sits in the same place
+ * in every bar. That consistency is what makes two bars comparable at a glance.
+ */
+function StackedBarChart({ rows, series, measure = 'count', references = [], xLabel, yLabel }) {
+    const max = Math.max(...rows.map((r) => r.count), ...references.map((r) => r.value), 1);
+
+    return (
+        <div>
+            {yLabel && (
+                <p className="mb-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {yLabel}
+                </p>
+            )}
+
+            <div className="space-y-2.5">
+                {rows.map((row) => (
+                    <div key={row.key} className="flex items-center gap-3">
+                        <span
+                            className="w-28 shrink-0 text-sm text-gray-600 dark:text-gray-300 truncate text-right"
+                            title={row.label}
+                        >
+                            {row.label}
+                        </span>
+                        <div className="relative flex-1 h-4 bg-gray-100 dark:bg-gray-700/50 rounded-r overflow-hidden flex">
+                            {row.segments.map((seg) => (
+                                <div
+                                    key={seg.key}
+                                    className="h-4 transition-all duration-500"
+                                    style={{ width: `${(seg.value / max) * 100}%`, backgroundColor: seg.color }}
+                                    title={`${seg.label}: ${formatValue(seg.value, measure)}`}
+                                />
+                            ))}
+                            {references.map((r, i) => (
+                                <div
+                                    key={i}
+                                    className="absolute top-0 bottom-0 border-l-2 border-dashed border-gray-500/70"
+                                    style={{ left: `${Math.min(100, (r.value / max) * 100)}%` }}
+                                    title={`${r.label}: ${formatValue(r.value, measure)}`}
+                                />
+                            ))}
+                        </div>
+                        <span className="w-12 shrink-0 text-sm font-medium text-gray-900 dark:text-white tabular-nums text-right">
+                            {formatValue(row.count, measure)}
+                        </span>
+                    </div>
+                ))}
+            </div>
+
+            <SeriesLegend series={series} />
+
+            {references.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-3">
+                    {references.map((r, i) => (
+                        <span key={i} className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="inline-block w-4 border-t-2 border-dashed border-gray-500/70" />
+                            {r.label} · {formatValue(r.value, measure)}
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {xLabel && <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">{xLabel}</p>}
+        </div>
+    );
+}
+
+/** One line per series, over shared time buckets. */
+function MultiLineChart({ rows, series, measure = 'count', references = [], xLabel, yLabel }) {
+    const W = 600, H = 230;
+    const M = { top: 14, right: 16, bottom: 30, left: 36 };
+    const plotW = W - M.left - M.right;
+    const plotH = H - M.top - M.bottom;
+
+    const peak = Math.max(...rows.flatMap((r) => r.values), ...references.map((r) => r.value), 1);
+    const yMax = niceMax(peak);
+
+    const x = (i) => M.left + (rows.length === 1 ? plotW / 2 : (i / (rows.length - 1)) * plotW);
+    const y = (v) => M.top + plotH - (v / yMax) * plotH;
+
+    const yTicks = [0, yMax / 4, yMax / 2, (3 * yMax) / 4, yMax].map((v) => Math.round(v * 10) / 10);
+    const xLabelEvery = Math.max(1, Math.ceil(rows.length / 6));
+
+    return (
+        <div>
+            {yLabel && (
+                <p className="mb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {yLabel}
+                </p>
+            )}
+
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img">
+                {yTicks.map((t, i) => (
+                    <g key={i}>
+                        <line
+                            x1={M.left} x2={W - M.right} y1={y(t)} y2={y(t)}
+                            stroke="currentColor" strokeWidth="1" className="text-gray-200 dark:text-gray-700"
+                        />
+                        <text
+                            x={M.left - 6} y={y(t) + 3} textAnchor="end" fontSize="9"
+                            fill="currentColor" className="text-gray-400"
+                        >
+                            {t}
+                        </text>
+                    </g>
+                ))}
+
+                {references.map((r, i) => (
+                    r.value <= yMax ? (
+                        <line
+                            key={`ref-${i}`}
+                            x1={M.left} x2={W - M.right} y1={y(r.value)} y2={y(r.value)}
+                            stroke="var(--viz-other)" strokeWidth="1.5" strokeDasharray="5 4"
+                        />
+                    ) : null
+                ))}
+
+                {series.map((s, si) => (
+                    <path
+                        key={s.key}
+                        d={rows.map((r, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(r.values[si])}`).join(' ')}
+                        fill="none" stroke={s.color} strokeWidth="2"
+                        strokeLinejoin="round" strokeLinecap="round"
+                    />
+                ))}
+
+                {rows.map((r, i) => (
+                    i % xLabelEvery === 0 ? (
+                        <text
+                            key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize="9"
+                            fill="currentColor" className="text-gray-400"
+                        >
+                            {r.label}
+                        </text>
+                    ) : null
+                ))}
+            </svg>
+
+            <SeriesLegend series={series} />
+
+            {xLabel && <p className="mt-1 text-center text-[11px] text-gray-500 dark:text-gray-400">{xLabel}</p>}
+        </div>
+    );
+}
 
 function BarChart({ buckets, measure = 'count', references = [], xLabel, yLabel }) {
     // Reference lines are part of the scale: a target above every bar would sit
@@ -750,7 +1104,19 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
     const measure = chart.config?.measure || 'count';
     const references = useMemo(() => referenceLines(chart), [chart]);
 
+    // A donut is already a breakdown of one whole, so it never splits.
+    const stackBy = chart.chart_type === 'donut' ? null : chart.config?.stack_by;
+
+    const split = useMemo(() => {
+        if (!stackBy) return null;
+
+        return chart.chart_type === 'line'
+            ? computeStackedTimeData(chart, allTasks, sections, customFields)
+            : computeStackedData(chart, allTasks, sections, customFields);
+    }, [stackBy, chart, allTasks, sections, customFields]);
+
     const data = useMemo(() => {
+        if (stackBy) return [];
         if (chart.chart_type === 'line') return computeTimeData(chart, allTasks);
 
         const buckets = computeCategoryData(chart, allTasks, sections, customFields);
@@ -759,9 +1125,11 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
         // Hand-entered figures are appended after folding, so an "Other" bucket
         // can never swallow one — they were typed in precisely to be seen.
         return [...folded, ...manualBuckets(chart)];
-    }, [chart, allTasks, sections, customFields]);
+    }, [stackBy, chart, allTasks, sections, customFields]);
 
-    const isEmpty = data.length === 0 || (chart.chart_type !== 'line' && data.every((b) => b.count === 0));
+    const isEmpty = stackBy
+        ? !split || split.rows.length === 0 || split.rows.every((r) => r.count === 0)
+        : data.length === 0 || (chart.chart_type !== 'line' && data.every((b) => b.count === 0));
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
@@ -807,6 +1175,18 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
 
             {isEmpty ? (
                 <p className="text-sm text-gray-500 dark:text-gray-400 py-8 text-center">No matching tasks yet</p>
+            ) : stackBy ? (
+                chart.chart_type === 'line' ? (
+                    <MultiLineChart
+                        rows={split.rows} series={split.series} measure={measure} references={references}
+                        xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                    />
+                ) : (
+                    <StackedBarChart
+                        rows={split.rows} series={split.series} measure={measure} references={references}
+                        xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                    />
+                )
             ) : chart.chart_type === 'bar' ? (
                 <BarChart
                     buckets={data} measure={measure} references={references}
@@ -831,7 +1211,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
 
     const numberFields = numericFields(customFields);
 
-    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [] });
+    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '' });
 
     useEffect(() => {
         if (!isOpen) return;
@@ -847,7 +1227,9 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
             y_label: chart.config?.y_label || '',
             manual_points: chart.config?.manual_points || [],
             reference_lines: chart.config?.reference_lines || [],
-        } : { title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [] });
+            stack_by: chart.config?.stack_by || '',
+            stack_custom_field_id: chart.config?.stack_custom_field_id || '',
+        } : { title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '' });
     }, [isOpen, chart]);
 
     const isLine = form.chart_type === 'line';
@@ -858,15 +1240,30 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
             const next = { ...f, chart_type: type };
             const allowed = (type === 'line' ? TIME_DIMENSIONS : CATEGORY_DIMENSIONS).map((d) => d.value);
             if (!allowed.includes(next.group_by)) next.group_by = allowed[0];
+
+            // A donut cannot be split, and a dimension cannot split itself —
+            // leaving a stale value here would be rejected on save.
+            if (type === 'donut' || next.stack_by === next.group_by) {
+                next.stack_by = '';
+                next.stack_custom_field_id = '';
+            }
+
             return next;
         });
     };
 
     const needsNumberField = measureSpec(form.measure).needsField;
 
+    // A donut is already a breakdown of one whole, so there is nothing left to
+    // split; and a dimension cannot be split by itself.
+    const canSplit = form.chart_type !== 'donut';
+    const splitOptions = CATEGORY_DIMENSIONS.filter((d) => d.value !== form.group_by);
+    const needsSplitField = form.stack_by === 'custom_field';
+
     const canSave = form.title.trim().length > 0
         && (form.group_by !== 'custom_field' || form.custom_field_id)
-        && (!needsNumberField || form.measure_custom_field_id);
+        && (!needsNumberField || form.measure_custom_field_id)
+        && (!canSplit || !needsSplitField || form.stack_custom_field_id);
 
     // Rows the user is part-way through typing are dropped rather than saved
     // as a blank label with a number nobody can read.
@@ -936,6 +1333,9 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                             measure_custom_field_id: needsNumberField ? form.measure_custom_field_id : null,
                             x_label: form.x_label.trim() || null,
                             y_label: form.y_label.trim() || null,
+                            stack_by: canSplit && form.stack_by ? form.stack_by : null,
+                            stack_custom_field_id: canSplit && form.stack_by === 'custom_field'
+                                ? form.stack_custom_field_id : null,
                             manual_points: isLine ? [] : cleanPairs(form.manual_points),
                             reference_lines: form.chart_type === 'donut' ? [] : cleanPairs(form.reference_lines),
                         })}
@@ -988,7 +1388,12 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                     </label>
                     <Select
                         value={form.group_by}
-                        onChange={(e) => setForm((f) => ({ ...f, group_by: e.target.value }))}
+                        onChange={(e) => setForm((f) => ({
+                            ...f,
+                            group_by: e.target.value,
+                            // Cannot split a dimension by itself.
+                            stack_by: f.stack_by === e.target.value ? '' : f.stack_by,
+                        }))}
                     >
                         {dimensions.map((d) => (
                             <option
@@ -1096,6 +1501,50 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                         />
                     </div>
                 </div>
+
+                {canSplit && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Split by <span className="font-normal text-gray-400">(optional)</span>
+                        </label>
+                        <Select
+                            value={form.stack_by}
+                            onChange={(e) => setForm((f) => ({ ...f, stack_by: e.target.value }))}
+                        >
+                            <option value="">Don&rsquo;t split</option>
+                            {splitOptions.map((d) => (
+                                <option key={d.value} value={d.value}>{d.label}</option>
+                            ))}
+                        </Select>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {isLine
+                                ? 'Draws one line per value — "completed over time, one line per assignee".'
+                                : 'Divides each bar — "by status, split by assignee". The largest ' + MAX_SERIES + ' are kept and the rest folded into Other.'}
+                        </p>
+                    </div>
+                )}
+
+                {canSplit && needsSplitField && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Split field
+                        </label>
+                        <Select
+                            value={form.stack_custom_field_id}
+                            onChange={(e) => setForm((f) => ({ ...f, stack_custom_field_id: e.target.value }))}
+                        >
+                            <option value="">Choose a field…</option>
+                            {selectFields.map((f) => (
+                                <option key={f.id} value={f.id}>{f.name}</option>
+                            ))}
+                        </Select>
+                        {selectFields.length === 0 && (
+                            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                This project has no single-select custom field to split by.
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 {form.chart_type !== 'donut' && pairEditor(
                     'reference_lines',
