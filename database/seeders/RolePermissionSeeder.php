@@ -35,6 +35,11 @@ class RolePermissionSeeder extends Seeder
             'view-links',
             'manage-approval-projects',
             'view-approval-projects',
+            // Admin-only. Both show every person's numbers across the whole
+            // organisation, which is a different thing from a head seeing the
+            // unit they run.
+            'view-workload',
+            'view-reports',
         ];
 
         foreach ($permissions as $permission) {

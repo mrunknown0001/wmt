@@ -336,11 +336,14 @@ Route::middleware('auth')->group(function () {
     Route::put('/notes/{note}/shares/{share}', [NoteShareController::class, 'update'])->name('notes.shares.update');
     Route::delete('/notes/{note}/shares/{share}', [NoteShareController::class, 'destroy'])->name('notes.shares.destroy');
 
-    // Reports
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    // Reports and Workload both show the whole organisation's numbers, so both
+    // are admin-only. Gated by permission rather than role name so the access
+    // can be granted from the roles table without a deploy.
+    Route::get('/reports', [ReportController::class, 'index'])
+        ->middleware('can:view-reports')->name('reports.index');
 
-    // Workload & capacity
-    Route::get('/workload', [WorkloadController::class, 'index'])->name('workload.index');
+    Route::get('/workload', [WorkloadController::class, 'index'])
+        ->middleware('can:view-workload')->name('workload.index');
 
     // Organization structure
     Route::resource('divisions', DivisionController::class)->except(['show']);

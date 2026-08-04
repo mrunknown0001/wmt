@@ -19,7 +19,7 @@ const STATUS_PILL = {
 
 export default function TaskDelegationsIndex() {
     const {
-        delegations = [], people = [], canManageOthers, currentUserId,
+        delegations = [], people = [], currentUserId,
         maxDelegates = 2, errors = {},
     } = usePage().props;
 
@@ -131,6 +131,9 @@ export default function TaskDelegationsIndex() {
                         owner automatically the day after cover ends. With two stand-ins the tasks are
                         split evenly between them. Anything already done or cancelled is left alone.
                     </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                        Both lists below are limited to the people you are responsible for.
+                    </p>
 
                     <form onSubmit={submit} className="space-y-4">
                         <SearchableSelect
@@ -138,9 +141,9 @@ export default function TaskDelegationsIndex() {
                             id="user_id"
                             value={form.user_id}
                             onChange={(v) => setForm({ ...form, user_id: v, delegate_ids: [] })}
-                            options={canManageOthers
-                                ? people.map((p) => ({ value: p.id, label: p.name }))
-                                : people.filter((p) => p.id === currentUserId).map((p) => ({ value: p.id, label: p.name }))}
+                            // Already narrowed server-side to the people this
+                            // person is responsible for.
+                            options={people.map((p) => ({ value: p.id, label: p.name }))}
                             error={errors.user_id}
                             showAvatar
                         />

@@ -253,18 +253,28 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     <NavLink href="/calendar" icon={<CalendarIcon />} active={isActive('/calendar')} collapsed={collapsed}>
                         Calendar
                     </NavLink>
-                    <NavLink
-                        href="/task-delegations"
-                        icon={(
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                            </svg>
-                        )}
-                        active={isActive('/task-delegations')}
-                        collapsed={collapsed}
-                    >
-                        Task Cover
-                    </NavLink>
+                    {/* Arranging cover means reassigning somebody else's work, so it
+                        belongs to whoever is responsible for them: admins and
+                        executives, and anyone who heads a division, department or
+                        team. The page scopes the pick-list to their own people. */}
+                    {(hasPermission('manage-users') || hasRole('admin') || hasRole('executive') || auth.user?.is_org_head) && (
+                        <NavLink
+                            href="/task-delegations"
+                            icon={(
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                </svg>
+                            )}
+                            active={isActive('/task-delegations')}
+                            collapsed={collapsed}
+                        >
+                            Task Cover
+                        </NavLink>
+                    )}
+                    {/* Workload and Reports cover the whole organisation, so both
+                        follow their admin-only permissions rather than being shown
+                        to everyone and refused on arrival. */}
+                    {hasPermission('view-workload') && (
                     <NavLink
                         href="/workload"
                         icon={(
@@ -277,6 +287,8 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     >
                         Workload
                     </NavLink>
+                    )}
+                    {hasPermission('view-reports') && (
                     <NavLink
                         href="/reports"
                         icon={(
@@ -290,6 +302,7 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     >
                         Reports
                     </NavLink>
+                    )}
                     {/* Links & URLs is available to every user; the page itself scopes
                         what each person can see. */}
                     <NavLink href="/links" icon={<LinkIcon />} active={isActive('/links')} collapsed={collapsed}>

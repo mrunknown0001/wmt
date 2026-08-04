@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Department;
+use App\Models\Division;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\TaskDelegation;
 use App\Models\TaskDelegationItem;
 use App\Models\User;
@@ -27,17 +30,56 @@ class TaskDelegationTest extends TestCase
     private User $owner;
     private User $standIn;
     private User $second;
+    private User $teamLead;
+    private User $deptHead;
+    private User $divHead;
+    private User $outsider;
     private Project $project;
 
+    /**
+     * A single branch of the org chart, plus somebody outside it.
+     *
+     *   Division "Field"            head: divHead
+     *     Department "Support"      head: deptHead
+     *       Team "Frontline"        leader: teamLead
+     *         owner, standIn, second
+     *     Department "Elsewhere"
+     *       outsider
+     */
     protected function setUp(): void
     {
         parent::setUp();
 
         Notification::fake();
 
-        $this->owner = User::factory()->create(['name' => 'Owner', 'is_active' => true]);
-        $this->standIn = User::factory()->create(['name' => 'Stand In', 'is_active' => true]);
-        $this->second = User::factory()->create(['name' => 'Second', 'is_active' => true]);
+        $this->teamLead = User::factory()->create(['name' => 'Team Lead', 'is_active' => true]);
+        $this->deptHead = User::factory()->create(['name' => 'Dept Head', 'is_active' => true]);
+        $this->divHead = User::factory()->create(['name' => 'Div Head', 'is_active' => true]);
+
+        $division = Division::create(['name' => 'Field', 'head_id' => $this->divHead->id]);
+
+        $support = Department::create([
+            'name' => 'Support', 'division_id' => $division->id, 'head_id' => $this->deptHead->id,
+        ]);
+        $elsewhere = Department::create([
+            'name' => 'Elsewhere', 'division_id' => $division->id,
+        ]);
+
+        $frontline = Team::create([
+            'name' => 'Frontline', 'department_id' => $support->id, 'leader_id' => $this->teamLead->id,
+        ]);
+        $otherTeam = Team::create(['name' => 'Other', 'department_id' => $elsewhere->id]);
+
+        $inTeam = ['is_active' => true, 'department_id' => $support->id, 'team_id' => $frontline->id];
+
+        $this->owner = User::factory()->create(['name' => 'Owner'] + $inTeam);
+        $this->standIn = User::factory()->create(['name' => 'Stand In'] + $inTeam);
+        $this->second = User::factory()->create(['name' => 'Second'] + $inTeam);
+
+        $this->outsider = User::factory()->create([
+            'name' => 'Outsider', 'is_active' => true,
+            'department_id' => $elsewhere->id, 'team_id' => $otherTeam->id,
+        ]);
 
         $this->project = Project::create([
             'name' => 'Cover Project',
@@ -386,37 +428,28 @@ class TaskDelegationTest extends TestCase
         $this->assertSame($this->owner->id, (int) TaskDelegationItem::first()->original_assignee_id);
     }
 
-    // ---- the HTTP surface ----
+    // ---- who may arrange cover at all ----
 
-    public function test_setting_up_cover_starting_today_hands_over_immediately(): void
+    public function test_an_ordinary_member_cannot_open_the_page(): void
     {
-        $task = $this->task();
-
-        $this->actingAs($this->owner)->post('/task-delegations', [
-            'user_id' => $this->owner->id,
-            'delegate_ids' => [$this->standIn->id],
-            'starts_on' => now()->toDateString(),
-            'ends_on' => now()->addDays(5)->toDateString(),
-        ])->assertRedirect();
-
-        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+        $this->actingAs($this->owner)->get('/task-delegations')->assertForbidden();
     }
 
-    public function test_you_cannot_set_up_cover_for_somebody_else(): void
+    public function test_an_ordinary_member_cannot_arrange_their_own_cover(): void
     {
         $this->actingAs($this->owner)->post('/task-delegations', [
-            'user_id' => $this->second->id,
+            'user_id' => $this->owner->id,
             'delegate_ids' => [$this->standIn->id],
             'starts_on' => now()->toDateString(),
             'ends_on' => now()->addDays(5)->toDateString(),
         ])->assertForbidden();
     }
 
-    public function test_an_administrator_can_set_it_up_for_anybody(): void
+    public function test_a_team_leader_can_arrange_cover_for_their_team(): void
     {
         $task = $this->task();
 
-        $this->actingAs($this->makeAdmin())->post('/task-delegations', [
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
             'user_id' => $this->owner->id,
             'delegate_ids' => [$this->standIn->id],
             'starts_on' => now()->toDateString(),
@@ -426,9 +459,159 @@ class TaskDelegationTest extends TestCase
         $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
     }
 
+    public function test_a_department_head_reaches_the_teams_inside_their_department(): void
+    {
+        $task = $this->task();
+
+        $this->actingAs($this->deptHead)->post('/task-delegations', [
+            'user_id' => $this->owner->id,
+            'delegate_ids' => [$this->standIn->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertRedirect();
+
+        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+    }
+
+    public function test_a_division_head_reaches_the_whole_branch(): void
+    {
+        $task = $this->task();
+
+        $this->actingAs($this->divHead)->post('/task-delegations', [
+            'user_id' => $this->owner->id,
+            'delegate_ids' => [$this->standIn->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertRedirect();
+
+        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+    }
+
+    public function test_an_administrator_can_arrange_it_for_anybody(): void
+    {
+        $task = $this->task($this->outsider);
+
+        $this->actingAs($this->makeAdmin())->post('/task-delegations', [
+            'user_id' => $this->outsider->id,
+            'delegate_ids' => [$this->standIn->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertRedirect();
+
+        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+    }
+
+    public function test_an_executive_can_arrange_it_for_anybody(): void
+    {
+        Role::findOrCreate('executive');
+        $executive = User::factory()->create(['is_active' => true]);
+        $executive->assignRole('executive');
+
+        $task = $this->task($this->outsider);
+
+        $this->actingAs($executive)->post('/task-delegations', [
+            'user_id' => $this->outsider->id,
+            'delegate_ids' => [$this->standIn->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertRedirect();
+
+        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+    }
+
+    // ---- scope ----
+
+    public function test_a_team_leader_cannot_reach_outside_their_team(): void
+    {
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
+            'user_id' => $this->outsider->id,
+            'delegate_ids' => [$this->standIn->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertForbidden();
+    }
+
+    public function test_a_team_leader_cannot_push_work_onto_somebody_elses_team(): void
+    {
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
+            'user_id' => $this->owner->id,
+            'delegate_ids' => [$this->outsider->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertSessionHasErrors('delegate_ids');
+    }
+
+    public function test_a_department_head_cannot_reach_a_sibling_department(): void
+    {
+        // Their department's teams, yes; the department next door, no.
+        $this->actingAs($this->deptHead)->post('/task-delegations', [
+            'user_id' => $this->outsider->id,
+            'delegate_ids' => [$this->standIn->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertForbidden();
+    }
+
+    public function test_a_division_head_does_reach_a_second_department_in_their_division(): void
+    {
+        $task = $this->task($this->outsider);
+
+        $this->actingAs($this->divHead)->post('/task-delegations', [
+            'user_id' => $this->outsider->id,
+            'delegate_ids' => [$this->standIn->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertRedirect();
+
+        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+    }
+
+    public function test_the_picker_offers_only_the_leaders_own_people(): void
+    {
+        $this->actingAs($this->teamLead)
+            ->get('/task-delegations')
+            ->assertOk()
+            ->assertInertia(function ($page) {
+                $names = collect($page->toArray()['props']['people'])->pluck('name')->sort()->values()->all();
+
+                // Their three team members plus themselves — not the outsider.
+                $this->assertSame(['Owner', 'Second', 'Stand In', 'Team Lead'], $names);
+            });
+    }
+
+    public function test_a_leader_may_hand_their_own_work_out(): void
+    {
+        $task = $this->task($this->teamLead);
+
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
+            'user_id' => $this->teamLead->id,
+            'delegate_ids' => [$this->standIn->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertRedirect();
+
+        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+    }
+
+    public function test_a_leader_may_take_the_work_on_themselves(): void
+    {
+        $task = $this->task();
+
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
+            'user_id' => $this->owner->id,
+            'delegate_ids' => [$this->teamLead->id],
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+        ])->assertRedirect();
+
+        $this->assertSame($this->teamLead->id, $task->fresh()->assigned_to);
+    }
+
+    // ---- validation ----
+
     public function test_you_cannot_stand_in_for_yourself(): void
     {
-        $this->actingAs($this->owner)->post('/task-delegations', [
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
             'user_id' => $this->owner->id,
             'delegate_ids' => [$this->owner->id],
             'starts_on' => now()->toDateString(),
@@ -438,7 +621,7 @@ class TaskDelegationTest extends TestCase
 
     public function test_an_end_date_is_required(): void
     {
-        $this->actingAs($this->owner)->post('/task-delegations', [
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
             'user_id' => $this->owner->id,
             'delegate_ids' => [$this->standIn->id],
             'starts_on' => now()->toDateString(),
@@ -447,11 +630,9 @@ class TaskDelegationTest extends TestCase
 
     public function test_more_than_two_stand_ins_is_rejected(): void
     {
-        $third = User::factory()->create(['is_active' => true]);
-
-        $this->actingAs($this->owner)->post('/task-delegations', [
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
             'user_id' => $this->owner->id,
-            'delegate_ids' => [$this->standIn->id, $this->second->id, $third->id],
+            'delegate_ids' => [$this->standIn->id, $this->second->id, $this->teamLead->id],
             'starts_on' => now()->toDateString(),
             'ends_on' => now()->addDays(5)->toDateString(),
         ])->assertSessionHasErrors('delegate_ids');
@@ -461,7 +642,7 @@ class TaskDelegationTest extends TestCase
     {
         $this->cover([$this->standIn], from: 'now', to: '+10 days');
 
-        $this->actingAs($this->owner)->post('/task-delegations', [
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
             'user_id' => $this->owner->id,
             'delegate_ids' => [$this->second->id],
             'starts_on' => now()->addDays(3)->toDateString(),
@@ -473,7 +654,7 @@ class TaskDelegationTest extends TestCase
     {
         $this->standIn->update(['is_active' => false]);
 
-        $this->actingAs($this->owner)->post('/task-delegations', [
+        $this->actingAs($this->teamLead)->post('/task-delegations', [
             'user_id' => $this->owner->id,
             'delegate_ids' => [$this->standIn->id],
             'starts_on' => now()->toDateString(),
@@ -481,13 +662,15 @@ class TaskDelegationTest extends TestCase
         ])->assertSessionHasErrors('delegate_ids');
     }
 
+    // ---- ending and visibility ----
+
     public function test_ending_cover_early_returns_the_tasks_now(): void
     {
         $task = $this->task();
         $delegation = $this->cover([$this->standIn]);
         TaskDelegationService::activate($delegation);
 
-        $this->actingAs($this->owner)
+        $this->actingAs($this->teamLead)
             ->post("/task-delegations/{$delegation->id}/end")
             ->assertRedirect();
 
@@ -501,7 +684,7 @@ class TaskDelegationTest extends TestCase
         $delegation = $this->cover([$this->standIn]);
         TaskDelegationService::activate($delegation);
 
-        $this->actingAs($this->owner)
+        $this->actingAs($this->teamLead)
             ->delete("/task-delegations/{$delegation->id}")
             ->assertRedirect();
 
@@ -519,9 +702,24 @@ class TaskDelegationTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_the_stand_in_can_see_what_they_have_been_signed_up_for(): void
+    public function test_a_leader_cannot_end_cover_outside_their_scope(): void
     {
-        $delegation = $this->cover([$this->standIn]);
+        $delegation = $this->cover([$this->standIn], for: $this->outsider);
+        TaskDelegationService::activate($delegation);
+
+        $this->actingAs($this->teamLead)
+            ->post("/task-delegations/{$delegation->id}/end")
+            ->assertForbidden();
+    }
+
+    public function test_a_stand_in_still_sees_what_they_have_been_signed_up_for(): void
+    {
+        // The stand-in leads nothing, so they reach the page only because work
+        // was handed to them.
+        $frontline = Team::where('name', 'Frontline')->first();
+        $frontline->update(['leader_id' => $this->standIn->id]);
+
+        $delegation = $this->cover([$this->standIn], for: $this->outsider);
         TaskDelegationService::activate($delegation);
 
         $this->actingAs($this->standIn)
@@ -530,11 +728,12 @@ class TaskDelegationTest extends TestCase
             ->assertInertia(fn ($page) => $page->has('delegations', 1));
     }
 
-    public function test_unrelated_people_do_not_see_it(): void
+    public function test_a_leader_does_not_see_cover_arranged_elsewhere(): void
     {
-        TaskDelegationService::activate($this->cover([$this->standIn]));
+        // Neither the person covered nor the stand-in is one of theirs.
+        TaskDelegationService::activate($this->cover([$this->deptHead], for: $this->outsider));
 
-        $this->actingAs($this->second)
+        $this->actingAs($this->teamLead)
             ->get('/task-delegations')
             ->assertOk()
             ->assertInertia(fn ($page) => $page->has('delegations', 0));

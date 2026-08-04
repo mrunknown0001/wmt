@@ -162,4 +162,52 @@ class OrgScope
             || $units['departments']->isNotEmpty()
             || $units['teams']->isNotEmpty();
     }
+
+    /**
+     * Everyone this person is responsible for, themselves included.
+     *
+     * The same downward walk as visibleUnits(), resolved to people: a team
+     * leader gets their team, a department head gets their department and the
+     * teams inside it, a division head gets the whole branch. Admins and
+     * executives get everybody.
+     *
+     * Themselves, because someone arranging cover is usually either taking the
+     * work on or handing their own out, and a leader is not always filed as a
+     * member of the team they run.
+     *
+     * @return Collection<int, int> user ids
+     */
+    public static function manageablePeopleIds(User $user): Collection
+    {
+        if (self::seesEverything($user)) {
+            return User::where('is_active', true)->pluck('id');
+        }
+
+        $units = self::visibleUnits($user);
+
+        return self::usersIn([
+            'divisions' => $units['divisions']->pluck('id')->all(),
+            'departments' => $units['departments']->pluck('id')->all(),
+            'teams' => $units['teams']->pluck('id')->all(),
+        ])->push($user->id)->unique()->values();
+    }
+
+    /**
+     * The same people, as records ready for a picker.
+     *
+     * @return Collection<int, User>
+     */
+    public static function manageablePeople(User $user): Collection
+    {
+        return User::whereIn('id', self::manageablePeopleIds($user))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    /** Whether this person may act on that one, by position in the org chart. */
+    public static function manages(User $user, int $subjectId): bool
+    {
+        return self::manageablePeopleIds($user)->contains($subjectId);
+    }
 }

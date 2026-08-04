@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TaskDelegation;
 use App\Models\User;
+use App\Services\OrgScope;
 use App\Services\TaskDelegationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,16 +15,26 @@ use Inertia\Response;
 /**
  * Cover for people who are away, for tasks rather than approvals.
  *
- * Same access rule as approval delegation: your own by default, anyone's if you
- * administer users. Someone already off sick cannot set their own up, which is
- * exactly when an administrator needs to do it for them.
+ * Arranging cover moves somebody else's work to a third person, so it belongs
+ * to whoever is answerable for them: admins and executives across the whole
+ * organisation, and division heads, department heads and team leaders over the
+ * branch they run. Everyone else has no business here and cannot open the page.
+ *
+ * Scope is taken from the org chart itself — Division.head_id,
+ * Department.head_id, Team.leader_id — not from role names. Holding the
+ * "division_head" role while heading no division confers nothing, which is the
+ * correct answer: the chart is what says who reports to whom.
  */
 class TaskDelegationController extends Controller
 {
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $manages = $user->can('manage-users');
+
+        abort_unless(OrgScope::hasAnyScope($user), 403);
+
+        $manages = OrgScope::seesEverything($user);
+        $people = OrgScope::manageablePeople($user);
 
         $query = TaskDelegation::with(['user:id,name', 'delegates:id,name', 'creator:id,name'])
             ->withCount([
@@ -33,9 +44,11 @@ class TaskDelegationController extends Controller
             ->orderByDesc('starts_on');
 
         if (!$manages) {
-            // Your own, plus the ones that hand work to you.
+            // Cover for the people they run, plus anything that hands work to
+            // them — a leader signed up as a stand-in for another unit still
+            // needs to see what they have been given.
             $query->where(fn ($q) => $q
-                ->where('user_id', $user->id)
+                ->whereIn('user_id', $people->pluck('id'))
                 ->orWhereHas('delegates', fn ($d) => $d->where('users.id', $user->id)));
         }
 
@@ -55,8 +68,9 @@ class TaskDelegationController extends Controller
                 'is_mine' => (int) $d->user_id === (int) $user->id,
                 'can_manage' => $this->canManage($request, $d),
             ]),
-            'people' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'canManageOthers' => $manages,
+            // Only their own people — the picker cannot offer somebody they are
+            // not answerable for, and store() checks the same list again.
+            'people' => $people,
             'currentUserId' => $user->id,
             'maxDelegates' => TaskDelegation::MAX_DELEGATES,
         ]);
@@ -77,11 +91,24 @@ class TaskDelegationController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
-        if ((int) $data['user_id'] !== (int) $user->id && !$user->can('manage-users')) {
+        abort_unless(OrgScope::hasAnyScope($user), 403);
+
+        $scope = OrgScope::manageablePeopleIds($user);
+        $delegateIds = collect($data['delegate_ids'])->map(fn ($id) => (int) $id);
+
+        // Both ends have to be theirs. Checking only the person being covered
+        // would let a team leader push their team's work onto anyone in the
+        // company; checking only the stand-in would let them reach into another
+        // unit for the work itself.
+        if (!$scope->contains((int) $data['user_id'])) {
             abort(403);
         }
 
-        $delegateIds = collect($data['delegate_ids'])->map(fn ($id) => (int) $id);
+        if ($delegateIds->diff($scope)->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'delegate_ids' => 'You can only hand work to people you are responsible for.',
+            ]);
+        }
 
         if ($delegateIds->contains((int) $data['user_id'])) {
             throw ValidationException::withMessages([
@@ -180,9 +207,14 @@ class TaskDelegationController extends Controller
             : 'Cover removed.');
     }
 
+    /**
+     * Ending or removing cover is the same authority as arranging it: whoever
+     * is answerable for the person being covered. A stand-in is deliberately
+     * not included — being handed work does not give you the right to hand it
+     * back early.
+     */
     private function canManage(Request $request, TaskDelegation $delegation): bool
     {
-        return (int) $delegation->user_id === (int) $request->user()->id
-            || $request->user()->can('manage-users');
+        return OrgScope::manages($request->user(), (int) $delegation->user_id);
     }
 }
