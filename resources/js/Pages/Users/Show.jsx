@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
@@ -62,8 +63,123 @@ function Stat({ label, value, accent = '', tip }) {
     );
 }
 
+const PRIORITY_PILL = {
+    urgent: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
+    high: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800',
+    medium: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
+    low: 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-700/40 dark:text-gray-300 dark:border-gray-600',
+};
+
+/** "Today", "Tomorrow", or "Tue 12 Aug". */
+function dueLabel(value) {
+    if (!value) return '';
+
+    const [y, m, d] = value.split('-').map(Number);
+    const due = new Date(y, m - 1, d);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.round((due - today) / 86400000);
+
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+
+    return due.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** "14:00" from a stored time of any precision. */
+const timeLabel = (value) => (value ? String(value).slice(0, 5) : null);
+
+function UpcomingTasks({ upcoming, name }) {
+    const [range, setRange] = useState('week');
+
+    const { tasks = [], weekCount = 0, monthCount = 0, limit = 50 } = upcoming || {};
+
+    const shown = useMemo(
+        () => tasks.filter((t) => (range === 'week' ? t.in_week : t.in_month)),
+        [tasks, range]
+    );
+
+    const total = range === 'week' ? weekCount : monthCount;
+    // The list is capped, so say so rather than quietly showing fewer than the
+    // count on the tab claims.
+    const hidden = Math.max(0, total - shown.length);
+
+    const tab = (key, label, count) => (
+        <button
+            type="button"
+            onClick={() => setRange(key)}
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                range === key
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+        >
+            {label}
+            <span className="ml-1.5 text-xs tabular-nums opacity-70">{count}</span>
+        </button>
+    );
+
+    return (
+        <Card className="mb-6" padding={false}>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Upcoming Tasks</h3>
+                <div className="flex items-center gap-1">
+                    {tab('week', 'This week', weekCount)}
+                    {tab('month', 'This month', monthCount)}
+                </div>
+            </div>
+
+            {shown.length === 0 ? (
+                <p className="px-6 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                    Nothing due for {name.split(' ')[0]} {range === 'week' ? 'for the rest of this week' : 'for the rest of this month'}.
+                </p>
+            ) : (
+                <>
+                    <ul className="divide-y divide-gray-100 dark:divide-gray-700 max-h-96 overflow-y-auto">
+                        {shown.map((task) => (
+                            <li key={task.id}>
+                                <Link
+                                    href={task.url}
+                                    className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                >
+                                    <div className="w-24 shrink-0">
+                                        <p className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                                            {dueLabel(task.due_date)}
+                                        </p>
+                                        {timeLabel(task.due_time) && (
+                                            <p className="text-xs text-gray-400">{timeLabel(task.due_time)}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{task.title}</p>
+                                        {task.project && (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                {task.project.name}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <span className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded border ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}>
+                                        {task.priority}
+                                    </span>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                    {hidden > 0 && (
+                        <p className="px-6 py-2.5 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700">
+                            Showing the first {limit} — {hidden} more due in this period.
+                        </p>
+                    )}
+                </>
+            )}
+        </Card>
+    );
+}
+
 export default function Show() {
-    const { profile, kpis, recentActivity = [], canManage } = usePage().props;
+    const { profile, kpis, recentActivity = [], upcoming, canManage } = usePage().props;
     const tier = activityTier(kpis.activity30);
 
     return (
@@ -114,6 +230,8 @@ export default function Show() {
                 <Stat label="Tasks Completed" value={kpis.tasksCompleted} accent="text-green-600 dark:text-green-400" />
                 <Stat label="Overdue Tasks" value={kpis.tasksOverdue} accent={kpis.tasksOverdue > 0 ? 'text-red-600 dark:text-red-400' : ''} />
             </div>
+
+            <UpcomingTasks upcoming={upcoming} name={profile.name} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Performance meters */}

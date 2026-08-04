@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\Department;
+use App\Models\Task;
 use App\Models\TaskDelegation;
 use App\Models\Team;
 use App\Models\User;
@@ -182,9 +183,71 @@ class UserController extends Controller
                 'lastActivityAt' => $lastActivity,
             ],
             'recentActivity' => $recentActivity,
+            'upcoming' => $this->upcomingTasks($user),
             'canManage' => $request->user()->can('manage-users'),
         ]);
     }
+
+    /**
+     * What this person has coming up, for the rest of the week and the month.
+     *
+     * Unfinished work only, from today forward — anything already past its due
+     * date is not "upcoming", and the overdue KPI above already reports it.
+     *
+     * The two buckets overlap on purpose: the month is a superset of the week,
+     * so the page offers them as a toggle over one list rather than two lists
+     * that would show the same task twice. The counts come from their own
+     * queries so the badges stay right even when the list is capped.
+     */
+    private function upcomingTasks(User $user): array
+    {
+        $today = now()->startOfDay();
+
+        // Sunday-to-Saturday, matching the calendar rather than Carbon's
+        // Monday default — the two pages should not disagree about "this week".
+        $weekEnd = now()->endOfWeek(\Carbon\Carbon::SATURDAY)->startOfDay();
+        $monthEnd = now()->endOfMonth()->startOfDay();
+
+        // In the last days of a month the week runs past month end, so the
+        // range has to cover whichever reaches further.
+        $rangeEnd = $weekEnd->greaterThan($monthEnd) ? $weekEnd : $monthEnd;
+
+        $base = fn () => Task::query()
+            ->where('assigned_to', $user->id)
+            ->whereNotIn('status', Task::CLOSING_STATUSES)
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '>=', $today->toDateString());
+
+        $tasks = $base()->with('project:id,name')
+            ->whereDate('due_date', '<=', $rangeEnd->toDateString())
+            ->orderBy('due_date')
+            ->orderByRaw('due_time is null, due_time')
+            ->limit(self::UPCOMING_LIMIT)
+            ->get(['id', 'project_id', 'title', 'status', 'priority', 'due_date', 'due_time']);
+
+        return [
+            'tasks' => $tasks->map(fn (Task $t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+                'status' => $t->status,
+                'priority' => $t->priority,
+                'due_date' => $t->due_date?->toDateString(),
+                'due_time' => $t->due_time,
+                'url' => $t->getEditUrl(),
+                'project' => $t->project ? ['id' => $t->project->id, 'name' => $t->project->name] : null,
+                'in_week' => $t->due_date && $t->due_date->startOfDay()->lessThanOrEqualTo($weekEnd),
+                'in_month' => $t->due_date && $t->due_date->startOfDay()->lessThanOrEqualTo($monthEnd),
+            ])->values()->all(),
+            'weekCount' => $base()->whereDate('due_date', '<=', $weekEnd->toDateString())->count(),
+            'monthCount' => $base()->whereDate('due_date', '<=', $monthEnd->toDateString())->count(),
+            'weekEnds' => $weekEnd->toDateString(),
+            'monthEnds' => $monthEnd->toDateString(),
+            'limit' => self::UPCOMING_LIMIT,
+        ];
+    }
+
+    /** Enough to be useful on an overview without turning it into a task list. */
+    private const UPCOMING_LIMIT = 50;
 
     /**
      * Who may view a user's overview: managers, the user themselves, or a head
