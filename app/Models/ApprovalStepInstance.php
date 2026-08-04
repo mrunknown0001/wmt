@@ -20,6 +20,9 @@ class ApprovalStepInstance extends Model
         'quorum_required',
         'activated_at',
         'completed_at',
+        'due_at',
+        'reminded_at',
+        'escalated_at',
     ];
 
     protected function casts(): array
@@ -27,6 +30,9 @@ class ApprovalStepInstance extends Model
         return [
             'activated_at' => 'datetime',
             'completed_at' => 'datetime',
+            'due_at' => 'datetime',
+            'reminded_at' => 'datetime',
+            'escalated_at' => 'datetime',
         ];
     }
 

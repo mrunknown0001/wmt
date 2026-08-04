@@ -27,6 +27,10 @@ function notificationMessage(data) {
             return <>Task <strong>{data.task_title}</strong> escalated — {data.escalation_label}</>;
         case 'approval_requested':
             return <>New approval request: <strong>{data.item_title}</strong>{data.approval_project_name ? <> in <strong>{data.approval_project_name}</strong></> : null}</>;
+        case 'approval_due_soon':
+            return <>Approval <strong>{data.item_title}</strong> is {data.timing}{data.step_name ? <> at {data.step_name}</> : null}</>;
+        case 'approval_overdue':
+            return <>Approval <strong>{data.item_title}</strong> is <strong>{data.timing}</strong>{data.step_name ? <> at {data.step_name}</> : null}</>;
         case 'note_shared':
             return <><strong>{data.shared_by}</strong> shared the note <strong>{data.note_title}</strong> with you ({data.role})</>;
         case 'note_folder_shared':

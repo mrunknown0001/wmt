@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\ExecutiveDashboardController;
 use App\Http\Controllers\Api\MyTaskController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PersonalTodoController;
+use App\Http\Controllers\TaskTimeLogController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\WebhookNotificationController;
@@ -97,6 +98,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/notifications/{id}/unarchive', [NotificationController::class, 'unarchive']);
 
     // Personal to-dos
+    // Time tracking. The timer routes come before /time-logs/{timeLog} so
+    // "timer" is never read as an id.
+    Route::get('/timer', [TaskTimeLogController::class, 'current']);
+    Route::post('/timer/stop', [TaskTimeLogController::class, 'stopTimer']);
+    Route::post('/tasks/{task}/timer/start', [TaskTimeLogController::class, 'startTimer']);
+    Route::get('/tasks/{task}/time-logs', [TaskTimeLogController::class, 'index']);
+    Route::post('/tasks/{task}/time-logs', [TaskTimeLogController::class, 'store']);
+    Route::delete('/time-logs/{timeLog}', [TaskTimeLogController::class, 'destroy']);
+
     Route::get('/personal-todos', [PersonalTodoController::class, 'index']);
     Route::post('/personal-todos', [PersonalTodoController::class, 'store']);
     Route::patch('/personal-todos/{personalTodo}', [PersonalTodoController::class, 'update']);

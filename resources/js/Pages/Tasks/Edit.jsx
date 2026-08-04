@@ -12,6 +12,7 @@ import LinkButton from '../../Components/LinkButton';
 import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import RecurrenceOptions from '../../Components/RecurrenceOptions';
+import EstimateInput from '../../Components/EstimateInput';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, isPastDue } from '../../utils';
@@ -296,6 +297,7 @@ export default function Edit() {
         start_date: task.start_date ? task.start_date.split('T')[0] : '',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         due_time: (task.due_time || '').slice(0, 5),
+        estimated_minutes: task.estimated_minutes ?? null,
         collaborator_ids: (task.collaborators || []).map((c) => c.id),
         is_recurring: task.is_recurring || false,
         recurrence_frequency: task.recurrence_frequency || 'weekly',
@@ -596,6 +598,12 @@ export default function Edit() {
                                     )}
                                     <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} disabled={!canManageTaskDetails} />
                                     <Input label="Due Time" id="due_time" type="time" value={data.due_time} onChange={(e) => setData('due_time', e.target.value)} error={errors.due_time} disabled={!canManageTaskDetails} />
+                            <EstimateInput
+                                value={data.estimated_minutes}
+                                onChange={(mins) => setData('estimated_minutes', mins)}
+                                error={errors.estimated_minutes}
+                                disabled={!canManageTaskDetails}
+                            />
                                 </div>
                                 {!showStartDate && canManageTaskDetails && (
                                     <button

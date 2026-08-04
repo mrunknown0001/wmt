@@ -13,6 +13,7 @@ class ApprovalStepInstanceApprover extends Model
     protected $fillable = [
         'approval_step_instance_id',
         'user_id',
+        'delegated_from_user_id',
     ];
 
     public function instance(): BelongsTo
@@ -23,5 +24,16 @@ class ApprovalStepInstanceApprover extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** Set when this approver is standing in for someone who is away. */
+    public function delegatedFrom(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'delegated_from_user_id');
+    }
+
+    public function isDelegated(): bool
+    {
+        return $this->delegated_from_user_id !== null;
     }
 }

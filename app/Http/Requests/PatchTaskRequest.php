@@ -34,6 +34,7 @@ class PatchTaskRequest extends FormRequest
             // Optional clock time for the due date. H:i from the browser's time
             // input; H:i:s accepted so a value read back from the DB round-trips.
             'due_time' => ['nullable', 'date_format:H:i,H:i:s'],
+            'estimated_minutes' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'section_id' => ['sometimes', 'nullable', 'exists:task_sections,id'],
             'collaborator_ids' => ['sometimes', 'array'],
             'collaborator_ids.*' => ['integer', 'exists:users,id'],

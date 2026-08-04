@@ -106,6 +106,37 @@ export const isPastDue = (value) => {
     return !!date && date < startOfToday();
 };
 
+/** "1h 30m", "45m", "—". Mirrors TimeTracker::formatMinutes on the server. */
+export const formatMinutes = (minutes) => {
+    const m = Number(minutes);
+    if (!m || m <= 0) return '—';
+    const hours = Math.floor(m / 60);
+    const rest = m % 60;
+    if (hours === 0) return `${rest}m`;
+    return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+};
+
+/**
+ * Read a typed duration: "1.5", "1:30" or "90m" all mean ninety minutes.
+ * Returns null when it cannot be read, so callers can show an error rather
+ * than silently storing a zero.
+ */
+export const parseMinutes = (input) => {
+    const text = String(input ?? '').trim();
+    if (!text) return null;
+
+    let m = /^(\d+):([0-5]?\d)$/.exec(text);
+    if (m) return Number(m[1]) * 60 + Number(m[2]);
+
+    m = /^(\d+(?:\.\d+)?)\s*m(?:in(?:utes?)?)?$/i.exec(text);
+    if (m) return Math.round(Number(m[1]));
+
+    m = /^(\d+(?:\.\d+)?)\s*h?(?:ours?|rs?)?$/i.exec(text);
+    if (m) return Math.round(Number(m[1]) * 60);
+
+    return null;
+};
+
 export const timeAgo = (dateString) => {
     const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
     const intervals = [

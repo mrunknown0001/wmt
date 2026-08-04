@@ -12,6 +12,8 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\MyTaskController;
 use App\Http\Controllers\NoteController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\WorkloadController;
 use App\Http\Controllers\NoteFolderController;
 use App\Http\Controllers\NoteFolderShareController;
 use App\Http\Controllers\NoteShareController;
@@ -47,6 +49,7 @@ use App\Http\Controllers\ApprovalItemCommentController;
 use App\Http\Controllers\ApprovalFormController;
 use App\Http\Controllers\PublicApprovalFormController;
 use App\Http\Controllers\ApprovalAutomationRuleController;
+use App\Http\Controllers\ApprovalDelegationController;
 use App\Http\Controllers\MyApprovalsController;
 use App\Http\Controllers\MyRequestsController;
 use Illuminate\Support\Facades\Route;
@@ -206,6 +209,11 @@ Route::middleware('auth')->group(function () {
 
     // My Approvals (Approver Inbox)
     Route::get('/my-approvals', [MyApprovalsController::class, 'index'])->name('my-approvals.index');
+
+    // Cover for approvers who are away.
+    Route::get('/approval-delegations', [ApprovalDelegationController::class, 'index'])->name('approval-delegations.index');
+    Route::post('/approval-delegations', [ApprovalDelegationController::class, 'store'])->name('approval-delegations.store');
+    Route::delete('/approval-delegations/{approvalDelegation}', [ApprovalDelegationController::class, 'destroy'])->name('approval-delegations.destroy');
     Route::get('/my-requests', [MyRequestsController::class, 'index'])->name('my-requests.index');
 
     // Folders
@@ -319,6 +327,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/notes/{note}/shares', [NoteShareController::class, 'store'])->name('notes.shares.store');
     Route::put('/notes/{note}/shares/{share}', [NoteShareController::class, 'update'])->name('notes.shares.update');
     Route::delete('/notes/{note}/shares/{share}', [NoteShareController::class, 'destroy'])->name('notes.shares.destroy');
+
+    // Reports
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+
+    // Workload & capacity
+    Route::get('/workload', [WorkloadController::class, 'index'])->name('workload.index');
 
     // Organization structure
     Route::resource('divisions', DivisionController::class)->except(['show']);

@@ -197,6 +197,14 @@ class UserController extends Controller
             'can_create_rules' => $request->boolean('can_create_rules', false),
             'can_approve' => $request->boolean('can_approve', false),
             'can_create_project' => $request->boolean('can_create_project', false),
+            'daily_capacity_minutes' => $request->integer('daily_capacity_minutes') ?: 480,
+            // Empty means "the default", stored as null so a later change to
+            // the default reaches everyone who never chose their own days.
+            //
+            // Note the emptiness test is on the value, not $request->filled():
+            // that reports an empty array as filled, because isEmptyString()
+            // short-circuits on arrays before blank() ever sees it.
+            'working_days' => self::workingDaysOrNull($request),
             'can_request' => $request->boolean('can_request', false),
         ]);
 
@@ -225,7 +233,7 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
-        $oldValues = $user->only(['name', 'email', 'position', 'department_id', 'team_id', 'is_active', 'can_create_rules', 'can_approve', 'can_request', 'can_create_project']);
+        $oldValues = $user->only(['name', 'email', 'position', 'department_id', 'team_id', 'is_active', 'can_create_rules', 'can_approve', 'can_request', 'can_create_project', 'daily_capacity_minutes', 'working_days']);
 
         $data = [
             'name' => $request->name,
@@ -237,6 +245,14 @@ class UserController extends Controller
             'can_create_rules' => $request->boolean('can_create_rules', false),
             'can_approve' => $request->boolean('can_approve', false),
             'can_create_project' => $request->boolean('can_create_project', false),
+            'daily_capacity_minutes' => $request->integer('daily_capacity_minutes') ?: 480,
+            // Empty means "the default", stored as null so a later change to
+            // the default reaches everyone who never chose their own days.
+            //
+            // Note the emptiness test is on the value, not $request->filled():
+            // that reports an empty array as filled, because isEmptyString()
+            // short-circuits on arrays before blank() ever sees it.
+            'working_days' => self::workingDaysOrNull($request),
             'can_request' => $request->boolean('can_request', false),
         ];
 
@@ -263,5 +279,20 @@ class UserController extends Controller
 
         return redirect()->route('users.index')
             ->with('success', 'User deleted successfully.');
+    }
+
+    /**
+     * Normalise the working-days input to a list of ISO weekdays, or null when
+     * none were chosen — null being "use the default".
+     */
+    private static function workingDaysOrNull(Request $request): ?array
+    {
+        $days = collect((array) $request->input('working_days', []))
+            ->filter(fn ($d) => is_numeric($d))
+            ->map(fn ($d) => (int) $d)
+            ->filter(fn ($d) => $d >= 1 && $d <= 7)
+            ->unique()->sort()->values()->all();
+
+        return $days ?: null;
     }
 }

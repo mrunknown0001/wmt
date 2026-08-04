@@ -358,7 +358,8 @@ class ProjectController extends Controller
             $tasks = $taskQuery
                 ->with([
                     'assignee', 'creator', 'collaborators',
-                    'subtasks' => fn ($q) => $q->withCount(['comments', 'attachments']),
+                    'subtasks' => fn ($q) => $q->withCount(['comments', 'attachments'])
+                        ->withSum(['timeLogs as logged_minutes' => fn ($t) => $t->whereNotNull('minutes')], 'minutes'),
                     'subtasks.assignee', 'subtasks.collaborators',
                     // customField is eager loaded because the value model appends
                     // people_names, whose accessor otherwise lazy-loads it once per
@@ -369,6 +370,9 @@ class ProjectController extends Controller
                 ->withCount('subtasks')
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')])
                 ->withCount(['comments', 'attachments'])
+                // One aggregate rather than a loggedMinutes() call per row.
+                // Only finished entries: a running timer has no duration.
+                ->withSum(['timeLogs as logged_minutes' => fn ($q) => $q->whereNotNull('minutes')], 'minutes')
                 ->orderBy('position')
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -382,7 +386,8 @@ class ProjectController extends Controller
                 })
                 ->with([
                     'assignee', 'creator', 'collaborators',
-                    'subtasks' => fn ($q) => $q->where('assigned_to', $userId)->withCount(['comments', 'attachments']),
+                    'subtasks' => fn ($q) => $q->where('assigned_to', $userId)->withCount(['comments', 'attachments'])
+                        ->withSum(['timeLogs as logged_minutes' => fn ($t) => $t->whereNotNull('minutes')], 'minutes'),
                     'subtasks.assignee', 'subtasks.collaborators',
                     'customFieldValues.selectedOption', 'customFieldValues.customField',
                     'subtasks.customFieldValues.selectedOption', 'subtasks.customFieldValues.customField',
@@ -390,6 +395,9 @@ class ProjectController extends Controller
                 ->withCount(['subtasks' => fn ($q) => $q->where('assigned_to', $userId)])
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('assigned_to', $userId)->where('status', 'done')])
                 ->withCount(['comments', 'attachments'])
+                // One aggregate rather than a loggedMinutes() call per row.
+                // Only finished entries: a running timer has no duration.
+                ->withSum(['timeLogs as logged_minutes' => fn ($q) => $q->whereNotNull('minutes')], 'minutes')
                 ->orderBy('position')
                 ->orderBy('created_at', 'desc')
                 ->get();

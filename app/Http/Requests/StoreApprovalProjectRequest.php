@@ -24,6 +24,9 @@ class StoreApprovalProjectRequest extends FormRequest
             // Series prefix is accepted only on creation — see the update request.
             'series_prefix' => ['nullable', 'string', 'max:20', 'regex:/^[A-Za-z0-9][A-Za-z0-9\-_\/]*$/'],
             'series_padding' => 'nullable|integer|min:1|max:10',
+            'default_sla_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
+            'sla_reminder_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
+            'sla_escalate_after_hours' => ['nullable', 'integer', 'min:0', 'max:8760'],
         ];
     }
 }

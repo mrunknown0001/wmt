@@ -23,6 +23,7 @@ class ApprovalStep extends Model
         'on_reject_override',
         'fallback_user_id',
         'parallel_group',
+        'sla_hours',
     ];
 
     protected function casts(): array

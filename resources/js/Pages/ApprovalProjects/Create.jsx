@@ -3,6 +3,7 @@ import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import SeriesNumberConfig from '../../Components/SeriesNumberConfig';
+import ApprovalSlaSettings from '../../Components/ApprovalSlaSettings';
 
 export default function Create({ users = [] }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -14,6 +15,9 @@ export default function Create({ users = [] }) {
         is_pinned: false,
         series_prefix: '',
         series_padding: 5,
+        default_sla_hours: null,
+        sla_reminder_hours: null,
+        sla_escalate_after_hours: null,
     });
 
     const handleSubmit = (e) => {
@@ -131,6 +135,17 @@ export default function Create({ users = [] }) {
                             onPaddingChange={(v) => setData('series_padding', v)}
                             errors={errors}
                         />
+
+                        <ApprovalSlaSettings
+                            defaultHours={data.default_sla_hours}
+                            reminderHours={data.sla_reminder_hours}
+                            escalateAfterHours={data.sla_escalate_after_hours}
+                            onDefaultChange={(v) => setData('default_sla_hours', v)}
+                            onReminderChange={(v) => setData('sla_reminder_hours', v)}
+                            onEscalateChange={(v) => setData('sla_escalate_after_hours', v)}
+                            errors={errors}
+                        />
+
 
                         <div className="flex gap-2 pt-4">
                             <Button type="submit" disabled={processing} processing={processing} processingText="Creating...">

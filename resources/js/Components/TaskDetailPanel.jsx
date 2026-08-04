@@ -6,6 +6,7 @@ import Avatar from './Avatar';
 import RichTextEditor from './RichTextEditor';
 import Tooltip from './Tooltip';
 import SearchableSelect from './SearchableSelect';
+import TaskTimePanel from './TaskTimePanel';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom, isPastDue } from '../utils';
 import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
 import { weekOfYearLabel } from '../weekOfYear';
@@ -275,6 +276,9 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     const { auth } = usePage().props;
     const [loading, setLoading] = useState(true);
     const [taskData, setTaskData] = useState(null);
+    // Sent by the detail endpoint as canManageTaskDetails; a viewer gets
+    // false and sees the time panel read-only.
+    const [canEdit, setCanEdit] = useState(false);
     const [timeline, setTimeline] = useState([]);
     const [totalComments, setTotalComments] = useState(0);
     const [totalActivities, setTotalActivities] = useState(0);
@@ -302,6 +306,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
             if (!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
             setTaskData(data.task);
+            setCanEdit(!!data.canManageTaskDetails);
             setTimeline(data.timeline);
             setTotalComments(data.totalComments);
             setTotalActivities(data.totalActivities);
@@ -635,6 +640,14 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                             users={users}
                             assigneeId={taskData.assigned_to}
                             onUpdate={(ids) => handleFieldUpdate('collaborator_ids', ids)}
+                        />
+
+                        {/* Time */}
+                        <TaskTimePanel
+                            taskId={taskData.id}
+                            estimatedMinutes={taskData.estimated_minutes}
+                            canEdit={canEdit}
+                            currentUserId={auth.user?.id}
                         />
 
                         {/* Custom Fields */}

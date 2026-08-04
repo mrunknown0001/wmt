@@ -46,6 +46,7 @@ class ApprovalChainVersioningService
                     'on_reject_override' => $stepData['on_reject_override'] ?? null,
                     'fallback_user_id' => $stepData['fallback_user_id'] ?? null,
                     'parallel_group' => $stepData['parallel_group'] ?? null,
+                    'sla_hours' => $stepData['sla_hours'] ?? null,
                 ]);
             } else {
                 $target->steps()->create([
@@ -59,6 +60,7 @@ class ApprovalChainVersioningService
                     'on_reject_override' => $stepData['on_reject_override'] ?? null,
                     'fallback_user_id' => $stepData['fallback_user_id'] ?? null,
                     'parallel_group' => $stepData['parallel_group'] ?? null,
+                    'sla_hours' => $stepData['sla_hours'] ?? null,
                 ]);
             }
         }
@@ -92,6 +94,7 @@ class ApprovalChainVersioningService
                         'on_reject_override',
                         'fallback_user_id',
                         'parallel_group',
+                        'sla_hours',
                     ]));
                 }
             }

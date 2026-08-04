@@ -39,6 +39,7 @@ class UpdateTaskRequest extends FormRequest
             // Optional clock time for the due date. H:i from the browser's time
             // input; H:i:s accepted so a value read back from the DB round-trips.
             'due_time' => ['nullable', 'date_format:H:i,H:i:s'],
+            'estimated_minutes' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'parent_id' => ['nullable', 'exists:tasks,id'],
             'collaborator_ids' => ['nullable', 'array'],
             'collaborator_ids.*' => ['exists:users,id'],

@@ -24,6 +24,9 @@ class ApprovalProject extends Model
         'position',
         'series_prefix',
         'series_padding',
+        'default_sla_hours',
+        'sla_reminder_hours',
+        'sla_escalate_after_hours',
     ];
 
     protected function casts(): array

@@ -44,6 +44,7 @@ export default function ApprovalChainBuilder({ value = [], onChange, users = [],
             approver_config: {},
             quorum_mode: 'any',
             quorum_count: 1,
+            sla_hours: null,
             skip_conditions: null,
             on_reject_override: null,
             fallback_user_id: null,
@@ -299,6 +300,28 @@ export default function ApprovalChainBuilder({ value = [], onChange, users = [],
                                             />
                                         </div>
                                     )}
+
+                                    {/* Deadline */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Deadline <span className="font-normal text-gray-400">(hours, optional)</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="8760"
+                                            value={step.sla_hours ?? ''}
+                                            placeholder="Use the project default"
+                                            onChange={(e) => updateStep(step.temp_id || step.id, {
+                                                sla_hours: e.target.value === '' ? null : parseInt(e.target.value),
+                                            })}
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-500 rounded-lg dark:bg-gray-700 dark:text-white"
+                                        />
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            How long this step has once it becomes active. Blank falls back to the
+                                            approval project&rsquo;s default.
+                                        </p>
+                                    </div>
 
                                     {/* Reject Behavior Override */}
                                     <div>

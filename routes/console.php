@@ -14,6 +14,9 @@ Schedule::command('tasks:send-reminders')->dailyAt('08:00');
 // and match rules against the current one.
 Schedule::command('automation:run-scheduled')->hourlyAt(5)->withoutOverlapping();
 
+// Approval SLAs are set in hours, so a daily check would miss most of them.
+Schedule::command('approvals:check-deadlines')->hourlyAt(10)->withoutOverlapping();
+
 Schedule::command('backup:run --only-db')->dailyAt('02:00');
 Schedule::command('backup:clean')->dailyAt('02:30');
 Schedule::command('attachments:purge')->dailyAt('03:00');

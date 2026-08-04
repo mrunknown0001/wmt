@@ -16,6 +16,9 @@ class RolePermissionSeeder extends Seeder
         // Create permissions
         $permissions = [
             'manage-users',
+            // Opens the Users admin area. Admins and executives only:
+            // heads and leaders reach their own people through the org
+            // pages and a user's overview, not the staff table.
             'view-users',
             'manage-roles',
             'manage-divisions',
@@ -56,7 +59,6 @@ class RolePermissionSeeder extends Seeder
 
         $divisionHead = Role::firstOrCreate(['name' => 'division_head']);
         $divisionHead->syncPermissions([
-            'view-users',
             'view-divisions',
             'view-departments',
             'view-teams',
@@ -67,7 +69,6 @@ class RolePermissionSeeder extends Seeder
 
         $supervisor = Role::firstOrCreate(['name' => 'supervisor']);
         $supervisor->syncPermissions([
-            'view-users',
             'view-departments',
             'view-teams',
             'view-projects',

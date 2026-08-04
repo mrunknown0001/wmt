@@ -10,6 +10,7 @@ import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import RecurrenceOptions from '../../Components/RecurrenceOptions';
+import EstimateInput from '../../Components/EstimateInput';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import { formatLabel } from '../../utils';
 
@@ -39,6 +40,7 @@ export default function Create() {
         start_date: '',
         due_date: '',
         due_time: '',
+        estimated_minutes: null,
         collaborator_ids: [],
         parent_id: parentTask?.id || '',
         section_id: defaultSectionId || '',
@@ -94,6 +96,11 @@ export default function Create() {
                                 )}
                                 <Input label="Due Date" id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} error={errors.due_date} />
                                 <Input label="Due Time" id="due_time" type="time" value={data.due_time} onChange={(e) => setData('due_time', e.target.value)} error={errors.due_time}  />
+                            <EstimateInput
+                                value={data.estimated_minutes}
+                                onChange={(mins) => setData('estimated_minutes', mins)}
+                                error={errors.estimated_minutes}
+                                />
                             </div>
                             {!showStartDate && (
                                 <button

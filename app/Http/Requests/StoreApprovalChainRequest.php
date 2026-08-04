@@ -32,6 +32,7 @@ class StoreApprovalChainRequest extends FormRequest
             'steps.*.approver_config' => 'nullable|array',
             'steps.*.quorum_mode' => 'nullable|string|in:any,all,majority,count',
             'steps.*.quorum_count' => 'nullable|integer|min:1',
+            'steps.*.sla_hours' => 'nullable|integer|min:1|max:8760',
             'steps.*.skip_conditions' => 'nullable|array',
             'steps.*.on_reject_override' => 'nullable|string|in:reject_item,return_to_previous_step,return_to_requester',
             'steps.*.fallback_user_id' => 'nullable|exists:users,id',

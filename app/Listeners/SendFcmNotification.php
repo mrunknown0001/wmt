@@ -87,6 +87,8 @@ class SendFcmNotification
             'approval_rejected' => 'Request Rejected',
             'approval_changes_requested' => 'Changes Requested',
             'approval_automation' => 'Approval Update',
+            'approval_due_soon' => 'Approval Due Soon',
+            'approval_overdue' => 'Approval Overdue',
             'note_shared' => 'Note Shared With You',
             'note_folder_shared' => 'Notes Folder Shared With You',
             'automation_blocked' => 'Task Could Not Be Completed',
@@ -119,6 +121,9 @@ class SendFcmNotification
                 . (($data['decided_by'] ?? null) ? " by {$data['decided_by']}" : ''),
             'approval_changes_requested' => ($data['item_title'] ?? 'Your request') . ' was returned for changes'
                 . (($data['decided_by'] ?? null) ? " by {$data['decided_by']}" : ''),
+            'approval_due_soon' => ($data['item_title'] ?? 'A request') . ' is ' . ($data['timing'] ?? 'due soon'),
+            'approval_overdue' => ($data['item_title'] ?? 'A request') . ' is ' . ($data['timing'] ?? 'overdue')
+                . (($data['step_name'] ?? null) ? " at {$data['step_name']}" : ''),
             // Notes carry note_title/folder_name, not task_title — without these
             // every notes push would read "Unknown Task".
             'note_shared' => ($data['shared_by'] ?? 'Someone') . ' shared "'

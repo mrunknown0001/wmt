@@ -373,6 +373,9 @@ class ApprovalWorkflowEngine
             'status' => 'active',
             'quorum_required' => ApprovalApproverResolver::requiredQuorum($step, $approvers->count()),
             'activated_at' => now(),
+            // Stamped now from whichever SLA applies, so a later edit to the
+            // chain cannot move the deadline of work already under way.
+            'due_at' => ApprovalDeadlineService::dueAtFor($step, $item->approvalProject),
         ]);
 
         // Materialize the eligible approver snapshot and notify each approver
@@ -380,6 +383,23 @@ class ApprovalWorkflowEngine
         foreach ($approvers as $approver) {
             $instance->approvers()->create(['user_id' => $approver->id]);
             $approver->notify(new \App\Notifications\ApprovalRequestedNotification($item, $step));
+        }
+
+        // Anyone away has their stand-in added, and told, so the step does not
+        // sit waiting on somebody who is not there.
+        foreach (ApprovalDelegationService::activeFor($approvers->pluck('id')) as $delegation) {
+            if ($instance->approvers()->where('user_id', $delegation->delegate_id)->exists()) {
+                continue;
+            }
+
+            $instance->approvers()->create([
+                'user_id' => $delegation->delegate_id,
+                'delegated_from_user_id' => $delegation->user_id,
+            ]);
+
+            $delegation->delegate?->notify(
+                new \App\Notifications\ApprovalRequestedNotification($item, $step)
+            );
         }
 
         // Update the item's current step

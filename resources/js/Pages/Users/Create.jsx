@@ -6,6 +6,7 @@ import Card from '../../Components/Card';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
 import Checkbox from '../../Components/Checkbox';
+import CapacitySettings from '../../Components/CapacitySettings';
 import Button from '../../Components/Button';
 import LinkButton from '../../Components/LinkButton';
 import { formatLabel } from '../../utils';
@@ -25,6 +26,8 @@ export default function Create() {
         can_create_rules: false,
         can_approve: false,
         can_create_project: false,
+        daily_capacity_minutes: 480,
+        working_days: [1, 2, 3, 4, 5],
         can_request: false,
         role: 'user',
     });
@@ -105,6 +108,15 @@ export default function Create() {
                         <Checkbox label="Can Approve Requests" id="can_approve" checked={data.can_approve} onChange={(e) => setData('can_approve', e.target.checked)} />
                         <Checkbox label="Can Create Projects" id="can_create_project" checked={data.can_create_project} onChange={(e) => setData('can_create_project', e.target.checked)} />
                         <Checkbox label="Can Request" id="can_request" checked={data.can_request} onChange={(e) => setData('can_request', e.target.checked)} />
+
+                        <CapacitySettings
+                            minutes={data.daily_capacity_minutes}
+                            workingDays={data.working_days}
+                            onMinutesChange={(v) => setData('daily_capacity_minutes', v)}
+                            onWorkingDaysChange={(v) => setData('working_days', v)}
+                            errors={errors}
+                        />
+
 
                         <div className="flex justify-end gap-3 pt-4">
                             <LinkButton href="/users" variant="secondary">Cancel</LinkButton>

@@ -43,6 +43,7 @@ class Task extends Model
         'start_date',
         'due_date',
         'due_time',
+        'estimated_minutes',
         'completed_at',
         'position',
         'is_recurring',
@@ -71,6 +72,7 @@ class Task extends Model
             'recurrence_interval' => 'integer',
             'recurrence_config' => 'array',
             'escalation_level' => 'integer',
+            'estimated_minutes' => 'integer',
         ];
     }
 
@@ -451,6 +453,22 @@ class Task extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(TaskAttachment::class);
+    }
+
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(TaskTimeLog::class);
+    }
+
+    /**
+     * Work recorded against this task.
+     *
+     * Only finished entries count — a running timer has no duration yet, and
+     * including a half-finished one would make the total move on its own.
+     */
+    public function loggedMinutes(): int
+    {
+        return (int) $this->timeLogs()->completed()->sum('minutes');
     }
 
     public function isStandalone(): bool

@@ -76,6 +76,15 @@ class ApprovalProjectController extends Controller
             // doesn't treat an empty string as a configured series.
             'series_prefix' => $request->filled('series_prefix') ? $request->series_prefix : null,
             'series_padding' => $request->input('series_padding') ?: 5,
+            // Null means "no deadline", which is the behaviour before anyone
+            // sets one. integer() would turn a blank into 0 and give every step
+            // an instantly-expired deadline.
+            'default_sla_hours' => $request->filled('default_sla_hours') ? (int) $request->input('default_sla_hours') : null,
+            'sla_reminder_hours' => $request->filled('sla_reminder_hours') ? (int) $request->input('sla_reminder_hours') : null,
+            // Escalate-after accepts 0 ("straight away"), so it tests for a
+            // present value rather than a truthy one.
+            'sla_escalate_after_hours' => $request->input('sla_escalate_after_hours') === null
+                ? null : (int) $request->input('sla_escalate_after_hours'),
         ]);
 
         $this->syncCoOwners($project, $request->input('co_owner_ids', []), $request->owner_id);
@@ -114,6 +123,15 @@ class ApprovalProjectController extends Controller
             'owner_id' => $request->owner_id,
             'is_pinned' => $request->is_pinned ?? false,
             'series_padding' => $request->input('series_padding') ?: $approvalProject->series_padding,
+            // Null means "no deadline", which is the behaviour before anyone
+            // sets one. integer() would turn a blank into 0 and give every step
+            // an instantly-expired deadline.
+            'default_sla_hours' => $request->filled('default_sla_hours') ? (int) $request->input('default_sla_hours') : null,
+            'sla_reminder_hours' => $request->filled('sla_reminder_hours') ? (int) $request->input('sla_reminder_hours') : null,
+            // Escalate-after accepts 0 ("straight away"), so it tests for a
+            // present value rather than a truthy one.
+            'sla_escalate_after_hours' => $request->input('sla_escalate_after_hours') === null
+                ? null : (int) $request->input('sla_escalate_after_hours'),
         ];
 
         // The prefix is write-once: settable while the project has none, ignored

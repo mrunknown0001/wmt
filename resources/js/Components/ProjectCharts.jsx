@@ -62,6 +62,76 @@ const TIME_DIMENSIONS = [
     { value: 'created_over_time', label: 'Tasks created over time' },
     { value: 'due_over_time', label: 'Tasks due over time' },
 ];
+/**
+ * What goes up the Y axis.
+ *
+ * Counting tasks answers "how many"; totalling hours answers "how much work",
+ * which is usually the question being asked of a project dashboard.
+ */
+const MEASURES = [
+    { value: 'count', label: 'Number of tasks', unit: '' },
+    { value: 'sum_estimate', label: 'Estimated hours', unit: 'h' },
+    { value: 'sum_logged', label: 'Logged hours', unit: 'h' },
+    { value: 'sum_custom_field', label: 'Total of a number field', unit: '', needsField: true },
+    { value: 'avg_custom_field', label: 'Average of a number field', unit: '', needsField: true },
+];
+
+const measureSpec = (value) => MEASURES.find((m) => m.value === value) || MEASURES[0];
+
+/** Number fields a measure can total. Formulas count — they resolve to numbers. */
+const numericFields = (customFields) =>
+    (customFields || []).filter((f) => f.type === 'number' || f.type === 'formula');
+
+/**
+ * The value one task contributes to a bucket.
+ *
+ * Returns null when the task has nothing to contribute, which is different from
+ * zero: a task with no estimate should not drag an average down.
+ */
+function taskValue(task, measure, fieldId) {
+    if (measure === 'sum_estimate') {
+        return task.estimated_minutes ? task.estimated_minutes / 60 : null;
+    }
+
+    if (measure === 'sum_logged') {
+        return task.logged_minutes ? task.logged_minutes / 60 : null;
+    }
+
+    if (measure === 'sum_custom_field' || measure === 'avg_custom_field') {
+        const cfv = (task.custom_field_values || []).find((v) => v.custom_field_id === fieldId);
+        const raw = cfv?.value_number;
+        return raw === null || raw === undefined || raw === '' ? null : Number(raw);
+    }
+
+    return 1; // count
+}
+
+/** Roll a set of tasks up into one number for the chosen measure. */
+function aggregate(tasks, measure, fieldId) {
+    if (measure === 'count') {
+        return tasks.length;
+    }
+
+    const values = tasks
+        .map((t) => taskValue(t, measure, fieldId))
+        .filter((v) => v !== null && !Number.isNaN(v));
+
+    if (values.length === 0) return 0;
+
+    const sum = values.reduce((a, b) => a + b, 0);
+
+    // Averaged over the tasks that actually carry a value, not over every task
+    // in the bucket — otherwise adding an unestimated task would lower the mean.
+    return measure === 'avg_custom_field' ? sum / values.length : sum;
+}
+
+/** Whole numbers stay whole; hours and averages get one decimal at most. */
+function formatValue(value, measure) {
+    const unit = measureSpec(measure).unit;
+    const rounded = Math.abs(value % 1) < 0.05 ? Math.round(value) : Math.round(value * 10) / 10;
+    return `${rounded}${unit}`;
+}
+
 const SCOPES = [
     { value: 'all', label: 'All tasks' },
     { value: 'active', label: 'Active tasks only' },
@@ -110,13 +180,18 @@ function computeCategoryData(chart, allTasks, sections, customFields) {
     const scope = chart.config?.scope || 'all';
     const tasks = scopeTasks(allTasks, scope);
     const groupBy = chart.group_by;
+    const measure = chart.config?.measure || 'count';
+    const fieldId = chart.config?.measure_custom_field_id || null;
+
+    // One helper so every branch below measures the same way.
+    const roll = (subset) => aggregate(subset, measure, fieldId);
 
     if (groupBy === 'status') {
         return Object.keys(STATUS_HEX)
             .map((s) => ({
                 key: s,
                 label: formatLabel(s),
-                count: tasks.filter((t) => t.status === s).length,
+                count: roll(tasks.filter((t) => t.status === s)),
                 color: STATUS_HEX[s],
             }))
             .filter((b) => b.count > 0);
@@ -127,7 +202,7 @@ function computeCategoryData(chart, allTasks, sections, customFields) {
             .map((p) => ({
                 key: p,
                 label: formatLabel(p),
-                count: tasks.filter((t) => t.priority === p).length,
+                count: roll(tasks.filter((t) => t.priority === p)),
                 color: PRIORITY_HEX[p],
             }))
             .filter((b) => b.count > 0);
@@ -138,9 +213,13 @@ function computeCategoryData(chart, allTasks, sections, customFields) {
         tasks.forEach((t) => {
             const key = t.assigned_to || 'unassigned';
             const label = t.assignee?.name || 'Unassigned';
-            const entry = map.get(key) || { key: String(key), label, count: 0 };
-            entry.count++;
+            const entry = map.get(key) || { key: String(key), label, tasks: [] };
+            entry.tasks.push(t);
             map.set(key, entry);
+        });
+        map.forEach((entry) => {
+            entry.count = roll(entry.tasks);
+            delete entry.tasks;
         });
         // Color follows the entity: slots assigned by stable alphabetical
         // order so a scope change never repaints an assignee
@@ -157,12 +236,12 @@ function computeCategoryData(chart, allTasks, sections, customFields) {
 
     if (groupBy === 'section') {
         const buckets = [];
-        const unsectioned = tasks.filter((t) => !t.section_id).length;
+        const unsectioned = roll(tasks.filter((t) => !t.section_id));
         if (unsectioned > 0) {
             buckets.push({ key: 'none', label: 'No section', count: unsectioned, color: 'var(--viz-other)' });
         }
         sections.forEach((s, i) => {
-            const count = tasks.filter((t) => t.section_id === s.id).length;
+            const count = roll(tasks.filter((t) => t.section_id === s.id));
             if (count > 0) {
                 buckets.push({
                     key: String(s.id),
@@ -180,11 +259,11 @@ function computeCategoryData(chart, allTasks, sections, customFields) {
         if (!field) return [];
         const buckets = [];
         (field.options || []).forEach((opt, i) => {
-            const count = tasks.filter((t) =>
+            const count = roll(tasks.filter((t) =>
                 (t.custom_field_values || []).some(
                     (v) => v.custom_field_id === field.id && v.value_option_id === opt.id
                 )
-            ).length;
+            ));
             if (count > 0) {
                 buckets.push({
                     key: String(opt.id),
@@ -194,11 +273,11 @@ function computeCategoryData(chart, allTasks, sections, customFields) {
                 });
             }
         });
-        const noValue = tasks.filter((t) =>
+        const noValue = roll(tasks.filter((t) =>
             !(t.custom_field_values || []).some(
                 (v) => v.custom_field_id === field.id && v.value_option_id
             )
-        ).length;
+        ));
         if (noValue > 0) {
             buckets.push({ key: 'none', label: 'No value', count: noValue, color: 'var(--viz-other)' });
         }
@@ -206,6 +285,32 @@ function computeCategoryData(chart, allTasks, sections, customFields) {
     }
 
     return [];
+}
+
+/**
+ * Figures typed in by hand, shown beside the live data.
+ *
+ * Marked so the renderers can distinguish them — a budget or last quarter's
+ * total sitting in the same chart as measured work should not be mistaken for
+ * measured work.
+ */
+function manualBuckets(chart) {
+    return (chart.config?.manual_points || [])
+        .filter((p) => p && p.label)
+        .map((p, i) => ({
+            key: `manual-${i}`,
+            label: p.label,
+            count: Number(p.value) || 0,
+            color: 'var(--viz-other)',
+            manual: true,
+        }));
+}
+
+/** Constant horizontal lines: a target, a threshold, a capacity. */
+function referenceLines(chart) {
+    return (chart.config?.reference_lines || [])
+        .filter((r) => r && r.label)
+        .map((r) => ({ label: r.label, value: Number(r.value) || 0 }));
 }
 
 // Fold anything past maxBuckets - 1 into a single "Other" bucket
@@ -234,6 +339,9 @@ function startOfWeek(date) {
 // Buckets for line charts: [{ label, count, date }], weekly, or monthly when
 // the range would exceed ~20 weekly points
 function computeTimeData(chart, allTasks) {
+    const measure = chart.config?.measure || 'count';
+    const fieldId = chart.config?.measure_custom_field_id || null;
+
     const accessor = {
         completed_over_time: (t) => (t.status === 'done' ? t.completed_at : null),
         created_over_time: (t) => t.created_at,
@@ -241,12 +349,14 @@ function computeTimeData(chart, allTasks) {
     }[chart.group_by];
     if (!accessor) return [];
 
-    const dates = allTasks
-        .map((t) => accessor(t))
-        .filter(Boolean)
-        .map((d) => new Date(d))
-        .filter((d) => !isNaN(d));
-    if (dates.length === 0) return [];
+    // Carry the task alongside its date: a bucket has to be measured, and the
+    // date alone cannot tell us how many hours it represents.
+    const points = allTasks
+        .map((t) => ({ task: t, date: new Date(accessor(t)) }))
+        .filter((p) => p.date instanceof Date && !isNaN(p.date));
+    if (points.length === 0) return [];
+
+    const dates = points.map((p) => p.date);
 
     const min = new Date(Math.min(...dates));
     const max = new Date(Math.max(...dates, Date.now()));
@@ -264,9 +374,10 @@ function computeTimeData(chart, allTasks) {
             });
             cursor.setMonth(cursor.getMonth() + 1);
         }
-        dates.forEach((d) => {
+        buckets.forEach((b) => { b.tasks = []; });
+        points.forEach(({ task, date: d }) => {
             const i = (d.getFullYear() - min.getFullYear()) * 12 + (d.getMonth() - min.getMonth());
-            if (buckets[i]) buckets[i].count++;
+            if (buckets[i]) buckets[i].tasks.push(task);
         });
     } else {
         const start = startOfWeek(min);
@@ -279,11 +390,17 @@ function computeTimeData(chart, allTasks) {
             });
             cursor.setDate(cursor.getDate() + 7);
         }
-        dates.forEach((d) => {
+        buckets.forEach((b) => { b.tasks = []; });
+        points.forEach(({ task, date: d }) => {
             const i = Math.floor((startOfWeek(d) - start) / (7 * DAY_MS));
-            if (buckets[i]) buckets[i].count++;
+            if (buckets[i]) buckets[i].tasks.push(task);
         });
     }
+    buckets.forEach((b) => {
+        b.count = aggregate(b.tasks || [], measure, fieldId);
+        delete b.tasks;
+    });
+
     return buckets;
 }
 
@@ -298,29 +415,73 @@ function niceMax(value) {
 
 /* ------------------------------- Renderers ------------------------------- */
 
-function BarChart({ buckets }) {
-    const max = Math.max(...buckets.map((b) => b.count), 1);
+function BarChart({ buckets, measure = 'count', references = [], xLabel, yLabel }) {
+    // Reference lines are part of the scale: a target above every bar would sit
+    // off the end of the chart and tell you nothing.
+    const max = Math.max(...buckets.map((b) => b.count), ...references.map((r) => r.value), 1);
+
     return (
-        <div className="space-y-2.5">
-            {buckets.map((b) => (
-                <div key={b.key} className="flex items-center gap-3">
-                    <span
-                        className="w-28 shrink-0 text-sm text-gray-600 dark:text-gray-300 truncate text-right"
-                        title={b.label}
-                    >
-                        {b.label}
-                    </span>
-                    <div className="flex-1 h-4 bg-gray-100 dark:bg-gray-700/50 rounded-r overflow-hidden">
-                        <div
-                            className="h-4 rounded-r transition-all duration-500"
-                            style={{ width: `${(b.count / max) * 100}%`, backgroundColor: b.color }}
-                        />
+        <div>
+            {yLabel && (
+                <p className="mb-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {yLabel}
+                </p>
+            )}
+
+            <div className="space-y-2.5">
+                {buckets.map((b) => (
+                    <div key={b.key} className="flex items-center gap-3">
+                        <span
+                            className={`w-28 shrink-0 text-sm truncate text-right ${
+                                b.manual ? 'text-gray-400 italic' : 'text-gray-600 dark:text-gray-300'
+                            }`}
+                            title={b.manual ? `${b.label} (entered by hand)` : b.label}
+                        >
+                            {b.label}
+                        </span>
+                        <div className="relative flex-1 h-4 bg-gray-100 dark:bg-gray-700/50 rounded-r overflow-hidden">
+                            <div
+                                className={`h-4 rounded-r transition-all duration-500 ${b.manual ? 'opacity-60' : ''}`}
+                                style={{
+                                    width: `${Math.max(0, (b.count / max) * 100)}%`,
+                                    backgroundColor: b.color,
+                                    // Hatched, so a hand-entered figure never reads
+                                    // as something the system measured.
+                                    backgroundImage: b.manual
+                                        ? 'repeating-linear-gradient(45deg, rgba(255,255,255,.45) 0 4px, transparent 4px 8px)'
+                                        : undefined,
+                                }}
+                            />
+                            {references.map((r, i) => (
+                                <div
+                                    key={i}
+                                    className="absolute top-0 bottom-0 border-l-2 border-dashed border-gray-500/70"
+                                    style={{ left: `${Math.min(100, (r.value / max) * 100)}%` }}
+                                    title={`${r.label}: ${formatValue(r.value, measure)}`}
+                                />
+                            ))}
+                        </div>
+                        <span className="w-12 shrink-0 text-sm font-medium text-gray-900 dark:text-white tabular-nums text-right">
+                            {formatValue(b.count, measure)}
+                        </span>
                     </div>
-                    <span className="w-8 shrink-0 text-sm font-medium text-gray-900 dark:text-white tabular-nums">
-                        {b.count}
-                    </span>
+                ))}
+            </div>
+
+            {references.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-3">
+                    {references.map((r, i) => (
+                        <span key={i} className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="inline-block w-4 border-t-2 border-dashed border-gray-500/70" />
+                            {r.label} · {formatValue(r.value, measure)}
+                        </span>
+                    ))}
                 </div>
-            ))}
+            )}
+
+            {xLabel && (
+                <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">{xLabel}</p>
+            )}
         </div>
     );
 }
@@ -341,7 +502,7 @@ function donutArcPath(cx, cy, rOuter, rInner, startAngle, endAngle) {
     ].join(' ');
 }
 
-function DonutChart({ buckets }) {
+function DonutChart({ buckets, measure = 'count' }) {
     const [hovered, setHovered] = useState(null);
     const total = buckets.reduce((sum, b) => sum + b.count, 0);
 
@@ -374,7 +535,7 @@ function DonutChart({ buckets }) {
                                 onMouseEnter={() => setHovered(s.key)}
                                 onMouseLeave={() => setHovered(null)}
                             >
-                                <title>{`${s.label}: ${s.count} (${Math.round((s.count / total) * 100)}%)`}</title>
+                                <title>{`${s.label}: ${formatValue(s.count, measure)} (${Math.round((s.count / total) * 100)}%)`}</title>
                             </path>
                         ))
                     )}
@@ -398,7 +559,7 @@ function DonutChart({ buckets }) {
                             <span className="text-sm text-gray-600 dark:text-gray-300 truncate" title={b.label}>{b.label}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-sm font-medium text-gray-900 dark:text-white tabular-nums">{b.count}</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white tabular-nums">{formatValue(b.count, measure)}</span>
                             <span className="text-xs text-gray-400 w-9 text-right tabular-nums">
                                 {Math.round((b.count / total) * 100)}%
                             </span>
@@ -410,7 +571,7 @@ function DonutChart({ buckets }) {
     );
 }
 
-function LineChart({ buckets }) {
+function LineChart({ buckets, measure = 'count', references = [], xLabel, yLabel }) {
     const [hovered, setHovered] = useState(null);
     const svgRef = useRef(null);
 
@@ -419,14 +580,15 @@ function LineChart({ buckets }) {
     const plotW = W - M.left - M.right;
     const plotH = H - M.top - M.bottom;
 
-    const yMax = niceMax(Math.max(...buckets.map((b) => b.count), 1));
+    // A target above the data still has to fit on the axis.
+    const yMax = niceMax(Math.max(...buckets.map((b) => b.count), ...references.map((r) => r.value), 1));
     const x = (i) => M.left + (buckets.length === 1 ? plotW / 2 : (i / (buckets.length - 1)) * plotW);
     const y = (v) => M.top + plotH - (v / yMax) * plotH;
 
     const linePath = buckets.map((b, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(b.count)}`).join(' ');
     const areaPath = `${linePath} L ${x(buckets.length - 1)} ${y(0)} L ${x(0)} ${y(0)} Z`;
 
-    const yTicks = [0, yMax / 4, yMax / 2, (3 * yMax) / 4, yMax].map((v) => Math.round(v));
+    const yTicks = [0, yMax / 4, yMax / 2, (3 * yMax) / 4, yMax].map((v) => Math.round(v * 10) / 10);
     const xLabelEvery = Math.max(1, Math.ceil(buckets.length / 6));
     const showMarkers = buckets.length <= 30;
 
@@ -443,6 +605,11 @@ function LineChart({ buckets }) {
 
     return (
         <div className="relative">
+            {yLabel && (
+                <p className="mb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {yLabel}
+                </p>
+            )}
             <svg
                 ref={svgRef}
                 viewBox={`0 0 ${W} ${H}`}
@@ -480,6 +647,25 @@ function LineChart({ buckets }) {
                 )}
 
                 <path d={areaPath} fill="var(--viz-s1)" opacity="0.1" />
+                {/* Targets sit behind the data, so the measured line reads first. */}
+                {references.map((r, i) => (
+                    r.value <= yMax ? (
+                        <g key={`ref-${i}`}>
+                            <line
+                                x1={M.left} x2={W - M.right} y1={y(r.value)} y2={y(r.value)}
+                                stroke="var(--viz-other)" strokeWidth="1.5" strokeDasharray="5 4"
+                            />
+                            <text
+                                x={W - M.right} y={y(r.value) - 4}
+                                textAnchor="end" fontSize="9" fill="currentColor"
+                                className="text-gray-500 dark:text-gray-400"
+                            >
+                                {r.label}
+                            </text>
+                        </g>
+                    ) : null
+                ))}
+
                 <path d={linePath} fill="none" stroke="var(--viz-s1)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
 
                 {/* Hover crosshair */}
@@ -509,7 +695,7 @@ function LineChart({ buckets }) {
                     textAnchor="end" fontSize="11" fontWeight="600" fill="var(--viz-ink)"
                     style={{ fontVariantNumeric: 'tabular-nums' }}
                 >
-                    {buckets[buckets.length - 1].count}
+                    {formatValue(buckets[buckets.length - 1].count, measure)}
                 </text>
             </svg>
 
@@ -521,8 +707,12 @@ function LineChart({ buckets }) {
                         transform: `translateX(${hovered > buckets.length / 2 ? '-100%' : '0'})`,
                     }}
                 >
-                    <span className="font-medium">{buckets[hovered].count}</span> · {buckets[hovered].label}
+                    <span className="font-medium">{formatValue(buckets[hovered].count, measure)}</span> · {buckets[hovered].label}
                 </div>
+            )}
+
+            {xLabel && (
+                <p className="mt-1 text-center text-[11px] text-gray-500 dark:text-gray-400">{xLabel}</p>
             )}
         </div>
     );
@@ -557,10 +747,18 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
         return () => document.removeEventListener('mousedown', close);
     }, [menuOpen]);
 
+    const measure = chart.config?.measure || 'count';
+    const references = useMemo(() => referenceLines(chart), [chart]);
+
     const data = useMemo(() => {
         if (chart.chart_type === 'line') return computeTimeData(chart, allTasks);
+
         const buckets = computeCategoryData(chart, allTasks, sections, customFields);
-        return foldBuckets(buckets, chart.chart_type === 'donut' ? 8 : 12);
+        const folded = foldBuckets(buckets, chart.chart_type === 'donut' ? 8 : 12);
+
+        // Hand-entered figures are appended after folding, so an "Other" bucket
+        // can never swallow one — they were typed in precisely to be seen.
+        return [...folded, ...manualBuckets(chart)];
     }, [chart, allTasks, sections, customFields]);
 
     const isEmpty = data.length === 0 || (chart.chart_type !== 'line' && data.every((b) => b.count === 0));
@@ -610,11 +808,17 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
             {isEmpty ? (
                 <p className="text-sm text-gray-500 dark:text-gray-400 py-8 text-center">No matching tasks yet</p>
             ) : chart.chart_type === 'bar' ? (
-                <BarChart buckets={data} />
+                <BarChart
+                    buckets={data} measure={measure} references={references}
+                    xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                />
             ) : chart.chart_type === 'donut' ? (
-                <DonutChart buckets={data} />
+                <DonutChart buckets={data} measure={measure} />
             ) : (
-                <LineChart buckets={data} />
+                <LineChart
+                    buckets={data} measure={measure} references={references}
+                    xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                />
             )}
         </div>
     );
@@ -625,7 +829,9 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
 function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, error }) {
     const selectFields = customFields.filter((f) => f.type === 'single_select');
 
-    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all' });
+    const numberFields = numericFields(customFields);
+
+    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [] });
 
     useEffect(() => {
         if (!isOpen) return;
@@ -635,7 +841,13 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
             group_by: chart.group_by,
             custom_field_id: chart.config?.custom_field_id || '',
             scope: chart.config?.scope || 'all',
-        } : { title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all' });
+            measure: chart.config?.measure || 'count',
+            measure_custom_field_id: chart.config?.measure_custom_field_id || '',
+            x_label: chart.config?.x_label || '',
+            y_label: chart.config?.y_label || '',
+            manual_points: chart.config?.manual_points || [],
+            reference_lines: chart.config?.reference_lines || [],
+        } : { title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [] });
     }, [isOpen, chart]);
 
     const isLine = form.chart_type === 'line';
@@ -650,8 +862,60 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
         });
     };
 
+    const needsNumberField = measureSpec(form.measure).needsField;
+
     const canSave = form.title.trim().length > 0
-        && (form.group_by !== 'custom_field' || form.custom_field_id);
+        && (form.group_by !== 'custom_field' || form.custom_field_id)
+        && (!needsNumberField || form.measure_custom_field_id);
+
+    // Rows the user is part-way through typing are dropped rather than saved
+    // as a blank label with a number nobody can read.
+    const cleanPairs = (rows) => rows
+        .map((r) => ({ label: String(r.label || '').trim(), value: Number(r.value) || 0 }))
+        .filter((r) => r.label !== '');
+
+    const setPairs = (key, rows) => setForm((f) => ({ ...f, [key]: rows }));
+
+    const pairEditor = (key, heading, hint, addLabel) => (
+        <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{heading}</label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{hint}</p>
+
+            {form[key].map((row, i) => (
+                <div key={i} className="flex items-center gap-2 mb-2">
+                    <input
+                        type="text" value={row.label} maxLength={40}
+                        placeholder="Label"
+                        onChange={(e) => setPairs(key, form[key].map((r, j) => j === i ? { ...r, label: e.target.value } : r))}
+                        className="flex-1 min-w-0 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1.5 text-sm"
+                    />
+                    <input
+                        type="number" value={row.value} step="any"
+                        placeholder="0"
+                        onChange={(e) => setPairs(key, form[key].map((r, j) => j === i ? { ...r, value: e.target.value } : r))}
+                        className="w-28 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1.5 text-sm"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setPairs(key, form[key].filter((_, j) => j !== i))}
+                        className="text-gray-400 hover:text-red-500 shrink-0"
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            ))}
+
+            <button
+                type="button"
+                onClick={() => setPairs(key, [...form[key], { label: '', value: 0 }])}
+                className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+                + {addLabel}
+            </button>
+        </div>
+    );
 
     return (
         <Modal
@@ -668,6 +932,12 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                             group_by: form.group_by,
                             custom_field_id: form.group_by === 'custom_field' ? form.custom_field_id : null,
                             scope: isLine ? 'all' : form.scope,
+                            measure: form.measure,
+                            measure_custom_field_id: needsNumberField ? form.measure_custom_field_id : null,
+                            x_label: form.x_label.trim() || null,
+                            y_label: form.y_label.trim() || null,
+                            manual_points: isLine ? [] : cleanPairs(form.manual_points),
+                            reference_lines: form.chart_type === 'donut' ? [] : cleanPairs(form.reference_lines),
                         })}
                         disabled={!canSave || saving}
                     >
@@ -759,6 +1029,86 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                             ))}
                         </Select>
                     </div>
+                )}
+
+                {/* Y axis — what is being measured, not just how many rows. */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Y axis — what to measure
+                    </label>
+                    <Select
+                        value={form.measure}
+                        onChange={(e) => setForm((f) => ({ ...f, measure: e.target.value }))}
+                    >
+                        {MEASURES
+                            // A donut divides a whole into parts, so an average
+                            // has nothing to divide.
+                            .filter((m) => !(form.chart_type === 'donut' && m.value === 'avg_custom_field'))
+                            .map((m) => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                    </Select>
+                    {needsNumberField && numberFields.length === 0 && (
+                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                            This project has no number or formula custom field to total.
+                        </p>
+                    )}
+                </div>
+
+                {needsNumberField && numberFields.length > 0 && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Number field
+                        </label>
+                        <Select
+                            value={form.measure_custom_field_id}
+                            onChange={(e) => setForm((f) => ({ ...f, measure_custom_field_id: e.target.value }))}
+                        >
+                            <option value="">Choose a field…</option>
+                            {numberFields.map((f) => (
+                                <option key={f.id} value={f.id}>{f.name}</option>
+                            ))}
+                        </Select>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            X axis label <span className="font-normal text-gray-400">(optional)</span>
+                        </label>
+                        <input
+                            type="text" value={form.x_label} maxLength={60}
+                            onChange={(e) => setForm((f) => ({ ...f, x_label: e.target.value }))}
+                            placeholder={isLine ? 'e.g. Week' : 'e.g. Assignee'}
+                            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Y axis label <span className="font-normal text-gray-400">(optional)</span>
+                        </label>
+                        <input
+                            type="text" value={form.y_label} maxLength={60}
+                            onChange={(e) => setForm((f) => ({ ...f, y_label: e.target.value }))}
+                            placeholder="e.g. Hours"
+                            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm"
+                        />
+                    </div>
+                </div>
+
+                {form.chart_type !== 'donut' && pairEditor(
+                    'reference_lines',
+                    'Target lines',
+                    'A constant drawn across the chart — a target, a threshold, a capacity.',
+                    'Add a target line',
+                )}
+
+                {!isLine && pairEditor(
+                    'manual_points',
+                    'Manual figures',
+                    'Values you type in yourself, shown beside the measured data and hatched so the two are never confused.',
+                    'Add a figure',
                 )}
             </div>
         </Modal>

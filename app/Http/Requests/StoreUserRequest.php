@@ -26,6 +26,9 @@ class StoreUserRequest extends FormRequest
             'can_create_rules' => ['boolean'],
             'can_approve' => ['boolean'],
             'can_create_project' => ['boolean'],
+            'daily_capacity_minutes' => ['nullable', 'integer', 'min:0', 'max:1440'],
+            'working_days' => ['nullable', 'array', 'max:7'],
+            'working_days.*' => ['integer', 'between:1,7'],
             'can_request' => ['boolean'],
             'role' => ['required', 'string', 'exists:roles,name'],
         ];

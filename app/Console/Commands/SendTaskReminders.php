@@ -237,12 +237,22 @@ class SendTaskReminders extends Command
                 break;
         }
 
-        // Deduplicate by user ID
+        // Deduplicate, and drop anyone who has left.
+        //
+        // Only the executive tier filtered on is_active, so levels 1-3 were
+        // escalating to deactivated accounts — a departed team leader or
+        // department head still named on an org unit would swallow the
+        // escalation, and nobody would know it had gone nowhere.
         $seen = [];
-        return array_filter($recipients, function ($user) use (&$seen) {
-            if (isset($seen[$user->id])) return false;
+
+        return array_values(array_filter($recipients, function (User $user) use (&$seen) {
+            if (isset($seen[$user->id]) || !$user->is_active) {
+                return false;
+            }
+
             $seen[$user->id] = true;
+
             return true;
-        });
+        }));
     }
 }

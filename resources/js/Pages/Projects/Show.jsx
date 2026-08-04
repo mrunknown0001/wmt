@@ -47,7 +47,7 @@ import ShareProjectModal from '../../Components/ShareProjectModal';
 import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
-import { formatLabel, formatDate, apiFetch, isPastDue } from '../../utils';
+import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import InlinePopover from '../../Components/InlinePopover';
@@ -361,6 +361,22 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     const renderCell = (colId) => {
         const cStyle = colStyle(colId);
         switch (colId) {
+            case 'estimate':
+                return (
+                    <td key="estimate" className="px-6 py-3 text-sm text-center overflow-hidden tabular-nums text-gray-600 dark:text-gray-300" style={cStyle}>
+                        {task.estimated_minutes ? formatMinutes(task.estimated_minutes) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    </td>
+                );
+            case 'logged': {
+                // Over the estimate is the number worth noticing, so it is the
+                // only one that changes colour.
+                const over = task.estimated_minutes > 0 && task.logged_minutes > task.estimated_minutes;
+                return (
+                    <td key="logged" className={`px-6 py-3 text-sm text-center overflow-hidden tabular-nums ${over ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-300'}`} style={cStyle}>
+                        {task.logged_minutes ? formatMinutes(task.logged_minutes) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    </td>
+                );
+            }
             case 'series':
                 return (
                     <td key="series" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
@@ -534,7 +550,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Default reorderable column IDs (excluding sticky checkbox, title, actions)
-const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates'];
+const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'estimate', 'logged'];
 
 // Resize handle for column headers
 function ColumnResizeHandle({ onResize }) {
@@ -786,6 +802,22 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     const renderCell = (colId) => {
         const cStyle = colStyle(colId);
         switch (colId) {
+            case 'estimate':
+                return (
+                    <td key="estimate" className="px-6 py-3 text-sm text-center overflow-hidden tabular-nums text-gray-600 dark:text-gray-300" style={cStyle}>
+                        {task.estimated_minutes ? formatMinutes(task.estimated_minutes) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    </td>
+                );
+            case 'logged': {
+                // Over the estimate is the number worth noticing, so it is the
+                // only one that changes colour.
+                const over = task.estimated_minutes > 0 && task.logged_minutes > task.estimated_minutes;
+                return (
+                    <td key="logged" className={`px-6 py-3 text-sm text-center overflow-hidden tabular-nums ${over ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-300'}`} style={cStyle}>
+                        {task.logged_minutes ? formatMinutes(task.logged_minutes) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    </td>
+                );
+            }
             case 'series':
                 return (
                     <td key="series" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
@@ -1572,6 +1604,8 @@ export default function Show() {
     const getColumnLabel = useCallback((colId) => {
         switch (colId) {
             case 'series': return 'Series';
+            case 'estimate': return 'Estimate';
+            case 'logged': return 'Logged';
             case 'status': return 'Status';
             case 'priority': return 'Priority';
             case 'assignee': return 'Assignee';
@@ -1595,6 +1629,9 @@ export default function Show() {
             // before TASK-10, which a text sort would reverse. Unnumbered tasks
             // sort last, as every other column here treats "missing" as last.
             case 'series': return task.series_sequence ?? Infinity;
+            // Unset sorts last, as every other column here treats missing.
+            case 'estimate': return task.estimated_minutes ?? Infinity;
+            case 'logged': return task.logged_minutes ?? Infinity;
             case 'title': return task.title?.toLowerCase() || '';
             case 'status': return STATUS_ORDER[task.status] ?? 99;
             case 'priority': return PRIORITY_ORDER[task.priority] ?? 99;
