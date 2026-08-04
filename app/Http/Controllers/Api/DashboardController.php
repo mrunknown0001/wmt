@@ -79,8 +79,7 @@ class DashboardController extends Controller
                     ->whereNotIn('status', ['done', 'cancelled'])
                     ->count(),
                 'overdueTasks' => Task::where('assigned_to', $user->id)
-                    ->whereNotNull('due_date')
-                    ->where('due_date', '<', now())
+                    ->pastDue()
                     ->whereNotIn('status', ['done', 'cancelled'])
                     ->count(),
                 'completedThisWeek' => Task::where('assigned_to', $user->id)

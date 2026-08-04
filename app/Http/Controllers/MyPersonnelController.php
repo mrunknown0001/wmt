@@ -101,8 +101,7 @@ class MyPersonnelController extends Controller
         $overdue = Task::query()
             ->whereIn('assigned_to', $peopleIds)
             ->whereNotIn('status', Task::CLOSING_STATUSES)
-            ->whereNotNull('due_date')
-            ->whereDate('due_date', '<', now()->toDateString())
+            ->pastDue()
             ->groupBy('assigned_to')
             ->pluck(DB::raw('count(*)'), 'assigned_to');
 

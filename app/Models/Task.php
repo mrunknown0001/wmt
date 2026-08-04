@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -149,6 +151,32 @@ class Task extends Model
 
     /** The statuses that close a task: "completed" and "unable to complete". */
     public const CLOSING_STATUSES = ['done', 'cancelled'];
+
+    /**
+     * Past its due date — the one definition of "overdue" in the application.
+     *
+     * Date-only, matching utils.js isPastDue: a task due today is not late
+     * until the day is out, whatever the hour. This exists because the obvious
+     * spelling is wrong in a way nobody notices. due_date is a date column, so
+     * where('due_date', '<', now()) compares '2026-08-12' against
+     * '2026-08-12 15:00:00' — the date sorts first, and everything due today
+     * reads as overdue from midnight. That was live in a dozen places, each
+     * over-reporting by a day's work.
+     *
+     * Callers add their own status filter where they need one; several count
+     * over relations that already exclude finished work.
+     */
+    public function scopePastDue(Builder $query, ?Carbon $on = null): Builder
+    {
+        return $query->whereNotNull('due_date')
+            ->whereDate('due_date', '<', ($on ?? now())->toDateString());
+    }
+
+    /** Past due and still open — the usual pairing. */
+    public function scopeOverdue(Builder $query, ?Carbon $on = null): Builder
+    {
+        return $query->pastDue($on)->whereNotIn('status', self::CLOSING_STATUSES);
+    }
 
     /** True when at least one of this task's comments has an attachment. */
     /**

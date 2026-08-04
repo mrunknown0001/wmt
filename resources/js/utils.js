@@ -133,6 +133,43 @@ export const dueAt = (task) => {
  * A task with no due date can never be late — it had no deadline to miss, and
  * counting it as late would make the figure meaningless.
  */
+/**
+ * How many days past its due date an unfinished task is, or 0.
+ *
+ * Date-only, like Task::scopePastDue on the server — a task due today is not
+ * late until the day is out. Keeping the two in step matters: a banner saying
+ * "overdue" on a task the dashboard does not count would be worse than no
+ * banner at all.
+ */
+export const overdueDays = (task) => {
+    if (!task?.due_date || ['done', 'cancelled'].includes(task.status)) return 0;
+
+    const due = parseDate(task.due_date);
+    if (!due) return 0;
+
+    const today = startOfToday();
+    if (due >= today) return 0;
+
+    return Math.round((today - due) / 86400000);
+};
+
+/**
+ * Due today, with a due time that has already gone by.
+ *
+ * Not overdue by the app's date-only rule, but worth saying on a detail page
+ * where the hour is shown — flagged separately so it cannot be mistaken for
+ * the counted kind.
+ */
+export const isDueEarlierToday = (task) => {
+    if (!task?.due_date || !task?.due_time) return false;
+    if (['done', 'cancelled'].includes(task.status)) return false;
+
+    const due = parseDate(task.due_date);
+    if (!due || due.getTime() !== startOfToday().getTime()) return false;
+
+    return new Date() > dueAt(task);
+};
+
 export const isCompletedLate = (task) => {
     if (!task?.completed_at || !task?.due_date) return false;
 

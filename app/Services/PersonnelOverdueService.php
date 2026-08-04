@@ -39,8 +39,7 @@ class PersonnelOverdueService
         return Task::query()
             ->whereIn('assigned_to', $peopleIds)
             ->whereNotIn('status', Task::CLOSING_STATUSES)
-            ->whereNotNull('due_date')
-            ->whereDate('due_date', '<', now()->toDateString());
+            ->pastDue();
     }
 
     /**

@@ -77,8 +77,7 @@ class DashboardController extends Controller
                     ->whereNotIn('status', ['done', 'cancelled'])
                     ->count(),
                 'overdueTasks' => Task::where('assigned_to', $user->id)
-                    ->whereNotNull('due_date')
-                    ->where('due_date', '<', now())
+                    ->pastDue()
                     ->whereNotIn('status', ['done', 'cancelled'])
                     ->count(),
             ],
@@ -157,17 +156,20 @@ class DashboardController extends Controller
             $weeks = collect(range(7, 0))->map(fn ($i) => now()->startOfWeek()->subWeeks($i));
             $trendStart = $weeks->first();
 
+            // Bucketed in PHP rather than with YEARWEEK(), which only MySQL
+            // has â€” the whole dashboard failed to render on any other driver,
+            // which is why none of it could be covered by a test. The window is
+            // eight weeks, so the rows pulled here are bounded either way.
+            // 'oW' is ISO year + ISO week, the same key YEARWEEK(x, 3) produced.
             $createdByWeek = Task::where('created_at', '>=', $trendStart)
-                ->selectRaw('YEARWEEK(created_at, 3) as yearweek, count(*) as count')
-                ->groupBy('yearweek')
-                ->pluck('count', 'yearweek');
+                ->pluck('created_at')
+                ->countBy(fn ($at) => $at->format('oW'));
 
             $completedByWeek = Task::where('status', 'done')
                 ->whereNotNull('completed_at')
                 ->where('completed_at', '>=', $trendStart)
-                ->selectRaw('YEARWEEK(completed_at, 3) as yearweek, count(*) as count')
-                ->groupBy('yearweek')
-                ->pluck('count', 'yearweek');
+                ->pluck('completed_at')
+                ->countBy(fn ($at) => $at->format('oW'));
 
             $data['charts'] = [
                 'tasksByStatus' => Task::selectRaw('status, count(*) as count')
@@ -191,7 +193,7 @@ class DashboardController extends Controller
                 ->whereNotIn('status', ['done', 'cancelled'])
                 ->where(function ($q) {
                     $q->where(function ($sub) {
-                        $sub->whereNotNull('due_date')->where('due_date', '<', now());
+                        $sub->pastDue();
                     })->orWhereDate('due_date', today());
                 })
                 ->orderBy('due_date')
@@ -204,7 +206,10 @@ class DashboardController extends Controller
             $data['teamWorkload'] = User::select('id', 'name')
                 ->where('is_active', true)
                 ->withCount(['assignedTasks' => fn ($q) => $q->whereNotIn('status', ['done', 'cancelled'])])
-                ->having('assigned_tasks_count', '>', 0)
+                // whereHas rather than having(): MySQL tolerates HAVING with no
+                // GROUP BY, other drivers reject it outright. Same meaning —
+                // keep people who have at least one open task.
+                ->whereHas('assignedTasks', fn ($q) => $q->whereNotIn('status', ['done', 'cancelled']))
                 ->orderByDesc('assigned_tasks_count')
                 ->take(10)
                 ->get();

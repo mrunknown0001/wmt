@@ -85,8 +85,7 @@ class AiContextBuilder
         $tasks = Task::with('project')
             ->where('assigned_to', $user->id)
             ->whereNotIn('status', ['done', 'cancelled'])
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', now()->startOfDay())
+            ->pastDue()
             ->orderBy('due_date')
             ->get();
 
@@ -157,8 +156,7 @@ class AiContextBuilder
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
             ->withCount(['tasks as overdue_tasks_count' => fn ($q) => $q
                 ->whereNotIn('status', ['done', 'cancelled'])
-                ->whereNotNull('due_date')
-                ->where('due_date', '<', now())])
+                ->pastDue()])
             ->orderByDesc('updated_at')
             ->take($limit)
             ->get();
@@ -196,8 +194,9 @@ class AiContextBuilder
         $members = User::select('id', 'name')
             ->where('is_active', true)
             ->withCount(['assignedTasks as active_tasks' => fn ($q) => $q->whereNotIn('status', ['done', 'cancelled'])])
-            ->withCount(['assignedTasks as overdue_tasks' => fn ($q) => $q->whereNotIn('status', ['done', 'cancelled'])->whereNotNull('due_date')->where('due_date', '<', now())])
-            ->having('active_tasks', '>', 0)
+            ->withCount(['assignedTasks as overdue_tasks' => fn ($q) => $q->whereNotIn('status', ['done', 'cancelled'])->pastDue()])
+            // See DashboardController: HAVING without GROUP BY is MySQL-only.
+            ->whereHas('assignedTasks', fn ($q) => $q->whereNotIn('status', ['done', 'cancelled']))
             ->orderByDesc('active_tasks')
             ->take(20)
             ->get();
@@ -226,8 +225,7 @@ class AiContextBuilder
         $totalTasks = Task::count();
         $completedTasks = Task::where('status', 'done')->count();
         $overdueTasks = Task::whereNotIn('status', ['done', 'cancelled'])
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', now())
+            ->pastDue()
             ->count();
         $activeProjects = Project::where('status', 'active')->count();
         $totalProjects = Project::count();

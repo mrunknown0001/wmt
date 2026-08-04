@@ -208,8 +208,7 @@ class ExecutiveDashboardController extends Controller
         $completedTasks = Task::whereIn('assigned_to', $userIds)->where('status', 'done')->count();
         $overdueTasks = Task::whereIn('assigned_to', $userIds)
             ->whereNotIn('status', ['done', 'cancelled'])
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', now())
+            ->pastDue()
             ->count();
 
         $projectIds = Task::whereIn('assigned_to', $userIds)->distinct()->pluck('project_id');
@@ -259,8 +258,7 @@ class ExecutiveDashboardController extends Controller
         return Task::with('project:id,name', 'assignee:id,name')
             ->whereIn('assigned_to', $userIds)
             ->whereNotIn('status', ['done', 'cancelled'])
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', now())
+            ->pastDue()
             ->orderBy('due_date')
             ->take($limit)
             ->get()

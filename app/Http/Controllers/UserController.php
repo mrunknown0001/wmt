@@ -121,8 +121,7 @@ class UserController extends Controller
         // overdue from midnight. The Overdue tab below reads date-only, as does
         // the rest of the app, and the two sat side by side disagreeing.
         $overdue = (clone $tasks)->whereNotIn('status', ['done', 'cancelled'])
-            ->whereNotNull('due_date')
-            ->whereDate('due_date', '<', now()->toDateString())->count();
+            ->pastDue()->count();
 
         // On-time rate over completed tasks that had a due date.
         $completedWithDue = (clone $tasks)->where('status', 'done')->whereNotNull('due_date')->whereNotNull('completed_at');

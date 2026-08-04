@@ -61,9 +61,13 @@ class ReportService
     {
         $query = self::completedTasks($user, $from, $to, $filters);
 
+        // Measured in PHP rather than with TIMESTAMPDIFF(), which only MySQL
+        // has. The rows are pulled either way — the sample is capped — so this
+        // costs nothing and makes the whole report runnable on any driver.
+        // Casting to int truncates toward zero, as TIMESTAMPDIFF did.
         $hours = $query->limit(self::SAMPLE_CAP)
-            ->pluck(DB::raw('TIMESTAMPDIFF(HOUR, tasks.created_at, tasks.completed_at) as h'))
-            ->map(fn ($h) => (int) $h)
+            ->get(['tasks.created_at', 'tasks.completed_at'])
+            ->map(fn (Task $t) => (int) $t->created_at->diffInHours($t->completed_at))
             ->filter(fn ($h) => $h >= 0)
             ->values();
 
@@ -91,9 +95,14 @@ class ReportService
         // The deadline is the due time when one is set, and the end of the due
         // day when it is not — matching Task::dueAt() rather than treating
         // every due date as midnight.
+        //
+        // Built with || rather than CONCAT(), which MySQL has and sqlite does
+        // not. || is the SQL standard string concatenation operator and MySQL
+        // reads it as such under PIPES_AS_CONCAT; to stay off that setting the
+        // pieces are joined by the driver-neutral route below instead.
         $onTimeExpression = "tasks.completed_at <= COALESCE(
-            CONCAT(tasks.due_date, ' ', tasks.due_time),
-            CONCAT(tasks.due_date, ' 23:59:59')
+            " . self::concat('tasks.due_date', "' '", 'tasks.due_time') . ",
+            " . self::concat('tasks.due_date', "' 23:59:59'") . "
         )";
 
         $onTime = (clone $dated)->whereRaw($onTimeExpression)->count();
@@ -175,22 +184,32 @@ class ReportService
             ->whereNotNull('i.activated_at')
             ->whereNotNull('d.decided_at')
             ->whereBetween('d.decided_at', [$from, $to])
-            ->selectRaw('u.id, u.name, COUNT(*) as decisions,
-                AVG(TIMESTAMPDIFF(HOUR, i.activated_at, d.decided_at)) as avg_hours,
-                MAX(TIMESTAMPDIFF(HOUR, i.activated_at, d.decided_at)) as max_hours')
-            ->groupBy('u.id', 'u.name')
-            ->having('decisions', '>=', $minDecisions)
-            ->orderByDesc('avg_hours')
-            ->limit(20)
+            ->select('u.id', 'u.name', 'i.activated_at', 'd.decided_at')
+            ->limit(self::SAMPLE_CAP)
             ->get();
 
-        return $rows->map(fn ($r) => [
-            'id' => $r->id,
-            'name' => $r->name,
-            'decisions' => (int) $r->decisions,
-            'average_hours' => round((float) $r->avg_hours, 1),
-            'slowest_hours' => (int) $r->max_hours,
-        ])->all();
+        // Grouped and averaged in PHP. The SQL version leaned on
+        // TIMESTAMPDIFF(), which only MySQL has; the window is already bounded
+        // by the report's date range and capped, so the rows are affordable.
+        return $rows
+            ->groupBy('id')
+            ->map(function ($decisions) {
+                $hours = $decisions->map(fn ($d) => (int) Carbon::parse($d->activated_at)
+                    ->diffInHours(Carbon::parse($d->decided_at)));
+
+                return [
+                    'id' => $decisions->first()->id,
+                    'name' => $decisions->first()->name,
+                    'decisions' => $decisions->count(),
+                    'average_hours' => round($hours->avg(), 1),
+                    'slowest_hours' => (int) $hours->max(),
+                ];
+            })
+            ->filter(fn ($row) => $row['decisions'] >= $minDecisions)
+            ->sortByDesc('average_hours')
+            ->take(20)
+            ->values()
+            ->all();
     }
 
     /**
@@ -238,12 +257,19 @@ class ReportService
     /** Tasks finished per week across the window, for a trend line. */
     public static function throughput(User $user, Carbon $from, Carbon $to, array $filters = []): array
     {
+        // Bucketed in PHP — YEARWEEK() is MySQL only. 'oW' is ISO year + ISO
+        // week, the same key the SQL produced, and it sorts correctly as a
+        // string across a year boundary ("202552" before "202601").
         return self::completedTasks($user, $from, $to, $filters)
-            ->selectRaw('YEARWEEK(tasks.completed_at, 3) as yw, MIN(DATE(tasks.completed_at)) as starts, COUNT(*) as total')
-            ->groupBy('yw')
-            ->orderBy('yw')
-            ->get()
-            ->map(fn ($r) => ['week' => $r->starts, 'total' => (int) $r->total])
+            ->limit(self::SAMPLE_CAP)
+            ->pluck('completed_at')
+            ->groupBy(fn ($at) => $at->format('oW'))
+            ->sortKeys()
+            ->map(fn ($week) => [
+                'week' => $week->min()->toDateString(),
+                'total' => $week->count(),
+            ])
+            ->values()
             ->all();
     }
 
@@ -263,6 +289,21 @@ class ReportService
      * Nulls rather than zeros on an empty set: "no data" and "zero hours" are
      * different answers, and a chart showing 0 for the former is a lie.
      */
+    /**
+     * String concatenation that both MySQL and sqlite understand.
+     *
+     * MySQL's CONCAT() is not portable and sqlite's || is not valid MySQL
+     * unless PIPES_AS_CONCAT is set, so the expression is chosen per driver.
+     * The MySQL branch emits exactly what this code emitted before, so nothing
+     * about the production query changes.
+     */
+    private static function concat(string ...$parts): string
+    {
+        return DB::connection()->getDriverName() === 'mysql'
+            ? 'CONCAT(' . implode(', ', $parts) . ')'
+            : '(' . implode(' || ', $parts) . ')';
+    }
+
     private static function summarise(Collection $hours): array
     {
         $count = $hours->count();

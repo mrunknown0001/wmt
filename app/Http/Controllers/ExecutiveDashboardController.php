@@ -114,8 +114,7 @@ class ExecutiveDashboardController extends Controller
         $completedTasks = (clone $taskQuery)->where('status', 'done')->count();
         $overdueTasks = Task::whereIn('assigned_to', $userIds)
             ->whereNotIn('status', ['done', 'cancelled'])
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', now())
+            ->pastDue()
             ->count();
 
         $projectIds = Task::whereIn('assigned_to', $userIds)->distinct()->pluck('project_id');
@@ -167,8 +166,7 @@ class ExecutiveDashboardController extends Controller
         return Task::with('project', 'assignee')
             ->whereIn('assigned_to', $userIds)
             ->whereNotIn('status', ['done', 'cancelled'])
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', now())
+            ->pastDue()
             ->orderBy('due_date')
             ->take($limit)
             ->get()
@@ -190,7 +188,8 @@ class ExecutiveDashboardController extends Controller
             ->where('is_active', true)
             ->select('id', 'name')
             ->withCount(['assignedTasks as active_tasks_count' => fn ($q) => $q->whereNotIn('status', ['done', 'cancelled'])])
-            ->having('active_tasks_count', '>', 0)
+            // See DashboardController: HAVING without GROUP BY is MySQL-only.
+            ->whereHas('assignedTasks', fn ($q) => $q->whereNotIn('status', ['done', 'cancelled']))
             ->orderByDesc('active_tasks_count')
             ->take(15)
             ->get()
@@ -305,8 +304,7 @@ class ExecutiveDashboardController extends Controller
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')])
             ->withCount(['tasks as overdue_tasks_count' => fn ($q) => $q
                 ->whereNotIn('status', ['done', 'cancelled'])
-                ->whereNotNull('due_date')
-                ->where('due_date', '<', now())]);
+                ->pastDue()]);
 
         if (in_array($status, ['active', 'on_hold', 'completed', 'archived'], true)) {
             $query->where('status', $status);
@@ -385,7 +383,12 @@ class ExecutiveDashboardController extends Controller
             ->selectRaw("SUM(tasks.status = 'done') as completed_tasks")
             ->selectRaw("SUM(tasks.status = 'done' AND tasks.due_date IS NOT NULL) as completed_with_due")
             ->selectRaw("SUM(tasks.status = 'done' AND tasks.due_date IS NOT NULL AND tasks.completed_at IS NOT NULL AND DATE(tasks.completed_at) <= tasks.due_date) as on_time_tasks")
-            ->selectRaw("SUM(tasks.status NOT IN ('done', 'cancelled') AND tasks.due_date IS NOT NULL AND tasks.due_date < CURDATE()) as overdue_tasks")
+            // Today bound as a parameter rather than CURDATE(), which is MySQL
+            // only. Same date-only meaning of overdue as Task::scopePastDue.
+            ->selectRaw(
+                "SUM(tasks.status NOT IN ('done', 'cancelled') AND tasks.due_date IS NOT NULL AND tasks.due_date < ?) as overdue_tasks",
+                [now()->toDateString()]
+            )
             ->get()
             ->keyBy('unit_id');
 
@@ -626,8 +629,7 @@ class ExecutiveDashboardController extends Controller
                 'assignedTasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done'),
                 'assignedTasks as overdue_tasks_count' => fn ($q) => $q
                     ->whereNotIn('status', ['done', 'cancelled'])
-                    ->whereNotNull('due_date')
-                    ->where('due_date', '<', now()),
+                    ->pastDue(),
                 'assignedTasks as active_tasks_count' => fn ($q) => $q
                     ->whereNotIn('status', ['done', 'cancelled']),
             ])

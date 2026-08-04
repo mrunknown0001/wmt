@@ -7,6 +7,7 @@ import RichTextEditor from './RichTextEditor';
 import Tooltip from './Tooltip';
 import SearchableSelect from './SearchableSelect';
 import TaskTimePanel from './TaskTimePanel';
+import OverdueNotice from './OverdueNotice';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom, isPastDue } from '../utils';
 import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
 import { weekOfYearLabel } from '../weekOfYear';
@@ -560,6 +561,12 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                             )}
                         </div>
 
+                        {/* Same notice as the full editor, so the two views cannot
+                            describe the same task differently. */}
+                        <div className="px-6 pb-3">
+                            <OverdueNotice task={taskData} />
+                        </div>
+
                         {/* Fields grid */}
                         <div className="px-6 pb-4 grid grid-cols-2 gap-x-6 gap-y-3">
                             {/* Status */}
@@ -609,7 +616,11 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                     type="date"
                                     value={taskData.due_date ? taskData.due_date.split('T')[0] : ''}
                                     onChange={(e) => handleFieldUpdate('due_date', e.target.value || null)}
-                                    className={`w-full text-sm rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 ${isOverdue ? 'text-red-600 dark:text-red-400' : ''}`}
+                                    className={`w-full text-sm rounded-md py-1.5 dark:bg-gray-800 dark:text-gray-100 ${
+                                        isOverdue
+                                            ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 font-medium'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                    }`}
                                 />
                             </div>
 
