@@ -6,11 +6,16 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\User;
+use App\Services\OrgScope;
+use App\Services\PersonnelOverdueService;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    /** How many overdue tasks the dashboard card shows before deferring to the full page. */
+    private const PERSONNEL_OVERDUE_PREVIEW = 8;
+
     public function __invoke(): Response
     {
         $user = auth()->user();
@@ -83,6 +88,27 @@ class DashboardController extends Controller
             'myRecentTasks' => $myRecentTasks,
             'dashboardPreferences' => $prefs,
         ];
+
+        // Overdue work across the people this person supervises. Only for
+        // heads and leaders — everyone else has nobody to be responsible for,
+        // and their own overdue count is already in the stats above.
+        if (OrgScope::hasAnyScope($user)) {
+            $peopleIds = OrgScope::manageablePeopleIds($user)
+                // Their own overdue tasks are reported separately; this card is
+                // about the people reporting to them.
+                ->reject(fn ($id) => (int) $id === (int) $user->id)
+                ->values();
+
+            $summary = PersonnelOverdueService::summary($peopleIds);
+
+            $data['personnelOverdue'] = [
+                'tasks' => PersonnelOverdueService::tasks($peopleIds, self::PERSONNEL_OVERDUE_PREVIEW)->all(),
+                'total' => $summary['total'],
+                'people' => $summary['people'],
+                'worstDaysLate' => $summary['worstDaysLate'],
+                'preview' => self::PERSONNEL_OVERDUE_PREVIEW,
+            ];
+        }
 
         // Task Stats
         if ($prefs['showTaskStats']) {

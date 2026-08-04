@@ -44,6 +44,105 @@ function StatCard({ label, value, icon, color = 'blue', href }) {
     return href ? <Link href={href} className="block">{content}</Link> : content;
 }
 
+/** "3 days late", coloured by how far behind it is. */
+function DaysLate({ days }) {
+    const tone = days > 30
+        ? 'text-red-700 dark:text-red-400 font-semibold'
+        : days > 7
+            ? 'text-red-600 dark:text-red-400'
+            : 'text-amber-600 dark:text-amber-400';
+
+    return <span className={`text-xs ${tone}`}>{days}d late</span>;
+}
+
+/**
+ * Overdue work across a leader's people.
+ *
+ * Deliberately short: the first few and a way through to the full page. A
+ * dashboard card that grows with the backlog is unreadable exactly when the
+ * backlog matters.
+ */
+function PersonnelOverdueCard({ data }) {
+    const { tasks = [], total = 0, people = 0, worstDaysLate = 0, preview = 8 } = data;
+
+    if (total === 0) {
+        return (
+            <Card className="mb-6">
+                <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                        Team Overdue Tasks
+                    </h2>
+                </div>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Nobody you supervise has anything past its due date.
+                </p>
+            </Card>
+        );
+    }
+
+    return (
+        <Card className="mb-6" padding={false}>
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                        Team Overdue Tasks
+                    </h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {total} overdue across {people} {people === 1 ? 'person' : 'people'}
+                        {worstDaysLate > 0 && ` · longest ${worstDaysLate} days`}
+                    </p>
+                </div>
+                <Link
+                    href="/my-personnel/overdue"
+                    className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                    View all
+                </Link>
+            </div>
+
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {tasks.map((task) => (
+                    <Link
+                        key={task.id}
+                        href={task.url}
+                        className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    >
+                        <div className="w-20 shrink-0">
+                            <DaysLate days={task.days_late} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{task.title}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {task.project?.name || 'No project'}
+                            </p>
+                        </div>
+                        {task.assignee && (
+                            <span className="hidden sm:block shrink-0 text-xs text-gray-600 dark:text-gray-300 truncate max-w-[10rem]">
+                                {task.assignee.name}
+                            </span>
+                        )}
+                    </Link>
+                ))}
+            </div>
+
+            {total > tasks.length && (
+                <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+                    <Link
+                        href="/my-personnel/overdue"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                        View all {total} overdue tasks
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </Link>
+                </div>
+            )}
+        </Card>
+    );
+}
+
 export default function Dashboard() {
     const {
         auth,
@@ -58,6 +157,7 @@ export default function Dashboard() {
         charts,
         urgentItems,
         teamWorkload,
+        personnelOverdue,
     } = usePage().props;
 
     const [preferences, setPreferences] = useState(dashboardPreferences || {});
@@ -198,6 +298,10 @@ export default function Dashboard() {
                         <TaskStatsBar taskStats={taskStats} />
                     </div>
                 )}
+
+                {/* Overdue work across the people this person supervises. Only
+                    reaches heads and leaders — see DashboardController. */}
+                {personnelOverdue && <PersonnelOverdueCard data={personnelOverdue} />}
 
                 {/* My Projects */}
                 <div className="mb-6">

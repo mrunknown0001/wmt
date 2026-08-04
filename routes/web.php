@@ -220,6 +220,7 @@ Route::middleware('auth')->group(function () {
 
     // The people a head or leader oversees, arranged as the org chart is.
     Route::get('/my-personnel', [MyPersonnelController::class, 'index'])->name('my-personnel.index');
+    Route::get('/my-personnel/overdue', [MyPersonnelController::class, 'overdue'])->name('my-personnel.overdue');
 
     // Cover for people who are away — their tasks move to a stand-in and come
     // back on their own when the period ends.

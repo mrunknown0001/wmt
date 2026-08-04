@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Task;
 use App\Models\TaskDelegation;
 use App\Services\OrgScope;
+use App\Services\PersonnelOverdueService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -34,6 +35,46 @@ class MyPersonnelController extends Controller
             'units' => OrgScope::personnelTree($user, $this->taskStats($peopleIds)),
             'coveredBy' => $this->coverNotes($peopleIds),
             'viewerId' => $user->id,
+        ]);
+    }
+
+    /**
+     * Every overdue task across the people this person supervises.
+     *
+     * Its own page rather than a longer dashboard card: once a backlog is more
+     * than a glance, what a supervisor needs is who it belongs to, how far
+     * behind it is and which projects it is sitting in — none of which fits
+     * beside the rest of a dashboard.
+     */
+    public function overdue(Request $request): Response
+    {
+        $user = $request->user();
+
+        abort_unless(OrgScope::hasAnyScope($user), 403);
+
+        $peopleIds = OrgScope::manageablePeopleIds($user)
+            ->reject(fn ($id) => (int) $id === (int) $user->id)
+            ->values();
+
+        $tasks = PersonnelOverdueService::tasks($peopleIds);
+        $summary = PersonnelOverdueService::summary($peopleIds);
+        $counts = PersonnelOverdueService::buckets($peopleIds);
+
+        return Inertia::render('MyPersonnel/Overdue', [
+            'tasks' => $tasks->all(),
+            'summary' => $summary,
+            'buckets' => collect(PersonnelOverdueService::BUCKETS)
+                ->map(fn ($band, $key) => [
+                    'key' => $key,
+                    'label' => $band['label'],
+                    'count' => $counts[$key],
+                ])->values()->all(),
+            // Everything the filters need, taken from the tasks in hand so the
+            // dropdowns can never offer something that filters to nothing.
+            'people' => $tasks->pluck('assignee')->filter()->unique('id')->sortBy('name')->values()->all(),
+            'projects' => $tasks->pluck('project')->filter()->unique('id')->sortBy('name')->values()->all(),
+            'limit' => PersonnelOverdueService::LIMIT,
+            'capped' => $summary['total'] > $tasks->count(),
         ]);
     }
 
