@@ -10,6 +10,12 @@ Artisan::command('inspire', function () {
 
 Schedule::command('tasks:send-reminders')->dailyAt('08:00');
 
+// Cover starts and ends on whole days, so this runs just after midnight —
+// early enough that a stand-in finds the work waiting at the start of the day,
+// and that the owner has it back on the morning they return. Before the 08:00
+// reminders, so nobody is chased about a task that is about to change hands.
+Schedule::command('tasks:process-delegations')->dailyAt('00:10')->withoutOverlapping();
+
 // Scheduled automation rules pick their own hour, so this has to run every hour
 // and match rules against the current one.
 Schedule::command('automation:run-scheduled')->hourlyAt(5)->withoutOverlapping();

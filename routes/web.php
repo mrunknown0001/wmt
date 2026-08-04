@@ -50,6 +50,7 @@ use App\Http\Controllers\ApprovalFormController;
 use App\Http\Controllers\PublicApprovalFormController;
 use App\Http\Controllers\ApprovalAutomationRuleController;
 use App\Http\Controllers\ApprovalDelegationController;
+use App\Http\Controllers\TaskDelegationController;
 use App\Http\Controllers\MyApprovalsController;
 use App\Http\Controllers\MyRequestsController;
 use Illuminate\Support\Facades\Route;
@@ -215,6 +216,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/approval-delegations', [ApprovalDelegationController::class, 'store'])->name('approval-delegations.store');
     Route::delete('/approval-delegations/{approvalDelegation}', [ApprovalDelegationController::class, 'destroy'])->name('approval-delegations.destroy');
     Route::get('/my-requests', [MyRequestsController::class, 'index'])->name('my-requests.index');
+
+    // Cover for people who are away — their tasks move to a stand-in and come
+    // back on their own when the period ends.
+    Route::get('/task-delegations', [TaskDelegationController::class, 'index'])->name('task-delegations.index');
+    Route::post('/task-delegations', [TaskDelegationController::class, 'store'])->name('task-delegations.store');
+    Route::post('/task-delegations/{taskDelegation}/end', [TaskDelegationController::class, 'end'])->name('task-delegations.end');
+    Route::delete('/task-delegations/{taskDelegation}', [TaskDelegationController::class, 'destroy'])->name('task-delegations.destroy');
 
     // Folders
     Route::post('/folders', [FolderController::class, 'store'])->name('folders.store');
