@@ -90,28 +90,43 @@ function dueLabel(value) {
 const timeLabel = (value) => (value ? String(value).slice(0, 5) : null);
 
 function UpcomingTasks({ upcoming, name }) {
-    const [range, setRange] = useState('week');
+    const {
+        tasks = [], overdue = [],
+        weekCount = 0, monthCount = 0, overdueCount = 0, limit = 50,
+    } = upcoming || {};
 
-    const { tasks = [], weekCount = 0, monthCount = 0, limit = 50 } = upcoming || {};
+    // Overdue work is what needs attention, so the card opens on it when there
+    // is any. Otherwise it opens on the week ahead.
+    const [range, setRange] = useState(overdueCount > 0 ? 'overdue' : 'week');
 
-    const shown = useMemo(
-        () => tasks.filter((t) => (range === 'week' ? t.in_week : t.in_month)),
-        [tasks, range]
-    );
+    const shown = useMemo(() => {
+        if (range === 'overdue') return overdue;
+        return tasks.filter((t) => (range === 'week' ? t.in_week : t.in_month));
+    }, [tasks, overdue, range]);
 
-    const total = range === 'week' ? weekCount : monthCount;
+    const total = { overdue: overdueCount, week: weekCount, month: monthCount }[range];
     // The list is capped, so say so rather than quietly showing fewer than the
     // count on the tab claims.
     const hidden = Math.max(0, total - shown.length);
 
-    const tab = (key, label, count) => (
+    const emptyMessage = {
+        overdue: 'Nothing overdue.',
+        week: `Nothing due for ${name.split(' ')[0]} for the rest of this week.`,
+        month: `Nothing due for ${name.split(' ')[0]} for the rest of this month.`,
+    }[range];
+
+    const tab = (key, label, count, danger = false) => (
         <button
             type="button"
             onClick={() => setRange(key)}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                 range === key
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    ? danger
+                        ? 'bg-red-50 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                        : 'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
+                    : danger && count > 0
+                        ? 'text-red-600 hover:text-red-700 dark:text-red-400'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
         >
             {label}
@@ -122,8 +137,9 @@ function UpcomingTasks({ upcoming, name }) {
     return (
         <Card className="mb-6" padding={false}>
             <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Upcoming Tasks</h3>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Tasks</h3>
                 <div className="flex items-center gap-1">
+                    {tab('overdue', 'Overdue', overdueCount, true)}
                     {tab('week', 'This week', weekCount)}
                     {tab('month', 'This month', monthCount)}
                 </div>
@@ -131,7 +147,7 @@ function UpcomingTasks({ upcoming, name }) {
 
             {shown.length === 0 ? (
                 <p className="px-6 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                    Nothing due for {name.split(' ')[0]} {range === 'week' ? 'for the rest of this week' : 'for the rest of this month'}.
+                    {emptyMessage}
                 </p>
             ) : (
                 <>
@@ -143,10 +159,18 @@ function UpcomingTasks({ upcoming, name }) {
                                     className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                                 >
                                     <div className="w-24 shrink-0">
-                                        <p className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                                        <p className={`text-xs font-medium ${
+                                            task.days_late != null
+                                                ? 'text-red-600 dark:text-red-400'
+                                                : 'text-gray-900 dark:text-gray-100'
+                                        }`}>
                                             {dueLabel(task.due_date)}
                                         </p>
-                                        {timeLabel(task.due_time) && (
+                                        {task.days_late != null ? (
+                                            <p className="text-xs text-red-500 dark:text-red-400">
+                                                {task.days_late} {task.days_late === 1 ? 'day' : 'days'} late
+                                            </p>
+                                        ) : timeLabel(task.due_time) && (
                                             <p className="text-xs text-gray-400">{timeLabel(task.due_time)}</p>
                                         )}
                                     </div>

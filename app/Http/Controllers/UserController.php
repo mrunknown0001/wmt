@@ -116,8 +116,13 @@ class UserController extends Controller
         $total = (clone $tasks)->count();
         $completed = (clone $tasks)->where('status', 'done')->count();
         $active = (clone $tasks)->whereNotIn('status', ['done', 'cancelled'])->count();
+        // whereDate, not where('<', now()): due_date is a date column, so
+        // comparing it to a full timestamp made anything due *today* count as
+        // overdue from midnight. The Overdue tab below reads date-only, as does
+        // the rest of the app, and the two sat side by side disagreeing.
         $overdue = (clone $tasks)->whereNotIn('status', ['done', 'cancelled'])
-            ->whereNotNull('due_date')->where('due_date', '<', now())->count();
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<', now()->toDateString())->count();
 
         // On-time rate over completed tasks that had a due date.
         $completedWithDue = (clone $tasks)->where('status', 'done')->whereNotNull('due_date')->whereNotNull('completed_at');
@@ -189,15 +194,18 @@ class UserController extends Controller
     }
 
     /**
-     * What this person has coming up, for the rest of the week and the month.
+     * What this person is carrying: overdue, due this week, due this month.
      *
-     * Unfinished work only, from today forward — anything already past its due
-     * date is not "upcoming", and the overdue KPI above already reports it.
+     * Unfinished work only. Week and month overlap on purpose — the month is a
+     * superset of the week, so the card offers them as a toggle over one list
+     * rather than two lists that would show the same task twice.
      *
-     * The two buckets overlap on purpose: the month is a superset of the week,
-     * so the page offers them as a toggle over one list rather than two lists
-     * that would show the same task twice. The counts come from their own
-     * queries so the badges stay right even when the list is capped.
+     * Overdue is kept as its own list rather than another flag on that one.
+     * Sharing a capped list would let a long backlog crowd the upcoming tabs
+     * out entirely, which is exactly when a supervisor most needs to see both.
+     *
+     * Every count comes from its own query, so the tab badges stay right even
+     * when the list beneath them is capped.
      */
     private function upcomingTasks(User $user): array
     {
@@ -212,34 +220,53 @@ class UserController extends Controller
         // range has to cover whichever reaches further.
         $rangeEnd = $weekEnd->greaterThan($monthEnd) ? $weekEnd : $monthEnd;
 
-        $base = fn () => Task::query()
+        $unfinished = fn () => Task::query()
             ->where('assigned_to', $user->id)
             ->whereNotIn('status', Task::CLOSING_STATUSES)
-            ->whereNotNull('due_date')
-            ->whereDate('due_date', '>=', $today->toDateString());
+            ->whereNotNull('due_date');
 
-        $tasks = $base()->with('project:id,name')
+        $ahead = fn () => $unfinished()->whereDate('due_date', '>=', $today->toDateString());
+        $behind = fn () => $unfinished()->whereDate('due_date', '<', $today->toDateString());
+
+        $row = fn (Task $t) => [
+            'id' => $t->id,
+            'title' => $t->title,
+            'status' => $t->status,
+            'priority' => $t->priority,
+            'due_date' => $t->due_date?->toDateString(),
+            'due_time' => $t->due_time,
+            'url' => $t->getEditUrl(),
+            'project' => $t->project ? ['id' => $t->project->id, 'name' => $t->project->name] : null,
+        ];
+
+        $columns = ['id', 'project_id', 'title', 'status', 'priority', 'due_date', 'due_time'];
+
+        $tasks = $ahead()->with('project:id,name')
             ->whereDate('due_date', '<=', $rangeEnd->toDateString())
+            ->orderBy('due_date')
+            // Timed work first within a day; undated-time tasks after it.
+            ->orderByRaw('due_time is null, due_time')
+            ->limit(self::UPCOMING_LIMIT)
+            ->get($columns);
+
+        // Oldest first — the longest-outstanding item is the one to look at.
+        $overdue = $behind()->with('project:id,name')
             ->orderBy('due_date')
             ->orderByRaw('due_time is null, due_time')
             ->limit(self::UPCOMING_LIMIT)
-            ->get(['id', 'project_id', 'title', 'status', 'priority', 'due_date', 'due_time']);
+            ->get($columns);
 
         return [
-            'tasks' => $tasks->map(fn (Task $t) => [
-                'id' => $t->id,
-                'title' => $t->title,
-                'status' => $t->status,
-                'priority' => $t->priority,
-                'due_date' => $t->due_date?->toDateString(),
-                'due_time' => $t->due_time,
-                'url' => $t->getEditUrl(),
-                'project' => $t->project ? ['id' => $t->project->id, 'name' => $t->project->name] : null,
-                'in_week' => $t->due_date && $t->due_date->startOfDay()->lessThanOrEqualTo($weekEnd),
-                'in_month' => $t->due_date && $t->due_date->startOfDay()->lessThanOrEqualTo($monthEnd),
+            'tasks' => $tasks->map(fn (Task $t) => $row($t) + [
+                'in_week' => $t->due_date->startOfDay()->lessThanOrEqualTo($weekEnd),
+                'in_month' => $t->due_date->startOfDay()->lessThanOrEqualTo($monthEnd),
             ])->values()->all(),
-            'weekCount' => $base()->whereDate('due_date', '<=', $weekEnd->toDateString())->count(),
-            'monthCount' => $base()->whereDate('due_date', '<=', $monthEnd->toDateString())->count(),
+            'overdue' => $overdue->map(fn (Task $t) => $row($t) + [
+                'days_late' => $t->due_date->startOfDay()->diffInDays($today),
+            ])->values()->all(),
+            'weekCount' => $ahead()->whereDate('due_date', '<=', $weekEnd->toDateString())->count(),
+            'monthCount' => $ahead()->whereDate('due_date', '<=', $monthEnd->toDateString())->count(),
+            'overdueCount' => $behind()->count(),
             'weekEnds' => $weekEnd->toDateString(),
             'monthEnds' => $monthEnd->toDateString(),
             'limit' => self::UPCOMING_LIMIT,

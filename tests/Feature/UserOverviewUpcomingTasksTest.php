@@ -277,6 +277,116 @@ class UserOverviewUpcomingTasksTest extends TestCase
         $this->assertSame(50, $upcoming['limit']);
     }
 
+    // ---- overdue ----
+
+    public function test_overdue_is_its_own_list(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 12, 9));
+
+        $this->task('2026-08-10');
+        $this->task('2026-08-05');
+        $this->task('2026-08-13');  // upcoming, not overdue
+
+        $upcoming = $this->upcoming();
+
+        $this->assertSame(2, $upcoming['overdueCount']);
+        $this->assertSame(
+            ['Task due 2026-08-05', 'Task due 2026-08-10'],
+            collect($upcoming['overdue'])->pluck('title')->sort()->values()->all()
+        );
+    }
+
+    public function test_the_longest_outstanding_comes_first(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 12, 9));
+
+        $this->task('2026-08-10');
+        $this->task('2026-07-28');
+        $this->task('2026-08-11');
+
+        $this->assertSame(
+            ['Task due 2026-07-28', 'Task due 2026-08-10', 'Task due 2026-08-11'],
+            collect($this->upcoming()['overdue'])->pluck('title')->all()
+        );
+    }
+
+    public function test_days_late_is_counted_from_today(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 12, 9));
+
+        $this->task('2026-08-11');  // one day
+        $this->task('2026-08-05');  // a week
+
+        $late = collect($this->upcoming()['overdue'])->pluck('days_late', 'title');
+
+        $this->assertSame(7, (int) $late['Task due 2026-08-05']);
+        $this->assertSame(1, (int) $late['Task due 2026-08-11']);
+    }
+
+    public function test_a_task_due_today_is_not_overdue(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 12, 23, 45));
+
+        $this->task('2026-08-12');
+
+        $upcoming = $this->upcoming();
+
+        $this->assertSame(0, $upcoming['overdueCount']);
+        $this->assertSame(1, $upcoming['weekCount']);
+    }
+
+    public function test_finished_work_is_never_overdue(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 12, 9));
+
+        $this->task('2026-08-01', 'done');
+        $this->task('2026-08-01', 'cancelled');
+
+        $this->assertSame(0, $this->upcoming()['overdueCount']);
+    }
+
+    public function test_a_long_backlog_does_not_crowd_out_the_week_ahead(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 12, 9));
+
+        // 60 overdue tasks — more than the cap on their own list.
+        foreach (range(1, 60) as $i) {
+            $this->task('2026-08-' . str_pad((string) (($i % 10) + 1), 2, '0', STR_PAD_LEFT));
+        }
+        $this->task('2026-08-13');
+
+        $upcoming = $this->upcoming();
+
+        // Separate lists, so the one upcoming task still shows.
+        $this->assertCount(50, $upcoming['overdue']);
+        $this->assertSame(60, $upcoming['overdueCount']);
+        $this->assertSame(1, $upcoming['weekCount']);
+        $this->assertCount(1, $upcoming['tasks']);
+    }
+
+    /**
+     * The Overdue KPI and the Overdue tab sit on the same screen, so they have
+     * to agree. The KPI compared a date column against a full timestamp, which
+     * made anything due today read as overdue from midnight.
+     */
+    public function test_the_overdue_kpi_agrees_with_the_overdue_tab(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 12, 15, 0));
+
+        $this->task('2026-08-12');  // today — overdue in neither
+        $this->task('2026-08-11');  // yesterday — overdue in both
+
+        $this->actingAs($this->admin)
+            ->get("/users/{$this->subject->id}")
+            ->assertOk()
+            ->assertInertia(function ($page) {
+                $props = $page->toArray()['props'];
+
+                $this->assertSame(1, $props['kpis']['tasksOverdue']);
+                $this->assertSame(1, $props['upcoming']['overdueCount']);
+            });
+    }
+
     // ---- access ----
 
     public function test_a_person_sees_their_own_upcoming_work(): void
