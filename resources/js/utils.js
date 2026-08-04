@@ -106,6 +106,40 @@ export const isPastDue = (value) => {
     return !!date && date < startOfToday();
 };
 
+/**
+ * The moment a task is actually late — its due time, or the end of the due day
+ * when no time is set.
+ *
+ * Mirrors Task::dueAt() on the server, so "late" means the same thing in the
+ * browser as it does in a report.
+ */
+export const dueAt = (task) => {
+    const date = parseDate(task?.due_date);
+    if (!date) return null;
+
+    if (!task.due_time) {
+        date.setHours(23, 59, 59, 999);
+        return date;
+    }
+
+    const [h, m] = String(task.due_time).split(':');
+    date.setHours(Number(h) || 0, Number(m) || 0, 0, 0);
+    return date;
+};
+
+/**
+ * True when a finished task was finished after its deadline.
+ *
+ * A task with no due date can never be late — it had no deadline to miss, and
+ * counting it as late would make the figure meaningless.
+ */
+export const isCompletedLate = (task) => {
+    if (!task?.completed_at || !task?.due_date) return false;
+
+    const deadline = dueAt(task);
+    return !!deadline && new Date(task.completed_at) > deadline;
+};
+
 /** "1h 30m", "45m", "—". Mirrors TimeTracker::formatMinutes on the server. */
 export const formatMinutes = (minutes) => {
     const m = Number(minutes);

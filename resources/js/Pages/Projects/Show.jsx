@@ -47,7 +47,7 @@ import ShareProjectModal from '../../Components/ShareProjectModal';
 import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
-import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes } from '../../utils';
+import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, isCompletedLate } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import InlinePopover from '../../Components/InlinePopover';
@@ -1881,6 +1881,12 @@ export default function Show() {
             { id: 'priority', name: 'Priority', fieldType: 'select', options: ['urgent', 'high', 'medium', 'low'].map(p => ({ id: p, label: formatLabel(p) })) },
             { id: 'assignee', name: 'Assignee', fieldType: 'select', options: assignees.map(a => ({ id: String(a.id), label: a.name })) },
             { id: 'due_date', name: 'Due Date', fieldType: 'date' },
+            {
+                id: 'completed_late',
+                name: 'Finished Late',
+                fieldType: 'select',
+                options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }],
+            },
         ];
         const custom = localCustomFields.filter(cf => !isDerivedField(cf.type)).map(cf => ({
             id: `cf_${cf.id}`, name: cf.name, fieldType: cf.type, options: cf.options, config: cf.config, cfId: cf.id,
@@ -1929,6 +1935,15 @@ export default function Show() {
                 if (operator === 'is_not' && String(t.assigned_to || '') === value) return false;
                 if (operator === 'is_empty' && t.assigned_to) return false;
                 if (operator === 'is_not_empty' && !t.assigned_to) return false;
+                continue;
+            }
+            if (filter.fieldId === 'completed_late') {
+                // Only finished work can be finished late; anything still open
+                // is "overdue", which is a different filter.
+                const late = t.status === 'done' && isCompletedLate(t);
+                const wanted = value === 'yes';
+                if (operator === 'is' && late !== wanted) return false;
+                if (operator === 'is_not' && late === wanted) return false;
                 continue;
             }
             if (filter.fieldId === 'due_date') {
@@ -2171,6 +2186,7 @@ export default function Show() {
                     user: t.assignee || null,
                     total: 0,
                     done: 0,
+                    doneLate: 0,
                     active: 0,
                     overdue: 0,
                 };
@@ -2178,6 +2194,10 @@ export default function Show() {
             assigneeMap[key].total++;
             if (t.status === 'done') {
                 assigneeMap[key].done++;
+                // Finished, but after the deadline. Counted separately from
+                // "overdue", which is work still outstanding — these two answer
+                // different questions and must not be conflated.
+                if (isCompletedLate(t)) assigneeMap[key].doneLate++;
             } else if (t.status !== 'cancelled') {
                 assigneeMap[key].active++;
                 if (t.due_date) {
@@ -4579,7 +4599,16 @@ export default function Show() {
                                                 <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Total</th>
                                                 <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Active</th>
                                                 <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Done</th>
-                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Overdue</th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">
+                                                    <Tooltip content="Finished, but after the due date — a subset of Done">
+                                                        <span className="cursor-help border-b border-dotted border-gray-400">Done Late</span>
+                                                    </Tooltip>
+                                                </th>
+                                                <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">
+                                                    <Tooltip content="Still open and past the due date">
+                                                        <span className="cursor-help border-b border-dotted border-gray-400">Overdue</span>
+                                                    </Tooltip>
+                                                </th>
                                                 <th className="text-left py-2 pl-4 font-medium text-gray-500 dark:text-gray-400">Progress</th>
                                             </tr>
                                         </thead>
@@ -4605,6 +4634,15 @@ export default function Show() {
                                                             { value: a.total, filters: [], className: 'text-gray-900 dark:text-white font-medium', what: 'all tasks' },
                                                             { value: a.active, filters: activeOnly, className: 'text-blue-600 dark:text-blue-400', what: 'active tasks' },
                                                             { value: a.done, filters: [{ fieldId: 'status', value: 'done' }], className: 'text-green-600 dark:text-green-400', what: 'completed tasks' },
+                                                            {
+                                                                value: a.doneLate,
+                                                                filters: [
+                                                                    { fieldId: 'status', value: 'done' },
+                                                                    { fieldId: 'completed_late', value: 'yes' },
+                                                                ],
+                                                                className: a.doneLate > 0 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400 dark:text-gray-500',
+                                                                what: 'tasks finished late',
+                                                            },
                                                             {
                                                                 value: a.overdue,
                                                                 filters: overdueFilters(),

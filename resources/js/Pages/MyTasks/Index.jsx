@@ -8,7 +8,7 @@ import PriorityBadge from '../../Components/PriorityBadge';
 import StatusBadge from '../../Components/StatusBadge';
 import Button from '../../Components/Button';
 import EmptyState from '../../Components/EmptyState';
-import { formatDate, formatLabel, taskEditUrl } from '../../utils';
+import { formatDate, formatLabel, taskEditUrl, isCompletedLate } from '../../utils';
 
 const TASK_STATUSES = ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
@@ -62,7 +62,11 @@ const sectionStyles = {
 function CompletionBadge({ task }) {
     if (task.status !== 'done' && task.status !== 'cancelled') return null;
 
-    const isLate = task.due_date && task.completed_at && new Date(task.completed_at) > new Date(new Date(task.due_date).setHours(23, 59, 59, 999));
+    // Shared with the project dashboard's "Done Late" column. The old inline
+    // version treated every due date as ending at midnight, so a task due at
+    // 09:00 and finished at 17:00 the same day read as on time here while the
+    // dashboard counted it late.
+    const isLate = isCompletedLate(task);
     const isOnTime = !isLate;
 
     return (
