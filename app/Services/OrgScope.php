@@ -210,4 +210,104 @@ class OrgScope
     {
         return self::manageablePeopleIds($user)->contains($subjectId);
     }
+
+    /**
+     * The people a supervisor oversees, arranged the way the org chart is.
+     *
+     * Only the units they head sit at the top. A team inside a department they
+     * already run is nested under it rather than repeated alongside it, so the
+     * page reads as one structure instead of three overlapping lists.
+     *
+     * @param  array<int, array>  $stats  keyed by user id, merged into each member
+     * @return array<int, array>
+     */
+    public static function personnelTree(User $user, array $stats = []): array
+    {
+        $units = self::visibleUnits($user);
+        $divisions = $units['divisions'];
+        $departments = $units['departments'];
+        $teams = $units['teams'];
+
+        $members = User::query()
+            ->where('is_active', true)
+            ->whereIn('id', self::usersIn([
+                'divisions' => $divisions->pluck('id')->all(),
+                'departments' => $departments->pluck('id')->all(),
+                'teams' => $teams->pluck('id')->all(),
+            ]))
+            ->with('roles:id,name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'position', 'department_id', 'team_id']);
+
+        $shape = fn (User $m) => [
+            'id' => $m->id,
+            'name' => $m->name,
+            'email' => $m->email,
+            'position' => $m->position,
+            'role' => $m->roles->first()?->name,
+        ] + ($stats[$m->id] ?? ['open_tasks' => 0, 'overdue_tasks' => 0]);
+
+        $teamNode = function ($team) use ($members, $shape) {
+            return [
+                'type' => 'team',
+                'id' => $team->id,
+                'name' => $team->name,
+                'members' => $members->where('team_id', $team->id)->map($shape)->values()->all(),
+                'children' => [],
+            ];
+        };
+
+        $departmentNode = function ($department) use ($teams, $members, $shape, $teamNode) {
+            $ownTeams = $teams->where('department_id', $department->id);
+            $ownTeamIds = $ownTeams->pluck('id');
+
+            return [
+                'type' => 'department',
+                'id' => $department->id,
+                'name' => $department->name,
+                // People filed against the department but not against any of
+                // its teams. Without this they would vanish from the page.
+                'members' => $members
+                    ->where('department_id', $department->id)
+                    ->filter(fn (User $m) => !$m->team_id || !$ownTeamIds->contains($m->team_id))
+                    ->map($shape)->values()->all(),
+                'children' => $ownTeams->map($teamNode)->values()->all(),
+            ];
+        };
+
+        $tree = [];
+
+        foreach ($divisions as $division) {
+            $tree[] = [
+                'type' => 'division',
+                'id' => $division->id,
+                'name' => $division->name,
+                // A division holds nobody directly — its people arrive through
+                // its departments.
+                'members' => [],
+                'children' => $departments
+                    ->where('division_id', $division->id)
+                    ->map($departmentNode)->values()->all(),
+            ];
+        }
+
+        $divisionIds = $divisions->pluck('id');
+        $topDepartments = $departments->filter(fn ($d) => !$divisionIds->contains($d->division_id));
+
+        foreach ($topDepartments as $department) {
+            $tree[] = $departmentNode($department);
+        }
+
+        // Teams led directly, in a department nobody here runs.
+        $coveredDepartmentIds = $departments
+            ->filter(fn ($d) => $divisionIds->contains($d->division_id))
+            ->pluck('id')
+            ->merge($topDepartments->pluck('id'));
+
+        foreach ($teams->filter(fn ($t) => !$coveredDepartmentIds->contains($t->department_id)) as $team) {
+            $tree[] = $teamNode($team);
+        }
+
+        return $tree;
+    }
 }

@@ -73,6 +73,11 @@ class TaskDelegationController extends Controller
             'people' => $people,
             'currentUserId' => $user->id,
             'maxDelegates' => TaskDelegation::MAX_DELEGATES,
+            // Arrived from the Users list with somebody already in mind. Only
+            // honoured if they are actually this person's to cover, so a
+            // hand-edited id cannot pre-fill a name outside their scope.
+            'preselectUserId' => $people->pluck('id')
+                ->first(fn ($id) => $id === (int) $request->query('for')),
         ]);
     }
 

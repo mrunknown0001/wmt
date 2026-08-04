@@ -19,12 +19,13 @@ const STATUS_PILL = {
 
 export default function TaskDelegationsIndex() {
     const {
-        delegations = [], people = [], currentUserId,
+        delegations = [], people = [], currentUserId, preselectUserId,
         maxDelegates = 2, errors = {},
     } = usePage().props;
 
     const blank = {
-        user_id: currentUserId,
+        // Coming from a row on the Users list, the form opens on that person.
+        user_id: preselectUserId ?? currentUserId,
         delegate_ids: [],
         starts_on: today(),
         ends_on: '',

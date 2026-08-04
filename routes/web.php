@@ -50,6 +50,7 @@ use App\Http\Controllers\ApprovalFormController;
 use App\Http\Controllers\PublicApprovalFormController;
 use App\Http\Controllers\ApprovalAutomationRuleController;
 use App\Http\Controllers\ApprovalDelegationController;
+use App\Http\Controllers\MyPersonnelController;
 use App\Http\Controllers\TaskDelegationController;
 use App\Http\Controllers\MyApprovalsController;
 use App\Http\Controllers\MyRequestsController;
@@ -216,6 +217,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/approval-delegations', [ApprovalDelegationController::class, 'store'])->name('approval-delegations.store');
     Route::delete('/approval-delegations/{approvalDelegation}', [ApprovalDelegationController::class, 'destroy'])->name('approval-delegations.destroy');
     Route::get('/my-requests', [MyRequestsController::class, 'index'])->name('my-requests.index');
+
+    // The people a head or leader oversees, arranged as the org chart is.
+    Route::get('/my-personnel', [MyPersonnelController::class, 'index'])->name('my-personnel.index');
 
     // Cover for people who are away — their tasks move to a stand-in and come
     // back on their own when the period ends.

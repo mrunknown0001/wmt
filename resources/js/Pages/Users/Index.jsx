@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -31,9 +31,30 @@ const TrashIcon = () => (
     </svg>
 );
 
+const CoverIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+    </svg>
+);
+
+/** "12 Aug" — enough to read at a glance in a table cell. */
+const shortDate = (value) => {
+    if (!value) return '';
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
+
 export default function Index() {
-    const { users, roles, filters } = usePage().props;
+    const { users, roles, filters, cover = [], canArrangeCover } = usePage().props;
     const [deleteTarget, setDeleteTarget] = useState(null);
+
+    // Sent as a list rather than a map, so the lookup is built here.
+    const coverByUser = useMemo(
+        () => new Map(cover.map((c) => [c.user_id, c])),
+        [cover]
+    );
+    const coverFor = (userId) => coverByUser.get(userId);
+
     const [search, setSearch] = useState(filters?.search || '');
     const [role, setRole] = useState(filters?.role || '');
     const [status, setStatus] = useState(filters?.status || '');
@@ -147,6 +168,7 @@ export default function Index() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Role</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Department</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">Task Cover</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                                     </tr>
                                 </thead>
@@ -172,8 +194,39 @@ export default function Index() {
                                                     {user.is_active ? 'Active' : 'Inactive'}
                                                 </span>
                                             </td>
+                                            <td className="px-6 py-4 text-sm hidden lg:table-cell">
+                                                {coverFor(user.id) ? (
+                                                    <Tooltip content={`${coverFor(user.id).delegates.join(' & ') || 'Nobody'} · ${coverFor(user.id).period}`}>
+                                                        <Link
+                                                            href="/task-delegations"
+                                                            className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                                                                coverFor(user.id).running
+                                                                    ? 'text-amber-700 dark:text-amber-400'
+                                                                    : 'text-blue-700 dark:text-blue-400'
+                                                            }`}
+                                                        >
+                                                            <span className={`h-1.5 w-1.5 rounded-full ${coverFor(user.id).running ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                                                            {coverFor(user.id).running
+                                                                ? `Covered until ${shortDate(coverFor(user.id).ends_on)}`
+                                                                : `From ${shortDate(coverFor(user.id).starts_on)}`}
+                                                        </Link>
+                                                    </Tooltip>
+                                                ) : (
+                                                    <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
+                                                )}
+                                            </td>
                                             <td className="px-6 py-4 text-sm text-right">
                                                 <div className="flex items-center justify-end gap-1">
+                                                    {canArrangeCover && (
+                                                        <Tooltip content={coverFor(user.id) ? 'Task cover' : 'Arrange task cover'}>
+                                                            <Link
+                                                                href={`/task-delegations?for=${user.id}`}
+                                                                className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+                                                            >
+                                                                <CoverIcon />
+                                                            </Link>
+                                                        </Tooltip>
+                                                    )}
                                                     <Tooltip content="View Overview">
                                                         <Link
                                                             href={`/users/${user.id}`}

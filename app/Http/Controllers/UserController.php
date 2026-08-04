@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\Department;
+use App\Models\TaskDelegation;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\OrgScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -49,7 +51,53 @@ class UserController extends Controller
                 'role' => $request->input('role', ''),
                 'status' => $request->input('status', ''),
             ],
+            'cover' => $this->coverFor($users->getCollection()),
+            // Executives can see this list but the cover page has its own
+            // authority rule, so the action only appears for people it will
+            // actually let in.
+            'canArrangeCover' => OrgScope::hasAnyScope($request->user()),
         ]);
+    }
+
+    /**
+     * Current or upcoming task cover for the people on this page.
+     *
+     * One query for the whole page rather than a relation on User: cover that
+     * has already finished is of no interest here, and eager-loading every
+     * delegation ever arranged would grow without bound.
+     *
+     * Returned as a list rather than a map keyed by user id — PHP's integer
+     * keys serialise to a JSON array when they happen to run 0..n, which would
+     * silently change the shape the page receives.
+     *
+     * @param  \Illuminate\Support\Collection<int, User>  $users
+     */
+    private function coverFor($users): array
+    {
+        if ($users->isEmpty()) {
+            return [];
+        }
+
+        return TaskDelegation::with('delegates:id,name')
+            ->whereIn('user_id', $users->pluck('id'))
+            ->whereIn('status', [TaskDelegation::SCHEDULED, TaskDelegation::ACTIVE])
+            ->whereDate('ends_on', '>=', now()->toDateString())
+            ->orderBy('starts_on')
+            ->get()
+            // Someone can have at most one live arrangement, but a finished one
+            // and a scheduled one can coexist; the soonest is the useful one.
+            ->unique('user_id')
+            ->map(fn (TaskDelegation $d) => [
+                'id' => $d->id,
+                'user_id' => $d->user_id,
+                'running' => $d->isRunning(),
+                'period' => $d->periodLabel(),
+                'starts_on' => $d->starts_on->toDateString(),
+                'ends_on' => $d->ends_on->toDateString(),
+                'delegates' => $d->delegates->pluck('name')->all(),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -157,20 +205,27 @@ class UserController extends Controller
             return true;
         }
 
+        // Which department the target sits in. Usually their own column, but
+        // somebody filed against a team and not a department still belongs to
+        // that team's department — My Personnel lists them there, so the
+        // overview has to agree or the link would 403.
+        $departmentId = $target->department_id
+            ?: ($target->team_id ? Team::where('id', $target->team_id)->value('department_id') : null);
+
+        if (!$departmentId) {
+            return false;
+        }
+
         // Head of the target's department.
-        if ($target->department_id && Department::where('id', $target->department_id)->where('head_id', $viewer->id)->exists()) {
+        if (Department::where('id', $departmentId)->where('head_id', $viewer->id)->exists()) {
             return true;
         }
 
-        // Head of the division the target's department belongs to.
-        if ($target->department_id) {
-            $divisionId = Department::where('id', $target->department_id)->value('division_id');
-            if ($divisionId && \App\Models\Division::where('id', $divisionId)->where('head_id', $viewer->id)->exists()) {
-                return true;
-            }
-        }
+        // Head of the division that department belongs to.
+        $divisionId = Department::where('id', $departmentId)->value('division_id');
 
-        return false;
+        return $divisionId
+            && \App\Models\Division::where('id', $divisionId)->where('head_id', $viewer->id)->exists();
     }
 
     public function create(): Response
