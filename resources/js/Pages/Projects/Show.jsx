@@ -1413,6 +1413,68 @@ export default function Show() {
         }
     };
 
+    /**
+     * Jump from a dashboard figure to the tasks behind it.
+     *
+     * Replaces the filters rather than adding to them: a number on the
+     * dashboard counts *all* matching tasks, so carrying an existing filter
+     * across would land on a list that doesn't add up to what was clicked.
+     * The search box is cleared for the same reason.
+     *
+     * The advanced panel is opened so the applied filters are visible and can
+     * be adjusted — a list that silently narrowed itself is worse than no
+     * drill-down at all.
+     */
+    const drillDown = useCallback((filters) => {
+        setDynamicFilters(
+            filters.map((f) => ({
+                id: nextFilterIdRef.current++,
+                operator: 'is',
+                ...f,
+            }))
+        );
+        setFilterSearch('');
+        setShowAdvancedFilters(true);
+        setView('list');
+    }, []);
+
+    /**
+     * A local calendar date, offset by days, as YYYY-MM-DD.
+     *
+     * Built from the local parts rather than toISOString(), which converts to
+     * UTC and would hand back yesterday for anyone ahead of Greenwich.
+     */
+    const isoDate = useCallback((offsetDays = 0) => {
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }, []);
+
+    /**
+     * The end of the dashboard's week window.
+     *
+     * Deliberately the same arithmetic the "Due This Week" panel uses —
+     * today + (7 - dayOfWeek) — so the drill-down covers exactly the days the
+     * tile counted. On a Sunday that is a week out, not today.
+     */
+    const isoEndOfWeek = useCallback(() => isoDate(7 - new Date().getDay()), [isoDate]);
+
+    /**
+     * The dashboard counts active tasks in most panels, so a drill-down has to
+     * exclude both closing statuses or the list will not match the figure that
+     * was clicked.
+     */
+    const activeOnly = useMemo(() => ([
+        { fieldId: 'status', operator: 'is_not', value: 'done' },
+        { fieldId: 'status', operator: 'is_not', value: 'cancelled' },
+    ]), []);
+
+    /** Overdue, expressed in the filter language the list view already speaks. */
+    const overdueFilters = useCallback(() => ([
+        { fieldId: 'due_date', operator: 'before', value: isoDate(0) },
+        ...activeOnly,
+    ]), [isoDate, activeOnly]);
+
     const addDynamicFilter = () => {
         setDynamicFilters(prev => [...prev, { id: nextFilterIdRef.current++, fieldId: '', operator: 'is', value: '' }]);
         setShowAdvancedFilters(true);
@@ -4273,12 +4335,21 @@ export default function Show() {
 
                 const stats = dashboardStats;
 
+                // Every drill-down target gets the same affordance: a pointer,
+                // a hover lift, and a focus ring for keyboard users.
+                const drillable = 'text-left w-full cursor-pointer transition-colors hover:border-primary-400 dark:hover:border-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40';
+
                 return (
                     <div className="h-full overflow-auto space-y-6">
                         {/* Summary Cards */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                             {/* Total Tasks */}
-                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                            <button
+                                type="button"
+                                onClick={() => drillDown([])}
+                                title="Show every task in the list"
+                                className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 ${drillable}`}
+                            >
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Tasks</span>
                                     <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</span>
@@ -4287,10 +4358,15 @@ export default function Show() {
                                     <div className="bg-green-500 h-2 rounded-full transition-all duration-500" style={{ width: `${stats.completionRate}%` }} />
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{stats.completionRate}% complete</p>
-                            </div>
+                            </button>
 
                             {/* Completed */}
-                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                            <button
+                                type="button"
+                                onClick={() => drillDown([{ fieldId: 'status', value: 'done' }])}
+                                title="Show completed tasks"
+                                className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 ${drillable}`}
+                            >
                                 <div className="flex items-center justify-between mb-1">
                                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed</span>
                                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/40">
@@ -4299,10 +4375,15 @@ export default function Show() {
                                 </div>
                                 <span className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.byStatus.done}</span>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">of {stats.total - stats.byStatus.cancelled} actionable</p>
-                            </div>
+                            </button>
 
                             {/* In Progress */}
-                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                            <button
+                                type="button"
+                                onClick={() => drillDown([{ fieldId: 'status', value: 'in_progress' }])}
+                                title="Show tasks in progress"
+                                className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 ${drillable}`}
+                            >
                                 <div className="flex items-center justify-between mb-1">
                                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">In Progress</span>
                                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-900/40">
@@ -4311,10 +4392,15 @@ export default function Show() {
                                 </div>
                                 <span className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.activeTasks}</span>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{stats.byStatus.backlog} backlog, {stats.byStatus.to_do} to do, {stats.byStatus.in_progress} active, {stats.byStatus.in_review} in review</p>
-                            </div>
+                            </button>
 
                             {/* Overdue */}
-                            <div className={`bg-white dark:bg-gray-800 rounded-xl border p-5 ${stats.overdue.length > 0 ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-gray-700'}`}>
+                            <button
+                                type="button"
+                                onClick={() => drillDown(overdueFilters())}
+                                title="Show overdue tasks"
+                                className={`bg-white dark:bg-gray-800 rounded-xl border p-5 ${drillable} ${stats.overdue.length > 0 ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-gray-700'}`}
+                            >
                                 <div className="flex items-center justify-between mb-1">
                                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Overdue</span>
                                     <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg ${stats.overdue.length > 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-gray-100 dark:bg-gray-700'}`}>
@@ -4323,7 +4409,7 @@ export default function Show() {
                                 </div>
                                 <span className={`text-2xl font-bold ${stats.overdue.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.overdue.length}</span>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">past due date</p>
-                            </div>
+                            </button>
                         </div>
 
                         {/* Status Breakdown + Priority Breakdown */}
@@ -4346,7 +4432,14 @@ export default function Show() {
                                         {/* Legend */}
                                         <div className="space-y-2">
                                             {TASK_STATUSES.map((s) => (
-                                                <div key={s} className="flex items-center justify-between">
+                                                <button
+                                                    key={s}
+                                                    type="button"
+                                                    onClick={() => drillDown([{ fieldId: 'status', value: s }])}
+                                                    disabled={stats.byStatus[s] === 0}
+                                                    title={`Show ${formatLabel(s).toLowerCase()} tasks`}
+                                                    className="w-full flex items-center justify-between rounded px-1 -mx-1 py-0.5 text-left enabled:hover:bg-gray-50 dark:enabled:hover:bg-gray-700/50 disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                                >
                                                     <div className="flex items-center gap-2">
                                                         <span className={`w-2.5 h-2.5 rounded-full ${STATUS_COLORS[s].bar}`} />
                                                         <span className="text-sm text-gray-600 dark:text-gray-300">{formatLabel(s)}</span>
@@ -4355,7 +4448,7 @@ export default function Show() {
                                                         <span className="text-sm font-medium text-gray-900 dark:text-white">{stats.byStatus[s]}</span>
                                                         <span className="text-xs text-gray-400 w-10 text-right">{stats.total > 0 ? Math.round((stats.byStatus[s] / stats.total) * 100) : 0}%</span>
                                                     </div>
-                                                </div>
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
@@ -4373,7 +4466,21 @@ export default function Show() {
                                             const count = stats.byPriority[p];
                                             const pct = stats.activeTasks > 0 ? (count / stats.activeTasks) * 100 : 0;
                                             return (
-                                                <div key={p}>
+                                                <button
+                                                    key={p}
+                                                    type="button"
+                                                    // The panel counts active tasks only, so the
+                                                    // drill-down excludes the closed ones too —
+                                                    // otherwise the list would not match the bar.
+                                                    onClick={() => drillDown([
+                                                        { fieldId: 'priority', value: p },
+                                                        { fieldId: 'status', operator: 'is_not', value: 'done' },
+                                                        { fieldId: 'status', operator: 'is_not', value: 'cancelled' },
+                                                    ])}
+                                                    disabled={count === 0}
+                                                    title={`Show active ${formatLabel(p).toLowerCase()} priority tasks`}
+                                                    className="w-full text-left rounded px-1 -mx-1 py-0.5 enabled:hover:bg-gray-50 dark:enabled:hover:bg-gray-700/50 disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+                                                >
                                                     <div className="flex items-center justify-between mb-1">
                                                         <span className={`text-sm font-medium ${PRIORITY_COLORS[p].text}`}>{formatLabel(p)}</span>
                                                         <span className="text-sm text-gray-600 dark:text-gray-300">{count}</span>
@@ -4381,7 +4488,7 @@ export default function Show() {
                                                     <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
                                                         <div className={`${PRIORITY_COLORS[p].bar} h-2 rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
                                                     </div>
-                                                </div>
+                                                </button>
                                             );
                                         })}
                                     </div>
@@ -4393,22 +4500,68 @@ export default function Show() {
                         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Due Date Overview</h3>
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className={`rounded-lg p-4 ${stats.overdue.length > 0 ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
-                                    <p className={`text-2xl font-bold ${stats.overdue.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.overdue.length}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Overdue</p>
-                                </div>
-                                <div className={`rounded-lg p-4 ${stats.dueToday.length > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
-                                    <p className={`text-2xl font-bold ${stats.dueToday.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.dueToday.length}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due Today</p>
-                                </div>
-                                <div className={`rounded-lg p-4 ${stats.dueThisWeek.length > 0 ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
-                                    <p className={`text-2xl font-bold ${stats.dueThisWeek.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>{stats.dueThisWeek.length}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Due This Week</p>
-                                </div>
-                                <div className="rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50">
-                                    <p className="text-2xl font-bold text-gray-500 dark:text-gray-400">{stats.noDueDate.length}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">No Due Date</p>
-                                </div>
+                                {/* Every tile here counts active tasks only, so each
+                                    drill-down carries the same two exclusions — the
+                                    list has to add up to the number on the tile. */}
+                                {[
+                                    {
+                                        key: 'overdue',
+                                        label: 'Overdue',
+                                        count: stats.overdue.length,
+                                        filters: overdueFilters(),
+                                        tone: 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800',
+                                        text: 'text-red-600 dark:text-red-400',
+                                    },
+                                    {
+                                        key: 'today',
+                                        label: 'Due Today',
+                                        count: stats.dueToday.length,
+                                        filters: [
+                                            { fieldId: 'due_date', operator: 'is', value: isoDate(0) },
+                                            ...activeOnly,
+                                        ],
+                                        tone: 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800',
+                                        text: 'text-amber-600 dark:text-amber-400',
+                                    },
+                                    {
+                                        key: 'week',
+                                        label: 'Due This Week',
+                                        count: stats.dueThisWeek.length,
+                                        filters: [
+                                            { fieldId: 'due_date', operator: 'between', value: { from: isoDate(0), to: isoEndOfWeek() } },
+                                            ...activeOnly,
+                                        ],
+                                        tone: 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800',
+                                        text: 'text-blue-600 dark:text-blue-400',
+                                    },
+                                    {
+                                        key: 'none',
+                                        label: 'No Due Date',
+                                        count: stats.noDueDate.length,
+                                        filters: [
+                                            { fieldId: 'due_date', operator: 'is_empty', value: '' },
+                                            ...activeOnly,
+                                        ],
+                                        tone: '',
+                                        text: 'text-gray-500 dark:text-gray-400',
+                                    },
+                                ].map((tile) => (
+                                    <button
+                                        key={tile.key}
+                                        type="button"
+                                        onClick={() => drillDown(tile.filters)}
+                                        disabled={tile.count === 0}
+                                        title={`Show active tasks — ${tile.label.toLowerCase()}`}
+                                        className={`rounded-lg p-4 text-left transition-shadow enabled:hover:ring-2 enabled:hover:ring-primary-400/40 disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 ${
+                                            tile.count > 0 && tile.tone ? tile.tone : 'bg-gray-50 dark:bg-gray-700/50'
+                                        }`}
+                                    >
+                                        <p className={`text-2xl font-bold ${tile.count > 0 ? tile.text : 'text-gray-400 dark:text-gray-500'}`}>
+                                            {tile.count}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{tile.label}</p>
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -4445,12 +4598,40 @@ export default function Show() {
                                                                 <span className="text-gray-400 dark:text-gray-500 italic">Unassigned</span>
                                                             )}
                                                         </td>
-                                                        <td className="text-center py-2.5 px-3 text-gray-900 dark:text-white font-medium">{a.total}</td>
-                                                        <td className="text-center py-2.5 px-3 text-blue-600 dark:text-blue-400">{a.active}</td>
-                                                        <td className="text-center py-2.5 px-3 text-green-600 dark:text-green-400">{a.done}</td>
-                                                        <td className="text-center py-2.5 px-3">
-                                                            <span className={a.overdue > 0 ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-400 dark:text-gray-500'}>{a.overdue}</span>
-                                                        </td>
+                                                        {/* Each number opens the tasks behind it, for
+                                                            this person, on the same terms the column
+                                                            was counted. */}
+                                                        {[
+                                                            { value: a.total, filters: [], className: 'text-gray-900 dark:text-white font-medium', what: 'all tasks' },
+                                                            { value: a.active, filters: activeOnly, className: 'text-blue-600 dark:text-blue-400', what: 'active tasks' },
+                                                            { value: a.done, filters: [{ fieldId: 'status', value: 'done' }], className: 'text-green-600 dark:text-green-400', what: 'completed tasks' },
+                                                            {
+                                                                value: a.overdue,
+                                                                filters: overdueFilters(),
+                                                                className: a.overdue > 0 ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-400 dark:text-gray-500',
+                                                                what: 'overdue tasks',
+                                                            },
+                                                        ].map((cell, i) => (
+                                                            <td key={i} className="text-center py-2.5 px-3">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => drillDown([
+                                                                        // The workload table keys unassigned rows
+                                                                        // as 'unassigned'; the filter expresses the
+                                                                        // same thing as an empty assignee.
+                                                                        a.id === 'unassigned'
+                                                                            ? { fieldId: 'assignee', operator: 'is_empty', value: '' }
+                                                                            : { fieldId: 'assignee', value: String(a.id) },
+                                                                        ...cell.filters,
+                                                                    ])}
+                                                                    disabled={cell.value === 0}
+                                                                    title={`Show ${cell.what} for ${a.user?.name || 'unassigned'}`}
+                                                                    className={`rounded px-1.5 py-0.5 enabled:hover:bg-gray-100 dark:enabled:hover:bg-gray-700 disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 ${cell.className}`}
+                                                                >
+                                                                    {cell.value}
+                                                                </button>
+                                                            </td>
+                                                        ))}
                                                         <td className="py-2.5 pl-4">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="w-20 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
