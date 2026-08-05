@@ -27,6 +27,9 @@ class ProjectChartController extends Controller
     private const CIRCULAR_CHARTS = ['donut', 'pie'];
     private const CHART_TYPES = ['bar', 'column', 'donut', 'pie', 'line', 'area'];
 
+    /** Bucket widths a time chart's X axis can use. */
+    private const TIME_GROUPINGS = ['auto', 'day', 'week', 'week_number', 'month'];
+
     /**
      * What goes up the Y axis.
      *
@@ -96,6 +99,10 @@ class ProjectChartController extends Controller
                 'integer',
                 Rule::exists('custom_fields', 'id')->where('project_id', $project->id),
             ],
+
+            // How wide each bucket on a time chart is. Null or 'auto' keeps
+            // the original behaviour: weeks, switching to months past twenty.
+            'time_grouping' => ['nullable', Rule::in(self::TIME_GROUPINGS)],
 
             'x_label' => ['nullable', 'string', 'max:60'],
             'y_label' => ['nullable', 'string', 'max:60'],
@@ -199,6 +206,9 @@ class ProjectChartController extends Controller
             'stack_custom_field_id' => ($validated['stack_by'] ?? null) === 'custom_field'
                 ? (int) $validated['stack_custom_field_id']
                 : null,
+            // Only meaningful on a time chart — a category axis has no buckets
+            // to widen, so storing one there would be dead config.
+            'time_grouping' => $overTime ? ($validated['time_grouping'] ?? 'auto') : null,
             'x_label' => $validated['x_label'] ?? null,
             'y_label' => $validated['y_label'] ?? null,
             // A time chart's X axis is dates, so a hand-entered category has

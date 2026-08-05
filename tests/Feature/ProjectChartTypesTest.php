@@ -198,6 +198,85 @@ class ProjectChartTypesTest extends TestCase
         $this->assertSame([], $config['reference_lines'] ?? []);
     }
 
+    // ---- the time axis ----
+
+    public function test_a_time_chart_can_be_grouped_by_week_number(): void
+    {
+        $this->newChart([
+            'chart_type' => 'line',
+            'group_by' => 'completed_over_time',
+            'time_grouping' => 'week_number',
+            'y_label' => 'Tasks',
+            'x_label' => 'Week',
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertSame('week_number', $config['time_grouping']);
+        $this->assertSame('Week', $config['x_label']);
+        $this->assertSame('Tasks', $config['y_label']);
+        // Counting tasks is the default measure, which is what the Y axis wants.
+        $this->assertSame('count', $config['measure']);
+    }
+
+    public static function timeGroupings(): array
+    {
+        return [
+            'auto' => ['auto'],
+            'day' => ['day'],
+            'week' => ['week'],
+            'week number' => ['week_number'],
+            'month' => ['month'],
+        ];
+    }
+
+    #[DataProvider('timeGroupings')]
+    public function test_every_grouping_in_the_picker_is_accepted(string $grouping): void
+    {
+        $this->newChart([
+            'chart_type' => 'area',
+            'group_by' => 'created_over_time',
+            'time_grouping' => $grouping,
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertSame($grouping, $config['time_grouping']);
+    }
+
+    public function test_an_unknown_grouping_is_rejected(): void
+    {
+        $this->newChart([
+            'chart_type' => 'line',
+            'group_by' => 'completed_over_time',
+            'time_grouping' => 'fortnight',
+        ])->assertStatus(422);
+    }
+
+    public function test_a_category_chart_stores_no_grouping(): void
+    {
+        // A status axis has no buckets to widen; storing one would be dead
+        // config that reappears if the chart is later switched to a line.
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'status',
+            'time_grouping' => 'week_number',
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertNull($config['time_grouping']);
+    }
+
+    public function test_an_existing_time_chart_defaults_to_automatic(): void
+    {
+        $this->newChart(['chart_type' => 'line', 'group_by' => 'due_over_time'])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertSame('auto', $config['time_grouping']);
+    }
+
     public function test_an_existing_chart_can_be_switched_to_a_new_type(): void
     {
         $this->newChart(['chart_type' => 'bar', 'group_by' => 'status'])->assertSuccessful();

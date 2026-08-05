@@ -4,6 +4,7 @@ import Button from './Button';
 import Input from './Input';
 import Select from './Select';
 import { formatLabel, apiFetch } from '../utils';
+import { isoWeekParts } from '../weekOfYear';
 
 // Categorical palette (validated for CVD safety + contrast on white / gray-800
 // surfaces). Slot order is the colorblind-safety mechanism — never reorder.
@@ -131,6 +132,20 @@ function formatValue(value, measure) {
     const rounded = Math.abs(value % 1) < 0.05 ? Math.round(value) : Math.round(value * 10) / 10;
     return `${rounded}${unit}`;
 }
+
+/**
+ * How wide each bucket on a time chart is.
+ *
+ * Automatic is what every existing chart used before this was configurable, so
+ * leaving it alone changes nothing.
+ */
+const TIME_GROUPINGS = [
+    { value: 'auto', label: 'Automatic' },
+    { value: 'day', label: 'Day' },
+    { value: 'week', label: 'Week (starting date)' },
+    { value: 'week_number', label: 'Week number (W32)' },
+    { value: 'month', label: 'Month' },
+];
 
 const SCOPES = [
     { value: 'all', label: 'All tasks' },
@@ -532,48 +547,116 @@ function computeTimeData(chart, allTasks) {
 
     const min = new Date(Math.min(...dates));
     const max = new Date(Math.max(...dates, Date.now()));
-    const weeks = Math.ceil((max - min) / (7 * DAY_MS)) + 1;
-    const monthly = weeks > 20;
+
+    const grouping = resolveTimeGrouping(chart.config?.time_grouping, min, max);
 
     const buckets = [];
-    if (monthly) {
+
+    if (grouping === 'month') {
         const cursor = new Date(min.getFullYear(), min.getMonth(), 1);
         while (cursor <= max) {
             buckets.push({
                 date: new Date(cursor),
                 label: cursor.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-                count: 0,
+                tasks: [],
             });
             cursor.setMonth(cursor.getMonth() + 1);
         }
-        buckets.forEach((b) => { b.tasks = []; });
         points.forEach(({ task, date: d }) => {
             const i = (d.getFullYear() - min.getFullYear()) * 12 + (d.getMonth() - min.getMonth());
             if (buckets[i]) buckets[i].tasks.push(task);
         });
+    } else if (grouping === 'day') {
+        const start = startOfDay(min);
+        const cursor = new Date(start);
+        while (cursor <= max) {
+            buckets.push({
+                date: new Date(cursor),
+                label: cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                tasks: [],
+            });
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        points.forEach(({ task, date: d }) => {
+            const i = Math.round((startOfDay(d) - start) / DAY_MS);
+            if (buckets[i]) buckets[i].tasks.push(task);
+        });
     } else {
+        // Both week groupings share the same Monday-aligned buckets; only the
+        // label differs, which is what keeps "week 32" and the bar starting
+        // 3 Aug describing the same seven days.
         const start = startOfWeek(min);
         const cursor = new Date(start);
         while (cursor <= max) {
             buckets.push({
                 date: new Date(cursor),
                 label: cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                count: 0,
+                tasks: [],
             });
             cursor.setDate(cursor.getDate() + 7);
         }
-        buckets.forEach((b) => { b.tasks = []; });
         points.forEach(({ task, date: d }) => {
             const i = Math.floor((startOfWeek(d) - start) / (7 * DAY_MS));
             if (buckets[i]) buckets[i].tasks.push(task);
         });
+
+        if (grouping === 'week_number') {
+            labelByWeekNumber(buckets);
+        }
     }
+
     buckets.forEach((b) => {
         b.count = aggregate(b.tasks || [], measure, fieldId);
         delete b.tasks;
     });
 
     return buckets;
+}
+
+function startOfDay(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+/**
+ * Which bucket width to use.
+ *
+ * 'auto' keeps the original behaviour — weeks until there are too many to read,
+ * then months. Anything else is the author's explicit choice and is honoured
+ * even when it produces a crowded axis; they asked for it.
+ */
+function resolveTimeGrouping(setting, min, max) {
+    if (['day', 'week', 'week_number', 'month'].includes(setting)) {
+        return setting;
+    }
+
+    const weeks = Math.ceil((max - min) / (7 * DAY_MS)) + 1;
+
+    return weeks > 20 ? 'month' : 'week';
+}
+
+/**
+ * Relabel weekly buckets as ISO week numbers.
+ *
+ * Uses the same isoWeekParts as the Week of Year custom field, so a chart and a
+ * task field never disagree about which week a date falls in — they differ at
+ * year boundaries under any hand-rolled version.
+ *
+ * The year is only shown when the range crosses one, which is the only time
+ * "W1" after "W52" would otherwise be ambiguous.
+ */
+function labelByWeekNumber(buckets) {
+    const parts = buckets.map((b) => isoWeekParts(b.date.toISOString().slice(0, 10)));
+    const years = new Set(parts.filter(Boolean).map((p) => p.year));
+    const spansYears = years.size > 1;
+
+    buckets.forEach((b, i) => {
+        const part = parts[i];
+        if (!part) return;
+
+        b.label = spansYears ? `${part.year}-W${part.week}` : `W${part.week}`;
+    });
 }
 
 /**
@@ -1411,7 +1494,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
 
     const numberFields = numericFields(customFields);
 
-    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '' });
+    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto' });
 
     useEffect(() => {
         if (!isOpen) return;
@@ -1431,7 +1514,8 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
             reference_lines: chart.config?.reference_lines || [],
             stack_by: chart.config?.stack_by || '',
             stack_custom_field_id: chart.config?.stack_custom_field_id || '',
-        } : { title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '' });
+            time_grouping: chart.config?.time_grouping || 'auto',
+        } : { title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto' });
     }, [isOpen, chart]);
 
     const [tab, setTab] = useState('setup');
@@ -1552,6 +1636,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                             stack_by: canSplit && form.stack_by ? form.stack_by : null,
                             stack_custom_field_id: canSplit && form.stack_by === 'custom_field'
                                 ? form.stack_custom_field_id : null,
+                            time_grouping: isLine ? form.time_grouping : null,
                             manual_points: isLine ? [] : cleanPairs(form.manual_points),
                             reference_lines: circular ? [] : cleanPairs(form.reference_lines),
                         })}
@@ -1672,6 +1757,26 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                                 <option key={f.id} value={f.id}>{f.name}</option>
                             ))}
                         </Select>
+                    </div>
+                )}
+
+                {isLine && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            X axis — group time by
+                        </label>
+                        <Select
+                            value={form.time_grouping}
+                            onChange={(e) => setForm((f) => ({ ...f, time_grouping: e.target.value }))}
+                        >
+                            {TIME_GROUPINGS.map((g) => (
+                                <option key={g.value} value={g.value}>{g.label}</option>
+                            ))}
+                        </Select>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Automatic uses weeks, switching to months once there are more than
+                            twenty to show.
+                        </p>
                     </div>
                 )}
 
