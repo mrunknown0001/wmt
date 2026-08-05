@@ -3654,8 +3654,12 @@ export default function Show() {
                                                             taskCount={group.tasks.length}
                                                         />
                                                     )}
-                                                    {/* Naming a new sub-section, inline under its column. */}
-                                                    {addingSubsectionFor === group.id && (
+                                                    {/* Naming a new sub-section, inline under its column.
+                                                        The id check has to be explicit: the Unsectioned
+                                                        group has id null, and "not adding" is also null,
+                                                        so a bare equality matched it on every load and
+                                                        left the input permanently open. */}
+                                                    {addingSubsectionFor !== null && addingSubsectionFor === group.id && (
                                                         <div className="pl-6 py-1.5">
                                                             <input
                                                                 type="text"
