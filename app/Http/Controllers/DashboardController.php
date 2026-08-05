@@ -207,7 +207,7 @@ class DashboardController extends Controller
                 ->where('is_active', true)
                 ->withCount(['assignedTasks' => fn ($q) => $q->whereNotIn('status', ['done', 'cancelled'])])
                 // whereHas rather than having(): MySQL tolerates HAVING with no
-                // GROUP BY, other drivers reject it outright. Same meaning —
+                // GROUP BY, other drivers reject it outright. Same meaning â€”
                 // keep people who have at least one open task.
                 ->whereHas('assignedTasks', fn ($q) => $q->whereNotIn('status', ['done', 'cancelled']))
                 ->orderByDesc('assigned_tasks_count')

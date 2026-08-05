@@ -16,6 +16,18 @@ class ProjectChartController extends Controller
     private const TIME_DIMENSIONS = ['completed_over_time', 'created_over_time', 'due_over_time'];
 
     /**
+     * How it is drawn.
+     *
+     * Grouped into families rather than checked by name: a time chart plots a
+     * date axis, and a circular one divides a single whole so it can be neither
+     * split nor given a target line. Adding a type means adding it to a list
+     * here, not hunting down every comparison against 'donut'.
+     */
+    private const TIME_CHARTS = ['line', 'area'];
+    private const CIRCULAR_CHARTS = ['donut', 'pie'];
+    private const CHART_TYPES = ['bar', 'column', 'donut', 'pie', 'line', 'area'];
+
+    /**
      * What goes up the Y axis.
      *
      * Until now every chart counted tasks. Being able to plot hours — estimated
@@ -60,7 +72,7 @@ class ProjectChartController extends Controller
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'chart_type' => ['required', Rule::in(['bar', 'donut', 'line'])],
+            'chart_type' => ['required', Rule::in(self::CHART_TYPES)],
             'group_by' => ['required', Rule::in([...self::CATEGORY_DIMENSIONS, ...self::TIME_DIMENSIONS])],
             'custom_field_id' => [
                 'nullable',
@@ -101,8 +113,8 @@ class ProjectChartController extends Controller
             'reference_lines.*.value' => ['required', 'numeric', 'min:-1000000000', 'max:1000000000'],
         ]);
 
-        // Line charts take time dimensions; bar/donut take category dimensions
-        $allowed = $validated['chart_type'] === 'line'
+        // Time charts take a date axis; every other type takes a category.
+        $allowed = in_array($validated['chart_type'], self::TIME_CHARTS, true)
             ? self::TIME_DIMENSIONS
             : self::CATEGORY_DIMENSIONS;
 
@@ -120,10 +132,10 @@ class ProjectChartController extends Controller
         $stackBy = $validated['stack_by'] ?? null;
 
         if ($stackBy !== null) {
-            // A donut is already a breakdown of one whole; splitting its
+            // A donut or pie is already a breakdown of one whole; splitting its
             // segments again has nowhere to go.
-            if ($validated['chart_type'] === 'donut') {
-                abort(422, 'A donut cannot be split by a second dimension.');
+            if (in_array($validated['chart_type'], self::CIRCULAR_CHARTS, true)) {
+                abort(422, 'A donut or pie cannot be split by a second dimension.');
             }
 
             // Splitting a dimension by itself yields one series per bar and
@@ -153,10 +165,10 @@ class ProjectChartController extends Controller
             }
         }
 
-        // A donut divides a whole into parts. An average is not a whole, so the
-        // segments would not add up to anything.
-        if ($validated['chart_type'] === 'donut' && $measure === 'avg_custom_field') {
-            abort(422, 'A donut cannot show an average — its segments have to sum to the total.');
+        // A donut or pie divides a whole into parts. An average is not a whole,
+        // so the segments would not add up to anything.
+        if (in_array($validated['chart_type'], self::CIRCULAR_CHARTS, true) && $measure === 'avg_custom_field') {
+            abort(422, 'A donut or pie cannot show an average — its segments have to sum to the total.');
         }
 
         return $validated;
@@ -166,6 +178,13 @@ class ProjectChartController extends Controller
     private function configFrom(array $validated): array
     {
         $measure = $validated['measure'] ?? 'count';
+
+        // Options the chosen type cannot draw are dropped here rather than
+        // stored and quietly ignored. The browser already does this; doing it
+        // on the server too means the stored config always describes something
+        // the chart can actually render, whichever client wrote it.
+        $circular = in_array($validated['chart_type'], self::CIRCULAR_CHARTS, true);
+        $overTime = in_array($validated['chart_type'], self::TIME_CHARTS, true);
 
         return [
             'custom_field_id' => $validated['group_by'] === 'custom_field'
@@ -182,8 +201,10 @@ class ProjectChartController extends Controller
                 : null,
             'x_label' => $validated['x_label'] ?? null,
             'y_label' => $validated['y_label'] ?? null,
-            'manual_points' => $this->normalisePairs($validated['manual_points'] ?? []),
-            'reference_lines' => $this->normalisePairs($validated['reference_lines'] ?? []),
+            // A time chart's X axis is dates, so a hand-entered category has
+            // nowhere to sit; a circle has no axis to draw a target across.
+            'manual_points' => $overTime ? [] : $this->normalisePairs($validated['manual_points'] ?? []),
+            'reference_lines' => $circular ? [] : $this->normalisePairs($validated['reference_lines'] ?? []),
         ];
     }
 

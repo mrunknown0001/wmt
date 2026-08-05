@@ -45,9 +45,15 @@ export default function Modal({ isOpen, onClose, title, children, actions, size 
                 className={`fixed inset-0 bg-black/50 ${isClosing ? 'animate-[backdrop-fade-in_200ms_ease_reverse_forwards]' : 'animate-backdrop'}`}
                 onClick={handleClose}
             />
-            <div className={`relative bg-white dark:bg-gray-800 rounded-xl shadow-xl ${SIZES[size] || SIZES.md} w-full mx-4 p-6 ${isClosing ? 'animate-[scale-out_200ms_ease_forwards]' : 'animate-scale-in'}`}>
+            {/*
+                Capped at the viewport with a scrolling body, so a long form
+                cannot run off the bottom of the screen with its buttons out of
+                reach. The header and actions stay put; only the content moves.
+                max-h does nothing to a modal that already fits.
+            */}
+            <div className={`relative bg-white dark:bg-gray-800 rounded-xl shadow-xl ${SIZES[size] || SIZES.md} w-full mx-4 p-6 max-h-[calc(100vh-2rem)] flex flex-col ${isClosing ? 'animate-[scale-out_200ms_ease_forwards]' : 'animate-scale-in'}`}>
                 {title && (
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2 shrink-0">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
                             <Tooltip content="Close"><button onClick={handleClose} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -56,8 +62,12 @@ export default function Modal({ isOpen, onClose, title, children, actions, size 
                             </button></Tooltip>
                     </div>
                 )}
-                <div className="text-sm text-gray-600 dark:text-gray-300">{children}</div>
-                {actions && <div className="mt-6 flex justify-end gap-2">{actions}</div>}
+                {/* -mx-1 px-1 keeps focus rings from being clipped by the
+                    scroll container; min-h-0 lets flex actually shrink it. */}
+                <div className="text-sm text-gray-600 dark:text-gray-300 overflow-y-auto min-h-0 -mx-1 px-1">
+                    {children}
+                </div>
+                {actions && <div className="mt-6 flex justify-end gap-2 shrink-0">{actions}</div>}
             </div>
         </div>,
         document.body

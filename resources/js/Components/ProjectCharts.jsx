@@ -138,6 +138,19 @@ const SCOPES = [
     { value: 'done', label: 'Completed tasks only' },
 ];
 
+/**
+ * Which family a chart type belongs to.
+ *
+ * Time charts plot a date axis and take the time dimensions; circular ones
+ * divide a single whole and so cannot be split or carry a target line. Every
+ * conditional in the form and the renderer asks one of these rather than
+ * listing type names again, which is how the old code drifted.
+ */
+const TIME_CHARTS = ['line', 'area'];
+const CIRCULAR_CHARTS = ['donut', 'pie'];
+const isTimeChart = (type) => TIME_CHARTS.includes(type);
+const isCircularChart = (type) => CIRCULAR_CHARTS.includes(type);
+
 const CHART_TYPES = [
     {
         value: 'bar',
@@ -164,6 +177,37 @@ const CHART_TYPES = [
         icon: (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
+            </svg>
+        ),
+    },
+    {
+        value: 'column',
+        label: 'Column',
+        hint: 'Vertical bars — good for a handful of categories',
+        icon: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 20V10M10 20V4M15 20v-7M20 20v-12" />
+            </svg>
+        ),
+    },
+    {
+        value: 'area',
+        label: 'Area',
+        hint: 'A filled line — emphasises volume over time',
+        icon: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8v11H3z" />
+            </svg>
+        ),
+    },
+    {
+        value: 'pie',
+        label: 'Pie',
+        hint: 'A donut with no hole',
+        icon: (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v9h9a9 9 0 11-9-9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14 3.2A9.01 9.01 0 0120.8 10H14V3.2z" />
             </svg>
         ),
     },
@@ -692,7 +736,7 @@ function StackedBarChart({ rows, series, measure = 'count', references = [], xLa
 }
 
 /** One line per series, over shared time buckets. */
-function MultiLineChart({ rows, series, measure = 'count', references = [], xLabel, yLabel }) {
+function MultiLineChart({ rows, series, measure = 'count', references = [], xLabel, yLabel, filled = false }) {
     const W = 600, H = 230;
     const M = { top: 14, right: 16, bottom: 30, left: 36 };
     const plotW = W - M.left - M.right;
@@ -739,6 +783,21 @@ function MultiLineChart({ rows, series, measure = 'count', references = [], xLab
                             stroke="var(--viz-other)" strokeWidth="1.5" strokeDasharray="5 4"
                         />
                     ) : null
+                ))}
+
+                {/* Bands first so every line still reads on top of them. Left
+                    translucent rather than stacked: these series are compared
+                    against each other, not summed. */}
+                {filled && series.map((s, si) => (
+                    <path
+                        key={`area-${s.key}`}
+                        d={
+                            rows.map((r, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(r.values[si])}`).join(' ')
+                            + ` L ${x(rows.length - 1)} ${y(0)} L ${x(0)} ${y(0)} Z`
+                        }
+                        fill={s.color}
+                        opacity={0.16}
+                    />
                 ))}
 
                 {series.map((s, si) => (
@@ -840,6 +899,111 @@ function BarChart({ buckets, measure = 'count', references = [], xLabel, yLabel 
     );
 }
 
+/**
+ * Vertical bars.
+ *
+ * The existing "bar" chart runs horizontally, which suits long labels like
+ * assignee names; this is the other orientation, which reads better for a few
+ * short categories and is what most people picture when they say bar chart.
+ *
+ * Takes the same rows as either the plain or the split renderer: when a row
+ * carries segments they stack up the column, otherwise it is drawn solid.
+ */
+function ColumnChart({ rows, series = null, measure = 'count', references = [], xLabel, yLabel }) {
+    const max = Math.max(...rows.map((r) => r.count), ...references.map((r) => r.value), 1);
+    const top = niceMax(max);
+
+    return (
+        <div>
+            {yLabel && (
+                <p className="mb-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {yLabel}
+                </p>
+            )}
+
+            <div className="relative">
+                {/* Targets sit behind the columns and share their scale. */}
+                {references.map((r, i) => (
+                    <div
+                        key={i}
+                        className="absolute left-0 right-0 border-t-2 border-dashed border-gray-500/70 pointer-events-none"
+                        style={{ bottom: `${Math.min(100, (r.value / top) * 100)}%`, marginBottom: '1.75rem' }}
+                        title={`${r.label}: ${formatValue(r.value, measure)}`}
+                    />
+                ))}
+
+                <div className="flex items-end gap-2 h-52 overflow-x-auto pb-0.5">
+                    {rows.map((row) => (
+                        <div key={row.key} className="flex-1 min-w-[2.5rem] flex flex-col items-center justify-end h-full">
+                            <span className="mb-1 text-[11px] font-medium text-gray-900 dark:text-white tabular-nums">
+                                {formatValue(row.count, measure)}
+                            </span>
+
+                            <div
+                                className="w-full max-w-[3.5rem] rounded-t overflow-hidden flex flex-col-reverse transition-all duration-500"
+                                style={{ height: `${Math.max(1, (row.count / top) * 100)}%` }}
+                                title={`${row.label}: ${formatValue(row.count, measure)}`}
+                            >
+                                {row.segments ? (
+                                    row.segments.map((seg) => (
+                                        <div
+                                            key={seg.key}
+                                            style={{
+                                                height: `${row.count > 0 ? (seg.value / row.count) * 100 : 0}%`,
+                                                backgroundColor: seg.color,
+                                            }}
+                                            title={`${seg.label}: ${formatValue(seg.value, measure)}`}
+                                        />
+                                    ))
+                                ) : (
+                                    <div
+                                        className={`h-full ${row.manual ? 'opacity-60' : ''}`}
+                                        style={{
+                                            backgroundColor: row.color,
+                                            backgroundImage: row.manual
+                                                ? 'repeating-linear-gradient(45deg, rgba(255,255,255,.45) 0 4px, transparent 4px 8px)'
+                                                : undefined,
+                                        }}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="flex gap-2 mt-1.5 border-t border-gray-200 dark:border-gray-700 pt-1.5">
+                    {rows.map((row) => (
+                        <span
+                            key={row.key}
+                            className={`flex-1 min-w-[2.5rem] text-center text-[11px] truncate ${
+                                row.manual ? 'text-gray-400 italic' : 'text-gray-500 dark:text-gray-400'
+                            }`}
+                            title={row.label}
+                        >
+                            {row.label}
+                        </span>
+                    ))}
+                </div>
+            </div>
+
+            {series && <SeriesLegend series={series} />}
+
+            {references.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-3">
+                    {references.map((r, i) => (
+                        <span key={i} className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="inline-block w-4 border-t-2 border-dashed border-gray-500/70" />
+                            {r.label} · {formatValue(r.value, measure)}
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {xLabel && <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">{xLabel}</p>}
+        </div>
+    );
+}
+
 function donutArcPath(cx, cy, rOuter, rInner, startAngle, endAngle) {
     const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
     const p = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
@@ -856,11 +1020,16 @@ function donutArcPath(cx, cy, rOuter, rInner, startAngle, endAngle) {
     ].join(' ');
 }
 
-function DonutChart({ buckets, measure = 'count' }) {
+/**
+ * @param hollow  false draws a pie — the same geometry with no hole. The total
+ *                then moves out of the centre and sits above the legend, since
+ *                a pie has nowhere to put it.
+ */
+function DonutChart({ buckets, measure = 'count', hollow = true }) {
     const [hovered, setHovered] = useState(null);
     const total = buckets.reduce((sum, b) => sum + b.count, 0);
 
-    const cx = 90, cy = 90, rOuter = 80, rInner = 52;
+    const cx = 90, cy = 90, rOuter = 80, rInner = hollow ? 52 : 0;
     const padAngle = buckets.length > 1 ? 0.035 : 0; // ~2px surface gap at mid-radius
     let angle = -Math.PI / 2;
     const slices = buckets.map((b) => {
@@ -875,10 +1044,14 @@ function DonutChart({ buckets, measure = 'count' }) {
             <div className="relative shrink-0">
                 <svg viewBox="0 0 180 180" className="w-40 h-40" role="img">
                     {buckets.length === 1 ? (
-                        <circle
-                            cx={cx} cy={cy} r={(rOuter + rInner) / 2}
-                            fill="none" stroke={buckets[0].color} strokeWidth={rOuter - rInner}
-                        />
+                        hollow ? (
+                            <circle
+                                cx={cx} cy={cy} r={(rOuter + rInner) / 2}
+                                fill="none" stroke={buckets[0].color} strokeWidth={rOuter - rInner}
+                            />
+                        ) : (
+                            <circle cx={cx} cy={cy} r={rOuter} fill={buckets[0].color} />
+                        )
                     ) : (
                         slices.map((s) => (
                             <path
@@ -894,13 +1067,21 @@ function DonutChart({ buckets, measure = 'count' }) {
                         ))
                     )}
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{total}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">tasks</span>
-                </div>
+                {hollow && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-2xl font-bold text-gray-900 dark:text-white">{total}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">tasks</span>
+                    </div>
+                )}
             </div>
             {/* Legend doubles as the readable value channel for every slice */}
             <div className="min-w-0 flex-1 space-y-1.5 self-center w-full">
+                {!hollow && (
+                    <div className="flex items-baseline gap-1.5 pb-1 mb-1 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-lg font-bold text-gray-900 dark:text-white">{total}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">total</span>
+                    </div>
+                )}
                 {buckets.map((b) => (
                     <div
                         key={b.key}
@@ -925,7 +1106,8 @@ function DonutChart({ buckets, measure = 'count' }) {
     );
 }
 
-function LineChart({ buckets, measure = 'count', references = [], xLabel, yLabel }) {
+/** @param filled  draws the area chart � the same line with the fill turned up. */
+function LineChart({ buckets, measure = 'count', references = [], xLabel, yLabel, filled = false }) {
     const [hovered, setHovered] = useState(null);
     const svgRef = useRef(null);
 
@@ -1000,7 +1182,7 @@ function LineChart({ buckets, measure = 'count', references = [], xLabel, yLabel
                     ) : null
                 )}
 
-                <path d={areaPath} fill="var(--viz-s1)" opacity="0.1" />
+                <path d={areaPath} fill="var(--viz-s1)" opacity={filled ? 0.3 : 0.1} />
                 {/* Targets sit behind the data, so the measured line reads first. */}
                 {references.map((r, i) => (
                     r.value <= yMax ? (
@@ -1104,23 +1286,29 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
     const measure = chart.config?.measure || 'count';
     const references = useMemo(() => referenceLines(chart), [chart]);
 
-    // A donut is already a breakdown of one whole, so it never splits.
-    const stackBy = chart.chart_type === 'donut' ? null : chart.config?.stack_by;
+    const type = chart.chart_type;
+    const overTime = isTimeChart(type);
+    const circular = isCircularChart(type);
+
+    // A donut or pie is already a breakdown of one whole, so it never splits.
+    const stackBy = circular ? null : chart.config?.stack_by;
 
     const split = useMemo(() => {
         if (!stackBy) return null;
 
-        return chart.chart_type === 'line'
+        return overTime
             ? computeStackedTimeData(chart, allTasks, sections, customFields)
             : computeStackedData(chart, allTasks, sections, customFields);
-    }, [stackBy, chart, allTasks, sections, customFields]);
+    }, [stackBy, overTime, chart, allTasks, sections, customFields]);
 
     const data = useMemo(() => {
         if (stackBy) return [];
-        if (chart.chart_type === 'line') return computeTimeData(chart, allTasks);
+        if (overTime) return computeTimeData(chart, allTasks);
 
         const buckets = computeCategoryData(chart, allTasks, sections, customFields);
-        const folded = foldBuckets(buckets, chart.chart_type === 'donut' ? 8 : 12);
+        // A circle can only carry so many slices before the labels collide;
+        // a column chart runs out of horizontal room sooner than a bar.
+        const folded = foldBuckets(buckets, circular ? 8 : type === 'column' ? 10 : 12);
 
         // Hand-entered figures are appended after folding, so an "Other" bucket
         // can never swallow one — they were typed in precisely to be seen.
@@ -1176,8 +1364,14 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
             {isEmpty ? (
                 <p className="text-sm text-gray-500 dark:text-gray-400 py-8 text-center">No matching tasks yet</p>
             ) : stackBy ? (
-                chart.chart_type === 'line' ? (
+                overTime ? (
                     <MultiLineChart
+                        rows={split.rows} series={split.series} measure={measure} references={references}
+                        xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                        filled={type === 'area'}
+                    />
+                ) : type === 'column' ? (
+                    <ColumnChart
                         rows={split.rows} series={split.series} measure={measure} references={references}
                         xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
                     />
@@ -1187,17 +1381,23 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
                         xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
                     />
                 )
-            ) : chart.chart_type === 'bar' ? (
+            ) : type === 'bar' ? (
                 <BarChart
                     buckets={data} measure={measure} references={references}
                     xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
                 />
-            ) : chart.chart_type === 'donut' ? (
-                <DonutChart buckets={data} measure={measure} />
+            ) : type === 'column' ? (
+                <ColumnChart
+                    rows={data} measure={measure} references={references}
+                    xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                />
+            ) : circular ? (
+                <DonutChart buckets={data} measure={measure} hollow={type === 'donut'} />
             ) : (
                 <LineChart
                     buckets={data} measure={measure} references={references}
                     xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                    filled={type === 'area'}
                 />
             )}
         </div>
@@ -1215,6 +1415,8 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
 
     useEffect(() => {
         if (!isOpen) return;
+        // Always opens on Setup, whichever tab was left showing last time.
+        setTab('setup');
         setForm(chart ? {
             title: chart.title,
             chart_type: chart.chart_type,
@@ -1232,18 +1434,21 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
         } : { title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '' });
     }, [isOpen, chart]);
 
-    const isLine = form.chart_type === 'line';
+    const [tab, setTab] = useState('setup');
+
+    const isLine = isTimeChart(form.chart_type);
+    const circular = isCircularChart(form.chart_type);
     const dimensions = isLine ? TIME_DIMENSIONS : CATEGORY_DIMENSIONS;
 
     const setType = (type) => {
         setForm((f) => {
             const next = { ...f, chart_type: type };
-            const allowed = (type === 'line' ? TIME_DIMENSIONS : CATEGORY_DIMENSIONS).map((d) => d.value);
+            const allowed = (isTimeChart(type) ? TIME_DIMENSIONS : CATEGORY_DIMENSIONS).map((d) => d.value);
             if (!allowed.includes(next.group_by)) next.group_by = allowed[0];
 
             // A donut cannot be split, and a dimension cannot split itself —
             // leaving a stale value here would be rejected on save.
-            if (type === 'donut' || next.stack_by === next.group_by) {
+            if (isCircularChart(type) || next.stack_by === next.group_by) {
                 next.stack_by = '';
                 next.stack_custom_field_id = '';
             }
@@ -1256,7 +1461,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
 
     // A donut is already a breakdown of one whole, so there is nothing left to
     // split; and a dimension cannot be split by itself.
-    const canSplit = form.chart_type !== 'donut';
+    const canSplit = !circular;
     const splitOptions = CATEGORY_DIMENSIONS.filter((d) => d.value !== form.group_by);
     const needsSplitField = form.stack_by === 'custom_field';
 
@@ -1272,6 +1477,17 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
         .filter((r) => r.label !== '');
 
     const setPairs = (key, rows) => setForm((f) => ({ ...f, [key]: rows }));
+
+    // How much is set on the second tab, so its badge can say so. Counted from
+    // what is actually in force — a split that the current chart type forbids
+    // is not advertised as configured.
+    const advancedCount = [
+        form.measure !== 'count',
+        canSplit && !!form.stack_by,
+        !!form.x_label.trim() || !!form.y_label.trim(),
+        !circular && cleanPairs(form.reference_lines).length > 0,
+        !isLine && cleanPairs(form.manual_points).length > 0,
+    ].filter(Boolean).length;
 
     const pairEditor = (key, heading, hint, addLabel) => (
         <div>
@@ -1337,7 +1553,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                             stack_custom_field_id: canSplit && form.stack_by === 'custom_field'
                                 ? form.stack_custom_field_id : null,
                             manual_points: isLine ? [] : cleanPairs(form.manual_points),
-                            reference_lines: form.chart_type === 'donut' ? [] : cleanPairs(form.reference_lines),
+                            reference_lines: circular ? [] : cleanPairs(form.reference_lines),
                         })}
                         disabled={!canSave || saving}
                     >
@@ -1350,6 +1566,42 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                 {error && (
                     <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>
                 )}
+
+                {/*
+                    Two tabs rather than one long scroll. Nearly every chart is
+                    made from the four fields on the first one; measures, splits,
+                    axis labels, targets and hand-entered figures are real
+                    capabilities but wanted rarely, and showing all eleven at once
+                    made a simple chart look like a configuration exercise.
+                    The dot marks the second tab when something there is set, so
+                    nothing is hidden without a trace.
+                */}
+                <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-700 -mt-1">
+                    {[
+                        { key: 'setup', label: 'Setup' },
+                        { key: 'advanced', label: 'Advanced' },
+                    ].map((t) => (
+                        <button
+                            key={t.key}
+                            type="button"
+                            onClick={() => setTab(t.key)}
+                            className={`relative px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                                tab === t.key
+                                    ? 'border-primary-500 text-primary-700 dark:text-primary-300'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            {t.label}
+                            {t.key === 'advanced' && advancedCount > 0 && (
+                                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 text-[10px] font-semibold px-1.5">
+                                    {advancedCount}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                <div className={tab === 'setup' ? 'space-y-4' : 'hidden'}>
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
@@ -1369,6 +1621,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                                 key={t.value}
                                 type="button"
                                 onClick={() => setType(t.value)}
+                                title={t.hint || t.label}
                                 className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
                                     form.chart_type === t.value
                                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
@@ -1436,8 +1689,12 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                     </div>
                 )}
 
+                </div>
+
+                <div className={tab === 'advanced' ? 'space-y-4' : 'hidden'}>
+
                 {/* Y axis — what is being measured, not just how many rows. */}
-                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Y axis — what to measure
                     </label>
@@ -1448,7 +1705,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                         {MEASURES
                             // A donut divides a whole into parts, so an average
                             // has nothing to divide.
-                            .filter((m) => !(form.chart_type === 'donut' && m.value === 'avg_custom_field'))
+                            .filter((m) => !(circular && m.value === 'avg_custom_field'))
                             .map((m) => (
                                 <option key={m.value} value={m.value}>{m.label}</option>
                             ))}
@@ -1546,7 +1803,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                     </div>
                 )}
 
-                {form.chart_type !== 'donut' && pairEditor(
+                {!circular && pairEditor(
                     'reference_lines',
                     'Target lines',
                     'A constant drawn across the chart — a target, a threshold, a capacity.',
@@ -1559,6 +1816,8 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, saving, 
                     'Values you type in yourself, shown beside the measured data and hatched so the two are never confused.',
                     'Add a figure',
                 )}
+
+                </div>
             </div>
         </Modal>
     );
