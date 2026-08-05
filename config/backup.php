@@ -143,7 +143,23 @@ return [
              *
              * For more check https://www.php.net/manual/zip.constants.php and confirm it's supported by your system.
              */
-            'compression_method' => ZipArchive::CM_DEFAULT,
+            /*
+             * DEFLATE named explicitly rather than CM_DEFAULT.
+             *
+             * libzip only accepts a compression level for DEFLATE; with
+             * CM_DEFAULT the level must be 0. Some builds tolerate the
+             * mismatch and some reject it, and the rejection does not surface
+             * where you would look for it: Spatie does not check the result of
+             * setCompressionName(), so the archive is happily assembled and
+             * then dies at close() with "ZipArchive::close(): Invalid
+             * argument". That is what broke backup:run on the production
+             * server while the same config worked in Docker.
+             *
+             * The dump is not pre-compressed (database_dump_compressor is
+             * null), so the zip is doing the real work here and level 9 is
+             * worth keeping.
+             */
+            'compression_method' => ZipArchive::CM_DEFLATE,
 
             /*
              * The compression level corresponding to the used algorithm; an integer between 0 and 9.
