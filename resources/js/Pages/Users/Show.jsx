@@ -4,6 +4,7 @@ import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Avatar from '../../Components/Avatar';
+import InfoTip from '../../Components/InfoTip';
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
 const fmtDateTime = (d) => (d ? new Date(d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -20,20 +21,6 @@ const rateColor = (r) => (r >= 75 ? 'text-green-600 dark:text-green-400' : r >= 
 const barColor = (r) => (r >= 75 ? 'bg-green-500' : r >= 40 ? 'bg-amber-500' : 'bg-red-500');
 
 // Small info affordance with a hover tooltip.
-function InfoTip({ text }) {
-    return (
-        <span className="group relative inline-flex align-middle">
-            <svg className="h-3.5 w-3.5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="12" cy="12" r="9" />
-                <path strokeLinecap="round" d="M12 16v-4M12 8h.01" />
-            </svg>
-            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 z-20 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-xs font-normal leading-relaxed px-3 py-2 shadow-lg text-left normal-case">
-                {text}
-            </span>
-        </span>
-    );
-}
-
 const PRODUCTIVITY_TIP = 'Weighted score: 50% Completion Rate + 30% On-Time Rate + 20% Activity. Activity is this user’s actions over the last 30 days, counting up to 20 (each action = 5 points, capped at 100).';
 
 function Meter({ label, value, suffix = '%', tip }) {

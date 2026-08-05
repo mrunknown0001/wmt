@@ -1,6 +1,14 @@
 import { Link } from '@inertiajs/react';
 
-export default function PageHeader({ title, titleExtra, breadcrumbs = [], actions }) {
+/**
+ * @param description  One or two sentences saying what this page is for, shown
+ *                     under the title. Optional, so pages that have nothing
+ *                     useful to add stay exactly as they were — but every page
+ *                     now has somewhere to put it, which is what was missing.
+ *                     Takes a node as well as a string, so a description can
+ *                     carry a link without a second prop.
+ */
+export default function PageHeader({ title, titleExtra, description, breadcrumbs = [], actions }) {
     return (
         <div className="mb-6">
             {breadcrumbs.length > 0 && (
@@ -30,6 +38,13 @@ export default function PageHeader({ title, titleExtra, breadcrumbs = [], action
                 </div>
                 {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
             </div>
+            {description && (
+                // max-w-2xl because a sentence running the full width of a wide
+                // screen is harder to read than one that wraps.
+                <p className="mt-1.5 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+                    {description}
+                </p>
+            )}
         </div>
     );
 }
