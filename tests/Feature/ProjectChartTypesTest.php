@@ -277,6 +277,147 @@ class ProjectChartTypesTest extends TestCase
         $this->assertSame('auto', $config['time_grouping']);
     }
 
+    // ---- cards ----
+
+    public function test_a_card_saves_with_no_dimension(): void
+    {
+        $this->newChart([
+            'title' => 'Open tasks',
+            'chart_type' => 'metric',
+            'group_by' => 'none',
+            'measure' => 'count',
+            'scope' => 'active',
+        ])->assertSuccessful();
+
+        $this->assertDatabaseHas('project_charts', [
+            'project_id' => $this->project->id,
+            'chart_type' => 'metric',
+            'group_by' => 'none',
+        ]);
+    }
+
+    public function test_a_card_keeps_its_filters_and_target(): void
+    {
+        $this->newChart([
+            'chart_type' => 'metric',
+            'group_by' => 'none',
+            'measure' => 'sum_estimate',
+            'filters' => [
+                ['field' => 'priority', 'value' => 'urgent'],
+                ['field' => 'status', 'value' => 'in_progress'],
+            ],
+            'compare' => 'target',
+            'target' => 40,
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertCount(2, $config['filters']);
+        $this->assertSame('priority', $config['filters'][0]['field']);
+        $this->assertSame('urgent', $config['filters'][0]['value']);
+        $this->assertSame('target', $config['compare']);
+        // assertEquals, not assertSame: JSON writes 40.0 back as an int.
+        $this->assertEquals(40, $config['target']);
+        $this->assertSame('sum_estimate', $config['measure']);
+    }
+
+    public function test_a_target_is_dropped_when_nothing_is_being_compared(): void
+    {
+        $this->newChart([
+            'chart_type' => 'metric',
+            'group_by' => 'none',
+            'compare' => 'percent',
+            'target' => 40,
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        // Storing it would resurrect a stale number if the card were later
+        // switched back to comparing against a target.
+        $this->assertNull($config['target']);
+        $this->assertSame('percent', $config['compare']);
+    }
+
+    public function test_a_card_refuses_a_real_dimension(): void
+    {
+        $this->newChart([
+            'chart_type' => 'metric',
+            'group_by' => 'status',
+        ])->assertStatus(422);
+    }
+
+    public function test_a_chart_refuses_the_card_dimension(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'none',
+        ])->assertStatus(422);
+    }
+
+    public function test_a_chart_stores_no_card_settings(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'status',
+            'filters' => [['field' => 'priority', 'value' => 'urgent']],
+            'compare' => 'target',
+            'target' => 40,
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertSame([], $config['filters']);
+        $this->assertNull($config['compare']);
+        $this->assertNull($config['target']);
+    }
+
+    public function test_a_card_stores_no_chart_settings(): void
+    {
+        $this->newChart([
+            'chart_type' => 'metric',
+            'group_by' => 'none',
+            'reference_lines' => [['label' => 'Target', 'value' => 40]],
+            'manual_points' => [['label' => 'Last quarter', 'value' => 31]],
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        // A card has no axis to draw either against; `target` covers the need.
+        $this->assertSame([], $config['reference_lines']);
+        $this->assertSame([], $config['manual_points']);
+    }
+
+    public function test_too_many_filters_are_rejected(): void
+    {
+        $this->newChart([
+            'chart_type' => 'metric',
+            'group_by' => 'none',
+            'filters' => array_fill(0, 6, ['field' => 'status', 'value' => 'done']),
+        ])->assertStatus(422);
+    }
+
+    public function test_a_filter_on_an_unknown_dimension_is_rejected(): void
+    {
+        $this->newChart([
+            'chart_type' => 'metric',
+            'group_by' => 'none',
+            'filters' => [['field' => 'due_over_time', 'value' => 'x']],
+        ])->assertStatus(422);
+    }
+
+    public function test_a_card_can_be_turned_into_a_chart(): void
+    {
+        $this->newChart(['chart_type' => 'metric', 'group_by' => 'none'])->assertSuccessful();
+        $id = \DB::table('project_charts')->latest('id')->value('id');
+
+        $this->actingAs($this->owner)->putJson(
+            "/projects/{$this->project->id}/charts/{$id}",
+            ['title' => 'Now a chart', 'chart_type' => 'bar', 'group_by' => 'status']
+        )->assertSuccessful();
+
+        $this->assertDatabaseHas('project_charts', ['id' => $id, 'chart_type' => 'bar', 'group_by' => 'status']);
+    }
+
     public function test_an_existing_chart_can_be_switched_to_a_new_type(): void
     {
         $this->newChart(['chart_type' => 'bar', 'group_by' => 'status'])->assertSuccessful();

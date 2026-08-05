@@ -25,7 +25,16 @@ class ProjectChartController extends Controller
      */
     private const TIME_CHARTS = ['line', 'area'];
     private const CIRCULAR_CHARTS = ['donut', 'pie'];
-    private const CHART_TYPES = ['bar', 'column', 'donut', 'pie', 'line', 'area'];
+    private const CHART_TYPES = ['bar', 'column', 'donut', 'pie', 'line', 'area', 'metric'];
+
+    /**
+     * A card rather than a chart: one computed number.
+     *
+     * It shares this table because it is the same thing minus an axis — same
+     * measure, same scope, same permissions, same ordering. Giving it its own
+     * table would have duplicated all of that to save one column.
+     */
+    private const METRIC_CHARTS = ['metric'];
 
     /** Bucket widths a time chart's X axis can use. */
     private const TIME_GROUPINGS = ['auto', 'day', 'week', 'week_number', 'month'];
@@ -51,6 +60,7 @@ class ProjectChartController extends Controller
     /** Ceilings on hand-entered data, so one chart can't carry a spreadsheet. */
     private const MAX_MANUAL_POINTS = 20;
     private const MAX_REFERENCE_LINES = 3;
+    private const MAX_CARD_FILTERS = 5;
 
     /**
      * Charts can be managed by admins (manage-projects), executives (all
@@ -76,7 +86,8 @@ class ProjectChartController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'chart_type' => ['required', Rule::in(self::CHART_TYPES)],
-            'group_by' => ['required', Rule::in([...self::CATEGORY_DIMENSIONS, ...self::TIME_DIMENSIONS])],
+            // 'none' belongs to cards, which have nothing to group by.
+            'group_by' => ['required', Rule::in([...self::CATEGORY_DIMENSIONS, ...self::TIME_DIMENSIONS, 'none'])],
             'custom_field_id' => [
                 'nullable',
                 'integer',
@@ -114,16 +125,33 @@ class ProjectChartController extends Controller
             'manual_points.*.label' => ['required', 'string', 'max:40'],
             'manual_points.*.value' => ['required', 'numeric', 'min:-1000000000', 'max:1000000000'],
 
+            // Cards only: narrow the tasks the number is computed from, so a
+            // project can show "urgent tasks still open" and not just totals.
+            'filters' => ['nullable', 'array', 'max:' . self::MAX_CARD_FILTERS],
+            'filters.*.field' => ['required', Rule::in(self::CATEGORY_DIMENSIONS)],
+            'filters.*.custom_field_id' => ['nullable', 'integer'],
+            'filters.*.value' => ['required', 'string', 'max:120'],
+
+            // What the number is shown against: nothing, the same measure over
+            // the whole scope, or a figure typed in.
+            'compare' => ['nullable', Rule::in(['none', 'percent', 'target'])],
+            'target' => ['nullable', 'numeric', 'min:-1000000000', 'max:1000000000'],
+
             // Constant horizontal lines: a target, a threshold, a capacity.
             'reference_lines' => ['nullable', 'array', 'max:' . self::MAX_REFERENCE_LINES],
             'reference_lines.*.label' => ['required', 'string', 'max:40'],
             'reference_lines.*.value' => ['required', 'numeric', 'min:-1000000000', 'max:1000000000'],
         ]);
 
-        // Time charts take a date axis; every other type takes a category.
-        $allowed = in_array($validated['chart_type'], self::TIME_CHARTS, true)
-            ? self::TIME_DIMENSIONS
-            : self::CATEGORY_DIMENSIONS;
+        $isMetric = in_array($validated['chart_type'], self::METRIC_CHARTS, true);
+
+        // Time charts take a date axis; category charts take a category; a card
+        // has no axis at all.
+        $allowed = $isMetric
+            ? ['none']
+            : (in_array($validated['chart_type'], self::TIME_CHARTS, true)
+                ? self::TIME_DIMENSIONS
+                : self::CATEGORY_DIMENSIONS);
 
         if (!in_array($validated['group_by'], $allowed)) {
             abort(422, 'The selected dimension is not valid for this chart type.');
@@ -192,6 +220,7 @@ class ProjectChartController extends Controller
         // the chart can actually render, whichever client wrote it.
         $circular = in_array($validated['chart_type'], self::CIRCULAR_CHARTS, true);
         $overTime = in_array($validated['chart_type'], self::TIME_CHARTS, true);
+        $isMetric = in_array($validated['chart_type'], self::METRIC_CHARTS, true);
 
         return [
             'custom_field_id' => $validated['group_by'] === 'custom_field'
@@ -212,10 +241,40 @@ class ProjectChartController extends Controller
             'x_label' => $validated['x_label'] ?? null,
             'y_label' => $validated['y_label'] ?? null,
             // A time chart's X axis is dates, so a hand-entered category has
-            // nowhere to sit; a circle has no axis to draw a target across.
-            'manual_points' => $overTime ? [] : $this->normalisePairs($validated['manual_points'] ?? []),
-            'reference_lines' => $circular ? [] : $this->normalisePairs($validated['reference_lines'] ?? []),
+            // nowhere to sit; a circle has no axis to draw a target across; a
+            // card has neither, and uses `target` for the same purpose.
+            'manual_points' => ($overTime || $isMetric) ? [] : $this->normalisePairs($validated['manual_points'] ?? []),
+            'reference_lines' => ($circular || $isMetric) ? [] : $this->normalisePairs($validated['reference_lines'] ?? []),
+
+            // Card-only settings. Kept out of a chart's config entirely rather
+            // than stored and ignored, so what is saved describes what is drawn.
+            'filters' => $isMetric ? $this->normaliseFilters($validated['filters'] ?? []) : [],
+            'compare' => $isMetric ? ($validated['compare'] ?? 'none') : null,
+            'target' => ($isMetric && ($validated['compare'] ?? null) === 'target')
+                ? (float) ($validated['target'] ?? 0)
+                : null,
         ];
+    }
+
+    /**
+     * Tidy a card's filter rows.
+     *
+     * The value is whatever key the browser derives for that dimension — a
+     * status, a user id, a section id, a custom field option. It is kept as a
+     * string because those keys are not all of one type, and the comparison is
+     * done against the same derivation on the way out.
+     */
+    private function normaliseFilters(array $rows): array
+    {
+        return collect($rows)
+            ->map(fn ($row) => [
+                'field' => $row['field'] ?? null,
+                'custom_field_id' => isset($row['custom_field_id']) ? (int) $row['custom_field_id'] : null,
+                'value' => (string) ($row['value'] ?? ''),
+            ])
+            ->filter(fn ($row) => $row['field'] !== null && $row['value'] !== '')
+            ->values()
+            ->all();
     }
 
     /** Trim and cast hand-entered rows, dropping anything left blank. */
