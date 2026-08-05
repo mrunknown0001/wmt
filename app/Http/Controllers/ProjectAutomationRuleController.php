@@ -53,7 +53,52 @@ class ProjectAutomationRuleController extends Controller
             ], 422));
         }
 
-        return $validator->validated();
+        $validated = $validator->validated();
+
+        $this->validateActionParams($validated['actions'] ?? []);
+
+        return $validated;
+    }
+
+    /**
+     * Check the parts of an action's params that have a fixed set of values.
+     *
+     * Done here rather than as validation rules on the nested keys: rules like
+     * 'actions.*.params.period_format' cause validated() to keep only the
+     * params that have a rule of their own and throw the rest away, which is
+     * how section_id went missing from every move_to_section rule.
+     */
+    private function validateActionParams(array $actions): void
+    {
+        $fail = fn (string $message) => throw new HttpResponseException(
+            response()->json(['message' => $message, 'errors' => ['actions' => [$message]]], 422)
+        );
+
+        foreach ($actions as $action) {
+            if (($action['type'] ?? null) !== 'move_to_section') {
+                continue;
+            }
+
+            $params = $action['params'] ?? [];
+            $mode = $params['subsection_mode'] ?? 'none';
+
+            if (!in_array($mode, ['none', 'fixed', 'period'], true)) {
+                $fail('That is not a way of choosing a sub-section.');
+            }
+
+            if ($mode === 'period') {
+                $format = $params['period_format'] ?? 'year_month';
+                $source = $params['period_source'] ?? 'created';
+
+                if ($format !== '' && !array_key_exists($format, SectionRouter::PERIOD_FORMATS)) {
+                    $fail('That is not a period a sub-section can be named after.');
+                }
+
+                if ($source !== '' && !in_array($source, SectionRouter::PERIOD_SOURCES, true)) {
+                    $fail('A period can be taken from when a task arrived or when it is due.');
+                }
+            }
+        }
     }
 
     private function ruleValidationRules(): array
@@ -74,20 +119,14 @@ class ProjectAutomationRuleController extends Controller
             'conditions.*.custom_field_id' => 'nullable|integer',
             'actions' => 'required|array|min:1',
             'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification,add_comment,set_custom_field',
-            'actions.*.params' => 'required|array',
 
-            // Where a move_to_section action files the task. 'none' drops it in
-            // the section itself; 'fixed' names a sub-section; 'period' picks
-            // the sub-section for the task's month, quarter or year, making it
-            // the first time one is needed. See SectionRouter.
-            'actions.*.params.subsection_mode' => 'nullable|string|in:none,fixed,period',
-            'actions.*.params.subsection_id' => 'nullable|integer',
-            'actions.*.params.period_format' => [
-                'nullable',
-                'string',
-                Rule::in(array_keys(SectionRouter::PERIOD_FORMATS)),
-            ],
-            'actions.*.params.period_source' => ['nullable', 'string', Rule::in(SectionRouter::PERIOD_SOURCES)],
+            // Deliberately validated as an opaque array. Adding rules for
+            // individual params — 'actions.*.params.subsection_id' and the
+            // like — makes validated() extract only the keys that have a rule
+            // and silently drop every sibling, which threw away section_id,
+            // message, user_id and the rest. The contents are checked by
+            // validateActionParams() instead, after validation has run.
+            'actions.*.params' => 'required|array',
         ];
     }
 

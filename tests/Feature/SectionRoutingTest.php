@@ -601,6 +601,159 @@ class SectionRoutingTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_a_rule_pointing_at_a_sub_section_keeps_the_sub_section(): void
+    {
+        $month = TaskSection::create([
+            'project_id' => $this->project->id, 'parent_id' => $this->requests->id, 'name' => '2026-08',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->postJson("/projects/{$this->project->id}/automation-rules", [
+                'name' => 'File into August',
+                'trigger_type' => 'form_submitted',
+                'actions' => [[
+                    'type' => 'move_to_section',
+                    'params' => [
+                        'section_id' => $this->requests->id,
+                        'subsection_mode' => 'fixed',
+                        'subsection_id' => $month->id,
+                    ],
+                ]],
+            ])
+            ->assertSuccessful();
+
+        $rule = ProjectAutomationRule::latest('id')->firstOrFail();
+        $params = $rule->actions[0]['params'];
+
+        // The whole action has to survive the round trip, not just the parts
+        // that happen to have their own validation rule.
+        $this->assertSame($this->requests->id, (int) $params['section_id']);
+        $this->assertSame('fixed', $params['subsection_mode']);
+        $this->assertSame($month->id, (int) $params['subsection_id']);
+    }
+
+    public function test_the_browser_shape_of_a_sub_section_rule_saves(): void
+    {
+        // Ids arrive from a <select> as strings, and cleared fields arrive as
+        // empty strings — exactly what the builder sends.
+        $month = TaskSection::create([
+            'project_id' => $this->project->id, 'parent_id' => $this->requests->id, 'name' => '2026-08',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->postJson("/projects/{$this->project->id}/automation-rules", [
+                'name' => 'From the browser',
+                'trigger_type' => 'form_submitted',
+                'actions' => [[
+                    'type' => 'move_to_section',
+                    'params' => [
+                        'section_id' => (string) $this->requests->id,
+                        'subsection_mode' => 'fixed',
+                        'subsection_id' => (string) $month->id,
+                        'period_format' => '',
+                        'period_source' => '',
+                    ],
+                ]],
+            ])
+            ->assertSuccessful();
+
+        $params = ProjectAutomationRule::latest('id')->firstOrFail()->actions[0]['params'];
+
+        $this->assertSame($month->id, (int) $params['subsection_id']);
+    }
+
+    /**
+     * Every action type keeps its own params.
+     *
+     * The nested validation rules that broke section_id applied to every
+     * action's params, so a comment lost its message and an assignment lost its
+     * user in exactly the same way. This is the guard against reintroducing it.
+     */
+    public function test_no_action_loses_its_params(): void
+    {
+        $this->actingAs($this->owner)
+            ->postJson("/projects/{$this->project->id}/automation-rules", [
+                'name' => 'Everything at once',
+                'trigger_type' => 'form_submitted',
+                'actions' => [
+                    ['type' => 'move_to_section', 'params' => ['section_id' => $this->requests->id]],
+                    ['type' => 'assign_user', 'params' => ['user_id' => $this->owner->id]],
+                    ['type' => 'add_comment', 'params' => ['message' => 'Received, thank you.']],
+                    ['type' => 'change_status', 'params' => ['status' => 'in_progress']],
+                    ['type' => 'change_priority', 'params' => ['priority' => 'high']],
+                ],
+            ])
+            ->assertSuccessful();
+
+        $actions = ProjectAutomationRule::latest('id')->firstOrFail()->actions;
+
+        $this->assertSame($this->requests->id, (int) $actions[0]['params']['section_id']);
+        $this->assertSame($this->owner->id, (int) $actions[1]['params']['user_id']);
+        $this->assertSame('Received, thank you.', $actions[2]['params']['message']);
+        $this->assertSame('in_progress', $actions[3]['params']['status']);
+        $this->assertSame('high', $actions[4]['params']['priority']);
+    }
+
+    public function test_editing_a_rule_keeps_its_params_too(): void
+    {
+        $month = TaskSection::create([
+            'project_id' => $this->project->id, 'parent_id' => $this->requests->id, 'name' => '2026-08',
+        ]);
+
+        $this->actingAs($this->owner)->postJson("/projects/{$this->project->id}/automation-rules", [
+            'name' => 'First', 'trigger_type' => 'form_submitted',
+            'actions' => [['type' => 'move_to_section', 'params' => ['section_id' => $this->requests->id]]],
+        ])->assertSuccessful();
+
+        $rule = ProjectAutomationRule::latest('id')->firstOrFail();
+
+        $this->actingAs($this->owner)
+            ->putJson("/projects/{$this->project->id}/automation-rules/{$rule->id}", [
+                'name' => 'First',
+                'trigger_type' => 'form_submitted',
+                'actions' => [[
+                    'type' => 'move_to_section',
+                    'params' => [
+                        'section_id' => $this->requests->id,
+                        'subsection_mode' => 'fixed',
+                        'subsection_id' => $month->id,
+                    ],
+                ]],
+            ])
+            ->assertSuccessful();
+
+        $params = $rule->fresh()->actions[0]['params'];
+
+        $this->assertSame($this->requests->id, (int) $params['section_id']);
+        $this->assertSame($month->id, (int) $params['subsection_id']);
+    }
+
+    /** A rule saved through the API actually routes when it fires. */
+    public function test_a_saved_sub_section_rule_files_the_task_there(): void
+    {
+        $month = TaskSection::create([
+            'project_id' => $this->project->id, 'parent_id' => $this->requests->id, 'name' => '2026-08',
+        ]);
+
+        $this->actingAs($this->owner)->postJson("/projects/{$this->project->id}/automation-rules", [
+            'name' => 'File into August',
+            'trigger_type' => 'form_submitted',
+            'actions' => [[
+                'type' => 'move_to_section',
+                'params' => [
+                    'section_id' => (string) $this->requests->id,
+                    'subsection_mode' => 'fixed',
+                    'subsection_id' => (string) $month->id,
+                ],
+            ]],
+        ])->assertSuccessful();
+
+        $task = $this->task();
+        AutomationRuleEngine::evaluate($task, 'form_submitted', [], [], []);
+
+        $this->assertSame($month->id, $task->fresh()->section_id);
+    }
+
     public function test_an_unknown_period_format_is_rejected(): void
     {
         $this->actingAs($this->owner)
