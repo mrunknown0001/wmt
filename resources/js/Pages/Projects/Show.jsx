@@ -3174,11 +3174,21 @@ export default function Show() {
                             <LinkButton href={`/projects/${project.id}/forms`} variant="secondary" size="sm">
                                 Forms
                             </LinkButton>
-                            <Button variant="secondary" size="sm" onClick={() => setShowCustomFields(v => !v)}>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                active={showCustomFields}
+                                onClick={() => setShowCustomFields(v => !v)}
+                            >
                                 Custom Fields
                             </Button>
                             {canManageTasks && (
-                                <Button variant="secondary" size="sm" onClick={() => setShowAutomation(v => !v)}>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    active={showAutomation}
+                                    onClick={() => setShowAutomation(v => !v)}
+                                >
                                     <AutomationIcon /> Automation
                                 </Button>
                             )}
