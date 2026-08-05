@@ -25,5 +25,10 @@ Schedule::command('approvals:check-deadlines')->hourlyAt(10)->withoutOverlapping
 
 Schedule::command('backup:run --only-db')->dailyAt('02:00');
 Schedule::command('backup:clean')->dailyAt('02:30');
+
+// A dead Google Drive token fails silently — backup:run still succeeds, having
+// written a local copy only. This is the thing that notices. Monday morning, so
+// there is a working week in which to fix it.
+Schedule::command('backup:check-token')->weeklyOn(1, '08:00')->withoutOverlapping();
 Schedule::command('attachments:purge')->dailyAt('03:00');
 Schedule::command('trash:purge')->dailyAt('03:30');
