@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Notifications\AutomationBlockedNotification;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\RecurringTaskService;
+use App\Services\SectionRouter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -523,9 +524,17 @@ class AutomationRuleEngine
         }
     }
 
+    /**
+     * Move a task to a section, or to a sub-section beneath one.
+     *
+     * The target is resolved rather than read straight from the params: a rule
+     * can now file by period, which means the sub-section may not exist until
+     * the first task of that month arrives. See SectionRouter.
+     */
     private static function actionMoveToSection(Task $task, array $params): void
     {
-        $sectionId = $params['section_id'] ?? null;
+        $sectionId = SectionRouter::resolve($task, $params);
+
         if ($task->section_id == $sectionId) return;
 
         $task->update(['section_id' => $sectionId]);

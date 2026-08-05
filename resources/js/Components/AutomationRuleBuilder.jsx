@@ -154,7 +154,14 @@ function ConditionRow({ condition, index, onChange, onRemove, users, sections, c
             case 'status': return STATUSES.map(s => ({ value: s, label: formatLabel(s) }));
             case 'priority': return PRIORITIES.map(p => ({ value: p, label: formatLabel(p) }));
             case 'assigned_to': return [{ value: '__project_owner__', label: 'Project Owner' }, ...users.map(u => ({ value: String(u.id), label: u.name }))];
-            case 'section_id': return sections.map(s => ({ value: String(s.id), label: s.name }));
+            // A sub-section's own name is often just a period ("2026-08"), so
+            // it is shown under its parent to stay unambiguous.
+            case 'section_id': return sections.map(s => ({
+                value: String(s.id),
+                label: s.parent_id
+                    ? `${sections.find((p) => p.id === s.parent_id)?.name ?? '—'} › ${s.name}`
+                    : s.name,
+            }));
             default: return [];
         }
     };
@@ -364,17 +371,88 @@ function ActionRow({ action, index, onChange, onRemove, users, sections, customF
                         {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 );
-            case 'move_to_section':
+            case 'move_to_section': {
+                const roots = sections.filter((s) => !s.parent_id);
+                const children = sections.filter((s) => String(s.parent_id) === String(params.section_id));
+                const mode = params.subsection_mode || 'none';
+
+                const setParams = (patch) => onChange(index, {
+                    ...action,
+                    params: { ...params, ...patch },
+                });
+
                 return (
-                    <select
-                        value={params.section_id || ''}
-                        onChange={(e) => onChange(index, { ...action, params: { section_id: e.target.value } })}
-                        className={selectClass}
-                    >
-                        <option value="">Select section...</option>
-                        {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
+                    <div className="space-y-2">
+                        <select
+                            value={params.section_id || ''}
+                            onChange={(e) => setParams({
+                                section_id: e.target.value,
+                                // A sub-section belongs to one parent, so a
+                                // stale choice cannot survive changing it.
+                                subsection_id: '',
+                            })}
+                            className={selectClass}
+                        >
+                            <option value="">Select section...</option>
+                            {roots.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+
+                        {params.section_id && (
+                            <select
+                                value={mode}
+                                onChange={(e) => setParams({ subsection_mode: e.target.value, subsection_id: '' })}
+                                className={selectClass}
+                            >
+                                <option value="none">Straight into the section</option>
+                                <option value="fixed">Into a specific sub-section</option>
+                                <option value="period">Into a sub-section for the period</option>
+                            </select>
+                        )}
+
+                        {params.section_id && mode === 'fixed' && (
+                            <select
+                                value={params.subsection_id || ''}
+                                onChange={(e) => setParams({ subsection_id: e.target.value })}
+                                className={selectClass}
+                            >
+                                <option value="">Select sub-section...</option>
+                                {children.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        )}
+
+                        {params.section_id && mode === 'period' && (
+                            <>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <select
+                                        value={params.period_format || 'year_month'}
+                                        onChange={(e) => setParams({ period_format: e.target.value })}
+                                        className={selectClass}
+                                    >
+                                        <option value="year_month">2026-08</option>
+                                        <option value="month_name">August 2026</option>
+                                        <option value="quarter">2026-Q3</option>
+                                        <option value="year">2026</option>
+                                    </select>
+                                    <select
+                                        value={params.period_source || 'created'}
+                                        onChange={(e) => setParams({ period_source: e.target.value })}
+                                        className={selectClass}
+                                    >
+                                        <option value="created">By when it arrived</option>
+                                        <option value="due">By when it is due</option>
+                                    </select>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    The sub-section is created the first time a task lands in that
+                                    period, and reused after that.
+                                    {(params.period_source || 'created') === 'due' &&
+                                        ' A task with no due date stays in the section itself.'}
+                                </p>
+                            </>
+                        )}
+                    </div>
                 );
+            }
             case 'send_notification':
                 return (
                     <select
@@ -561,6 +639,9 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                     break;
                 case 'move_to_section':
                     if (!p.section_id) errors.push(`Action ${n}: Select a section.`);
+                    else if (p.subsection_mode === 'fixed' && !p.subsection_id) {
+                        errors.push(`Action ${n}: Select a sub-section, or file straight into the section.`);
+                    }
                     break;
                 case 'add_comment':
                     if (!p.message?.trim()) errors.push(`Action ${n}: Enter a comment message.`);

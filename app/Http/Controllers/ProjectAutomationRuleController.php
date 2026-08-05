@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\ProjectAutomationRule;
+use App\Services\SectionRouter;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class ProjectAutomationRuleController extends Controller
 {
@@ -73,6 +75,19 @@ class ProjectAutomationRuleController extends Controller
             'actions' => 'required|array|min:1',
             'actions.*.type' => 'required|string|in:change_status,change_priority,assign_user,move_to_section,send_notification,add_comment,set_custom_field',
             'actions.*.params' => 'required|array',
+
+            // Where a move_to_section action files the task. 'none' drops it in
+            // the section itself; 'fixed' names a sub-section; 'period' picks
+            // the sub-section for the task's month, quarter or year, making it
+            // the first time one is needed. See SectionRouter.
+            'actions.*.params.subsection_mode' => 'nullable|string|in:none,fixed,period',
+            'actions.*.params.subsection_id' => 'nullable|integer',
+            'actions.*.params.period_format' => [
+                'nullable',
+                'string',
+                Rule::in(array_keys(SectionRouter::PERIOD_FORMATS)),
+            ],
+            'actions.*.params.period_source' => ['nullable', 'string', Rule::in(SectionRouter::PERIOD_SOURCES)],
         ];
     }
 

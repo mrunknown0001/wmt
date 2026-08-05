@@ -50,6 +50,7 @@ import ProjectCharts from '../../Components/ProjectCharts';
 import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, isCompletedLate } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
+import { orderSections, moveSection } from '../../sectionTree';
 import InlinePopover from '../../Components/InlinePopover';
 
 // Types whose value is computed from other data rather than entered. They are
@@ -1159,7 +1160,7 @@ const SECTION_COLORS = [
     '#f43f5e', // rose
 ];
 
-function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditing, editingName, onEditName, onStartEditing, onRename, onCancelEditing, onAddTask, onDelete, onColorChange, canManage, projectId, taskCount }) {
+function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditing, editingName, onEditName, onStartEditing, onRename, onCancelEditing, onAddTask, onAddSubsection, onDelete, onColorChange, canManage, projectId, taskCount }) {
     const [showColorPicker, setShowColorPicker] = useState(false);
     const colorBtnRef = useRef(null);
     const colorPickerRef = useRef(null);
@@ -1199,7 +1200,13 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
     return (
         <tr ref={setNodeRef} style={style} className="group/section">
             <td colSpan={99} className="px-0 py-0">
-                <div className="sticky left-0 flex items-center gap-2 px-3 py-2 w-fit">
+                {/* Sub-sections are indented under their column, with a rule
+                    down the left so the grouping reads at a glance. */}
+                <div
+                    className={`sticky left-0 flex items-center gap-2 px-3 py-2 w-fit ${
+                        section.depth === 1 ? 'ml-8 border-l-2 border-gray-200 dark:border-gray-700 pl-3' : ''
+                    }`}
+                >
                     {canManage && (
                         <button
                             {...attributes}
@@ -1312,6 +1319,20 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
                                     </svg>
                                 </Link>
                             </Tooltip>
+                            {/* Only offered on a column — sub-sections do not
+                                nest further. */}
+                            {onAddSubsection && (
+                                <Tooltip content="Add sub-section">
+                                    <button
+                                        onClick={onAddSubsection}
+                                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                    >
+                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6M4 5v10a2 2 0 002 2h4m4-4h6m-3-3v6" />
+                                        </svg>
+                                    </button>
+                                </Tooltip>
+                            )}
                             <Tooltip content="Delete section">
                                 <button
                                     onClick={onDelete}
@@ -1512,6 +1533,9 @@ export default function Show() {
     const [editingSectionId, setEditingSectionId] = useState(null);
     const [editingSectionName, setEditingSectionName] = useState('');
     const [addingSectionName, setAddingSectionName] = useState(null); // null = not adding, string = input value
+    // Which section is having a sub-section added under it, if any.
+    const [addingSubsectionFor, setAddingSubsectionFor] = useState(null);
+    const [addingSubsectionName, setAddingSubsectionName] = useState('');
     const [showAutomation, setShowAutomation] = useState(false);
     const [showCustomFields, setShowCustomFields] = useState(false);
     const [celebration, setCelebration] = useState(null); // { x, y } or null
@@ -2077,20 +2101,28 @@ export default function Show() {
         };
     }, [hideCompleted, revealedGroups]);
 
+    const orderedSections = useMemo(() => orderSections(localSections), [localSections]);
+
     // Group filtered tasks by section for list view
     const tasksBySection = useMemo(() => {
         if (localSections.length === 0) return null; // No sections — render flat list
         const groups = [];
         // Unsectioned tasks first
         const unsectioned = sortTasks(filteredTasks.filter((t) => !t.section_id));
-        groups.push({ id: null, name: 'Unsectioned', ...splitCompleted(unsectioned, null) });
-        // Then each section in order
-        localSections.forEach((s) => {
+        groups.push({ id: null, name: 'Unsectioned', depth: 0, ...splitCompleted(unsectioned, null) });
+        // Then each section in order, sub-sections under their own parent
+        orderedSections.forEach((s) => {
             const sectionTasks = sortTasks(filteredTasks.filter((t) => t.section_id === s.id));
-            groups.push({ id: s.id, name: s.name, color: s.color, ...splitCompleted(sectionTasks, s.id) });
+            groups.push({
+                id: s.id,
+                name: s.name,
+                color: s.color,
+                depth: s.depth,
+                ...splitCompleted(sectionTasks, s.id),
+            });
         });
         return groups;
-    }, [filteredTasks, localSections, sortTasks, splitCompleted]);
+    }, [filteredTasks, localSections, orderedSections, sortTasks, splitCompleted]);
 
     // Flat list (no sections) gets the same treatment as a single group.
     const flatList = useMemo(
@@ -2226,12 +2258,12 @@ export default function Show() {
     }, [localTasks]);
 
     // Section management handlers
-    const handleCreateSection = useCallback(async (name) => {
+    const handleCreateSection = useCallback(async (name, parentId = null) => {
         if (!name.trim()) return;
         try {
             const res = await apiFetch(`/projects/${project.id}/sections`, {
                 method: 'POST',
-                body: JSON.stringify({ name: name.trim() }),
+                body: JSON.stringify({ name: name.trim(), parent_id: parentId }),
             });
             if (res.ok) {
                 const section = await res.json();
@@ -2239,6 +2271,7 @@ export default function Show() {
             }
         } catch {}
         setAddingSectionName(null);
+        setAddingSubsectionFor(null);
     }, [project.id]);
 
     const handleRenameSection = useCallback(async (sectionId, name) => {
@@ -2341,10 +2374,18 @@ export default function Show() {
     }, [project.id, serverTasks]);
 
     // Persist section reorder to backend
+    /**
+     * Save a rearranged list of sections.
+     *
+     * Positions are numbered within the list passed in — columns among columns,
+     * a column's sub-sections among themselves — because the server keeps a
+     * sequence per list, not one across the whole board.
+     */
     const persistSectionReorder = useCallback((reorderedSections) => {
         const payload = reorderedSections.map((s, index) => ({
             id: s.id,
             position: index,
+            parent_id: s.parent_id ?? null,
         }));
 
         apiFetch(`/projects/${project.id}/sections/reorder`, {
@@ -2530,16 +2571,16 @@ export default function Show() {
         const activeIdStr = String(active.id);
         const overIdStr = String(over.id);
 
-        // Section header drag — reorder sections
+        // Section header drag — reorder sections, respecting the hierarchy
         if (activeIdStr.startsWith('section-header-') && overIdStr.startsWith('section-header-')) {
             const activeSecId = parseInt(activeIdStr.replace('section-header-', ''));
             const overSecId = parseInt(overIdStr.replace('section-header-', ''));
-            const oldIndex = localSections.findIndex((s) => s.id === activeSecId);
-            const newIndex = localSections.findIndex((s) => s.id === overSecId);
-            if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-                const reordered = arrayMove(localSections, oldIndex, newIndex);
-                setLocalSections(reordered);
-                persistSectionReorder(reordered);
+
+            const move = moveSection(localSections, activeSecId, overSecId);
+
+            if (move) {
+                setLocalSections(move.sections);
+                persistSectionReorder(move.changed);
             }
             return;
         }
@@ -3581,13 +3622,22 @@ export default function Show() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                     {tasksBySection ? (
-                                        <SortableContext items={localSections.map((s) => `section-header-${s.id}`)} strategy={verticalListSortingStrategy}>
+                                        /* Display order, not storage order — dnd-kit measures
+                                           against this list, so a mismatch makes drops land a
+                                           row out. */
+                                        <SortableContext items={orderedSections.map((s) => `section-header-${s.id}`)} strategy={verticalListSortingStrategy}>
                                             {tasksBySection.map((group) => (
                                                 <React.Fragment key={group.id ?? '__unsectioned'}>
                                                     {/* Section header — skip for unsectioned */}
                                                     {group.id !== null && (
                                                         <SortableSectionHeader
-                                                            section={{ id: group.id, name: group.name, color: group.color }}
+                                                            section={{ id: group.id, name: group.name, color: group.color, depth: group.depth }}
+                                                            // Only a top-level column can take one — the
+                                                            // structure stops at a single level.
+                                                            onAddSubsection={group.depth === 0 ? () => {
+                                                                setAddingSubsectionFor(group.id);
+                                                                setAddingSubsectionName('');
+                                                            } : null}
                                                             isCollapsed={collapsedSections.has(group.id)}
                                                             onToggleCollapse={() => toggleSectionCollapse(group.id)}
                                                             isEditing={editingSectionId === group.id}
@@ -3603,6 +3653,27 @@ export default function Show() {
                                                             projectId={project.id}
                                                             taskCount={group.tasks.length}
                                                         />
+                                                    )}
+                                                    {/* Naming a new sub-section, inline under its column. */}
+                                                    {addingSubsectionFor === group.id && (
+                                                        <div className="pl-8 py-1.5">
+                                                            <input
+                                                                type="text"
+                                                                autoFocus
+                                                                value={addingSubsectionName}
+                                                                placeholder="Sub-section name…"
+                                                                onChange={(e) => setAddingSubsectionName(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') handleCreateSection(addingSubsectionName, group.id);
+                                                                    if (e.key === 'Escape') setAddingSubsectionFor(null);
+                                                                }}
+                                                                onBlur={() => {
+                                                                    if (addingSubsectionName.trim()) handleCreateSection(addingSubsectionName, group.id);
+                                                                    else setAddingSubsectionFor(null);
+                                                                }}
+                                                                className="w-64 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2.5 py-1.5 text-sm"
+                                                            />
+                                                        </div>
                                                     )}
                                                     {/* Collapsed section drop zone */}
                                                     {group.id !== null && collapsedSections.has(group.id) && (

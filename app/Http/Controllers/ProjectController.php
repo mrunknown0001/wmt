@@ -617,13 +617,36 @@ class ProjectController extends Controller
                 }
             }
 
-            // Copy sections (build mapping)
+            // Copy sections (build mapping).
+            //
+            // Columns first, then their sub-sections, so a child's parent has
+            // already been copied and can be remapped. Ordering by parent_id
+            // with nulls first is not portable, hence the two passes — and a
+            // child pointed at the *original* project's section would be
+            // rejected by TaskSection, which is the failure this avoids.
             $sectionMap = [];
-            foreach ($project->sections()->orderBy('position')->get() as $oldSection) {
+            $allSections = $project->sections()->orderBy('position')->get();
+
+            foreach ($allSections->whereNull('parent_id') as $oldSection) {
                 $newSection = $newProject->sections()->create([
                     'name' => $oldSection->name,
                     'color' => $oldSection->color,
                     'position' => $oldSection->position,
+                ]);
+                $sectionMap[$oldSection->id] = $newSection->id;
+            }
+
+            foreach ($allSections->whereNotNull('parent_id') as $oldSection) {
+                // A sub-section whose parent was not copied has nowhere to go.
+                if (!isset($sectionMap[$oldSection->parent_id])) {
+                    continue;
+                }
+
+                $newSection = $newProject->sections()->create([
+                    'name' => $oldSection->name,
+                    'color' => $oldSection->color,
+                    'position' => $oldSection->position,
+                    'parent_id' => $sectionMap[$oldSection->parent_id],
                 ]);
                 $sectionMap[$oldSection->id] = $newSection->id;
             }
