@@ -502,7 +502,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     </button>
                 </Tooltip>
             </td>
-            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] pl-10 pr-6 py-3 text-sm overflow-hidden ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`} style={colStyle('title')}>
+            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] pl-6 pr-6 py-3 text-sm overflow-hidden ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`} style={colStyle('title')}>
                 <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
                     <svg className="h-3 w-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -949,7 +949,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
             onContextMenu={(e) => onContextMenu?.(e, task)}
             className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''} ${isFocused ? 'ring-2 ring-inset ring-primary-400' : ''}`}
         >
-            <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-4 w-[52px] min-w-[52px]`}>
+            <td className={`sticky left-0 z-10 ${stickyBg} relative pl-4 pr-2 py-4 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <Tooltip content={isDone ? 'Mark incomplete' : 'Mark complete'}>
                     <button
@@ -967,7 +967,7 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     </button>
                 </Tooltip>
             </td>
-            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] px-6 py-4 text-sm font-medium overflow-hidden ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`} style={colStyle('title')}>
+            <td className={`sticky left-[52px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] pl-2 pr-6 py-4 text-sm font-medium overflow-hidden ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`} style={colStyle('title')}>
                 <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                     {(task.subtasks_count > 0 || canManageTasks) && (
                         <Tooltip content={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}>
@@ -1204,7 +1204,7 @@ function SortableSectionHeader({ section, isCollapsed, onToggleCollapse, isEditi
                     down the left so the grouping reads at a glance. */}
                 <div
                     className={`sticky left-0 flex items-center gap-2 px-3 py-2 w-fit ${
-                        section.depth === 1 ? 'ml-8 border-l-2 border-gray-200 dark:border-gray-700 pl-3' : ''
+                        section.depth === 1 ? 'ml-4 border-l-2 border-gray-200 dark:border-gray-700 pl-2' : ''
                     }`}
                 >
                     {canManage && (
@@ -3562,7 +3562,7 @@ export default function Show() {
                                         onDragCancel={() => setActiveColumnId(null)}
                                     >
                                     <tr>
-                                        <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 pl-6 pr-2 py-3 w-[52px] min-w-[52px]">
+                                        <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-800 pl-4 pr-2 py-3 w-[52px] min-w-[52px]">
                                             {canManageTasks && flatVisibleTaskIds.length > 0 && (
                                                 <input
                                                     type="checkbox"
@@ -3577,7 +3577,7 @@ export default function Show() {
                                             )}
                                         </th>
                                         <th
-                                            className="group/col sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] relative overflow-hidden"
+                                            className="group/col sticky left-[52px] z-20 bg-gray-50 dark:bg-gray-800 pl-2 pr-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] relative overflow-hidden"
                                             style={columnWidths['title'] ? { width: columnWidths['title'], minWidth: 60, maxWidth: columnWidths['title'] } : { width: 300, minWidth: 60 }}
                                         >
                                             <div className="flex items-center gap-1.5 pr-5">
@@ -3656,7 +3656,7 @@ export default function Show() {
                                                     )}
                                                     {/* Naming a new sub-section, inline under its column. */}
                                                     {addingSubsectionFor === group.id && (
-                                                        <div className="pl-8 py-1.5">
+                                                        <div className="pl-6 py-1.5">
                                                             <input
                                                                 type="text"
                                                                 autoFocus
