@@ -277,6 +277,48 @@ class ProjectChartTypesTest extends TestCase
         $this->assertSame('auto', $config['time_grouping']);
     }
 
+    // ---- legends ----
+
+    public function test_a_category_chart_can_ask_for_a_legend(): void
+    {
+        $this->newChart([
+            'chart_type' => 'column',
+            'group_by' => 'status',
+            'show_legend' => true,
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertTrue($config['show_legend']);
+    }
+
+    public function test_a_legend_is_off_unless_asked_for(): void
+    {
+        $this->newChart(['chart_type' => 'bar', 'group_by' => 'status'])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        // It would only repeat the axis labels on a single-series chart.
+        $this->assertFalse($config['show_legend']);
+    }
+
+    public function test_types_that_draw_their_own_legend_do_not_store_the_flag(): void
+    {
+        // A time axis has no categories to name, and a circle already lists its
+        // slices beside itself.
+        foreach ([['line', 'completed_over_time'], ['donut', 'status'], ['pie', 'status']] as [$type, $dimension]) {
+            $this->newChart([
+                'chart_type' => $type,
+                'group_by' => $dimension,
+                'show_legend' => true,
+            ])->assertSuccessful();
+
+            $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+            $this->assertFalse($config['show_legend'], "{$type} should not store show_legend");
+        }
+    }
+
     // ---- cards ----
 
     public function test_a_card_saves_with_no_dimension(): void

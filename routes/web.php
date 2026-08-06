@@ -124,6 +124,9 @@ Route::middleware('auth')->group(function () {
     // User management (admin)
     // whereNumber keeps this from shadowing /users/create.
     Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show')->whereNumber('user');
+    // Admin only: hand a departing person's unfinished work to somebody else.
+    Route::post('/users/{user}/transfer-tasks', [UserController::class, 'transferTasks'])
+        ->name('users.transfer-tasks')->whereNumber('user');
     Route::resource('users', UserController::class)->except(['show']);
 
     // Projects & Tasks

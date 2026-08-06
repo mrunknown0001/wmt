@@ -924,7 +924,7 @@ function MultiLineChart({ rows, series, measure = 'count', references = [], xLab
     );
 }
 
-function BarChart({ buckets, measure = 'count', references = [], xLabel, yLabel }) {
+function BarChart({ buckets, legend = null, measure = 'count', references = [], xLabel, yLabel }) {
     // Reference lines are part of the scale: a target above every bar would sit
     // off the end of the chart and tell you nothing.
     const max = Math.max(...buckets.map((b) => b.count), ...references.map((r) => r.value), 1);
@@ -977,6 +977,8 @@ function BarChart({ buckets, measure = 'count', references = [], xLabel, yLabel 
                 ))}
             </div>
 
+            {legend && <SeriesLegend series={legend} />}
+
             {references.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-3">
                     {references.map((r, i) => (
@@ -1005,7 +1007,19 @@ function BarChart({ buckets, measure = 'count', references = [], xLabel, yLabel 
  * Takes the same rows as either the plain or the split renderer: when a row
  * carries segments they stack up the column, otherwise it is drawn solid.
  */
-function ColumnChart({ rows, series = null, measure = 'count', references = [], xLabel, yLabel }) {
+/**
+ * Round tick values up a chart's Y axis, including zero for the baseline.
+ *
+ * Five gridlines is enough to read a value off without the chart becoming
+ * graph paper.
+ */
+function axisTicks(top, count = 4) {
+    if (!(top > 0)) return [0];
+
+    return Array.from({ length: count + 1 }, (_, i) => (top / count) * i);
+}
+
+function ColumnChart({ rows, series = null, legend = null, measure = 'count', references = [], xLabel, yLabel }) {
     const max = Math.max(...rows.map((r) => r.count), ...references.map((r) => r.value), 1);
     const top = niceMax(max);
 
@@ -1022,21 +1036,42 @@ function ColumnChart({ rows, series = null, measure = 'count', references = [], 
                 {references.map((r, i) => (
                     <div
                         key={i}
-                        className="absolute left-0 right-0 border-t-2 border-dashed border-gray-500/70 pointer-events-none"
+                        className="absolute left-9 right-0 border-t-2 border-dashed border-gray-500/70 pointer-events-none"
                         style={{ bottom: `${Math.min(100, (r.value / top) * 100)}%`, marginBottom: '1.75rem' }}
                         title={`${r.label}: ${formatValue(r.value, measure)}`}
                     />
                 ))}
 
-                <div className="flex items-end gap-2 h-52 overflow-x-auto pb-0.5">
+                {/* The scale, drawn behind everything: without it a column
+                    chart shows relative heights but no readable quantity. */}
+                {axisTicks(top).map((tick) => (
+                    <div
+                        key={`tick-${tick}`}
+                        className="absolute left-0 right-0 pointer-events-none"
+                        style={{ bottom: `${(tick / top) * 100}%`, marginBottom: '1.75rem' }}
+                    >
+                        <span className="absolute left-0 -translate-y-1/2 text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+                            {formatValue(tick, measure)}
+                        </span>
+                        <div className="ml-9 border-t border-gray-100 dark:border-gray-700/60" />
+                    </div>
+                ))}
+
+                <div className="flex items-end gap-2 h-52 overflow-x-auto pb-0.5 pl-9">
                     {rows.map((row) => (
-                        <div key={row.key} className="flex-1 min-w-[2.5rem] flex flex-col items-center justify-end h-full">
-                            <span className="mb-1 text-[11px] font-medium text-gray-900 dark:text-white tabular-nums">
+                        // Positioned rather than stacked in flow: a value label
+                        // taking part of the column's height would leave the
+                        // bars a few pixels short of the gridline they meet.
+                        <div key={row.key} className="relative flex-1 min-w-[2.5rem] h-full">
+                            <span
+                                className="absolute left-1/2 -translate-x-1/2 text-[11px] font-medium text-gray-900 dark:text-white tabular-nums whitespace-nowrap"
+                                style={{ bottom: `calc(${Math.max(1, (row.count / top) * 100)}% + 3px)` }}
+                            >
                                 {formatValue(row.count, measure)}
                             </span>
 
                             <div
-                                className="w-full max-w-[3.5rem] rounded-t overflow-hidden flex flex-col-reverse transition-all duration-500"
+                                className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[3.5rem] rounded-t overflow-hidden flex flex-col-reverse transition-all duration-500"
                                 style={{ height: `${Math.max(1, (row.count / top) * 100)}%` }}
                                 title={`${row.label}: ${formatValue(row.count, measure)}`}
                             >
@@ -1067,7 +1102,7 @@ function ColumnChart({ rows, series = null, measure = 'count', references = [], 
                     ))}
                 </div>
 
-                <div className="flex gap-2 mt-1.5 border-t border-gray-200 dark:border-gray-700 pt-1.5">
+                <div className="flex gap-2 mt-1.5 ml-9 border-t border-gray-200 dark:border-gray-700 pt-1.5">
                     {rows.map((row) => (
                         <span
                             key={row.key}
@@ -1082,7 +1117,7 @@ function ColumnChart({ rows, series = null, measure = 'count', references = [], 
                 </div>
             </div>
 
-            {series && <SeriesLegend series={series} />}
+            {(series || legend) && <SeriesLegend series={series || legend} />}
 
             {references.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-3">
@@ -1551,6 +1586,12 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
         return [...folded, ...manualBuckets(chart)];
     }, [stackBy, chart, allTasks, sections, customFields]);
 
+    // A single-series chart already names each bar on its axis, so a legend
+    // is only drawn when asked for — it repeats the labels otherwise.
+    const categoryLegend = (!stackBy && chart.config?.show_legend && !overTime && !metric)
+        ? data.filter((d) => !d.manual).map((d) => ({ key: d.key, label: d.label, color: d.color }))
+        : null;
+
     const isEmpty = metric ? false : stackBy
         ? !split || split.rows.length === 0 || split.rows.every((r) => r.count === 0)
         : data.length === 0 || (chart.chart_type !== 'line' && data.every((b) => b.count === 0));
@@ -1624,12 +1665,12 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
                 />
             ) : type === 'bar' ? (
                 <BarChart
-                    buckets={data} measure={measure} references={references}
+                    buckets={data} legend={categoryLegend} measure={measure} references={references}
                     xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
                 />
             ) : type === 'column' ? (
                 <ColumnChart
-                    rows={data} measure={measure} references={references}
+                    rows={data} legend={categoryLegend} measure={measure} references={references}
                     xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
                 />
             ) : circular ? (
@@ -1652,7 +1693,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
 
     const numberFields = numericFields(customFields);
 
-    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '' });
+    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false });
 
     useEffect(() => {
         if (!isOpen) return;
@@ -1673,10 +1714,11 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
             stack_by: chart.config?.stack_by || '',
             stack_custom_field_id: chart.config?.stack_custom_field_id || '',
             time_grouping: chart.config?.time_grouping || 'auto',
+            show_legend: !!chart.config?.show_legend,
             filters: chart.config?.filters || [],
             compare: chart.config?.compare || 'none',
             target: chart.config?.target ?? '',
-        } : { title: '', chart_type: newType, group_by: isMetricChart(newType) ? 'none' : 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '' });
+        } : { title: '', chart_type: newType, group_by: isMetricChart(newType) ? 'none' : 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false });
     }, [isOpen, chart, newType]);
 
     const [tab, setTab] = useState('setup');
@@ -1834,6 +1876,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
                             stack_custom_field_id: canSplit && form.stack_by === 'custom_field'
                                 ? form.stack_custom_field_id : null,
                             time_grouping: isLine ? form.time_grouping : null,
+                            show_legend: (!isLine && !metric && !circular) ? form.show_legend : false,
                             manual_points: isLine ? [] : cleanPairs(form.manual_points),
                             reference_lines: circular ? [] : cleanPairs(form.reference_lines),
                         })}
@@ -2156,6 +2199,27 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
                             />
                         )}
                     </div>
+                )}
+
+                {!metric && !isLine && !circular && (
+                    <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.show_legend}
+                            onChange={(e) => setForm((f) => ({ ...f, show_legend: e.target.checked }))}
+                            className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 dark:bg-gray-700"
+                        />
+                        <span>
+                            <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Show a legend
+                            </span>
+                            <span className="block text-xs text-gray-500 dark:text-gray-400">
+                                Lists each colour and what it stands for. A split chart always has
+                                one; on a single-series chart it repeats the axis labels, so it is
+                                off unless you want it.
+                            </span>
+                        </span>
+                    </label>
                 )}
 
                 {canSplit && !metric && (

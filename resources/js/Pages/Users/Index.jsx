@@ -8,7 +8,8 @@ import Badge from '../../Components/Badge';
 import LinkButton from '../../Components/LinkButton';
 import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
-import { ConfirmModal } from '../../Components/Modal';
+import Modal, { ConfirmModal } from '../../Components/Modal';
+import Button from '../../Components/Button';
 import Tooltip from '../../Components/Tooltip';
 import { formatLabel } from '../../utils';
 
@@ -31,6 +32,12 @@ const TrashIcon = () => (
     </svg>
 );
 
+const HandoverIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 17l5-5-5-5M21 12H9M12 19H6a2 2 0 01-2-2V7a2 2 0 012-2h6" />
+    </svg>
+);
+
 const CoverIcon = () => (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
@@ -45,8 +52,19 @@ const shortDate = (value) => {
 };
 
 export default function Index() {
-    const { users, roles, filters, cover = [], canArrangeCover } = usePage().props;
+    const { users, roles, filters, cover = [], openTasks = [], canArrangeCover, auth } = usePage().props;
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [handoverFrom, setHandoverFrom] = useState(null);
+    const [handoverTo, setHandoverTo] = useState('');
+
+    // Reassigning somebody's whole workload is an admin action, not something
+    // an executive who can merely read this list should be able to do.
+    const canTransfer = auth?.user?.permissions?.includes('manage-users');
+
+    const openTaskCount = useMemo(
+        () => new Map(openTasks.map((row) => [row.user_id, row.total])),
+        [openTasks]
+    );
 
     // Sent as a list rather than a map, so the lookup is built here.
     const coverByUser = useMemo(
@@ -54,6 +72,13 @@ export default function Index() {
         [cover]
     );
     const coverFor = (userId) => coverByUser.get(userId);
+
+    const submitHandover = () => {
+        router.post(`/users/${handoverFrom.id}/transfer-tasks`, { to_user_id: handoverTo }, {
+            preserveScroll: true,
+            onSuccess: () => { setHandoverFrom(null); setHandoverTo(''); },
+        });
+    };
 
     const [search, setSearch] = useState(filters?.search || '');
     const [role, setRole] = useState(filters?.role || '');
@@ -243,6 +268,16 @@ export default function Index() {
                                                             <EditIcon />
                                                         </Link>
                                                     </Tooltip>
+                                                    {canTransfer && (
+                                                        <Tooltip content={`Transfer unfinished tasks (${openTaskCount.get(user.id) || 0})`}>
+                                                            <button
+                                                                onClick={() => { setHandoverFrom(user); setHandoverTo(''); }}
+                                                                className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+                                                            >
+                                                                <HandoverIcon />
+                                                            </button>
+                                                        </Tooltip>
+                                                    )}
                                                     <Tooltip content="Delete">
                                                         <button
                                                             onClick={() => setDeleteTarget(user)}
@@ -268,6 +303,65 @@ export default function Index() {
                     )}
                 </Card>
             </div>
+
+            <Modal
+                isOpen={!!handoverFrom}
+                onClose={() => { setHandoverFrom(null); setHandoverTo(''); }}
+                title="Transfer Unfinished Tasks"
+                actions={
+                    <>
+                        <Button variant="secondary" onClick={() => { setHandoverFrom(null); setHandoverTo(''); }}>
+                            Cancel
+                        </Button>
+                        <Button onClick={submitHandover} disabled={!handoverTo}>
+                            Transfer
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4 text-left">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Move every unfinished task from{' '}
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{handoverFrom?.name}</span>{' '}
+                        to somebody else. For when a person has left the organisation.
+                    </p>
+
+                    <div className="rounded-lg bg-gray-50 dark:bg-gray-700/40 px-3 py-2 text-sm">
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">
+                            {openTaskCount.get(handoverFrom?.id) || 0}
+                        </span>
+                        <span className="text-gray-600 dark:text-gray-300"> unfinished{' '}
+                            {(openTaskCount.get(handoverFrom?.id) || 0) === 1 ? 'task' : 'tasks'} will move.
+                        </span>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Transfer to
+                        </label>
+                        <select
+                            value={handoverTo}
+                            onChange={(e) => setHandoverTo(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        >
+                            <option value="">Choose a person…</option>
+                            {users.data
+                                .filter((u) => u.id !== handoverFrom?.id && u.is_active)
+                                .map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Only people on this page are listed — search above to find somebody else.
+                        </p>
+                    </div>
+
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Completed and cancelled tasks stay where they are, so the record of who
+                        did the work is not rewritten. This cannot be undone in bulk.
+                    </p>
+                </div>
+            </Modal>
 
             <ConfirmModal
                 isOpen={!!deleteTarget}

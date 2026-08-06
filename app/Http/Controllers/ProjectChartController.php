@@ -115,6 +115,9 @@ class ProjectChartController extends Controller
             // the original behaviour: weeks, switching to months past twenty.
             'time_grouping' => ['nullable', Rule::in(self::TIME_GROUPINGS)],
 
+            // Category charts only: a legend naming each bar's colour.
+            'show_legend' => ['nullable', 'boolean'],
+
             'x_label' => ['nullable', 'string', 'max:60'],
             'y_label' => ['nullable', 'string', 'max:60'],
 
@@ -238,6 +241,11 @@ class ProjectChartController extends Controller
             // Only meaningful on a time chart — a category axis has no buckets
             // to widen, so storing one there would be dead config.
             'time_grouping' => $overTime ? ($validated['time_grouping'] ?? 'auto') : null,
+            // A time axis has no categories to name, and a circle draws its
+            // own legend already.
+            'show_legend' => (!$overTime && !$circular && !$isMetric)
+                ? (bool) ($validated['show_legend'] ?? false)
+                : false,
             'x_label' => $validated['x_label'] ?? null,
             'y_label' => $validated['y_label'] ?? null,
             // A time chart's X axis is dates, so a hand-entered category has

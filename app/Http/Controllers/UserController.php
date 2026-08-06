@@ -11,8 +11,10 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\OrgScope;
+use App\Services\TaskHandover;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
@@ -53,11 +55,74 @@ class UserController extends Controller
                 'status' => $request->input('status', ''),
             ],
             'cover' => $this->coverFor($users->getCollection()),
+            'openTasks' => $this->openTaskCounts($users->getCollection()),
             // Executives can see this list but the cover page has its own
             // authority rule, so the action only appears for people it will
             // actually let in.
             'canArrangeCover' => OrgScope::hasAnyScope($request->user()),
         ]);
+    }
+
+    /**
+     * Unfinished task counts for the people on this page.
+     *
+     * One grouped query rather than one per row, and returned as a list for the
+     * same reason as the cover data: integer keys serialise to a JSON array
+     * when they happen to run 0..n.
+     *
+     * @param  \Illuminate\Support\Collection<int, User>  $users
+     */
+    private function openTaskCounts($users): array
+    {
+        if ($users->isEmpty()) {
+            return [];
+        }
+
+        return Task::query()
+            ->whereIn('assigned_to', $users->pluck('id'))
+            ->whereNotIn('status', Task::CLOSING_STATUSES)
+            ->groupBy('assigned_to')
+            ->selectRaw('assigned_to as user_id, count(*) as total')
+            ->get()
+            ->map(fn ($row) => ['user_id' => (int) $row->user_id, 'total' => (int) $row->total])
+            ->all();
+    }
+
+    /**
+     * Hand a departing person's unfinished work to somebody else, for good.
+     *
+     * Admin only — manage-users, not view-users, so executives who can read the
+     * staff list cannot reassign a colleague's whole workload.
+     */
+    public function transferTasks(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()->can('manage-users'), 403);
+
+        $data = $request->validate([
+            'to_user_id' => ['required', 'integer', 'exists:users,id', 'different:' . $user->id],
+        ]);
+
+        $recipient = User::findOrFail($data['to_user_id']);
+
+        if ((int) $recipient->id === (int) $user->id) {
+            throw ValidationException::withMessages([
+                'to_user_id' => 'Choose somebody other than the person leaving.',
+            ]);
+        }
+
+        if (! $recipient->is_active) {
+            throw ValidationException::withMessages([
+                'to_user_id' => 'That person is not active, so the work would have nobody to do it.',
+            ]);
+        }
+
+        $result = TaskHandover::transfer($user, $recipient, $request->user());
+
+        $count = $result['tasks'];
+
+        return back()->with('success', $count > 0
+            ? "{$count} unfinished " . str('task')->plural($count) . " moved to {$recipient->name}."
+            : "{$user->name} had no unfinished tasks to move.");
     }
 
     /**
