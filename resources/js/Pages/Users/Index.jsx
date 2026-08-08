@@ -52,7 +52,7 @@ const shortDate = (value) => {
 };
 
 export default function Index() {
-    const { users, roles, filters, cover = [], openTasks = [], canArrangeCover, auth } = usePage().props;
+    const { users, roles, filters, cover = [], openTasks = [], ownedProjects = [], canArrangeCover, auth } = usePage().props;
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [handoverFrom, setHandoverFrom] = useState(null);
     const [handoverTo, setHandoverTo] = useState('');
@@ -64,6 +64,11 @@ export default function Index() {
     const openTaskCount = useMemo(
         () => new Map(openTasks.map((row) => [row.user_id, row.total])),
         [openTasks]
+    );
+
+    const ownedProjectCount = useMemo(
+        () => new Map(ownedProjects.map((row) => [row.user_id, row.total])),
+        [ownedProjects]
     );
 
     // Sent as a list rather than a map, so the lookup is built here.
@@ -269,7 +274,7 @@ export default function Index() {
                                                         </Link>
                                                     </Tooltip>
                                                     {canTransfer && (
-                                                        <Tooltip content={`Transfer unfinished tasks (${openTaskCount.get(user.id) || 0})`}>
+                                                        <Tooltip content={`Hand over work (${openTaskCount.get(user.id) || 0} tasks, ${ownedProjectCount.get(user.id) || 0} projects)`}>
                                                             <button
                                                                 onClick={() => { setHandoverFrom(user); setHandoverTo(''); }}
                                                                 className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
@@ -307,7 +312,7 @@ export default function Index() {
             <Modal
                 isOpen={!!handoverFrom}
                 onClose={() => { setHandoverFrom(null); setHandoverTo(''); }}
-                title="Transfer Unfinished Tasks"
+                title="Hand Over Work"
                 actions={
                     <>
                         <Button variant="secondary" onClick={() => { setHandoverFrom(null); setHandoverTo(''); }}>
@@ -321,18 +326,24 @@ export default function Index() {
             >
                 <div className="space-y-4 text-left">
                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Move every unfinished task from{' '}
+                        Move every unfinished task and every project owned by{' '}
                         <span className="font-medium text-gray-900 dark:text-gray-100">{handoverFrom?.name}</span>{' '}
                         to somebody else. For when a person has left the organisation.
                     </p>
 
-                    <div className="rounded-lg bg-gray-50 dark:bg-gray-700/40 px-3 py-2 text-sm">
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">
-                            {openTaskCount.get(handoverFrom?.id) || 0}
-                        </span>
-                        <span className="text-gray-600 dark:text-gray-300"> unfinished{' '}
-                            {(openTaskCount.get(handoverFrom?.id) || 0) === 1 ? 'task' : 'tasks'} will move.
-                        </span>
+                    <div className="rounded-lg bg-gray-50 dark:bg-gray-700/40 px-3 py-2 text-sm space-y-1">
+                        <p className="text-gray-600 dark:text-gray-300">
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                {openTaskCount.get(handoverFrom?.id) || 0}
+                            </span>{' '}
+                            unfinished {(openTaskCount.get(handoverFrom?.id) || 0) === 1 ? 'task' : 'tasks'}
+                        </p>
+                        <p className="text-gray-600 dark:text-gray-300">
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                {ownedProjectCount.get(handoverFrom?.id) || 0}
+                            </span>{' '}
+                            {(ownedProjectCount.get(handoverFrom?.id) || 0) === 1 ? 'project' : 'projects'} they own
+                        </p>
                     </div>
 
                     <div>
@@ -358,7 +369,8 @@ export default function Index() {
 
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                         Completed and cancelled tasks stay where they are, so the record of who
-                        did the work is not rewritten. This cannot be undone in bulk.
+                        did the work is not rewritten. Project ownership moves in full, including
+                        archived projects and approval projects. This cannot be undone in bulk.
                     </p>
                 </div>
             </Modal>

@@ -3,13 +3,15 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\ApprovalProject;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskDelegationItem;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Moving a departed person's open work to somebody else, for good.
+ * Moving a departed person's responsibilities to somebody else, for good.
  *
  * Distinct from task cover, which is temporary and hands everything back. This
  * is what you do when someone has left: their unfinished tasks become another
@@ -19,8 +21,15 @@ use Illuminate\Support\Facades\DB;
  * them would rewrite who did the work, and every report in the app reads
  * completion history off assigned_to.
  */
-class TaskHandover
+class UserHandover
 {
+    /** Projects a departing person is answerable for, of both kinds. */
+    public static function ownedProjects(User $user): int
+    {
+        return Project::where('owner_id', $user->id)->count()
+            + ApprovalProject::where('owner_id', $user->id)->count();
+    }
+
     /** Tasks a departing person still owes. */
     public static function pendingFor(User $user)
     {
@@ -30,9 +39,9 @@ class TaskHandover
     }
 
     /**
-     * Hand every unfinished task from one person to another.
+     * Hand everything one person is answerable for to another.
      *
-     * @return array{tasks: int, cover_held: int, cover_owed: int}
+     * @return array{tasks: int, projects: int, approval_projects: int, cover_held: int, cover_owed: int}
      */
     public static function transfer(User $from, User $to, ?User $actor = null): array
     {
@@ -61,12 +70,21 @@ class TaskHandover
                 ->where('original_assignee_id', $from->id)
                 ->update(['original_assignee_id' => $to->id]);
 
+            // Ownership is a live responsibility, not a record of what
+            // happened, so unlike a finished task there is nothing to preserve
+            // by leaving it pointed at somebody who has gone — including on
+            // archived projects, which still need an owner if they are reopened.
+            $projects = Project::where('owner_id', $from->id)->update(['owner_id' => $to->id]);
+            $approvalProjects = ApprovalProject::where('owner_id', $from->id)->update(['owner_id' => $to->id]);
+
             if ($actor) {
-                self::log($from, $to, $actor, $tasks);
+                self::log($from, $to, $actor, $tasks, $projects + $approvalProjects);
             }
 
             return [
                 'tasks' => $tasks,
+                'projects' => $projects,
+                'approval_projects' => $approvalProjects,
                 'cover_held' => $coverHeld,
                 'cover_owed' => $coverOwed,
             ];
@@ -77,16 +95,23 @@ class TaskHandover
      * Written against the person who left, since that is the record someone
      * will go looking at when they wonder where the work went.
      */
-    private static function log(User $from, User $to, User $actor, int $tasks): void
+    private static function log(User $from, User $to, User $actor, int $tasks, int $projects): void
     {
+        $parts = [
+            $tasks . ' unfinished ' . str('task')->plural($tasks),
+        ];
+
+        if ($projects > 0) {
+            $parts[] = $projects . ' ' . str('project')->plural($projects);
+        }
+
         ActivityLog::create([
             'user_id' => $actor->id,
             'entity_type' => 'user',
             'entity_id' => $from->id,
             'entity_name' => $from->name,
             'action' => 'updated',
-            'description' => "transferred {$tasks} unfinished "
-                . str('task')->plural($tasks)
+            'description' => 'transferred ' . implode(' and ', $parts)
                 . " from \"{$from->name}\" to \"{$to->name}\"",
         ]);
     }

@@ -4,14 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Models\ApprovalProject;
 use App\Models\Department;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskDelegation;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\OrgScope;
-use App\Services\TaskHandover;
+use App\Services\UserHandover;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -56,6 +58,7 @@ class UserController extends Controller
             ],
             'cover' => $this->coverFor($users->getCollection()),
             'openTasks' => $this->openTaskCounts($users->getCollection()),
+            'ownedProjects' => $this->ownedProjectCounts($users->getCollection()),
             // Executives can see this list but the cover page has its own
             // authority rule, so the action only appears for people it will
             // actually let in.
@@ -89,6 +92,39 @@ class UserController extends Controller
     }
 
     /**
+     * How many projects of either kind each person on this page owns.
+     *
+     * @param  \Illuminate\Support\Collection<int, User>  $users
+     */
+    private function ownedProjectCounts($users): array
+    {
+        if ($users->isEmpty()) {
+            return [];
+        }
+
+        $ids = $users->pluck('id');
+
+        $tally = [];
+
+        foreach ([Project::class, ApprovalProject::class] as $model) {
+            $rows = $model::query()
+                ->whereIn('owner_id', $ids)
+                ->groupBy('owner_id')
+                ->selectRaw('owner_id, count(*) as total')
+                ->pluck('total', 'owner_id');
+
+            foreach ($rows as $ownerId => $total) {
+                $tally[(int) $ownerId] = ($tally[(int) $ownerId] ?? 0) + (int) $total;
+            }
+        }
+
+        return collect($tally)
+            ->map(fn ($total, $userId) => ['user_id' => (int) $userId, 'total' => $total])
+            ->values()
+            ->all();
+    }
+
+    /**
      * Hand a departing person's unfinished work to somebody else, for good.
      *
      * Admin only — manage-users, not view-users, so executives who can read the
@@ -116,13 +152,29 @@ class UserController extends Controller
             ]);
         }
 
-        $result = TaskHandover::transfer($user, $recipient, $request->user());
+        $result = UserHandover::transfer($user, $recipient, $request->user());
 
-        $count = $result['tasks'];
+        $tasks = $result['tasks'];
+        $projects = $result['projects'] + $result['approval_projects'];
 
-        return back()->with('success', $count > 0
-            ? "{$count} unfinished " . str('task')->plural($count) . " moved to {$recipient->name}."
-            : "{$user->name} had no unfinished tasks to move.");
+        if ($tasks === 0 && $projects === 0) {
+            return back()->with('success', "{$user->name} had nothing to hand over.");
+        }
+
+        $parts = [];
+
+        if ($tasks > 0) {
+            $parts[] = "{$tasks} unfinished " . str('task')->plural($tasks);
+        }
+
+        if ($projects > 0) {
+            $parts[] = "{$projects} " . str('project')->plural($projects);
+        }
+
+        return back()->with(
+            'success',
+            implode(' and ', $parts) . " moved to {$recipient->name}."
+        );
     }
 
     /**

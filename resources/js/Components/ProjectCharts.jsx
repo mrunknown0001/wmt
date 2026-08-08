@@ -3,7 +3,7 @@ import Modal, { ConfirmModal } from './Modal';
 import Button from './Button';
 import Input from './Input';
 import Select from './Select';
-import { formatLabel, apiFetch } from '../utils';
+import { formatLabel, apiFetch, isPastDue } from '../utils';
 import { isoWeekParts } from '../weekOfYear';
 
 // Categorical palette (validated for CVD safety + contrast on white / gray-800
@@ -56,6 +56,9 @@ const CATEGORY_DIMENSIONS = [
     { value: 'priority', label: 'Priority' },
     { value: 'assignee', label: 'Assignee' },
     { value: 'section', label: 'Section' },
+    { value: 'created_by', label: 'Created by' },
+    { value: 'overdue', label: 'Overdue or on track' },
+    { value: 'has_due_date', label: 'Has a due date' },
     { value: 'custom_field', label: 'Custom field (single-select)' },
 ];
 const TIME_DIMENSIONS = [
@@ -241,6 +244,129 @@ const CHART_TYPES = [
     },
 ];
 
+
+/** Preset windows for a chart's date range. */
+const DATE_RANGES = [
+    { value: 'all', label: 'All time' },
+    { value: 'last_7', label: 'Last 7 days' },
+    { value: 'last_30', label: 'Last 30 days' },
+    { value: 'last_90', label: 'Last 90 days' },
+    { value: 'this_month', label: 'This month' },
+    { value: 'this_quarter', label: 'This quarter' },
+    { value: 'this_year', label: 'This year' },
+    { value: 'custom', label: 'Between two dates' },
+];
+
+/** Which date the window is measured against on a category chart. */
+const DATE_FIELDS = [
+    { value: 'created', label: 'Created date' },
+    { value: 'completed', label: 'Completed date' },
+    { value: 'due', label: 'Due date' },
+];
+
+const HOW_TO_SORT = [
+    { value: 'natural', label: 'Natural order' },
+    { value: 'value_desc', label: 'Largest first' },
+    { value: 'value_asc', label: 'Smallest first' },
+    { value: 'label', label: 'By name' },
+];
+
+/**
+ * The tasks a chart draws from: its scope, then its filters, then its date
+ * window.
+ *
+ * One function so every path agrees — the plain category chart, the split one,
+ * the time series, and a card. Each of those used to reach for scopeTasks on
+ * its own, which is how a filter would end up applying to the bars but not to
+ * the series inside them.
+ *
+ * Applying it twice is harmless, so nested callers need not know whether their
+ * caller has already done it.
+ */
+function chartTasks(chart, allTasks, sections, customFields) {
+    const filters = chart.config?.filters || [];
+
+    let tasks = scopeTasks(allTasks, chart.config?.scope);
+
+    if (filters.length > 0) {
+        tasks = tasks.filter((task) => filters.every((f) => {
+            const opts = { sections, customFields, fieldId: f.custom_field_id };
+
+            return String(categorise(task, f.field, opts).key) === String(f.value);
+        }));
+    }
+
+    return withinDateWindow(tasks, chart);
+}
+
+/** The date a chart's window is measured against. */
+function windowDate(task, chart) {
+    // A time chart already plots one particular date; windowing on a different
+    // one would cut the axis somewhere it does not run.
+    const field = {
+        completed_over_time: 'completed',
+        created_over_time: 'created',
+        due_over_time: 'due',
+    }[chart.group_by] || chart.config?.date_field || 'created';
+
+    const raw = { created: task.created_at, completed: task.completed_at, due: task.due_date }[field];
+
+    return raw ? new Date(raw) : null;
+}
+
+function withinDateWindow(tasks, chart) {
+    const range = chart.config?.date_range || 'all';
+
+    if (range === 'all') return tasks;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    let from = null;
+    let to = null;
+
+    if (range === 'custom') {
+        from = chart.config?.date_from ? new Date(chart.config.date_from + 'T00:00:00') : null;
+        to = chart.config?.date_to ? new Date(chart.config.date_to + 'T23:59:59') : null;
+    } else if (range.startsWith('last_')) {
+        const days = Number(range.slice(5));
+        from = new Date(startOfToday);
+        from.setDate(from.getDate() - (days - 1));
+    } else if (range === 'this_month') {
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (range === 'this_quarter') {
+        from = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    } else if (range === 'this_year') {
+        from = new Date(now.getFullYear(), 0, 1);
+    }
+
+    return tasks.filter((task) => {
+        const date = windowDate(task, chart);
+
+        // A task with no date of that kind cannot be placed in the window, so
+        // it is left out rather than silently counted as inside it.
+        if (!date || Number.isNaN(date.getTime())) return false;
+        if (from && date < from) return false;
+        if (to && date > to) return false;
+
+        return true;
+    });
+}
+
+/** Order the bars, and fold everything past the cut into "Other". */
+function arrangeBuckets(buckets, chart, fallbackMax) {
+    const sort = chart.config?.sort || 'natural';
+
+    const sorted = sort === 'value_desc' ? [...buckets].sort((a, b) => b.count - a.count)
+        : sort === 'value_asc' ? [...buckets].sort((a, b) => a.count - b.count)
+        : sort === 'label' ? [...buckets].sort((a, b) => a.label.localeCompare(b.label))
+        : buckets;
+
+    const max = Number(chart.config?.max_buckets) || fallbackMax;
+
+    return foldBuckets(sorted, max);
+}
+
 function scopeTasks(tasks, scope) {
     if (scope === 'active') return tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled');
     if (scope === 'done') return tasks.filter((t) => t.status === 'done');
@@ -249,8 +375,7 @@ function scopeTasks(tasks, scope) {
 
 // Buckets for bar/donut charts: [{ key, label, count, color }]
 function computeCategoryData(chart, allTasks, sections, customFields) {
-    const scope = chart.config?.scope || 'all';
-    const tasks = scopeTasks(allTasks, scope);
+    const tasks = chartTasks(chart, allTasks, sections, customFields);
     const groupBy = chart.group_by;
     const measure = chart.config?.measure || 'count';
     const fieldId = chart.config?.measure_custom_field_id || null;
@@ -416,6 +541,29 @@ function categorise(task, dimension, { sections, customFields, fieldId }) {
             : { key: 'none', label: 'No section', color: 'var(--viz-other)' };
     }
 
+    if (dimension === 'created_by') {
+        return task.created_by
+            ? { key: String(task.created_by), label: task.creator?.name || 'Unknown' }
+            : { key: 'none', label: 'Unknown', color: 'var(--viz-other)' };
+    }
+
+    if (dimension === 'overdue') {
+        // Same date-only rule as everywhere else: due today is not late yet.
+        const late = task.due_date
+            && !['done', 'cancelled'].includes(task.status)
+            && isPastDue(task.due_date);
+
+        return late
+            ? { key: 'overdue', label: 'Overdue', color: '#ef4444' }
+            : { key: 'on_track', label: 'On track', color: '#22c55e' };
+    }
+
+    if (dimension === 'has_due_date') {
+        return task.due_date
+            ? { key: 'yes', label: 'Has a due date', color: '#3b82f6' }
+            : { key: 'no', label: 'No due date', color: 'var(--viz-other)' };
+    }
+
     if (dimension === 'custom_field') {
         const field = (customFields || []).find((f) => f.id === fieldId);
         const value = (task.custom_field_values || []).find((v) => v.custom_field_id === fieldId);
@@ -441,7 +589,7 @@ function computeStackedData(chart, allTasks, sections, customFields) {
     const groupBy = chart.group_by;
     const stackBy = chart.config?.stack_by;
 
-    const tasks = scopeTasks(allTasks, chart.config?.scope || 'all');
+    const tasks = chartTasks(chart, allTasks, sections, customFields);
 
     const xOpts = { sections, customFields, fieldId: chart.config?.custom_field_id };
     const sOpts = { sections, customFields, fieldId: chart.config?.stack_custom_field_id };
@@ -510,7 +658,55 @@ function computeStackedData(chart, allTasks, sections, customFields) {
         };
     });
 
-    return { rows: rows.sort((a, b) => b.count - a.count), series };
+    return { rows: arrangeStackedRows(rows, series, chart), series };
+}
+
+/**
+ * Order and cap the bars of a split chart.
+ *
+ * Kept separate from arrangeBuckets because a split row is not just a number:
+ * folding two rows into "Other" has to add up their segments series by series,
+ * or the stack would be a total with nothing inside it.
+ *
+ * A chart saved before ordering existed has no sort, and split charts have
+ * always come back largest-first — so that, not 'natural', is the fallback.
+ */
+function arrangeStackedRows(rows, series, chart, fallbackMax = 12) {
+    const sort = chart.config?.sort || 'value_desc';
+
+    const sorted = sort === 'value_asc' ? [...rows].sort((a, b) => a.count - b.count)
+        : sort === 'label' ? [...rows].sort((a, b) => a.label.localeCompare(b.label))
+        : sort === 'natural' ? rows
+        : [...rows].sort((a, b) => b.count - a.count);
+
+    const max = Number(chart.config?.max_buckets) || fallbackMax;
+
+    if (sorted.length <= max) return sorted;
+
+    const kept = sorted.slice(0, max);
+    const tail = sorted.slice(max);
+
+    // One row standing for the rest, with each series summed across it.
+    const segments = series
+        .map((s) => ({
+            key: s.key,
+            label: s.label,
+            color: s.color,
+            value: tail.reduce(
+                (sum, row) => sum + (row.segments.find((seg) => seg.key === s.key)?.value || 0),
+                0
+            ),
+        }))
+        .filter((seg) => seg.value !== 0);
+
+    kept.push({
+        key: '__other',
+        label: `Other (${tail.length})`,
+        segments,
+        count: tail.reduce((sum, row) => sum + row.count, 0),
+    });
+
+    return kept;
 }
 
 // Fold anything past maxBuckets - 1 into a single "Other" bucket
@@ -538,7 +734,7 @@ function startOfWeek(date) {
 
 // Buckets for line charts: [{ label, count, date }], weekly, or monthly when
 // the range would exceed ~20 weekly points
-function computeTimeData(chart, allTasks) {
+function computeTimeData(chart, allTasks, sections, customFields) {
     const measure = chart.config?.measure || 'count';
     const fieldId = chart.config?.measure_custom_field_id || null;
 
@@ -551,7 +747,7 @@ function computeTimeData(chart, allTasks) {
 
     // Carry the task alongside its date: a bucket has to be measured, and the
     // date alone cannot tell us how many hours it represents.
-    const points = allTasks
+    const points = chartTasks(chart, allTasks, sections, customFields)
         .map((t) => ({ task: t, date: new Date(accessor(t)) }))
         .filter((p) => p.date instanceof Date && !isNaN(p.date));
     if (points.length === 0) return [];
@@ -683,13 +879,13 @@ function computeStackedTimeData(chart, allTasks, sections, customFields) {
     const sOpts = { sections, customFields, fieldId: chart.config?.stack_custom_field_id };
 
     // The shape of the axis, measured across everything.
-    const skeleton = computeTimeData(chart, allTasks);
+    const skeleton = computeTimeData(chart, allTasks, sections, customFields);
     if (skeleton.length === 0) return { rows: [], series: [] };
 
     const groups = new Map();
     const meta = new Map();
 
-    allTasks.forEach((task) => {
+    chartTasks(chart, allTasks, sections, customFields).forEach((task) => {
         const slice = categorise(task, stackBy, sOpts);
         if (!meta.has(slice.key)) meta.set(slice.key, { key: slice.key, label: slice.label, color: slice.color });
         if (!groups.has(slice.key)) groups.set(slice.key, []);
@@ -721,7 +917,7 @@ function computeStackedTimeData(chart, allTasks, sections, customFields) {
             ? folded.flatMap((f) => groups.get(f.key) || [])
             : (groups.get(sSeries.key) || []);
 
-        const bucketed = computeTimeData(chart, subset);
+        const bucketed = computeTimeData(chart, subset, sections, customFields);
         const byLabel = new Map(bucketed.map((b) => [b.label, b.count]));
 
         valuesByKey.set(sSeries.key, skeleton.map((b) => byLabel.get(b.label) || 0));
@@ -1016,6 +1212,16 @@ function BarChart({ buckets, legend = null, measure = 'count', references = [], 
 function axisTicks(top, count = 4) {
     if (!(top > 0)) return [0];
 
+    // Prefer a divisor that lands on whole numbers. Counting tasks and reading
+    // "2.5" off the axis invites the question of what half a task is.
+    if (Number.isInteger(top)) {
+        const divisor = [4, 5, 3, 2].find((d) => top % d === 0);
+
+        if (divisor) {
+            return Array.from({ length: divisor + 1 }, (_, i) => (top / divisor) * i);
+        }
+    }
+
     return Array.from({ length: count + 1 }, (_, i) => (top / count) * i);
 }
 
@@ -1166,15 +1372,7 @@ function describeFilters(chart, allTasks, sections, customFields) {
  * a second matcher here is how the two would drift.
  */
 function metricTasks(chart, allTasks, sections, customFields) {
-    const filters = chart.config?.filters || [];
-
-    return scopeTasks(allTasks, chart.config?.scope).filter((task) =>
-        filters.every((f) => {
-            const opts = { sections, customFields, fieldId: f.custom_field_id };
-
-            return String(categorise(task, f.field, opts).key) === String(f.value);
-        })
-    );
+    return chartTasks(chart, allTasks, sections, customFields);
 }
 
 /** What a card computes, and what it is measured against. */
@@ -1574,12 +1772,13 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
 
     const data = useMemo(() => {
         if (stackBy) return [];
-        if (overTime) return computeTimeData(chart, allTasks);
+        if (overTime) return computeTimeData(chart, allTasks, sections, customFields);
 
         const buckets = computeCategoryData(chart, allTasks, sections, customFields);
         // A circle can only carry so many slices before the labels collide;
-        // a column chart runs out of horizontal room sooner than a bar.
-        const folded = foldBuckets(buckets, circular ? 8 : type === 'column' ? 10 : 12);
+        // a column chart runs out of horizontal room sooner than a bar. Those
+        // are the defaults the chart can override.
+        const folded = arrangeBuckets(buckets, chart, circular ? 8 : type === 'column' ? 10 : 12);
 
         // Hand-entered figures are appended after folding, so an "Other" bucket
         // can never swallow one — they were typed in precisely to be seen.
@@ -1693,7 +1892,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
 
     const numberFields = numericFields(customFields);
 
-    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false });
+    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false, date_range: 'all', date_field: 'created', date_from: '', date_to: '', sort: 'natural', max_buckets: '' });
 
     useEffect(() => {
         if (!isOpen) return;
@@ -1715,10 +1914,16 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
             stack_custom_field_id: chart.config?.stack_custom_field_id || '',
             time_grouping: chart.config?.time_grouping || 'auto',
             show_legend: !!chart.config?.show_legend,
+            date_range: chart.config?.date_range || 'all',
+            date_field: chart.config?.date_field || 'created',
+            date_from: chart.config?.date_from || '',
+            date_to: chart.config?.date_to || '',
+            sort: chart.config?.sort || 'natural',
+            max_buckets: chart.config?.max_buckets ?? '',
             filters: chart.config?.filters || [],
             compare: chart.config?.compare || 'none',
             target: chart.config?.target ?? '',
-        } : { title: '', chart_type: newType, group_by: isMetricChart(newType) ? 'none' : 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false });
+        } : { title: '', chart_type: newType, group_by: isMetricChart(newType) ? 'none' : 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false, date_range: 'all', date_field: 'created', date_from: '', date_to: '', sort: 'natural', max_buckets: '' });
     }, [isOpen, chart, newType]);
 
     const [tab, setTab] = useState('setup');
@@ -1863,7 +2068,14 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
                             title: form.title.trim(),
                             chart_type: form.chart_type,
                             group_by: metric ? 'none' : form.group_by,
-                            filters: metric ? form.filters : [],
+                            // Filters now apply to every type, not just cards.
+                            filters: form.filters,
+                            date_range: form.date_range,
+                            date_field: form.date_field,
+                            date_from: form.date_range === 'custom' ? (form.date_from || null) : null,
+                            date_to: form.date_range === 'custom' ? (form.date_to || null) : null,
+                            sort: (metric || isLine) ? null : form.sort,
+                            max_buckets: (metric || isLine) ? null : (Number(form.max_buckets) || null),
                             compare: metric ? form.compare : null,
                             target: metric && form.compare === 'target' ? Number(form.target) || 0 : null,
                             custom_field_id: form.group_by === 'custom_field' ? form.custom_field_id : null,
@@ -2115,13 +2327,97 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
                 </div>
                 )}
 
-                {metric && (
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Date range
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <Select
+                            value={form.date_range}
+                            onChange={(e) => setForm((f) => ({ ...f, date_range: e.target.value }))}
+                        >
+                            {DATE_RANGES.map((r) => (
+                                <option key={r.value} value={r.value}>{r.label}</option>
+                            ))}
+                        </Select>
+
+                        {/* A time chart already plots one date; windowing on a
+                            different one would cut the axis somewhere it does
+                            not run, so the field is fixed there. */}
+                        {form.date_range !== 'all' && !isLine && (
+                            <Select
+                                value={form.date_field}
+                                onChange={(e) => setForm((f) => ({ ...f, date_field: e.target.value }))}
+                            >
+                                {DATE_FIELDS.map((d) => (
+                                    <option key={d.value} value={d.value}>{d.label}</option>
+                                ))}
+                            </Select>
+                        )}
+                    </div>
+
+                    {form.date_range === 'custom' && (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                            <input
+                                type="date" value={form.date_from}
+                                onChange={(e) => setForm((f) => ({ ...f, date_from: e.target.value }))}
+                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm"
+                            />
+                            <input
+                                type="date" value={form.date_to}
+                                onChange={(e) => setForm((f) => ({ ...f, date_to: e.target.value }))}
+                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm"
+                            />
+                        </div>
+                    )}
+
+                    {form.date_range !== 'all' && (
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Tasks without that date are left out — they cannot be placed in the window.
+                        </p>
+                    )}
+                </div>
+
+                {!metric && !isLine && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Order
+                            </label>
+                            <Select
+                                value={form.sort}
+                                onChange={(e) => setForm((f) => ({ ...f, sort: e.target.value }))}
+                            >
+                                {HOW_TO_SORT.map((o) => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                How many <span className="font-normal text-gray-400">(optional)</span>
+                            </label>
+                            <input
+                                type="number" min="2" max="30" value={form.max_buckets}
+                                onChange={(e) => setForm((f) => ({ ...f, max_buckets: e.target.value }))}
+                                placeholder="Default"
+                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm"
+                            />
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                The rest fold into &ldquo;Other&rdquo;. Pair with
+                                &ldquo;Largest first&rdquo; for a top-N chart.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {(
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Filters <span className="font-normal text-gray-400">(optional)</span>
                         </label>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                            Narrow what the number counts — &ldquo;urgent tasks&rdquo;, &ldquo;Ana&rsquo;s tasks&rdquo;.
+                            Narrow what this counts — &ldquo;urgent tasks&rdquo;, &ldquo;Ana&rsquo;s tasks&rdquo;.
                             Several filters all have to match.
                         </p>
 

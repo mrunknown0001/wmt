@@ -9,7 +9,7 @@ use App\Models\TaskDelegation;
 use App\Models\TaskDelegationItem;
 use App\Models\User;
 use App\Services\TaskDelegationService;
-use App\Services\TaskHandover;
+use App\Services\UserHandover;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Permission;
@@ -25,7 +25,7 @@ use Tests\TestCase;
  * id. Move the tasks without moving the ledger and the hand-back silently
  * declines months later.
  */
-class TaskHandoverTest extends TestCase
+class UserHandoverTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -141,7 +141,7 @@ class TaskHandoverTest extends TestCase
 
         $this->transfer()->assertRedirect();
 
-        $this->assertSame(0, TaskHandover::pendingFor($this->successor)->count());
+        $this->assertSame(0, UserHandover::pendingFor($this->successor)->count());
     }
 
     // ---- validation ----
@@ -249,6 +249,98 @@ class TaskHandoverTest extends TestCase
 
         // History of who held what stays as it happened.
         $this->assertSame($this->leaver->id, (int) $item->fresh()->delegate_id);
+    }
+
+    // ---- project ownership ----
+
+    public function test_owned_projects_move_to_the_successor(): void
+    {
+        $owned = Project::create([
+            'name' => 'Theirs', 'status' => 'active', 'owner_id' => $this->leaver->id,
+        ]);
+
+        $this->transfer()->assertRedirect();
+
+        $this->assertSame($this->successor->id, $owned->fresh()->owner_id);
+    }
+
+    public function test_archived_projects_move_too(): void
+    {
+        // Ownership is a live responsibility, not a record of what happened —
+        // an archived project still needs an owner if it is ever reopened.
+        $archived = Project::create([
+            'name' => 'Finished', 'status' => 'archived', 'owner_id' => $this->leaver->id,
+        ]);
+
+        $this->transfer()->assertRedirect();
+
+        $this->assertSame($this->successor->id, $archived->fresh()->owner_id);
+    }
+
+    public function test_approval_projects_move_as_well(): void
+    {
+        $id = \DB::table('approval_projects')->insertGetId([
+            'name' => 'Requests', 'status' => 'active', 'owner_id' => $this->leaver->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->transfer()->assertRedirect();
+
+        $this->assertSame(
+            $this->successor->id,
+            (int) \DB::table('approval_projects')->where('id', $id)->value('owner_id')
+        );
+    }
+
+    public function test_projects_owned_by_others_are_untouched(): void
+    {
+        $bystander = User::factory()->create(['is_active' => true]);
+        $theirs = Project::create([
+            'name' => 'Not involved', 'status' => 'active', 'owner_id' => $bystander->id,
+        ]);
+
+        $this->transfer()->assertRedirect();
+
+        $this->assertSame($bystander->id, $theirs->fresh()->owner_id);
+    }
+
+    public function test_the_confirmation_names_both_what_moved(): void
+    {
+        $this->task($this->leaver);
+        Project::create(['name' => 'Theirs', 'status' => 'active', 'owner_id' => $this->leaver->id]);
+
+        $this->transfer()
+            ->assertRedirect()
+            ->assertSessionHas('success', fn ($message) => str_contains($message, '1 unfinished task')
+                && str_contains($message, '1 project'));
+    }
+
+    public function test_a_leaver_with_nothing_at_all_says_so(): void
+    {
+        $this->transfer()
+            ->assertRedirect()
+            ->assertSessionHas('success', fn ($message) => str_contains($message, 'nothing to hand over'));
+    }
+
+    public function test_the_users_list_reports_how_many_projects_are_owned(): void
+    {
+        Project::create(['name' => 'One', 'status' => 'active', 'owner_id' => $this->leaver->id]);
+        Project::create(['name' => 'Two', 'status' => 'archived', 'owner_id' => $this->leaver->id]);
+        \DB::table('approval_projects')->insert([
+            'name' => 'Three', 'status' => 'active', 'owner_id' => $this->leaver->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/users')
+            ->assertOk()
+            ->assertInertia(function ($page) {
+                $counts = collect($page->toArray()['props']['ownedProjects'])
+                    ->pluck('total', 'user_id');
+
+                // Both kinds counted together, since both move together.
+                $this->assertSame(3, $counts[$this->leaver->id]);
+            });
     }
 
     // ---- the record ----

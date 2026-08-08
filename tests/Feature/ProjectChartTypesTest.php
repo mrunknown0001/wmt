@@ -277,6 +277,163 @@ class ProjectChartTypesTest extends TestCase
         $this->assertSame('auto', $config['time_grouping']);
     }
 
+    // ---- flexibility: window, order, dimensions ----
+
+    public static function newDimensions(): array
+    {
+        return [
+            'created by' => ['created_by'],
+            'overdue' => ['overdue'],
+            'has due date' => ['has_due_date'],
+        ];
+    }
+
+    #[DataProvider('newDimensions')]
+    public function test_the_new_dimensions_are_accepted(string $dimension): void
+    {
+        $this->newChart(['chart_type' => 'column', 'group_by' => $dimension])->assertSuccessful();
+
+        $this->assertDatabaseHas('project_charts', ['group_by' => $dimension]);
+    }
+
+    public function test_a_chart_can_be_limited_to_a_window(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'assignee',
+            'date_range' => 'last_30',
+            'date_field' => 'completed',
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertSame('last_30', $config['date_range']);
+        $this->assertSame('completed', $config['date_field']);
+    }
+
+    public function test_a_custom_window_keeps_both_ends(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'status',
+            'date_range' => 'custom',
+            'date_from' => '2026-01-01',
+            'date_to' => '2026-06-30',
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertSame('2026-01-01', $config['date_from']);
+        $this->assertSame('2026-06-30', $config['date_to']);
+    }
+
+    public function test_a_window_that_ends_before_it_starts_is_rejected(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'status',
+            'date_range' => 'custom',
+            'date_from' => '2026-06-30',
+            'date_to' => '2026-01-01',
+        ])->assertStatus(422);
+    }
+
+    public function test_dates_are_dropped_when_the_window_is_not_custom(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'status',
+            'date_range' => 'this_year',
+            'date_from' => '2026-01-01',
+            'date_to' => '2026-06-30',
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        // Stale endpoints would come back to life if the range were later
+        // switched to custom.
+        $this->assertNull($config['date_from']);
+        $this->assertNull($config['date_to']);
+    }
+
+    public function test_a_time_chart_takes_its_date_field_from_the_axis(): void
+    {
+        $this->newChart([
+            'chart_type' => 'line',
+            'group_by' => 'completed_over_time',
+            'date_range' => 'last_90',
+            'date_field' => 'due',
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        // Windowing on a different date than the axis plots would cut the axis
+        // somewhere it does not run.
+        $this->assertSame('last_90', $config['date_range']);
+        $this->assertNull($config['date_field']);
+    }
+
+    public function test_bars_can_be_ordered_and_capped(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'assignee',
+            'sort' => 'value_desc',
+            'max_buckets' => 5,
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertSame('value_desc', $config['sort']);
+        $this->assertSame(5, $config['max_buckets']);
+    }
+
+    public function test_an_absurd_bucket_cap_is_rejected(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar', 'group_by' => 'status', 'max_buckets' => 500,
+        ])->assertStatus(422);
+    }
+
+    public function test_ordering_is_not_stored_where_there_are_no_bars(): void
+    {
+        foreach ([['line', 'completed_over_time'], ['metric', 'none']] as [$type, $dimension]) {
+            $this->newChart([
+                'chart_type' => $type,
+                'group_by' => $dimension,
+                'sort' => 'value_desc',
+                'max_buckets' => 5,
+            ])->assertSuccessful();
+
+            $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+            $this->assertNull($config['sort'], "{$type} should not store a sort");
+            $this->assertNull($config['max_buckets'], "{$type} should not store a cap");
+        }
+    }
+
+    public function test_a_chart_can_filter_and_split_at_once(): void
+    {
+        // The combination the whole thing exists for: "urgent tasks by
+        // assignee, split by status, this quarter, largest first".
+        $this->newChart([
+            'chart_type' => 'column',
+            'group_by' => 'assignee',
+            'stack_by' => 'status',
+            'filters' => [['field' => 'priority', 'value' => 'urgent']],
+            'date_range' => 'this_quarter',
+            'sort' => 'value_desc',
+            'max_buckets' => 8,
+        ])->assertSuccessful();
+
+        $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
+
+        $this->assertSame('status', $config['stack_by']);
+        $this->assertCount(1, $config['filters']);
+        $this->assertSame('this_quarter', $config['date_range']);
+        $this->assertSame('value_desc', $config['sort']);
+    }
+
     // ---- legends ----
 
     public function test_a_category_chart_can_ask_for_a_legend(): void
@@ -396,7 +553,7 @@ class ProjectChartTypesTest extends TestCase
         ])->assertStatus(422);
     }
 
-    public function test_a_chart_stores_no_card_settings(): void
+    public function test_a_chart_keeps_filters_but_not_the_card_comparison(): void
     {
         $this->newChart([
             'chart_type' => 'bar',
@@ -408,7 +565,10 @@ class ProjectChartTypesTest extends TestCase
 
         $config = json_decode(\DB::table('project_charts')->latest('id')->first()->config, true);
 
-        $this->assertSame([], $config['filters']);
+        // Filters apply to every type — "urgent tasks by status" is the whole
+        // point. Comparing one figure against another is card-only.
+        $this->assertCount(1, $config['filters']);
+        $this->assertSame('urgent', $config['filters'][0]['value']);
         $this->assertNull($config['compare']);
         $this->assertNull($config['target']);
     }

@@ -12,7 +12,13 @@ use Illuminate\Validation\Rule;
 class ProjectChartController extends Controller
 {
     /** What goes along the X axis. */
-    private const CATEGORY_DIMENSIONS = ['status', 'priority', 'assignee', 'section', 'custom_field'];
+    private const CATEGORY_DIMENSIONS = [
+        'status', 'priority', 'assignee', 'section', 'created_by',
+        // Derived rather than stored: computed from due_date and status the
+        // same way the rest of the app decides what is late.
+        'overdue', 'has_due_date',
+        'custom_field',
+    ];
     private const TIME_DIMENSIONS = ['completed_over_time', 'created_over_time', 'due_over_time'];
 
     /**
@@ -38,6 +44,13 @@ class ProjectChartController extends Controller
 
     /** Bucket widths a time chart's X axis can use. */
     private const TIME_GROUPINGS = ['auto', 'day', 'week', 'week_number', 'month'];
+
+    /** Windows a chart can be limited to, and the date each is measured against. */
+    private const DATE_RANGES = ['all', 'last_7', 'last_30', 'last_90', 'this_month', 'this_quarter', 'this_year', 'custom'];
+    private const DATE_FIELDS = ['created', 'completed', 'due'];
+
+    /** How the bars are ordered before the tail folds into "Other". */
+    private const SORTS = ['natural', 'value_desc', 'value_asc', 'label'];
 
     /**
      * What goes up the Y axis.
@@ -118,6 +131,17 @@ class ProjectChartController extends Controller
             // Category charts only: a legend naming each bar's colour.
             'show_legend' => ['nullable', 'boolean'],
 
+            // A window over the data. Applies to every type; on a time chart
+            // the field follows the axis rather than being chosen.
+            'date_range' => ['nullable', Rule::in(self::DATE_RANGES)],
+            'date_field' => ['nullable', Rule::in(self::DATE_FIELDS)],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+
+            // Bar order, and how many before the rest fold into "Other".
+            'sort' => ['nullable', Rule::in(self::SORTS)],
+            'max_buckets' => ['nullable', 'integer', 'min:2', 'max:30'],
+
             'x_label' => ['nullable', 'string', 'max:60'],
             'y_label' => ['nullable', 'string', 'max:60'],
 
@@ -128,8 +152,8 @@ class ProjectChartController extends Controller
             'manual_points.*.label' => ['required', 'string', 'max:40'],
             'manual_points.*.value' => ['required', 'numeric', 'min:-1000000000', 'max:1000000000'],
 
-            // Cards only: narrow the tasks the number is computed from, so a
-            // project can show "urgent tasks still open" and not just totals.
+            // Narrow the tasks anything is computed from, so a chart can show
+            // "urgent tasks by assignee" and not just totals. Every type.
             'filters' => ['nullable', 'array', 'max:' . self::MAX_CARD_FILTERS],
             'filters.*.field' => ['required', Rule::in(self::CATEGORY_DIMENSIONS)],
             'filters.*.custom_field_id' => ['nullable', 'integer'],
@@ -256,7 +280,21 @@ class ProjectChartController extends Controller
 
             // Card-only settings. Kept out of a chart's config entirely rather
             // than stored and ignored, so what is saved describes what is drawn.
-            'filters' => $isMetric ? $this->normaliseFilters($validated['filters'] ?? []) : [],
+            'filters' => $this->normaliseFilters($validated['filters'] ?? []),
+
+            'date_range' => $validated['date_range'] ?? 'all',
+            // Only meaningful when a window is set, and a time chart takes its
+            // field from the axis, so storing one there would be misleading.
+            'date_field' => ($overTime || ($validated['date_range'] ?? 'all') === 'all')
+                ? null
+                : ($validated['date_field'] ?? 'created'),
+            'date_from' => ($validated['date_range'] ?? null) === 'custom' ? ($validated['date_from'] ?? null) : null,
+            'date_to' => ($validated['date_range'] ?? null) === 'custom' ? ($validated['date_to'] ?? null) : null,
+
+            // A time axis is already in date order and a card has one value, so
+            // neither has bars to arrange.
+            'sort' => ($overTime || $isMetric) ? null : ($validated['sort'] ?? 'natural'),
+            'max_buckets' => ($overTime || $isMetric) ? null : ($validated['max_buckets'] ?? null),
             'compare' => $isMetric ? ($validated['compare'] ?? 'none') : null,
             'target' => ($isMetric && ($validated['compare'] ?? null) === 'target')
                 ? (float) ($validated['target'] ?? 0)
