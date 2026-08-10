@@ -1392,9 +1392,10 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
     // How much is set on the second tab, so its badge can say so. Counted from
     // what is actually in force — a split that the current chart type forbids
     // is not advertised as configured.
+    // The second grouping moved to Setup, so it no longer counts here — the
+    // badge should reflect what is actually configured on the Advanced tab.
     const advancedCount = [
         form.measure !== 'count',
-        canSplit && !!form.stack_by,
         !!form.x_label.trim() || !!form.y_label.trim(),
         !circular && cleanPairs(form.reference_lines).length > 0,
         !isLine && cleanPairs(form.manual_points).length > 0,
@@ -1606,6 +1607,83 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
                                 <option key={f.id} value={f.id}>{f.name}</option>
                             ))}
                         </Select>
+                    </div>
+                )}
+
+                {/*
+                    The second grouping, sitting with the first rather than
+                    buried under Advanced: a bar/column chart is expected to take
+                    two dimensions, and hiding one made it look like it took only
+                    one. On a line it draws a line per value; on a bar/column it
+                    splits each bar, stacked or side by side per the mode below.
+                */}
+                {canSplit && !metric && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {isLine ? 'One line per' : 'Then group by'} <span className="font-normal text-gray-400">(optional)</span>
+                        </label>
+                        <Select
+                            value={form.stack_by}
+                            onChange={(e) => setForm((f) => ({ ...f, stack_by: e.target.value }))}
+                        >
+                            <option value="">{isLine ? 'A single line' : 'Just the one grouping'}</option>
+                            {splitOptions.map((d) => (
+                                <option key={d.value} value={d.value}>{d.label}</option>
+                            ))}
+                        </Select>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {isLine
+                                ? 'Draws one line per value — "completed over time, one line per assignee".'
+                                : 'A second grouping inside each bar — "by status, then by assignee". The largest ' + MAX_SERIES + ' are kept and the rest folded into Other.'}
+                        </p>
+                    </div>
+                )}
+
+                {canSplit && !metric && needsSplitField && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Second grouping field
+                        </label>
+                        <Select
+                            value={form.stack_custom_field_id}
+                            onChange={(e) => setForm((f) => ({ ...f, stack_custom_field_id: e.target.value }))}
+                        >
+                            <option value="">Choose a field…</option>
+                            {selectFields.map((f) => (
+                                <option key={f.id} value={f.id}>{f.name}</option>
+                            ))}
+                        </Select>
+                        {selectFields.length === 0 && (
+                            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                This project has no single-select custom field to group by.
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {/*
+                    How the two groupings sit against each other. Only a split
+                    bar or column can cluster — a line already draws one line
+                    each, and a time axis stacks or overlays but does not group.
+                */}
+                {canSplit && !metric && !isLine && form.stack_by && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Bars
+                        </label>
+                        <Select
+                            value={form.bar_mode}
+                            onChange={(e) => setForm((f) => ({ ...f, bar_mode: e.target.value }))}
+                        >
+                            {BAR_MODES.map((m) => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </Select>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {form.bar_mode === 'grouped'
+                                ? 'One bar per value, side by side in each group — for comparing the parts.'
+                                : 'The values piled into one bar per group — for reading the total.'}
+                        </p>
                     </div>
                 )}
 
@@ -1922,76 +2000,6 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
                             </span>
                         </span>
                     </label>
-                )}
-
-                {canSplit && !metric && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Split by <span className="font-normal text-gray-400">(optional)</span>
-                        </label>
-                        <Select
-                            value={form.stack_by}
-                            onChange={(e) => setForm((f) => ({ ...f, stack_by: e.target.value }))}
-                        >
-                            <option value="">Don&rsquo;t split</option>
-                            {splitOptions.map((d) => (
-                                <option key={d.value} value={d.value}>{d.label}</option>
-                            ))}
-                        </Select>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {isLine
-                                ? 'Draws one line per value — "completed over time, one line per assignee".'
-                                : 'Divides each bar — "by status, split by assignee". The largest ' + MAX_SERIES + ' are kept and the rest folded into Other.'}
-                        </p>
-                    </div>
-                )}
-
-                {canSplit && !metric && needsSplitField && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Split field
-                        </label>
-                        <Select
-                            value={form.stack_custom_field_id}
-                            onChange={(e) => setForm((f) => ({ ...f, stack_custom_field_id: e.target.value }))}
-                        >
-                            <option value="">Choose a field…</option>
-                            {selectFields.map((f) => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
-                            ))}
-                        </Select>
-                        {selectFields.length === 0 && (
-                            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                                This project has no single-select custom field to split by.
-                            </p>
-                        )}
-                    </div>
-                )}
-
-                {/*
-                    How the series sit against each other. Only a split bar or
-                    column can cluster — a line already draws one line each, and
-                    a time axis stacks or overlays but does not group.
-                */}
-                {canSplit && !metric && !isLine && form.stack_by && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Bars
-                        </label>
-                        <Select
-                            value={form.bar_mode}
-                            onChange={(e) => setForm((f) => ({ ...f, bar_mode: e.target.value }))}
-                        >
-                            {BAR_MODES.map((m) => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                            ))}
-                        </Select>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {form.bar_mode === 'grouped'
-                                ? 'One bar per value, side by side in each group — for comparing the parts.'
-                                : 'The values piled into one bar per group — for reading the total.'}
-                        </p>
-                    </div>
                 )}
 
                 {!circular && !metric && pairEditor(
