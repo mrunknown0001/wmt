@@ -692,6 +692,41 @@ class TaskDelegationTest extends TestCase
         $this->assertDatabaseCount('task_delegations', 0);
     }
 
+    public function test_deleting_cover_returns_a_task_that_is_not_yet_due(): void
+    {
+        // The return is about ownership, not deadlines: a task due next week is
+        // just as much the owner's as one due yesterday, and pulling the cover
+        // must put it back either way. Pinned because it would be an easy — and
+        // wrong — "optimisation" to only bother returning work that is due.
+        $task = $this->task();
+        $task->update(['due_date' => now()->addWeek()->toDateString()]);
+
+        $delegation = $this->cover([$this->standIn]);
+        TaskDelegationService::activate($delegation);
+        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+
+        $this->actingAs($this->teamLead)
+            ->delete("/task-delegations/{$delegation->id}")
+            ->assertRedirect();
+
+        $this->assertSame($this->owner->id, $task->fresh()->assigned_to);
+    }
+
+    public function test_ending_cover_early_returns_a_task_that_is_not_yet_due(): void
+    {
+        $task = $this->task();
+        $task->update(['due_date' => now()->addWeek()->toDateString()]);
+
+        $delegation = $this->cover([$this->standIn]);
+        TaskDelegationService::activate($delegation);
+
+        $this->actingAs($this->teamLead)
+            ->post("/task-delegations/{$delegation->id}/end")
+            ->assertRedirect();
+
+        $this->assertSame($this->owner->id, $task->fresh()->assigned_to);
+    }
+
     public function test_a_stand_in_cannot_end_cover_they_did_not_arrange(): void
     {
         $delegation = $this->cover([$this->standIn]);
