@@ -14,8 +14,13 @@ import { formatDate, overdueDays, isDueEarlierToday, isCompletedLate } from '../
  *
  * Renders nothing when the task is on track, so it can be dropped in
  * unconditionally.
+ *
+ * Also renders nothing once a task is done: CompletedNotice covers that state,
+ * lateness included, and two boxes about the same task is one too many.
  */
 export default function OverdueNotice({ task, className = '' }) {
+    if (task?.status === 'done') return null;
+
     const days = overdueDays(task);
     const dueSoonPassed = days === 0 && isDueEarlierToday(task);
     const finishedLate = days === 0 && !dueSoonPassed && isCompletedLate(task);

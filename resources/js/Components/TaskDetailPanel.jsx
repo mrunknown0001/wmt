@@ -8,6 +8,7 @@ import Tooltip from './Tooltip';
 import SearchableSelect from './SearchableSelect';
 import TaskTimePanel from './TaskTimePanel';
 import OverdueNotice from './OverdueNotice';
+import CompletedNotice from './CompletedNotice';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom, isPastDue } from '../utils';
 import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
 import { weekOfYearLabel } from '../weekOfYear';
@@ -565,6 +566,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                             describe the same task differently. */}
                         <div className="px-6 pb-3">
                             <OverdueNotice task={taskData} />
+                            <CompletedNotice task={taskData} />
                         </div>
 
                         {/* Fields grid */}

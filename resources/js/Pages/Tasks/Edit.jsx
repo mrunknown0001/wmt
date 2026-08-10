@@ -16,6 +16,7 @@ import EstimateInput from '../../Components/EstimateInput';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
 import OverdueNotice from '../../Components/OverdueNotice';
+import CompletedNotice from '../../Components/CompletedNotice';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, isPastDue, overdueDays } from '../../utils';
 import echo from '../../echo';
 
@@ -530,12 +531,18 @@ export default function Edit() {
     // Read from the saved task, not the form: typing a new due date should not
     // clear the warning before the change has actually been saved.
     const daysOverdue = overdueDays(task);
+    const isDone = task.status === 'done';
 
     return (
         <AuthenticatedLayout title="Edit Task">
             <PageHeader
                 title="Edit Task"
-                titleExtra={daysOverdue > 0 && (
+                titleExtra={isDone ? (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/40 px-2 py-0.5 text-xs font-semibold text-green-700 dark:text-green-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                        Completed
+                    </span>
+                ) : daysOverdue > 0 && (
                     <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-semibold text-red-700 dark:text-red-300">
                         <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
                         Overdue
@@ -558,6 +565,7 @@ export default function Edit() {
                 <div className="lg:col-span-2">
                     <Card>
                         <OverdueNotice task={task} className="mb-5" />
+                        <CompletedNotice task={task} className="mb-5" />
                         {task.parent && (
                             <div className="mb-5 flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
                                 <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

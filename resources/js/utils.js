@@ -177,6 +177,29 @@ export const isCompletedLate = (task) => {
     return !!deadline && new Date(task.completed_at) > deadline;
 };
 
+/**
+ * Whole days between the day a task was due and the day it was finished.
+ *
+ * Positive is late, negative is early, zero means it landed on the day. Null
+ * when either date is missing, which is not the same as zero — "finished the
+ * day it was due" and "had no deadline" must not read alike.
+ *
+ * Measured by calendar day rather than against the deadline moment, to match
+ * overdueDays and every other count in the app. A task closed at 6pm on its due
+ * date is late by isCompletedLate and on time here; both are true, and this is
+ * the one worth saying out loud.
+ */
+export const completionDelta = (task) => {
+    if (!task?.completed_at || !task?.due_date) return null;
+
+    const due = parseDate(task.due_date);
+    const finished = parseDate(task.completed_at);
+    if (!due || !finished) return null;
+
+    const finishedDay = new Date(finished.getFullYear(), finished.getMonth(), finished.getDate());
+    return Math.round((finishedDay - due) / 86400000);
+};
+
 /** "1h 30m", "45m", "—". Mirrors TimeTracker::formatMinutes on the server. */
 export const formatMinutes = (minutes) => {
     const m = Number(minutes);
