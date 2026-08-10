@@ -1352,8 +1352,13 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
         title: form.title.trim(),
         chart_type: form.chart_type,
         group_by: metric ? 'none' : form.group_by,
-        // Filters now apply to every type, not just cards.
-        filters: form.filters,
+        // Filters now apply to every type, not just cards. custom_field_id is
+        // coerced to a number so the same value matches whether it came from
+        // the form (a <select> string) or the server (an int).
+        filters: form.filters.map((f) => ({
+            ...f,
+            custom_field_id: f.field === 'custom_field' && f.custom_field_id ? Number(f.custom_field_id) : null,
+        })),
         date_range: form.date_range,
         date_field: form.date_field,
         date_from: form.date_range === 'custom' ? (form.date_from || null) : null,
@@ -1404,7 +1409,10 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
      * options — and can never offer a value no task has.
      */
     const filterValues = (row) => {
-        const opts = { sections, customFields, fieldId: row.custom_field_id };
+        // categorise() matches field ids strictly, and a <select> hands back a
+        // string — so without this coercion a custom-field filter resolves to
+        // nothing and its value list comes up empty.
+        const opts = { sections, customFields, fieldId: row.custom_field_id ? Number(row.custom_field_id) : null };
         const seen = new Map();
 
         allTasks.forEach((task) => {
@@ -1953,23 +1961,51 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
                         </p>
 
                         {form.filters.map((row, i) => (
-                            <div key={i} className="flex items-center gap-2 mb-2">
+                            <div key={i} className="flex items-center gap-2 mb-2 flex-wrap sm:flex-nowrap">
                                 <Select
                                     value={row.field}
-                                    onChange={(e) => setFilter(i, { field: e.target.value, value: '' })}
+                                    // Switching field starts the row over: the old
+                                    // value and field belong to a dimension that
+                                    // no longer applies.
+                                    onChange={(e) => setFilter(i, { field: e.target.value, custom_field_id: '', value: '' })}
                                     className="w-40"
                                 >
                                     {CATEGORY_DIMENSIONS.map((d) => (
-                                        <option key={d.value} value={d.value}>{d.label}</option>
+                                        <option
+                                            key={d.value}
+                                            value={d.value}
+                                            disabled={d.value === 'custom_field' && selectFields.length === 0}
+                                        >
+                                            {d.label}{d.value === 'custom_field' && selectFields.length === 0 ? ' — none available' : ''}
+                                        </option>
                                     ))}
                                 </Select>
+
+                                {/* Which custom field, when filtering by one — the
+                                    piece that was missing, so a custom-field filter
+                                    could never resolve any values to choose from. */}
+                                {row.field === 'custom_field' && (
+                                    <Select
+                                        value={row.custom_field_id || ''}
+                                        onChange={(e) => setFilter(i, { custom_field_id: e.target.value, value: '' })}
+                                        className="w-40"
+                                    >
+                                        <option value="">Which field…</option>
+                                        {selectFields.map((f) => (
+                                            <option key={f.id} value={f.id}>{f.name}</option>
+                                        ))}
+                                    </Select>
+                                )}
 
                                 <Select
                                     value={row.value}
                                     onChange={(e) => setFilter(i, { value: e.target.value })}
-                                    className="flex-1"
+                                    className="flex-1 min-w-[8rem]"
+                                    disabled={row.field === 'custom_field' && !row.custom_field_id}
                                 >
-                                    <option value="">Choose a value…</option>
+                                    <option value="">
+                                        {row.field === 'custom_field' && !row.custom_field_id ? 'Pick a field first…' : 'Choose a value…'}
+                                    </option>
                                     {filterValues(row).map((o) => (
                                         <option key={o.key} value={o.key}>{o.label}</option>
                                     ))}
