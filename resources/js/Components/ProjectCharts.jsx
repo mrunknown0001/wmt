@@ -11,6 +11,7 @@ import {
     DATE_FIELDS,
     DATE_RANGES,
     DAY_MS,
+    BAR_MODES,
     HOW_TO_SORT,
     MAX_SERIES,
     MEASURES,
@@ -39,6 +40,7 @@ import {
     isTimeChart,
     labelByWeekNumber,
     manualBuckets,
+    maxSegmentValue,
     measureFields,
     measureSpec,
     metricTasks,
@@ -563,6 +565,178 @@ function ColumnChart({ rows, series = null, legend = null, measure = 'count', re
     );
 }
 
+/**
+ * Clustered vertical bars: one bar per series, side by side, in every group.
+ *
+ * The stacked column answers "how big is each group and what is it made of";
+ * this answers "how do the series compare within each group, and across them".
+ * Same {rows, series} the stack uses — the only change is that segments sit
+ * next to each other instead of on top, so the axis scales to the tallest
+ * single bar rather than the tallest pile.
+ */
+function GroupedColumnChart({ rows, series, measure = 'count', references = [], xLabel, yLabel }) {
+    const max = Math.max(maxSegmentValue(rows), ...references.map((r) => r.value), 1);
+    const top = niceMax(max);
+
+    // A slot per series in each group. Reading a segment by series key rather
+    // than by position keeps a bar the same colour even in a group that happens
+    // to be missing one of the values.
+    const valueFor = (row, key) => row.segments.find((s) => s.key === key)?.value || 0;
+
+    return (
+        <div>
+            {yLabel && (
+                <p className="mb-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {yLabel}
+                </p>
+            )}
+
+            <div className="relative">
+                {references.map((r, i) => (
+                    <div
+                        key={i}
+                        className="absolute left-9 right-0 border-t-2 border-dashed border-gray-500/70 pointer-events-none"
+                        style={{ bottom: `${Math.min(100, (r.value / top) * 100)}%`, marginBottom: '1.75rem' }}
+                        title={`${r.label}: ${formatValue(r.value, measure)}`}
+                    />
+                ))}
+
+                {axisTicks(top).map((tick) => (
+                    <div
+                        key={`tick-${tick}`}
+                        className="absolute left-0 right-0 pointer-events-none"
+                        style={{ bottom: `${(tick / top) * 100}%`, marginBottom: '1.75rem' }}
+                    >
+                        <span className="absolute left-0 -translate-y-1/2 text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+                            {formatValue(tick, measure)}
+                        </span>
+                        <div className="ml-9 border-t border-gray-100 dark:border-gray-700/60" />
+                    </div>
+                ))}
+
+                <div className="flex items-end gap-3 h-52 overflow-x-auto pb-0.5 pl-9">
+                    {rows.map((row) => (
+                        <div key={row.key} className="flex-1 min-w-[3rem] h-full flex items-end justify-center gap-0.5">
+                            {series.map((s) => {
+                                const value = valueFor(row, s.key);
+                                return (
+                                    <div
+                                        key={s.key}
+                                        className="relative flex-1 max-w-[1.75rem] h-full flex items-end"
+                                        title={`${row.label} · ${s.label}: ${formatValue(value, measure)}`}
+                                    >
+                                        <div
+                                            className="w-full rounded-t transition-all duration-500"
+                                            style={{ height: `${Math.max(value > 0 ? 2 : 0, (value / top) * 100)}%`, backgroundColor: s.color }}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="flex gap-3 mt-1.5 ml-9 border-t border-gray-200 dark:border-gray-700 pt-1.5">
+                    {rows.map((row) => (
+                        <span
+                            key={row.key}
+                            className="flex-1 min-w-[3rem] text-center text-[11px] truncate text-gray-500 dark:text-gray-400"
+                            title={row.label}
+                        >
+                            {row.label}
+                        </span>
+                    ))}
+                </div>
+            </div>
+
+            <SeriesLegend series={series} />
+
+            {references.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-3">
+                    {references.map((r, i) => (
+                        <span key={i} className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="inline-block w-4 border-t-2 border-dashed border-gray-500/70" />
+                            {r.label} · {formatValue(r.value, measure)}
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {xLabel && <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">{xLabel}</p>}
+        </div>
+    );
+}
+
+/**
+ * Clustered horizontal bars: the same side-by-side comparison as
+ * GroupedColumnChart, laid on its side for groups with long labels or many
+ * series, where vertical bars would grow too thin to read.
+ */
+function GroupedBarChart({ rows, series, measure = 'count', references = [], xLabel, yLabel }) {
+    const max = Math.max(maxSegmentValue(rows), ...references.map((r) => r.value), 1);
+    const valueFor = (row, key) => row.segments.find((s) => s.key === key)?.value || 0;
+
+    return (
+        <div>
+            {yLabel && (
+                <p className="mb-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {yLabel}
+                </p>
+            )}
+
+            <div className="space-y-3">
+                {rows.map((row) => (
+                    <div key={row.key} className="flex items-center gap-3">
+                        <span
+                            className="w-28 shrink-0 text-sm text-gray-600 dark:text-gray-300 truncate text-right"
+                            title={row.label}
+                        >
+                            {row.label}
+                        </span>
+                        <div className="relative flex-1 flex flex-col gap-0.5">
+                            {series.map((s) => {
+                                const value = valueFor(row, s.key);
+                                return (
+                                    <div key={s.key} className="h-3 bg-gray-100 dark:bg-gray-700/50 rounded-r overflow-hidden">
+                                        <div
+                                            className="h-3 transition-all duration-500"
+                                            style={{ width: `${(value / max) * 100}%`, backgroundColor: s.color }}
+                                            title={`${row.label} · ${s.label}: ${formatValue(value, measure)}`}
+                                        />
+                                    </div>
+                                );
+                            })}
+                            {references.map((r, i) => (
+                                <div
+                                    key={i}
+                                    className="absolute top-0 bottom-0 border-l-2 border-dashed border-gray-500/70"
+                                    style={{ left: `${Math.min(100, (r.value / max) * 100)}%` }}
+                                    title={`${r.label}: ${formatValue(r.value, measure)}`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <SeriesLegend series={series} />
+
+            {references.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-3">
+                    {references.map((r, i) => (
+                        <span key={i} className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="inline-block w-4 border-t-2 border-dashed border-gray-500/70" />
+                            {r.label} · {formatValue(r.value, measure)}
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {xLabel && <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">{xLabel}</p>}
+        </div>
+    );
+}
+
 
 /** A single computed number, with whatever it is measured against. */
 function MetricCard({ result, filterSummary }) {
@@ -912,6 +1086,10 @@ function ChartCard({ chart, allTasks, sections, customFields, formulaResults, ca
     // A donut or pie is already a breakdown of one whole, so it never splits.
     const stackBy = circular ? null : chart.config?.stack_by;
 
+    // Side-by-side rather than stacked. Only a bar or column can cluster —
+    // a line already draws one line per series, and there is nothing to stack.
+    const grouped = chart.config?.bar_mode === 'grouped' && !overTime;
+
     const split = useMemo(() => {
         if (!stackBy) return null;
 
@@ -996,6 +1174,16 @@ function ChartCard({ chart, allTasks, sections, customFields, formulaResults, ca
                         xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
                         filled={type === 'area'}
                     />
+                ) : grouped && type === 'column' ? (
+                    <GroupedColumnChart
+                        rows={split.rows} series={split.series} measure={measure} references={references}
+                        xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                    />
+                ) : grouped ? (
+                    <GroupedBarChart
+                        rows={split.rows} series={split.series} measure={measure} references={references}
+                        xLabel={chart.config?.x_label} yLabel={chart.config?.y_label}
+                    />
                 ) : type === 'column' ? (
                     <ColumnChart
                         rows={split.rows} series={split.series} measure={measure} references={references}
@@ -1042,7 +1230,7 @@ function ChartCard({ chart, allTasks, sections, customFields, formulaResults, ca
 export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks = [], sections = [], formulaResults = {}, newType = 'bar', saving, error }) {
     const selectFields = customFields.filter((f) => f.type === 'single_select');
 
-    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false, date_range: 'all', date_field: 'created', date_from: '', date_to: '', sort: 'natural', max_buckets: '' });
+    const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', bar_mode: 'stacked', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false, date_range: 'all', date_field: 'created', date_from: '', date_to: '', sort: 'natural', max_buckets: '' });
 
     useEffect(() => {
         if (!isOpen) return;
@@ -1062,6 +1250,7 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
             reference_lines: chart.config?.reference_lines || [],
             stack_by: chart.config?.stack_by || '',
             stack_custom_field_id: chart.config?.stack_custom_field_id || '',
+            bar_mode: chart.config?.bar_mode || 'stacked',
             time_grouping: chart.config?.time_grouping || 'auto',
             show_legend: !!chart.config?.show_legend,
             date_range: chart.config?.date_range || 'all',
@@ -1073,7 +1262,7 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
             filters: chart.config?.filters || [],
             compare: chart.config?.compare || 'none',
             target: chart.config?.target ?? '',
-        } : { title: '', chart_type: newType, group_by: isMetricChart(newType) ? 'none' : 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false, date_range: 'all', date_field: 'created', date_from: '', date_to: '', sort: 'natural', max_buckets: '' });
+        } : { title: '', chart_type: newType, group_by: isMetricChart(newType) ? 'none' : 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', bar_mode: 'stacked', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false, date_range: 'all', date_field: 'created', date_from: '', date_to: '', sort: 'natural', max_buckets: '' });
     }, [isOpen, chart, newType]);
 
     const [tab, setTab] = useState('setup');
@@ -1154,6 +1343,9 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
         stack_by: canSplit && form.stack_by ? form.stack_by : null,
         stack_custom_field_id: canSplit && form.stack_by === 'custom_field'
             ? form.stack_custom_field_id : null,
+        // Only meaningful when a bar/column is actually split; the server drops
+        // it otherwise so a line chart never carries a dead "grouped".
+        bar_mode: canSplit && form.stack_by ? form.bar_mode : null,
         time_grouping: isLine ? form.time_grouping : null,
         show_legend: (!isLine && !metric && !circular) ? form.show_legend : false,
         manual_points: isLine ? [] : cleanPairs(form.manual_points),
@@ -1773,6 +1965,32 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
                                 This project has no single-select custom field to split by.
                             </p>
                         )}
+                    </div>
+                )}
+
+                {/*
+                    How the series sit against each other. Only a split bar or
+                    column can cluster — a line already draws one line each, and
+                    a time axis stacks or overlays but does not group.
+                */}
+                {canSplit && !metric && !isLine && form.stack_by && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Bars
+                        </label>
+                        <Select
+                            value={form.bar_mode}
+                            onChange={(e) => setForm((f) => ({ ...f, bar_mode: e.target.value }))}
+                        >
+                            {BAR_MODES.map((m) => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </Select>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {form.bar_mode === 'grouped'
+                                ? 'One bar per value, side by side in each group — for comparing the parts.'
+                                : 'The values piled into one bar per group — for reading the total.'}
+                        </p>
                     </div>
                 )}
 

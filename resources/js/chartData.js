@@ -526,6 +526,31 @@ export function referenceLines(chart) {
 export const MAX_SERIES = 8;
 
 /**
+ * How the series of a split bar/column chart sit against each other.
+ *
+ * Stacked answers "what is the total, and what is it made of"; grouped answers
+ * "how do the parts compare, group by group". Same data either way — only the
+ * drawing changes — so this is a display choice, not a second computation.
+ */
+export const BAR_MODES = [
+    { value: 'stacked', label: 'Stacked' },
+    { value: 'grouped', label: 'Side by side' },
+];
+
+/**
+ * The tallest single series value across every group.
+ *
+ * A stacked chart scales to the row total; a grouped one draws each series as
+ * its own bar, so the axis has to reach the largest bar, not the largest pile.
+ */
+export function maxSegmentValue(rows) {
+    return (rows || []).reduce(
+        (max, row) => (row.segments || []).reduce((m, seg) => Math.max(m, seg.value || 0), max),
+        0,
+    );
+}
+
+/**
  * Which slice of a category dimension a task belongs to.
  *
  * Shared by the X axis and the split, so "by assignee" means the same thing

@@ -53,6 +53,12 @@ class ProjectChartController extends Controller
     private const SORTS = ['natural', 'value_desc', 'value_asc', 'label'];
 
     /**
+     * How a split bar/column draws its series: piled into one bar, or side by
+     * side. Same data either way — it changes the drawing, not the numbers.
+     */
+    private const BAR_MODES = ['stacked', 'grouped'];
+
+    /**
      * What goes up the Y axis.
      *
      * Until now every chart counted tasks. Being able to plot hours — estimated
@@ -134,6 +140,9 @@ class ProjectChartController extends Controller
                 'integer',
                 Rule::exists('custom_fields', 'id')->where('project_id', $project->id),
             ],
+
+            // Stacked or side-by-side, for a split bar/column.
+            'bar_mode' => ['nullable', Rule::in(self::BAR_MODES)],
 
             'measure' => ['nullable', Rule::in(self::MEASURES)],
             'measure_custom_field_id' => [
@@ -292,6 +301,12 @@ class ProjectChartController extends Controller
             'stack_by' => $validated['stack_by'] ?? null,
             'stack_custom_field_id' => ($validated['stack_by'] ?? null) === 'custom_field'
                 ? (int) $validated['stack_custom_field_id']
+                : null,
+            // Clustered bars only mean something on a split bar or column. On a
+            // circle, a time chart, a card, or an unsplit chart there is nothing
+            // to sit side by side, so it is not stored.
+            'bar_mode' => (!$circular && !$overTime && !$isMetric && ($validated['stack_by'] ?? null))
+                ? ($validated['bar_mode'] ?? 'stacked')
                 : null,
             // Only meaningful on a time chart — a category axis has no buckets
             // to widen, so storing one there would be dead config.

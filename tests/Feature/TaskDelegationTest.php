@@ -727,6 +727,44 @@ class TaskDelegationTest extends TestCase
         $this->assertSame($this->owner->id, $task->fresh()->assigned_to);
     }
 
+    public function test_deleting_cover_leaves_a_hand_reassigned_task_where_it_was_put(): void
+    {
+        // A manual reassignment during cover is a deliberate decision by someone
+        // with the task in front of them, and it must win: removing the cover
+        // returns the stand-in's remaining work, but never overrides a move a
+        // person made by hand. The auto-end path already promises this
+        // (test_a_task_moved_on_by_hand_is_not_dragged_back); the delete path
+        // must promise it too.
+        $task = $this->task();
+        $delegation = $this->cover([$this->standIn]);
+        TaskDelegationService::activate($delegation);
+        $this->assertSame($this->standIn->id, $task->fresh()->assigned_to);
+
+        // Somebody decides it really belongs to a third person.
+        $task->fresh()->update(['assigned_to' => $this->second->id]);
+
+        $this->actingAs($this->teamLead)
+            ->delete("/task-delegations/{$delegation->id}")
+            ->assertRedirect();
+
+        $this->assertSame($this->second->id, $task->fresh()->assigned_to);
+    }
+
+    public function test_ending_cover_early_leaves_a_hand_reassigned_task_where_it_was_put(): void
+    {
+        $task = $this->task();
+        $delegation = $this->cover([$this->standIn]);
+        TaskDelegationService::activate($delegation);
+
+        $task->fresh()->update(['assigned_to' => $this->second->id]);
+
+        $this->actingAs($this->teamLead)
+            ->post("/task-delegations/{$delegation->id}/end")
+            ->assertRedirect();
+
+        $this->assertSame($this->second->id, $task->fresh()->assigned_to);
+    }
+
     public function test_a_stand_in_cannot_end_cover_they_did_not_arrange(): void
     {
         $delegation = $this->cover([$this->standIn]);

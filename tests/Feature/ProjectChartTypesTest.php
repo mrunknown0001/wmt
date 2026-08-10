@@ -632,4 +632,60 @@ class ProjectChartTypesTest extends TestCase
 
         $this->assertDatabaseHas('project_charts', ['id' => $id, 'chart_type' => 'column']);
     }
+
+    // ---- grouped (side-by-side) bars ----
+
+    private function storedConfig(): array
+    {
+        return json_decode(\DB::table('project_charts')->latest('id')->value('config'), true);
+    }
+
+    public function test_a_split_bar_can_be_grouped_side_by_side(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'assignee',
+            'stack_by' => 'status',
+            'bar_mode' => 'grouped',
+        ])->assertSuccessful();
+
+        $this->assertSame('grouped', $this->storedConfig()['bar_mode']);
+    }
+
+    public function test_an_invalid_bar_mode_is_rejected(): void
+    {
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'assignee',
+            'stack_by' => 'status',
+            'bar_mode' => 'sideways',
+        ])->assertStatus(422);
+    }
+
+    public function test_bar_mode_is_dropped_when_there_is_no_split_to_group(): void
+    {
+        // Nothing to sit side by side without a second dimension, so a grouped
+        // flag on an unsplit chart is stored as null rather than kept as dead
+        // config that the next reader has to second-guess.
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'assignee',
+            'bar_mode' => 'grouped',
+        ])->assertSuccessful();
+
+        $this->assertNull($this->storedConfig()['bar_mode']);
+    }
+
+    public function test_bar_mode_is_dropped_on_a_chart_that_cannot_cluster(): void
+    {
+        // A line already draws one line per series; there is no bar to group.
+        $this->newChart([
+            'chart_type' => 'line',
+            'group_by' => 'created_over_time',
+            'stack_by' => 'status',
+            'bar_mode' => 'grouped',
+        ])->assertSuccessful();
+
+        $this->assertNull($this->storedConfig()['bar_mode']);
+    }
 }
