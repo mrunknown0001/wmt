@@ -65,10 +65,28 @@ class ProjectChartController extends Controller
         'sum_logged',       // hours actually recorded
         'sum_custom_field', // total of a number field
         'avg_custom_field', // its average
+        'count_filled',     // tasks holding a value in any field
+        'count_distinct',   // how many different values that field holds
     ];
 
     /** Measures that need a number custom field naming. */
-    private const FIELD_MEASURES = ['sum_custom_field', 'avg_custom_field'];
+    private const NUMBER_FIELD_MEASURES = ['sum_custom_field', 'avg_custom_field'];
+
+    /**
+     * Measures that work on any field at all.
+     *
+     * A date, a select or a person cannot be added up, but counting how many
+     * tasks carry one — or how many different ones there are — is a perfectly
+     * good Y axis, and restricting the picker to numbers kept most of a
+     * project's own data off its charts.
+     */
+    private const ANY_FIELD_MEASURES = ['count_filled', 'count_distinct'];
+
+    /** Every measure that needs a field naming, whatever its type. */
+    private const FIELD_MEASURES = [...self::NUMBER_FIELD_MEASURES, ...self::ANY_FIELD_MEASURES];
+
+    /** Field types that hold something a total or an average can use. */
+    private const NUMERIC_FIELD_TYPES = ['number', 'formula'];
 
     /** Ceilings on hand-entered data, so one chart can't carry a spreadsheet. */
     private const MAX_MANUAL_POINTS = 20;
@@ -220,10 +238,23 @@ class ProjectChartController extends Controller
         if (in_array($measure, self::FIELD_MEASURES, true)) {
             $field = $project->customFields()->find($validated['measure_custom_field_id'] ?? null);
 
-            // Summing a text or select field would produce a number that looks
-            // real and means nothing.
-            if (!$field || !in_array($field->type, ['number', 'formula'], true)) {
-                abort(422, 'Totalling a custom field needs a number or formula field.');
+            if (!$field) {
+                abort(422, 'Measuring a custom field needs the field naming.');
+            }
+
+            // Counting works on anything; totalling does not. Summing a text or
+            // select field would produce a number that looks real and means
+            // nothing.
+            if (in_array($measure, self::NUMBER_FIELD_MEASURES, true)) {
+                $numeric = in_array($field->type, self::NUMERIC_FIELD_TYPES, true)
+                    // A formula answering Yes/No or a date is no more summable
+                    // than a checkbox would be.
+                    && ($field->type !== 'formula'
+                        || ($field->config['result_type'] ?? 'number') === 'number');
+
+                if (!$numeric) {
+                    abort(422, 'Totalling a custom field needs a number or a number-returning formula.');
+                }
             }
         }
 

@@ -4779,6 +4779,10 @@ export default function Show() {
                             tasks={localTasks}
                             sections={localSections}
                             customFields={localCustomFields}
+                            // Formula fields are computed here, not stored on the
+                            // value rows, so a chart measuring one reads zero
+                            // without them.
+                            formulaResults={formulaResults}
                             canManage={canManageCharts}
                         />
                     </div>

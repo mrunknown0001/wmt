@@ -39,15 +39,16 @@ import {
     isTimeChart,
     labelByWeekNumber,
     manualBuckets,
+    measureFields,
     measureSpec,
     metricTasks,
-    numericFields,
     referenceLines,
     resolveTimeGrouping,
     scopeTasks,
     startOfDay,
     startOfWeek,
     taskValue,
+    validateChartConfig,
     windowDate,
     withinDateWindow,
 } from '../chartData';
@@ -887,7 +888,7 @@ function chartSubtitle(chart, customFields) {
     return chart.chart_type === 'line' ? label : `By ${label.toLowerCase()}${scopeLabel}`;
 }
 
-function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit, onDelete }) {
+function ChartCard({ chart, allTasks, sections, customFields, formulaResults, canManage, onEdit, onDelete }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
 
@@ -915,15 +916,15 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
         if (!stackBy) return null;
 
         return overTime
-            ? computeStackedTimeData(chart, allTasks, sections, customFields)
-            : computeStackedData(chart, allTasks, sections, customFields);
-    }, [stackBy, overTime, chart, allTasks, sections, customFields]);
+            ? computeStackedTimeData(chart, allTasks, sections, customFields, formulaResults)
+            : computeStackedData(chart, allTasks, sections, customFields, formulaResults);
+    }, [stackBy, overTime, chart, allTasks, sections, customFields, formulaResults]);
 
     const data = useMemo(() => {
         if (stackBy) return [];
-        if (overTime) return computeTimeData(chart, allTasks, sections, customFields);
+        if (overTime) return computeTimeData(chart, allTasks, sections, customFields, formulaResults);
 
-        const buckets = computeCategoryData(chart, allTasks, sections, customFields);
+        const buckets = computeCategoryData(chart, allTasks, sections, customFields, formulaResults);
         // A circle can only carry so many slices before the labels collide;
         // a column chart runs out of horizontal room sooner than a bar. Those
         // are the defaults the chart can override.
@@ -932,7 +933,7 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
         // Hand-entered figures are appended after folding, so an "Other" bucket
         // can never swallow one — they were typed in precisely to be seen.
         return [...folded, ...manualBuckets(chart)];
-    }, [stackBy, chart, allTasks, sections, customFields]);
+    }, [stackBy, chart, allTasks, sections, customFields, formulaResults]);
 
     // A single-series chart already names each bar on its axis, so a legend
     // is only drawn when asked for — it repeats the labels otherwise.
@@ -1008,7 +1009,7 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
                 )
             ) : metric ? (
                 <MetricCard
-                    result={computeMetric(chart, allTasks, sections, customFields)}
+                    result={computeMetric(chart, allTasks, sections, customFields, formulaResults)}
                     filterSummary={describeFilters(chart, allTasks, sections, customFields)}
                 />
             ) : type === 'bar' ? (
@@ -1036,10 +1037,10 @@ function ChartCard({ chart, allTasks, sections, customFields, canManage, onEdit,
 
 /* ----------------------------- Add/edit modal ----------------------------- */
 
-function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks = [], sections = [], newType = 'bar', saving, error }) {
+// Exported so the form can be rendered on its own and checked. Nothing else
+// imports it; the dashboard below renders it directly.
+export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks = [], sections = [], formulaResults = {}, newType = 'bar', saving, error }) {
     const selectFields = customFields.filter((f) => f.type === 'single_select');
-
-    const numberFields = numericFields(customFields);
 
     const [form, setForm] = useState({ title: '', chart_type: 'bar', group_by: 'status', custom_field_id: '', scope: 'all', measure: 'count', measure_custom_field_id: '', x_label: '', y_label: '', manual_points: [], reference_lines: [], stack_by: '', stack_custom_field_id: '', time_grouping: 'auto', filters: [], compare: 'none', target: '', show_legend: false, date_range: 'all', date_field: 'created', date_from: '', date_to: '', sort: 'natural', max_buckets: '' });
 
@@ -1105,7 +1106,11 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
         });
     };
 
-    const needsNumberField = measureSpec(form.measure).needsField;
+    const measureNeedsField = measureSpec(form.measure).needsField;
+
+    // Which fields the chosen measure can point at: numbers only for a total or
+    // an average, anything at all for the two that count values.
+    const measurableFields = measureFields(customFields, form.measure);
 
     // A donut is already a breakdown of one whole, so there is nothing left to
     // split; and a dimension cannot be split by itself.
@@ -1113,16 +1118,56 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
     const splitOptions = CATEGORY_DIMENSIONS.filter((d) => d.value !== form.group_by);
     const needsSplitField = form.stack_by === 'custom_field';
 
-    const canSave = form.title.trim().length > 0
-        && (form.group_by !== 'custom_field' || form.custom_field_id)
-        && (!needsNumberField || form.measure_custom_field_id)
-        && (!canSplit || !needsSplitField || form.stack_custom_field_id);
-
     // Rows the user is part-way through typing are dropped rather than saved
     // as a blank label with a number nobody can read.
     const cleanPairs = (rows) => rows
         .map((r) => ({ label: String(r.label || '').trim(), value: Number(r.value) || 0 }))
         .filter((r) => r.label !== '');
+
+    /**
+     * Exactly what would be posted.
+     *
+     * Built once and used for both the save and the checks below, so what gets
+     * validated is what gets stored. Two versions of this object is how a form
+     * comes to pass its own validation and fail the server's.
+     */
+    const payload = useMemo(() => ({
+        title: form.title.trim(),
+        chart_type: form.chart_type,
+        group_by: metric ? 'none' : form.group_by,
+        // Filters now apply to every type, not just cards.
+        filters: form.filters,
+        date_range: form.date_range,
+        date_field: form.date_field,
+        date_from: form.date_range === 'custom' ? (form.date_from || null) : null,
+        date_to: form.date_range === 'custom' ? (form.date_to || null) : null,
+        sort: (metric || isLine) ? null : form.sort,
+        max_buckets: (metric || isLine) ? null : (Number(form.max_buckets) || null),
+        compare: metric ? form.compare : null,
+        target: metric && form.compare === 'target' ? Number(form.target) || 0 : null,
+        custom_field_id: form.group_by === 'custom_field' ? form.custom_field_id : null,
+        scope: isLine ? 'all' : form.scope,
+        measure: form.measure,
+        measure_custom_field_id: measureNeedsField ? form.measure_custom_field_id : null,
+        x_label: form.x_label.trim() || null,
+        y_label: form.y_label.trim() || null,
+        stack_by: canSplit && form.stack_by ? form.stack_by : null,
+        stack_custom_field_id: canSplit && form.stack_by === 'custom_field'
+            ? form.stack_custom_field_id : null,
+        time_grouping: isLine ? form.time_grouping : null,
+        show_legend: (!isLine && !metric && !circular) ? form.show_legend : false,
+        manual_points: isLine ? [] : cleanPairs(form.manual_points),
+        reference_lines: circular ? [] : cleanPairs(form.reference_lines),
+    }), [form, metric, isLine, circular, canSplit, measureNeedsField]);
+
+    // Errors block the save and say what to fix; warnings say what the chart
+    // will look like and let it through.
+    const { errors, warnings } = useMemo(
+        () => validateChartConfig(payload, { customFields, sections, tasks: allTasks, formulaResults }),
+        [payload, customFields, sections, allTasks, formulaResults]
+    );
+
+    const canSave = errors.length === 0;
 
     const setPairs = (key, rows) => setForm((f) => ({ ...f, [key]: rows }));
 
@@ -1213,34 +1258,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
                 <>
                     <Button variant="secondary" onClick={onClose}>Cancel</Button>
                     <Button
-                        onClick={() => onSave({
-                            title: form.title.trim(),
-                            chart_type: form.chart_type,
-                            group_by: metric ? 'none' : form.group_by,
-                            // Filters now apply to every type, not just cards.
-                            filters: form.filters,
-                            date_range: form.date_range,
-                            date_field: form.date_field,
-                            date_from: form.date_range === 'custom' ? (form.date_from || null) : null,
-                            date_to: form.date_range === 'custom' ? (form.date_to || null) : null,
-                            sort: (metric || isLine) ? null : form.sort,
-                            max_buckets: (metric || isLine) ? null : (Number(form.max_buckets) || null),
-                            compare: metric ? form.compare : null,
-                            target: metric && form.compare === 'target' ? Number(form.target) || 0 : null,
-                            custom_field_id: form.group_by === 'custom_field' ? form.custom_field_id : null,
-                            scope: isLine ? 'all' : form.scope,
-                            measure: form.measure,
-                            measure_custom_field_id: needsNumberField ? form.measure_custom_field_id : null,
-                            x_label: form.x_label.trim() || null,
-                            y_label: form.y_label.trim() || null,
-                            stack_by: canSplit && form.stack_by ? form.stack_by : null,
-                            stack_custom_field_id: canSplit && form.stack_by === 'custom_field'
-                                ? form.stack_custom_field_id : null,
-                            time_grouping: isLine ? form.time_grouping : null,
-                            show_legend: (!isLine && !metric && !circular) ? form.show_legend : false,
-                            manual_points: isLine ? [] : cleanPairs(form.manual_points),
-                            reference_lines: circular ? [] : cleanPairs(form.reference_lines),
-                        })}
+                        onClick={() => onSave(payload)}
                         disabled={!canSave || saving}
                     >
                         {saving ? 'Saving…' : chart ? 'Save Changes' : 'Add Chart'}
@@ -1251,6 +1269,35 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
             <div className="space-y-4 text-left">
                 {error && (
                     <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>
+                )}
+
+                {/*
+                    Why Save is greyed out, rather than leaving the user to
+                    guess. A brand new form has exactly one thing wrong with it
+                    — no title yet — and saying so before anything is typed is
+                    just shouting, so that single case stays quiet.
+                */}
+                {errors.length > 0 && (form.title.trim().length > 0 || errors.length > 1) && (
+                    <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2">
+                        <p className="text-xs font-semibold text-red-800 dark:text-red-300 mb-1">
+                            {errors.length === 1 ? 'One thing to fix' : `${errors.length} things to fix`}
+                        </p>
+                        <ul className="space-y-0.5 text-sm text-red-700 dark:text-red-300">
+                            {errors.map((message, i) => <li key={i}>• {message}</li>)}
+                        </ul>
+                    </div>
+                )}
+
+                {/* Valid, but worth knowing before it lands on the dashboard. */}
+                {errors.length === 0 && warnings.length > 0 && (
+                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+                        <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-1">
+                            This will save, but:
+                        </p>
+                        <ul className="space-y-0.5 text-sm text-amber-700 dark:text-amber-300">
+                            {warnings.map((message, i) => <li key={i}>• {message}</li>)}
+                        </ul>
+                    </div>
                 )}
 
                 {/*
@@ -1415,7 +1462,16 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
                     </label>
                     <Select
                         value={form.measure}
-                        onChange={(e) => setForm((f) => ({ ...f, measure: e.target.value }))}
+                        onChange={(e) => setForm((f) => {
+                            const measure = e.target.value;
+                            // A field picked for counting may be a date or a
+                            // select, which a total cannot use. Dropping it here
+                            // is clearer than leaving an invalid pair selected.
+                            const stillValid = measureFields(customFields, measure)
+                                .some((cf) => String(cf.id) === String(f.measure_custom_field_id));
+
+                            return { ...f, measure, measure_custom_field_id: stillValid ? f.measure_custom_field_id : '' };
+                        })}
                     >
                         {MEASURES
                             // A donut divides a whole into parts, so an average
@@ -1425,25 +1481,34 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
                                 <option key={m.value} value={m.value}>{m.label}</option>
                             ))}
                     </Select>
-                    {needsNumberField && numberFields.length === 0 && (
+                    {measureNeedsField && measurableFields.length === 0 && (
                         <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                            This project has no number or formula custom field to total.
+                            {measureSpec(form.measure).fieldKind === 'numeric'
+                                ? 'This project has no number or formula field to total. Counting the values of any field works instead.'
+                                : 'This project has no custom fields yet.'}
                         </p>
                     )}
                 </div>
 
-                {needsNumberField && numberFields.length > 0 && (
+                {measureNeedsField && measurableFields.length > 0 && (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Number field
+                            {measureSpec(form.measure).fieldKind === 'numeric' ? 'Number field' : 'Custom field'}
                         </label>
                         <Select
                             value={form.measure_custom_field_id}
                             onChange={(e) => setForm((f) => ({ ...f, measure_custom_field_id: e.target.value }))}
                         >
                             <option value="">Choose a field…</option>
-                            {numberFields.map((f) => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
+                            {measurableFields.map((f) => (
+                                <option key={f.id} value={f.id}>
+                                    {f.name}
+                                    {/* The type matters here: two fields can share
+                                        a name and behave nothing alike. */}
+                                    {measureSpec(form.measure).fieldKind === 'any'
+                                        ? ` — ${String(f.type).replace(/_/g, ' ')}`
+                                        : ''}
+                                </option>
                             ))}
                         </Select>
                     </div>
@@ -1733,7 +1798,7 @@ function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, allTasks
 
 /* ------------------------------- Section ------------------------------- */
 
-export default function ProjectCharts({ projectId, charts: initialCharts, tasks, sections, customFields, canManage }) {
+export default function ProjectCharts({ projectId, charts: initialCharts, tasks, sections, customFields, formulaResults = {}, canManage }) {
     const [charts, setCharts] = useState(initialCharts || []);
     const [modalOpen, setModalOpen] = useState(false);
     const [newType, setNewType] = useState('bar');
@@ -1856,6 +1921,7 @@ export default function ProjectCharts({ projectId, charts: initialCharts, tasks,
                                 allTasks={allTasks}
                                 sections={sections}
                                 customFields={customFields}
+                                formulaResults={formulaResults}
                                 canManage={canManage}
                                 onEdit={(c) => { setEditingChart(c); setError(null); setModalOpen(true); }}
                                 onDelete={(c) => setDeletingChart(c)}
@@ -1872,6 +1938,7 @@ export default function ProjectCharts({ projectId, charts: initialCharts, tasks,
                             allTasks={allTasks}
                             sections={sections}
                             customFields={customFields}
+                            formulaResults={formulaResults}
                             canManage={canManage}
                             onEdit={(c) => { setEditingChart(c); setError(null); setModalOpen(true); }}
                             onDelete={(c) => setDeletingChart(c)}
@@ -1889,6 +1956,7 @@ export default function ProjectCharts({ projectId, charts: initialCharts, tasks,
                 customFields={customFields}
                 allTasks={allTasks}
                 sections={sections}
+                formulaResults={formulaResults}
                 newType={newType}
                 saving={saving}
                 error={error}

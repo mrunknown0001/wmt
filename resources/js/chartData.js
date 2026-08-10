@@ -12,7 +12,7 @@
  */
 // Extensions spelled out so plain Node can import this too, not only Vite.
 import { formatLabel, isPastDue } from './utils.js';
-import { isoWeekParts } from './weekOfYear.js';
+import { isoWeekParts, resolveReferenceDate } from './weekOfYear.js';
 
 export const SERIES_VARS = ['--viz-s1', '--viz-s2', '--viz-s3', '--viz-s4', '--viz-s5', '--viz-s6', '--viz-s7', '--viz-s8'];
 
@@ -58,15 +58,100 @@ export const MEASURES = [
     { value: 'count', label: 'Number of tasks', unit: '' },
     { value: 'sum_estimate', label: 'Estimated hours', unit: 'h' },
     { value: 'sum_logged', label: 'Logged hours', unit: 'h' },
-    { value: 'sum_custom_field', label: 'Total of a number field', unit: '', needsField: true },
-    { value: 'avg_custom_field', label: 'Average of a number field', unit: '', needsField: true },
+    { value: 'sum_custom_field', label: 'Total of a number field', unit: '', needsField: true, fieldKind: 'numeric' },
+    { value: 'avg_custom_field', label: 'Average of a number field', unit: '', needsField: true, fieldKind: 'numeric' },
+    // These two take any field at all. A date, a select, a person — none of them
+    // can be added up, but "how many tasks have one" and "how many different
+    // ones are there" are questions worth putting on an axis.
+    { value: 'count_filled', label: 'Tasks with a value in a field', unit: '', needsField: true, fieldKind: 'any' },
+    { value: 'count_distinct', label: 'Different values in a field', unit: '', needsField: true, fieldKind: 'any' },
 ];
 
 export const measureSpec = (value) => MEASURES.find((m) => m.value === value) || MEASURES[0];
 
-/** Number fields a measure can total. Formulas count — they resolve to numbers. */
-export const numericFields = (customFields) =>
-    (customFields || []).filter((f) => f.type === 'number' || f.type === 'formula');
+/**
+ * Fields a measure can be pointed at.
+ *
+ * Only some fields hold a number, so only some can be totalled — but every
+ * field can be counted, and restricting the whole picker to numbers was hiding
+ * most of a project's data from the Y axis.
+ */
+export const numericFields = (customFields) => (customFields || []).filter((f) =>
+    f.type === 'number'
+    // A formula that returns Yes/No or a date is not something to total.
+    || (f.type === 'formula' && (f.config?.result_type || 'number') === 'number'));
+
+export const measureFields = (customFields, measure) =>
+    measureSpec(measure).fieldKind === 'any'
+        ? (customFields || [])
+        : numericFields(customFields);
+
+/**
+ * Everything one task holds for one custom field, as comparable entries.
+ *
+ * An array because a multi-select or a people field holds several at once, and
+ * counting how many distinct values exist has to see all of them.
+ *
+ * Two field types are not stored on the value row at all and would otherwise
+ * read as permanently empty: a formula is computed in the browser, and a week
+ * of year is derived from whichever date the field follows.
+ */
+export function fieldEntries(task, field, formulaResults = {}) {
+    if (!field) return [];
+
+    if (field.type === 'formula') {
+        const raw = formulaResults?.[task.id]?.[field.id];
+        if (raw === null || raw === undefined || raw === '') return [];
+        const number = typeof raw === 'number' ? raw : null;
+        return [{ key: String(raw), label: String(raw), number }];
+    }
+
+    if (field.type === 'week_of_year') {
+        const parts = isoWeekParts(resolveReferenceDate(task, field.config));
+        return parts
+            ? [{ key: `${parts.year}-W${parts.week}`, label: `Week ${parts.week}, ${parts.year}`, number: parts.week }]
+            : [];
+    }
+
+    const cfv = (task.custom_field_values || []).find((v) => v.custom_field_id === field.id);
+    if (!cfv) return [];
+
+    if (field.type === 'number') {
+        const raw = cfv.value_number;
+        if (raw === null || raw === undefined || raw === '') return [];
+        return [{ key: String(raw), label: String(raw), number: Number(raw) }];
+    }
+
+    if (field.type === 'date') {
+        return cfv.value_date ? [{ key: cfv.value_date, label: cfv.value_date, number: null }] : [];
+    }
+
+    if (field.type === 'single_select') {
+        const option = (field.options || []).find((o) => o.id === cfv.value_option_id);
+        if (!cfv.value_option_id) return [];
+        return [{
+            key: String(cfv.value_option_id),
+            label: option?.label || String(cfv.value_option_id),
+            number: null,
+        }];
+    }
+
+    if (field.type === 'multi_select' || field.type === 'people') {
+        return (cfv.value_json || [])
+            .filter((v) => v !== null && v !== undefined && v !== '')
+            .map((v) => {
+                const option = (field.options || []).find((o) => String(o.id) === String(v));
+                return { key: String(v), label: option?.label || String(v), number: null };
+            });
+    }
+
+    // text, textarea, and anything added later that lands in value_text.
+    const text = String(cfv.value_text ?? '').trim();
+    return text === '' ? [] : [{ key: text, label: text, number: null }];
+}
+
+const fieldById = (customFields, fieldId) =>
+    (customFields || []).find((f) => f.id === fieldId) || null;
 
 /**
  * The value one task contributes to a bucket.
@@ -74,7 +159,7 @@ export const numericFields = (customFields) =>
  * Returns null when the task has nothing to contribute, which is different from
  * zero: a task with no estimate should not drag an average down.
  */
-export function taskValue(task, measure, fieldId) {
+export function taskValue(task, measure, fieldId, ctx = {}) {
     if (measure === 'sum_estimate') {
         return task.estimated_minutes ? task.estimated_minutes / 60 : null;
     }
@@ -84,22 +169,41 @@ export function taskValue(task, measure, fieldId) {
     }
 
     if (measure === 'sum_custom_field' || measure === 'avg_custom_field') {
-        const cfv = (task.custom_field_values || []).find((v) => v.custom_field_id === fieldId);
-        const raw = cfv?.value_number;
-        return raw === null || raw === undefined || raw === '' ? null : Number(raw);
+        const numbers = fieldEntries(task, fieldById(ctx.customFields, fieldId), ctx.formulaResults)
+            .map((e) => e.number)
+            .filter((n) => n !== null && !Number.isNaN(n));
+
+        // A multi-value field contributes the sum of what it holds, so one task
+        // is still one contribution and an average stays an average over tasks.
+        return numbers.length ? numbers.reduce((a, b) => a + b, 0) : null;
     }
 
     return 1; // count
 }
 
 /** Roll a set of tasks up into one number for the chosen measure. */
-export function aggregate(tasks, measure, fieldId) {
+export function aggregate(tasks, measure, fieldId, ctx = {}) {
     if (measure === 'count') {
         return tasks.length;
     }
 
+    // Counting values is not summing per-task numbers, so these two answer
+    // before the numeric path below.
+    if (measure === 'count_filled' || measure === 'count_distinct') {
+        const field = fieldById(ctx.customFields, fieldId);
+        if (!field) return 0;
+
+        if (measure === 'count_filled') {
+            return tasks.filter((t) => fieldEntries(t, field, ctx.formulaResults).length > 0).length;
+        }
+
+        const seen = new Set();
+        tasks.forEach((t) => fieldEntries(t, field, ctx.formulaResults).forEach((e) => seen.add(e.key)));
+        return seen.size;
+    }
+
     const values = tasks
-        .map((t) => taskValue(t, measure, fieldId))
+        .map((t) => taskValue(t, measure, fieldId, ctx))
         .filter((v) => v !== null && !Number.isNaN(v));
 
     if (values.length === 0) return 0;
@@ -282,14 +386,14 @@ export function scopeTasks(tasks, scope) {
 }
 
 // Buckets for bar/donut charts: [{ key, label, count, color }]
-export function computeCategoryData(chart, allTasks, sections, customFields) {
+export function computeCategoryData(chart, allTasks, sections, customFields, formulaResults = {}) {
     const tasks = chartTasks(chart, allTasks, sections, customFields);
     const groupBy = chart.group_by;
     const measure = chart.config?.measure || 'count';
     const fieldId = chart.config?.measure_custom_field_id || null;
 
     // One helper so every branch below measures the same way.
-    const roll = (subset) => aggregate(subset, measure, fieldId);
+    const roll = (subset) => aggregate(subset, measure, fieldId, { customFields, formulaResults });
 
     if (groupBy === 'status') {
         return Object.keys(STATUS_HEX)
@@ -491,7 +595,7 @@ export function categorise(task, dimension, { sections, customFields, fieldId })
  * Colour belongs to the series, not the bucket: a given assignee has to be the
  * same colour in every bar, or the legend is a lie.
  */
-export function computeStackedData(chart, allTasks, sections, customFields) {
+export function computeStackedData(chart, allTasks, sections, customFields, formulaResults = {}) {
     const measure = chart.config?.measure || 'count';
     const measureFieldId = chart.config?.measure_custom_field_id || null;
     const groupBy = chart.group_by;
@@ -527,7 +631,7 @@ export function computeStackedData(chart, allTasks, sections, customFields) {
     const seriesTotals = new Map();
     buckets.forEach((b) => {
         b.series.forEach((group, key) => {
-            seriesTotals.set(key, (seriesTotals.get(key) || 0) + aggregate(group, measure, measureFieldId));
+            seriesTotals.set(key, (seriesTotals.get(key) || 0) + aggregate(group, measure, measureFieldId, { customFields, formulaResults }));
         });
     });
 
@@ -555,7 +659,7 @@ export function computeStackedData(chart, allTasks, sections, customFields) {
                 ? [...b.series.entries()].filter(([k]) => foldedKeys.has(k)).flatMap(([, g]) => g)
                 : (b.series.get(s.key) || []);
 
-            return { key: s.key, label: s.label, color: s.color, value: aggregate(group, measure, measureFieldId) };
+            return { key: s.key, label: s.label, color: s.color, value: aggregate(group, measure, measureFieldId, { customFields, formulaResults }) };
         }).filter((seg) => seg.value !== 0);
 
         return {
@@ -648,7 +752,7 @@ export function startOfWeek(date) {
 
 // Buckets for line charts: [{ label, count, date }], weekly, or monthly when
 // the range would exceed ~20 weekly points
-export function computeTimeData(chart, allTasks, sections, customFields) {
+export function computeTimeData(chart, allTasks, sections, customFields, formulaResults = {}) {
     const measure = chart.config?.measure || 'count';
     const fieldId = chart.config?.measure_custom_field_id || null;
 
@@ -729,7 +833,7 @@ export function computeTimeData(chart, allTasks, sections, customFields) {
     }
 
     buckets.forEach((b) => {
-        b.count = aggregate(b.tasks || [], measure, fieldId);
+        b.count = aggregate(b.tasks || [], measure, fieldId, { customFields, formulaResults });
         delete b.tasks;
     });
 
@@ -788,12 +892,12 @@ export function labelByWeekNumber(buckets) {
  * Built on top of computeTimeData so the bucketing — weekly, or monthly once
  * the range gets long — stays in one place and both paths agree.
  */
-export function computeStackedTimeData(chart, allTasks, sections, customFields) {
+export function computeStackedTimeData(chart, allTasks, sections, customFields, formulaResults = {}) {
     const stackBy = chart.config?.stack_by;
     const sOpts = { sections, customFields, fieldId: chart.config?.stack_custom_field_id };
 
     // The shape of the axis, measured across everything.
-    const skeleton = computeTimeData(chart, allTasks, sections, customFields);
+    const skeleton = computeTimeData(chart, allTasks, sections, customFields, formulaResults);
     if (skeleton.length === 0) return { rows: [], series: [] };
 
     const groups = new Map();
@@ -831,7 +935,7 @@ export function computeStackedTimeData(chart, allTasks, sections, customFields) 
             ? folded.flatMap((f) => groups.get(f.key) || [])
             : (groups.get(sSeries.key) || []);
 
-        const bucketed = computeTimeData(chart, subset, sections, customFields);
+        const bucketed = computeTimeData(chart, subset, sections, customFields, formulaResults);
         const byLabel = new Map(bucketed.map((b) => [b.label, b.count]));
 
         valuesByKey.set(sSeries.key, skeleton.map((b) => byLabel.get(b.label) || 0));
@@ -882,19 +986,19 @@ export function metricTasks(chart, allTasks, sections, customFields) {
 }
 
 /** What a card computes, and what it is measured against. */
-export function computeMetric(chart, allTasks, sections, customFields) {
+export function computeMetric(chart, allTasks, sections, customFields, formulaResults = {}) {
     const measure = chart.config?.measure || 'count';
     const fieldId = chart.config?.measure_custom_field_id || null;
 
     const matched = metricTasks(chart, allTasks, sections, customFields);
-    const value = aggregate(matched, measure, fieldId);
+    const value = aggregate(matched, measure, fieldId, { customFields, formulaResults });
 
     const compare = chart.config?.compare || 'none';
 
     if (compare === 'percent') {
         // Against the same measure over the unfiltered scope, so the figure
         // answers "how much of the work this card is about".
-        const whole = aggregate(scopeTasks(allTasks, chart.config?.scope), measure, fieldId);
+        const whole = aggregate(scopeTasks(allTasks, chart.config?.scope), measure, fieldId, { customFields, formulaResults });
 
         return {
             value,
@@ -918,4 +1022,173 @@ export function computeMetric(chart, allTasks, sections, customFields) {
     }
 
     return { value, measure, matched: matched.length };
+}
+
+/**
+ * What is wrong with a chart before it is saved, and what is merely worth
+ * knowing.
+ *
+ * The form used to grey out Save when something was missing, which told the
+ * user there was a problem without telling them what it was. Errors block the
+ * save and name the thing to fix; warnings let it through but say what the
+ * chart will look like — an empty chart drawn from a filter that matches
+ * nothing is a valid chart and a wasted afternoon.
+ *
+ * Takes the payload the form would post, so what is checked is exactly what
+ * would be stored. Checking a rephrased copy of the config is how a check
+ * drifts away from the thing it is checking.
+ */
+export function validateChartConfig(payload, { customFields = [], sections = [], tasks = [], formulaResults = {} } = {}) {
+    const errors = [];
+    const warnings = [];
+
+    const type = payload.chart_type;
+    const circular = isCircularChart(type);
+    const metric = isMetricChart(type);
+    const overTime = isTimeChart(type);
+    const field = (id) => (customFields || []).find((f) => f.id === Number(id)) || null;
+    const typeName = (f) => String(f.type || '').replace(/_/g, ' ');
+
+    if (!String(payload.title || '').trim()) {
+        errors.push('Give the chart a title.');
+    }
+
+    // --- the X axis -------------------------------------------------------
+    if (metric) {
+        if (payload.group_by && payload.group_by !== 'none') {
+            errors.push('A card shows one number, so it has nothing to group by.');
+        }
+    } else if (overTime && !TIME_DIMENSIONS.some((d) => d.value === payload.group_by)) {
+        errors.push('A line or area chart plots dates, so pick one of the over-time dimensions.');
+    } else if (!overTime && !CATEGORY_DIMENSIONS.some((d) => d.value === payload.group_by)) {
+        errors.push('Pick something for the X axis.');
+    }
+
+    if (payload.group_by === 'custom_field') {
+        const f = field(payload.custom_field_id);
+
+        if (!f) {
+            errors.push('Choose the custom field for the X axis.');
+        } else if (f.type !== 'single_select') {
+            errors.push(`The X axis needs a single-select field — "${f.name}" is a ${typeName(f)} field.`);
+        }
+    }
+
+    // --- the Y axis -------------------------------------------------------
+    const measure = payload.measure || 'count';
+    const spec = measureSpec(measure);
+
+    if (spec.needsField) {
+        const f = field(payload.measure_custom_field_id);
+
+        if (!f) {
+            errors.push(`"${spec.label}" needs a field to measure — choose one.`);
+        } else if (spec.fieldKind === 'numeric' && !numericFields(customFields).some((n) => n.id === f.id)) {
+            // Totalling a date or a select would produce a number that looks
+            // real and means nothing.
+            errors.push(`"${spec.label}" needs a number field — "${f.name}" is a ${typeName(f)} field. Counting its values works instead.`);
+        }
+    }
+
+    if (circular && measure === 'avg_custom_field') {
+        errors.push('A donut or pie divides one whole into parts, and averages do not add up to a whole.');
+    }
+
+    // --- the split --------------------------------------------------------
+    if (payload.stack_by) {
+        if (circular) {
+            errors.push('A donut or pie is already a breakdown, so it cannot be split again.');
+        }
+
+        if (payload.stack_by === payload.group_by) {
+            errors.push('Split by a different dimension — splitting one by itself gives one series per bar.');
+        }
+
+        if (payload.stack_by === 'custom_field') {
+            const f = field(payload.stack_custom_field_id);
+
+            if (!f) {
+                errors.push('Choose the custom field to split by.');
+            } else if (f.type !== 'single_select') {
+                errors.push(`Splitting needs a single-select field — "${f.name}" is a ${typeName(f)} field.`);
+            }
+        }
+    }
+
+    // --- the window, the ordering, the filters ----------------------------
+    if (payload.date_range === 'custom') {
+        if (!payload.date_from || !payload.date_to) {
+            errors.push('A custom date range needs both a start and an end.');
+        } else if (payload.date_from > payload.date_to) {
+            errors.push('The date range starts after it ends.');
+        }
+    }
+
+    const cap = payload.max_buckets;
+    if (cap !== null && cap !== undefined && cap !== '' && (Number(cap) < 2 || Number(cap) > 30)) {
+        errors.push('Show between 2 and 30 bars before the rest fold into "Other".');
+    }
+
+    (payload.filters || []).forEach((f, i) => {
+        if (!f.field) {
+            errors.push(`Filter ${i + 1} has no field chosen.`);
+        } else if (f.value === '' || f.value === null || f.value === undefined) {
+            errors.push(`Filter ${i + 1} has no value chosen.`);
+        } else if (f.field === 'custom_field' && !f.custom_field_id) {
+            errors.push(`Filter ${i + 1} needs a custom field naming.`);
+        }
+    });
+
+    if (metric && payload.compare === 'target' && !Number.isFinite(Number(payload.target))) {
+        errors.push('Set the target this card is measured against.');
+    }
+
+    // Everything below reads the real data, which only means anything once the
+    // config above makes sense.
+    if (errors.length > 0) return { errors, warnings };
+
+    // --- what it will actually draw ---------------------------------------
+    const probe = { group_by: payload.group_by, config: payload };
+    const matched = chartTasks(probe, tasks, sections, customFields);
+
+    if (tasks.length === 0) {
+        warnings.push('This project has no tasks yet, so the chart stays empty until it does.');
+    } else if (matched.length === 0) {
+        warnings.push('No task matches this scope, these filters and this date range, so the chart will be empty.');
+    }
+
+    if (spec.needsField && matched.length > 0) {
+        const f = field(payload.measure_custom_field_id);
+        const withValue = matched.filter((t) => fieldEntries(t, f, formulaResults).length > 0).length;
+
+        if (withValue === 0) {
+            warnings.push(`No matching task has a value in "${f.name}", so every bar comes out zero.`);
+        } else if (withValue < matched.length) {
+            warnings.push(`${matched.length - withValue} of ${matched.length} matching tasks have no value in "${f.name}".`);
+        }
+    }
+
+    if (!metric && matched.length > 0) {
+        const buckets = overTime
+            ? computeTimeData(probe, tasks, sections, customFields, formulaResults)
+            : computeCategoryData(probe, tasks, sections, customFields, formulaResults);
+
+        if (buckets.length === 0) {
+            warnings.push('Nothing lands on the X axis with these settings, so the chart will be blank.');
+        } else if (buckets.every((b) => !b.count)) {
+            warnings.push('Every value comes out as zero.');
+        }
+
+        if (payload.stack_by) {
+            const split = overTime
+                ? computeStackedTimeData(probe, tasks, sections, customFields, formulaResults)
+                : computeStackedData(probe, tasks, sections, customFields, formulaResults);
+
+            if (split.series.some((s) => s.key === '__other')) {
+                warnings.push(`The split has more than ${MAX_SERIES} series, so the rest are grouped as "Other".`);
+            }
+        }
+    }
+
+    return { errors, warnings };
 }
