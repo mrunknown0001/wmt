@@ -50,7 +50,7 @@ class ProjectChartController extends Controller
     private const DATE_FIELDS = ['created', 'completed', 'due'];
 
     /** How the bars are ordered before the tail folds into "Other". */
-    private const SORTS = ['natural', 'value_desc', 'value_asc', 'label'];
+    private const SORTS = ['natural', 'value_desc', 'value_asc', 'label', 'label_desc'];
 
     /**
      * How a split bar/column draws its series: piled into one bar, or side by

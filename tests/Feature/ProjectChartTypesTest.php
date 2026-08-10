@@ -388,6 +388,22 @@ class ProjectChartTypesTest extends TestCase
         $this->assertSame(5, $config['max_buckets']);
     }
 
+    public function test_bars_can_be_ordered_by_label_in_both_directions(): void
+    {
+        foreach (['label', 'label_desc'] as $sort) {
+            $this->newChart(['chart_type' => 'bar', 'group_by' => 'assignee', 'sort' => $sort])
+                ->assertSuccessful();
+
+            $this->assertSame($sort, $this->storedConfig()['sort']);
+        }
+    }
+
+    public function test_an_unknown_sort_is_rejected(): void
+    {
+        $this->newChart(['chart_type' => 'bar', 'group_by' => 'assignee', 'sort' => 'sideways'])
+            ->assertStatus(422);
+    }
+
     public function test_an_absurd_bucket_cap_is_rejected(): void
     {
         $this->newChart([

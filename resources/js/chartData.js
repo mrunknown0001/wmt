@@ -280,8 +280,24 @@ export const HOW_TO_SORT = [
     { value: 'natural', label: 'Natural order' },
     { value: 'value_desc', label: 'Largest first' },
     { value: 'value_asc', label: 'Smallest first' },
-    { value: 'label', label: 'By name' },
+    { value: 'label', label: 'By label (A→Z, 1→9)' },
+    { value: 'label_desc', label: 'By label (Z→A, 9→1)' },
 ];
+
+/**
+ * Order two labels the obvious way: numbers as numbers, words alphabetically.
+ *
+ * Plain string order puts "10" before "2" and "Week 10" before "Week 2", which
+ * is never what someone sorting a chart means. The numeric option compares runs
+ * of digits by value, so "2" < "10" and "Item 9" < "Item 10", while text still
+ * falls in A→Z order.
+ */
+export function compareLabels(a, b) {
+    return String(a ?? '').localeCompare(String(b ?? ''), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+    });
+}
 
 /**
  * The tasks a chart draws from: its scope, then its filters, then its date
@@ -371,7 +387,8 @@ export function arrangeBuckets(buckets, chart, fallbackMax) {
 
     const sorted = sort === 'value_desc' ? [...buckets].sort((a, b) => b.count - a.count)
         : sort === 'value_asc' ? [...buckets].sort((a, b) => a.count - b.count)
-        : sort === 'label' ? [...buckets].sort((a, b) => a.label.localeCompare(b.label))
+        : sort === 'label' ? [...buckets].sort((a, b) => compareLabels(a.label, b.label))
+        : sort === 'label_desc' ? [...buckets].sort((a, b) => compareLabels(b.label, a.label))
         : buckets;
 
     const max = Number(chart.config?.max_buckets) || fallbackMax;
@@ -712,7 +729,8 @@ export function arrangeStackedRows(rows, series, chart, fallbackMax = 12) {
     const sort = chart.config?.sort || 'value_desc';
 
     const sorted = sort === 'value_asc' ? [...rows].sort((a, b) => a.count - b.count)
-        : sort === 'label' ? [...rows].sort((a, b) => a.label.localeCompare(b.label))
+        : sort === 'label' ? [...rows].sort((a, b) => compareLabels(a.label, b.label))
+        : sort === 'label_desc' ? [...rows].sort((a, b) => compareLabels(b.label, a.label))
         : sort === 'natural' ? rows
         : [...rows].sort((a, b) => b.count - a.count);
 
