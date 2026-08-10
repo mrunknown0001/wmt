@@ -1125,17 +1125,28 @@ export function validateChartConfig(payload, { customFields = [], sections = [],
             errors.push('A donut or pie is already a breakdown, so it cannot be split again.');
         }
 
-        if (payload.stack_by === payload.group_by) {
-            errors.push('Split by a different dimension — splitting one by itself gives one series per bar.');
+        // The same grouping twice gives one series per bar and says nothing.
+        // Two custom fields only collide when they are the same field — "by
+        // Client, then by Region" is two groupings, not one.
+        const sameField = payload.stack_by === 'custom_field'
+            && String(payload.stack_custom_field_id) === String(payload.custom_field_id);
+        const sameGrouping = payload.stack_by === payload.group_by
+            && (payload.stack_by !== 'custom_field' || sameField);
+
+        if (sameGrouping) {
+            const f = sameField ? field(payload.custom_field_id) : null;
+            errors.push(f
+                ? `"${f.name}" is already the first grouping — choose a different field for the second, or grouping by it twice just splits each bar into itself.`
+                : 'Use a different second grouping — grouping by the same thing twice gives one series per bar.');
         }
 
         if (payload.stack_by === 'custom_field') {
             const f = field(payload.stack_custom_field_id);
 
             if (!f) {
-                errors.push('Choose the custom field to split by.');
+                errors.push('Choose the custom field for the second grouping.');
             } else if (f.type !== 'single_select') {
-                errors.push(`Splitting needs a single-select field — "${f.name}" is a ${typeName(f)} field.`);
+                errors.push(`The second grouping needs a single-select field — "${f.name}" is a ${typeName(f)} field.`);
             }
         }
     }

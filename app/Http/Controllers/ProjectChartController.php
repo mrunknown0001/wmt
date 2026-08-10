@@ -227,17 +227,22 @@ class ProjectChartController extends Controller
                 abort(422, 'A donut or pie cannot be split by a second dimension.');
             }
 
-            // Splitting a dimension by itself yields one series per bar and
-            // tells you nothing you could not read off the bar.
-            if ($stackBy === $validated['group_by']) {
-                abort(422, 'Choose a different dimension to split by.');
+            // Grouping by a dimension twice yields one series per bar and tells
+            // you nothing you could not read off the bar. Two custom fields
+            // only collide when they are the same field — "by Client, then by
+            // Region" is a legitimate second grouping.
+            $sameField = $stackBy === 'custom_field'
+                && (int) ($validated['stack_custom_field_id'] ?? 0) === (int) ($validated['custom_field_id'] ?? 0);
+
+            if ($stackBy === $validated['group_by'] && ($stackBy !== 'custom_field' || $sameField)) {
+                abort(422, 'Choose a different dimension for the second grouping.');
             }
 
             if ($stackBy === 'custom_field') {
                 $field = $project->customFields()->find($validated['stack_custom_field_id'] ?? null);
 
                 if (!$field || $field->type !== 'single_select') {
-                    abort(422, 'Splitting by a custom field needs a single-select field.');
+                    abort(422, 'The second grouping by a custom field needs a single-select field.');
                 }
             }
         }

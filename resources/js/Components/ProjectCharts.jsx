@@ -1284,9 +1284,16 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
                 if (!allowed.includes(next.group_by) || next.group_by === 'none') next.group_by = allowed[0];
             }
 
-            // A donut cannot be split, and a dimension cannot split itself —
-            // leaving a stale value here would be rejected on save.
-            if (isCircularChart(type) || next.stack_by === next.group_by) {
+            // A donut cannot be split, and a dimension cannot split itself.
+            // Two custom fields are only a self-split when they are the same
+            // field, so switching to a custom-field X axis need not wipe a
+            // custom-field second grouping. Leaving a real self-split would be
+            // rejected on save.
+            const selfSplit = next.stack_by && next.stack_by === next.group_by
+                && (next.stack_by !== 'custom_field'
+                    || String(next.stack_custom_field_id) === String(next.custom_field_id));
+
+            if (isCircularChart(type) || selfSplit) {
                 next.stack_by = '';
                 next.stack_custom_field_id = '';
             }
@@ -1304,8 +1311,29 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
     // A donut is already a breakdown of one whole, so there is nothing left to
     // split; and a dimension cannot be split by itself.
     const canSplit = !circular;
-    const splitOptions = CATEGORY_DIMENSIONS.filter((d) => d.value !== form.group_by);
+
+    // The second grouping offers everything the first does. Custom field stays
+    // on the list even when the first grouping is one too — "by Client, then by
+    // Region" is two different fields, not the same dimension twice. Only a
+    // plain dimension is removed when the first already uses it.
+    const splitOptions = CATEGORY_DIMENSIONS.filter(
+        (d) => d.value === 'custom_field' || d.value !== form.group_by
+    );
     const needsSplitField = form.stack_by === 'custom_field';
+
+    // Two custom fields are only "the same grouping" when they are the same
+    // field; two plain dimensions when they are the same dimension.
+    const sameCustomField = form.group_by === 'custom_field'
+        && form.stack_by === 'custom_field'
+        && !!form.stack_custom_field_id
+        && String(form.stack_custom_field_id) === String(form.custom_field_id);
+
+    const sameGrouping = form.stack_by && form.stack_by === form.group_by
+        && (form.stack_by !== 'custom_field' || sameCustomField);
+
+    const firstGroupingField = form.group_by === 'custom_field'
+        ? customFields.find((f) => String(f.id) === String(form.custom_field_id))
+        : null;
 
     // Rows the user is part-way through typing are dropped rather than saved
     // as a blank label with a number nobody can read.
@@ -1575,12 +1603,20 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
                     </label>
                     <Select
                         value={form.group_by}
-                        onChange={(e) => setForm((f) => ({
-                            ...f,
-                            group_by: e.target.value,
-                            // Cannot split a dimension by itself.
-                            stack_by: f.stack_by === e.target.value ? '' : f.stack_by,
-                        }))}
+                        onChange={(e) => setForm((f) => {
+                            const value = e.target.value;
+                            // Clear a second grouping only if it becomes a true
+                            // duplicate — the same plain dimension. Two custom
+                            // fields stay put; they are told apart by their own
+                            // field pickers below.
+                            const clash = f.stack_by === value && value !== 'custom_field';
+                            return {
+                                ...f,
+                                group_by: value,
+                                stack_by: clash ? '' : f.stack_by,
+                                stack_custom_field_id: clash ? '' : f.stack_custom_field_id,
+                            };
+                        })}
                     >
                         {dimensions.map((d) => (
                             <option
@@ -1649,6 +1685,10 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
                             onChange={(e) => setForm((f) => ({ ...f, stack_custom_field_id: e.target.value }))}
                         >
                             <option value="">Choose a field…</option>
+                            {/* Every field is offered, including the one the
+                                first grouping uses: picking it is a mistake worth
+                                naming out loud, not one to hide by omission. The
+                                clash message below says exactly what is wrong. */}
                             {selectFields.map((f) => (
                                 <option key={f.id} value={f.id}>{f.name}</option>
                             ))}
@@ -1656,6 +1696,13 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
                         {selectFields.length === 0 && (
                             <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
                                 This project has no single-select custom field to group by.
+                            </p>
+                        )}
+                        {sameCustomField && (
+                            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                                {firstGroupingField
+                                    ? `That's the same field as the first grouping. Grouping by “${firstGroupingField.name}” twice just splits each bar into itself — pick a different field.`
+                                    : 'That is the same field as the first grouping — pick a different one.'}
                             </p>
                         )}
                     </div>

@@ -688,4 +688,66 @@ class ProjectChartTypesTest extends TestCase
 
         $this->assertNull($this->storedConfig()['bar_mode']);
     }
+
+    // ---- two custom fields as the two groupings ----
+
+    private function selectField(string $name): \App\Models\CustomField
+    {
+        return \App\Models\CustomField::create([
+            'project_id' => $this->project->id,
+            'name' => $name,
+            'type' => 'single_select',
+            'position' => 1,
+        ]);
+    }
+
+    public function test_a_custom_field_can_be_the_second_grouping(): void
+    {
+        $client = $this->selectField('Client');
+
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'status',
+            'stack_by' => 'custom_field',
+            'stack_custom_field_id' => $client->id,
+        ])->assertSuccessful();
+
+        $config = $this->storedConfig();
+        $this->assertSame('custom_field', $config['stack_by']);
+        $this->assertSame($client->id, $config['stack_custom_field_id']);
+    }
+
+    public function test_two_different_custom_fields_can_be_the_two_groupings(): void
+    {
+        $client = $this->selectField('Client');
+        $region = $this->selectField('Region');
+
+        $this->newChart([
+            'chart_type' => 'column',
+            'group_by' => 'custom_field',
+            'custom_field_id' => $client->id,
+            'stack_by' => 'custom_field',
+            'stack_custom_field_id' => $region->id,
+            'bar_mode' => 'grouped',
+        ])->assertSuccessful();
+
+        $config = $this->storedConfig();
+        $this->assertSame($client->id, $config['custom_field_id']);
+        $this->assertSame($region->id, $config['stack_custom_field_id']);
+    }
+
+    public function test_the_same_custom_field_cannot_be_both_groupings(): void
+    {
+        $client = $this->selectField('Client');
+
+        // One field twice is not two groupings — one series per bar, saying
+        // nothing you could not read off the bar.
+        $this->newChart([
+            'chart_type' => 'bar',
+            'group_by' => 'custom_field',
+            'custom_field_id' => $client->id,
+            'stack_by' => 'custom_field',
+            'stack_custom_field_id' => $client->id,
+        ])->assertStatus(422);
+    }
 }
