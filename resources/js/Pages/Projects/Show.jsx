@@ -51,6 +51,7 @@ import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, isComplete
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import { orderSections, moveSection } from '../../sectionTree';
+import { initialHiddenColumns, DEFAULT_HIDDEN_COLUMN_IDS } from '../../columnPrefs';
 import InlinePopover from '../../Components/InlinePopover';
 
 // Types whose value is computed from other data rather than entered. They are
@@ -460,6 +461,14 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                         </div>
                     </td>
                 );
+            case 'completed':
+                return (
+                    <td key="completed" className="px-6 py-3 text-sm text-center overflow-hidden text-gray-600 dark:text-gray-300" style={cStyle}>
+                        {task.completed_at
+                            ? <span className="text-xs truncate">{formatDate(task.completed_at)}</span>
+                            : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    </td>
+                );
             default:
                 if (colId.startsWith('cf-')) {
                     const cfId = Number(colId.replace('cf-', ''));
@@ -551,7 +560,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Default reorderable column IDs (excluding sticky checkbox, title, actions)
-const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'estimate', 'logged'];
+const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'estimate', 'logged'];
 
 // Resize handle for column headers
 function ColumnResizeHandle({ onResize }) {
@@ -911,6 +920,14 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                                 </span>
                             )}
                         </div>
+                    </td>
+                );
+            case 'completed':
+                return (
+                    <td key="completed" className="px-6 py-4 text-sm text-center overflow-hidden text-gray-600 dark:text-gray-300" style={cStyle}>
+                        {task.completed_at
+                            ? <span className="truncate">{formatDate(task.completed_at)}</span>
+                            : <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </td>
                 );
             default:
@@ -1583,13 +1600,24 @@ export default function Show() {
         });
     }, [project.id]);
 
-    // Hidden columns (persisted per project)
+    // Hidden columns (persisted per project). Default-hidden columns are folded
+    // in once via initialHiddenColumns; the decision lives in columnPrefs.js so
+    // it can be tested, the localStorage writes stay here.
     const [hiddenColumns, setHiddenColumns] = useState(() => {
         try {
             const saved = localStorage.getItem(`wmt-col-hidden-${project.id}`);
-            if (saved) return new Set(JSON.parse(saved));
+            const migrated = localStorage.getItem(`wmt-col-hidden-init-${project.id}`);
+            const { hidden, persist } = initialHiddenColumns(saved ? JSON.parse(saved) : null, !!migrated);
+
+            if (persist) {
+                try {
+                    localStorage.setItem(`wmt-col-hidden-${project.id}`, JSON.stringify(hidden));
+                    localStorage.setItem(`wmt-col-hidden-init-${project.id}`, '1');
+                } catch {}
+            }
+            return new Set(hidden);
         } catch {}
-        return new Set();
+        return new Set(DEFAULT_HIDDEN_COLUMN_IDS);
     });
 
     // Project rule: collapse closed tasks out of the list, with a per-section
@@ -1696,6 +1724,7 @@ export default function Show() {
             case 'priority': return 'Priority';
             case 'assignee': return 'Assignee';
             case 'dates': return 'Due date';
+            case 'completed': return 'Date Completed';
             default:
                 if (colId.startsWith('cf-')) {
                     const cfId = Number(colId.replace('cf-', ''));
@@ -1723,6 +1752,9 @@ export default function Show() {
             case 'priority': return PRIORITY_ORDER[task.priority] ?? 99;
             case 'assignee': return task.assigned_user?.name?.toLowerCase() || '\uffff';
             case 'dates': return task.due_date || '\uffff';
+            // ISO timestamps sort lexically; unfinished tasks have none and
+            // sort last, as every other column here treats "missing".
+            case 'completed': return task.completed_at || '\uffff';
             default:
                 if (key.startsWith('cf-')) {
                     const cfId = Number(key.replace('cf-', ''));
