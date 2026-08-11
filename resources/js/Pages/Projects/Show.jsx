@@ -4514,11 +4514,14 @@ export default function Show() {
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">of {stats.total - stats.byStatus.cancelled} actionable</p>
                             </button>
 
-                            {/* In Progress */}
+                            {/* In Progress — the count is every active (pending)
+                                task, so the drill-down must be the same set, not
+                                just the in_progress status, or clicking a card
+                                that reads 14 lands on an empty list. */}
                             <button
                                 type="button"
-                                onClick={() => drillDown([{ fieldId: 'status', value: 'in_progress' }])}
-                                title="Show tasks in progress"
+                                onClick={() => drillDown(activeOnly)}
+                                title="Show active (not done or cancelled) tasks"
                                 className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 ${drillable}`}
                             >
                                 <div className="flex items-center justify-between mb-1">
