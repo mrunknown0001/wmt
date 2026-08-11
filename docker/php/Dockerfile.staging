@@ -1,0 +1,124 @@
+# syntax=docker/dockerfile:1
+#
+# Staging image for WMT (wmt-dev.bfcgroup.ph on the internal VM).
+#
+# Ported from the purchasing-system prod image, which runs on the same box, with
+# one deliberate difference: WMT is MySQL, so the PDO driver and client change.
+# Development still uses Laravel Sail (docker-compose.yml); this is the built,
+# immutable image staging serves from — code and compiled assets baked in, only
+# .env and mutable storage mounted at runtime.
+
+# ------------------------------------------------------------------ base ---
+# One base for dependency resolution and runtime, so composer resolves platform
+# requirements against the same extensions the code will actually run on.
+FROM php:8.4-fpm-bookworm AS base
+
+COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions \
+        pdo_mysql \
+        mysqli \
+        redis \
+        intl \
+        bcmath \
+        gd \
+        zip \
+        exif \
+        pcntl \
+        sockets \
+        opcache
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        unzip \
+        curl \
+        default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
+# ---------------------------------------------------------------- vendor ---
+FROM base AS vendor
+
+ENV COMPOSER_ALLOW_SUPERUSER=1
+WORKDIR /app
+
+# Dependencies first so the layer caches until composer.lock changes.
+COPY composer.json composer.lock ./
+RUN composer install \
+        --no-dev \
+        --no-scripts \
+        --no-autoloader \
+        --prefer-dist \
+        --no-interaction
+
+COPY . .
+# --no-scripts: dump-autoload would otherwise fire package:discover, which boots
+# the whole app — and there is no .env in the build, so any provider that
+# validates config eagerly (spatie/laravel-backup checks its notification email)
+# blows up on an empty value. Discovery is deferred to first boot on the VM,
+# where the real .env is mounted; the optimized, authoritative classmap is still
+# produced here.
+RUN composer dump-autoload --optimize --classmap-authoritative --no-dev --no-scripts
+
+# ---------------------------------------------------------------- assets ---
+FROM node:22-alpine AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --no-fund --no-audit
+
+COPY . .
+
+# VITE_* values are compile-time — Vite bakes them into the bundle; the runtime
+# .env is not present during the build. Anything the browser needs (the app
+# name, the websocket host/key the Pusher client dials) has to arrive here as a
+# build argument. Change the public hostname or the websocket key and you must
+# rebuild, not just edit .env and restart.
+ARG VITE_APP_NAME="WMT"
+ARG VITE_PUSHER_APP_KEY=""
+ARG VITE_PUSHER_HOST=""
+ARG VITE_PUSHER_PORT="443"
+ARG VITE_PUSHER_SCHEME="https"
+ARG VITE_PUSHER_APP_CLUSTER="mt1"
+
+RUN printf '%s\n' \
+        "VITE_APP_NAME=${VITE_APP_NAME}" \
+        "VITE_PUSHER_APP_KEY=${VITE_PUSHER_APP_KEY}" \
+        "VITE_PUSHER_HOST=${VITE_PUSHER_HOST}" \
+        "VITE_PUSHER_PORT=${VITE_PUSHER_PORT}" \
+        "VITE_PUSHER_SCHEME=${VITE_PUSHER_SCHEME}" \
+        "VITE_PUSHER_APP_CLUSTER=${VITE_PUSHER_APP_CLUSTER}" \
+        > .env \
+    && npm run build
+
+# --------------------------------------------------------------- runtime ---
+FROM base AS runtime
+
+COPY docker/php/php.staging.ini /usr/local/etc/php/conf.d/zz-app.ini
+
+# Match the container user to the account that owns .env on the VM (mounted at
+# mode 600). Left as stock www-data the container cannot read it and Laravel
+# quietly falls back to sqlite. Must precede the COPY --chown lines.
+ARG UID=1000
+ARG GID=1000
+RUN groupmod -o -g ${GID} www-data \
+    && usermod  -o -u ${UID} -g ${GID} www-data
+
+WORKDIR /var/www/html
+
+COPY --from=vendor --chown=www-data:www-data /app /var/www/html
+COPY --from=assets --chown=www-data:www-data /app/public/build /var/www/html/public/build
+
+RUN rm -f /var/www/html/.env \
+    && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+COPY --chown=www-data:www-data docker/php/entrypoint.staging.sh /usr/local/bin/entrypoint
+RUN chmod +x /usr/local/bin/entrypoint
+
+USER www-data
+
+EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
+CMD ["php-fpm"]

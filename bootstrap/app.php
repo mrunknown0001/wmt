@@ -17,6 +17,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind a reverse proxy (the Cloudflare Tunnel on staging/prod, Sail's
+        // nginx in dev) the app only ever sees the proxy. Trusting it means
+        // Laravel honours X-Forwarded-Proto/For, so it knows the request was
+        // HTTPS and who the real client was — without this, secure cookies and
+        // scheme-aware URLs get it wrong on anything served through the tunnel.
+        // Safe here because the app is reachable only via that proxy.
+        $middleware->trustProxies(at: '*');
+
         $middleware->statefulApi();
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
