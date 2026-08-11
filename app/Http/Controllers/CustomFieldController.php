@@ -9,6 +9,7 @@ use App\Models\CustomFieldOption;
 use App\Models\Project;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CustomFieldController extends Controller
 {
@@ -44,19 +45,26 @@ class CustomFieldController extends Controller
             $validated['is_required'] = false;
         }
 
-        $field = $project->customFields()->create($validated);
+        // Field + its options + its default are one unit: if the options fail
+        // halfway, a field with no choices is worse than no field at all, so the
+        // whole thing rolls back rather than leaving a broken half.
+        $field = DB::transaction(function () use ($project, $validated, $options, $defaultOptionIndexes) {
+            $field = $project->customFields()->create($validated);
 
-        if (in_array($field->type, ['single_select', 'multi_select'])) {
-            foreach ($options as $i => $option) {
-                $field->options()->create([
-                    'label' => $option['label'],
-                    'color' => $option['color'] ?? null,
-                    'position' => $i,
-                ]);
+            if (in_array($field->type, ['single_select', 'multi_select'])) {
+                foreach ($options as $i => $option) {
+                    $field->options()->create([
+                        'label' => $option['label'],
+                        'color' => $option['color'] ?? null,
+                        'position' => $i,
+                    ]);
+                }
             }
-        }
 
-        $this->applySelectDefault($field, $defaultOptionIndexes);
+            $this->applySelectDefault($field, $defaultOptionIndexes);
+
+            return $field;
+        });
 
         $field->load('options');
 
@@ -73,32 +81,37 @@ class CustomFieldController extends Controller
         $defaultOptionIndexes = $validated['default_option_indexes'] ?? null;
         unset($validated['options'], $validated['default_option_indexes']);
 
-        $customField->update($validated);
+        // Reconciling options means deletes, updates and inserts in sequence —
+        // exactly the kind of multi-step change that must be all-or-nothing, or
+        // a failure halfway leaves the field describing options it no longer has.
+        DB::transaction(function () use ($customField, $validated, $options, $defaultOptionIndexes) {
+            $customField->update($validated);
 
-        if (in_array($customField->type, ['single_select', 'multi_select'])) {
-            $keepIds = collect($options)->pluck('id')->filter()->toArray();
-            $customField->options()->whereNotIn('id', $keepIds)->delete();
+            if (in_array($customField->type, ['single_select', 'multi_select'])) {
+                $keepIds = collect($options)->pluck('id')->filter()->toArray();
+                $customField->options()->whereNotIn('id', $keepIds)->delete();
 
-            foreach ($options as $i => $option) {
-                if (!empty($option['id'])) {
-                    $customField->options()->where('id', $option['id'])->update([
-                        'label' => $option['label'],
-                        'color' => $option['color'] ?? null,
-                        'position' => $i,
-                    ]);
-                } else {
-                    $customField->options()->create([
-                        'label' => $option['label'],
-                        'color' => $option['color'] ?? null,
-                        'position' => $i,
-                    ]);
+                foreach ($options as $i => $option) {
+                    if (!empty($option['id'])) {
+                        $customField->options()->where('id', $option['id'])->update([
+                            'label' => $option['label'],
+                            'color' => $option['color'] ?? null,
+                            'position' => $i,
+                        ]);
+                    } else {
+                        $customField->options()->create([
+                            'label' => $option['label'],
+                            'color' => $option['color'] ?? null,
+                            'position' => $i,
+                        ]);
+                    }
                 }
+            } else {
+                $customField->options()->delete();
             }
-        } else {
-            $customField->options()->delete();
-        }
 
-        $this->applySelectDefault($customField, $defaultOptionIndexes);
+            $this->applySelectDefault($customField, $defaultOptionIndexes);
+        });
 
         $customField->load('options');
 
@@ -156,9 +169,13 @@ class CustomFieldController extends Controller
             'order.*' => ['integer'],
         ]);
 
-        foreach ($request->input('order') as $position => $id) {
-            $project->customFields()->where('id', $id)->update(['position' => $position]);
-        }
+        // All positions move together — a half-applied reorder is a scrambled
+        // list, which is harder to recover from than one that never moved.
+        DB::transaction(function () use ($request, $project) {
+            foreach ($request->input('order') as $position => $id) {
+                $project->customFields()->where('id', $id)->update(['position' => $position]);
+            }
+        });
 
         return response()->json(['success' => true]);
     }

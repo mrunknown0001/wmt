@@ -6,7 +6,7 @@ import Select from './Select';
 import Modal from './Modal';
 import { ConfirmModal } from './Modal';
 import Tooltip from './Tooltip';
-import { apiFetch } from '../utils';
+import { request } from '../apiClient';
 import { validateFormula } from '../formulaEngine';
 import { loadPeopleOptions } from './PeoplePicker';
 import { dateSourceOptions } from '../weekOfYear';
@@ -649,20 +649,16 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
                 config,
             };
 
-            let result;
-            if (editingField) {
-                result = await apiFetch(`${fieldsUrl}/${editingField.id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(payload),
-                });
-            } else {
-                result = await apiFetch(`${fieldsUrl}`, {
-                    method: 'POST',
-                    body: JSON.stringify(payload),
-                });
-            }
+            const { ok, data } = editingField
+                ? await request(`${fieldsUrl}/${editingField.id}`, { method: 'PUT', body: JSON.stringify(payload) })
+                : await request(`${fieldsUrl}`, { method: 'POST', body: JSON.stringify(payload) });
 
-            const data = await result.json();
+            // request() has already toasted the reason; leave the modal open so
+            // the user can fix and retry rather than losing what they typed.
+            if (!ok) {
+                setSaving(false);
+                return;
+            }
 
             if (editingField) {
                 setFields(prev => prev.map(f => f.id === data.field.id ? data.field : f));
@@ -672,8 +668,6 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
 
             setShowModal(false);
             resetForm();
-        } catch (e) {
-            console.error('Failed to save custom field', e);
         } finally {
             setSaving(false);
         }
@@ -681,15 +675,14 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
 
     const handleDelete = useCallback(async () => {
         if (!deleteField) return;
-        try {
-            await apiFetch(`${fieldsUrl}/${deleteField.id}`, {
-                method: 'DELETE',
-            });
-            setFields(prev => prev.filter(f => f.id !== deleteField.id));
-            setDeleteField(null);
-        } catch (e) {
-            console.error('Failed to delete custom field', e);
-        }
+
+        const { ok } = await request(`${fieldsUrl}/${deleteField.id}`, { method: 'DELETE' });
+        // Only drop it from the list once the server confirms — a failed delete
+        // used to remove the field from the UI while it still existed.
+        if (!ok) return;
+
+        setFields(prev => prev.filter(f => f.id !== deleteField.id));
+        setDeleteField(null);
     }, [deleteField, projectId, fieldsUrl]);
 
     const handleDragStart = (e, index) => {
@@ -711,6 +704,7 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
             return;
         }
 
+        const previous = fields;
         const reordered = [...fields];
         const [moved] = reordered.splice(dragIndex, 1);
         reordered.splice(dropIndex, 0, moved);
@@ -718,15 +712,14 @@ export default forwardRef(function CustomFieldManager({ projectId, initialFields
         setDragIndex(null);
         setDragOverIndex(null);
 
-        try {
-            await apiFetch(`${fieldsUrl}/reorder`, {
-                method: 'POST',
-                body: JSON.stringify({ order: reordered.map(f => f.id) }),
-            });
-        } catch (e) {
-            console.error('Failed to reorder custom fields', e);
-            setFields(fields); // revert on failure
-        }
+        // A rejected reorder (a 422, not just a dropped connection) used to stick
+        // on screen because fetch does not reject on 4xx. request() reports both,
+        // so the list snaps back to what the server still holds.
+        const { ok } = await request(`${fieldsUrl}/reorder`, {
+            method: 'POST',
+            body: JSON.stringify({ order: reordered.map(f => f.id) }),
+        });
+        if (!ok) setFields(previous);
     };
 
     const handleDragEnd = () => {

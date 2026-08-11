@@ -18,6 +18,7 @@ import Tooltip from '../../Components/Tooltip';
 import OverdueNotice from '../../Components/OverdueNotice';
 import CompletedNotice from '../../Components/CompletedNotice';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, isPastDue, overdueDays } from '../../utils';
+import { request } from '../../apiClient';
 import echo from '../../echo';
 
 function timeAgo(dateString) {
@@ -340,7 +341,7 @@ export default function Edit() {
         if (!newSubtaskTitle.trim() || addingSubtask) return;
         setAddingSubtask(true);
         try {
-            const res = await apiFetch(`/projects/${project.id}/tasks/quick`, {
+            const { ok, data } = await request(`/projects/${project.id}/tasks/quick`, {
                 method: 'POST',
                 body: JSON.stringify({
                     title: newSubtaskTitle.trim(),
@@ -351,15 +352,12 @@ export default function Edit() {
                     due_date: newSubtaskDueDate || null,
                 }),
             });
-            if (res.ok) {
-                const created = await res.json();
-                setLocalSubtasks(prev => [...prev, created.task || created]);
-                setNewSubtaskTitle('');
-                setNewSubtaskAssignee('');
-                setNewSubtaskDueDate('');
-            }
-        } catch (e) {
-            console.error('Failed to add subtask', e);
+            if (!ok) return; // reason already toasted; keep the typed title
+
+            setLocalSubtasks(prev => [...prev, data.task || data]);
+            setNewSubtaskTitle('');
+            setNewSubtaskAssignee('');
+            setNewSubtaskDueDate('');
         } finally {
             setAddingSubtask(false);
         }
@@ -368,12 +366,14 @@ export default function Edit() {
     const handleToggleSubtaskDone = async (subtask) => {
         const newStatus = subtask.status === 'done' ? 'to_do' : 'done';
         setLocalSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: newStatus } : s));
-        try {
-            await apiFetch(`/projects/${project.id}/tasks/${subtask.id}/patch`, {
-                method: 'PATCH',
-                body: JSON.stringify({ status: newStatus }),
-            });
-        } catch (e) {
+
+        // A 4xx does not reject a fetch, so the old catch never fired and a
+        // rejected toggle silently stuck. request() reports it and we revert.
+        const { ok } = await request(`/projects/${project.id}/tasks/${subtask.id}/patch`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: newStatus }),
+        });
+        if (!ok) {
             setLocalSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, status: subtask.status } : s));
         }
     };
@@ -381,11 +381,11 @@ export default function Edit() {
     const handleDeleteSubtask = async (subtask) => {
         if (!confirm(`Delete subtask "${subtask.title}"?`)) return;
         setLocalSubtasks(prev => prev.filter(s => s.id !== subtask.id));
-        try {
-            await apiFetch(`/projects/${project.id}/tasks/${subtask.id}`, { method: 'DELETE' });
-        } catch (e) {
-            setLocalSubtasks(prev => [...prev, subtask]);
-        }
+
+        const { ok } = await request(`/projects/${project.id}/tasks/${subtask.id}`, { method: 'DELETE' });
+        // Put it back if the server refused, instead of leaving the UI claiming
+        // a delete that did not happen.
+        if (!ok) setLocalSubtasks(prev => [...prev, subtask]);
     };
 
     const maxUploadSize = settings?.max_upload_size || 10;

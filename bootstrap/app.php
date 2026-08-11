@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\ErrorReporter;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -40,10 +41,33 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
 
+        // Everything below acts on the *resolved* response, not the raw
+        // exception — so Laravel has already mapped auth to 401, a policy to
+        // 403, a missing model to 404, and a validation failure to 422 before we
+        // look. That is deliberate: judging by status is what keeps an
+        // unauthenticated request a clean 401 instead of a mislabelled 500.
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {
             $status = $response->getStatusCode();
+            $wantsJson = $request->is('api/*') || $request->expectsJson();
 
-            if (! $request->is('api/*') && in_array($status, [403, 404, 419, 429, 500, 503])) {
+            // Unexpected server faults, for any client that asked for JSON, come
+            // back as { message, reference } with the exception logged under that
+            // reference — so a fetch() call has something to toast and support
+            // has something to grep. Only 5xx: a 4xx already says what is wrong.
+            if ($wantsJson && $status >= 500) {
+                $reference = ErrorReporter::report($exception, $request);
+
+                return response()->json(
+                    ErrorReporter::payload($reference, $exception, (bool) config('app.debug')),
+                    $status,
+                );
+            }
+
+            // The Error *page* is for actual navigations. A fetch()/Inertia-JSON
+            // caller expecting JSON must not have its body replaced with an HTML
+            // page it cannot read — that was turning a readable error into an
+            // inscrutable parse failure in the browser.
+            if (! $wantsJson && in_array($status, [403, 404, 419, 429, 500, 503])) {
                 return Inertia::render('Error', ['status' => $status])
                     ->toResponse($request)
                     ->setStatusCode($status);

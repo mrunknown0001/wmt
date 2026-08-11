@@ -52,6 +52,7 @@ import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import { orderSections, moveSection } from '../../sectionTree';
 import { initialHiddenColumns, DEFAULT_HIDDEN_COLUMN_IDS } from '../../columnPrefs';
+import { request } from '../../apiClient';
 import InlinePopover from '../../Components/InlinePopover';
 
 // Types whose value is computed from other data rather than entered. They are
@@ -2710,25 +2711,34 @@ export default function Show() {
     }, [tasksBySection, localTasks, localSections, matchesFilters, persistReorder, persistSectionReorder]);
 
     // --- Subtask drag handler (within a parent) ---
-    const handleSubtaskDragEnd = useCallback((parentId, event) => {
+    const handleSubtaskDragEnd = useCallback(async (parentId, event) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
 
         let toPersist = null;
+        let previousSubtasks = null;
         setLocalTasks((prev) => prev.map((t) => {
             if (t.id !== parentId || !t.subtasks) return t;
             const oldIndex = t.subtasks.findIndex((s) => s.id === active.id);
             const newIndex = t.subtasks.findIndex((s) => s.id === over.id);
             if (oldIndex === -1 || newIndex === -1) return t;
+            previousSubtasks = t.subtasks;
             const reordered = arrayMove(t.subtasks, oldIndex, newIndex);
             toPersist = reordered.map((s, i) => ({ id: s.id, status: s.status, position: i, section_id: s.section_id ?? null }));
             return { ...t, subtasks: reordered };
         }));
-        if (toPersist) {
-            apiFetch(`/projects/${project.id}/tasks/reorder`, {
-                method: 'POST',
-                body: JSON.stringify({ tasks: toPersist }),
-            });
+
+        if (!toPersist) return;
+
+        // Was fire-and-forget: a failed persist left the screen showing an order
+        // the server never accepted, with no error and no way back. Now it
+        // reports and restores the order the server still holds.
+        const { ok } = await request(`/projects/${project.id}/tasks/reorder`, {
+            method: 'POST',
+            body: JSON.stringify({ tasks: toPersist }),
+        });
+        if (!ok && previousSubtasks) {
+            setLocalTasks((prev) => prev.map((t) => (t.id === parentId ? { ...t, subtasks: previousSubtasks } : t)));
         }
     }, [project.id]);
 
@@ -2877,15 +2887,12 @@ export default function Show() {
     }, []);
 
     const handleDuplicateTask = useCallback(async (task) => {
-        try {
-            const res = await apiFetch(`/projects/${project.id}/tasks/${task.id}/duplicate`, { method: 'POST' });
-            if (!res.ok) throw new Error('Duplicate failed');
-            const data = await res.json();
-            if (data.task) {
-                setLocalTasks((prev) => [...prev, data.task]);
-            }
-        } catch {
-            router.reload({ only: ['tasks'] });
+        const { ok, data } = await request(`/projects/${project.id}/tasks/${task.id}/duplicate`, { method: 'POST' });
+        // A silent reload used to hide the failure and drop any unsaved edits on
+        // the page. Now the reason is toasted; reload only to resync the copy in.
+        if (!ok) return;
+        if (data.task) {
+            setLocalTasks((prev) => [...prev, data.task]);
         }
     }, [project.id]);
 
@@ -3056,22 +3063,21 @@ export default function Show() {
 
         if (!opts.keepSelection) clearSelection();
 
-        try {
-            const body = action === 'update_custom_field'
-                ? { task_ids: taskIds, action, field_id: value.field_id, value: value.value }
-                : { task_ids: taskIds, action, value };
-            const res = await apiFetch(`/projects/${project.id}/tasks/bulk`, {
-                method: 'POST',
-                body: JSON.stringify(body),
-            });
-            if (!res.ok) throw new Error('Bulk action failed');
-            const data = await res.json();
-            if (data.new_tasks?.length > 0) {
-                setLocalTasks((prev) => [...prev, ...data.new_tasks]);
-            }
-        } catch {
-            // Revert on failure — reload from server
+        const body = action === 'update_custom_field'
+            ? { task_ids: taskIds, action, field_id: value.field_id, value: value.value }
+            : { task_ids: taskIds, action, value };
+        const { ok, data } = await request(`/projects/${project.id}/tasks/bulk`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        });
+        // The reload still resyncs the optimistic change, but now the user is
+        // told why it snapped back instead of watching it silently undo.
+        if (!ok) {
             router.reload({ only: ['tasks'] });
+            return;
+        }
+        if (data.new_tasks?.length > 0) {
+            setLocalTasks((prev) => [...prev, ...data.new_tasks]);
         }
     }, [selectedTasks, project.id, users, clearSelection, localCustomFields]);
 
@@ -3111,10 +3117,14 @@ export default function Show() {
             setLocalTasks((prev) => prev.filter((t) => !taskIds.includes(t.id)));
             clearSelection();
             setConfirmDelete(null);
-            apiFetch(`/projects/${project.id}/tasks/bulk`, {
+            // The old .catch only fired on a dropped connection, so a rejected
+            // delete (say, no permission) left the rows gone from the screen but
+            // alive on the server. request() catches the 4xx too, tells the user,
+            // and the reload brings the rows back.
+            request(`/projects/${project.id}/tasks/bulk`, {
                 method: 'POST',
                 body: JSON.stringify({ task_ids: taskIds, action: 'delete', value: null }),
-            }).catch(() => router.reload({ only: ['tasks'] }));
+            }).then(({ ok }) => { if (!ok) router.reload({ only: ['tasks'] }); });
             return;
         }
         if (confirmDelete?.type === 'section') {

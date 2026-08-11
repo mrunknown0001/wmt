@@ -10,6 +10,7 @@ import TaskTimePanel from './TaskTimePanel';
 import OverdueNotice from './OverdueNotice';
 import CompletedNotice from './CompletedNotice';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom, isPastDue } from '../utils';
+import { request } from '../apiClient';
 import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
 import { weekOfYearLabel } from '../weekOfYear';
 
@@ -347,7 +348,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
         if (!newSubtaskTitle.trim() || addingSubtask) return;
         setAddingSubtask(true);
         try {
-            const res = await apiFetch(`/projects/${projectId}/tasks/quick`, {
+            const { ok, data } = await request(`/projects/${projectId}/tasks/quick`, {
                 method: 'POST',
                 body: JSON.stringify({
                     title: newSubtaskTitle.trim(),
@@ -358,20 +359,20 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                     due_date: newSubtaskDueDate || null,
                 }),
             });
-            if (res.ok) {
-                const data = await res.json();
-                setSubtasks(prev => [...prev, data.task]);
-                setNewSubtaskTitle('');
-                setNewSubtaskAssignee('');
-                setNewSubtaskDueDate('');
-                setTaskData(prev => ({
-                    ...prev,
-                    subtasks_count: (prev.subtasks_count || 0) + 1,
-                }));
-                onSubtaskCreated?.(taskId, data.task);
-            }
-        } catch (e) {
-            console.error('Failed to add subtask', e);
+            // A failed create used to leave the typed title sitting there with no
+            // hint it had not saved. request() says why; keep the input as-is so
+            // the user can simply press add again.
+            if (!ok) return;
+
+            setSubtasks(prev => [...prev, data.task]);
+            setNewSubtaskTitle('');
+            setNewSubtaskAssignee('');
+            setNewSubtaskDueDate('');
+            setTaskData(prev => ({
+                ...prev,
+                subtasks_count: (prev.subtasks_count || 0) + 1,
+            }));
+            onSubtaskCreated?.(taskId, data.task);
         } finally {
             setAddingSubtask(false);
         }
