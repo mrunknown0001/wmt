@@ -20,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -407,6 +408,8 @@ class ProjectController extends Controller
         // custom fields, forms or automation rules — hence two separate checks.
         $canManageProject = $project->userCanManageProject(auth()->user());
         $canManageTasks = $project->userCanManageTasks(auth()->user());
+        // Archive and delete are the owner's, not a project admin's.
+        $canArchiveProject = $project->userCanArchiveOrDelete(auth()->user());
 
         // Dashboard charts: admins, executives (all projects), project owner,
         // and project admin members can add/edit/remove charts
@@ -428,6 +431,7 @@ class ProjectController extends Controller
             'canManageProject' => $canManageProject,
             'canManageTasks' => $canManageTasks,
             'canManageCharts' => $canManageCharts,
+            'canArchiveProject' => $canArchiveProject,
             'charts' => $project->charts()->get(),
             'automationRules' => $automationRules,
             'customFields' => $customFields,
@@ -442,6 +446,16 @@ class ProjectController extends Controller
         $this->authorize('update', $project);
 
         $project->load('owner', 'members');
+
+        // A project admin may edit the project but not archive it, so 'archived'
+        // is not offered to them. When they open an already-archived project the
+        // status is locked to 'archived' — they cannot unarchive it either.
+        $canArchive = $project->userCanArchiveOrDelete(auth()->user());
+        $statuses = $canArchive
+            ? ['active', 'on_hold', 'completed', 'archived']
+            : ($project->status === 'archived'
+                ? ['archived']
+                : ['active', 'on_hold', 'completed']);
 
         return Inertia::render('Projects/Edit', [
             'project' => array_merge($project->toArray(), [
@@ -464,7 +478,7 @@ class ProjectController extends Controller
             'escalationRecipients' => ProjectEscalationRule::RECIPIENTS,
             'globalEscalation' => $this->globalEscalationSummary(),
             'users' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'statuses' => ['active', 'on_hold', 'completed', 'archived'],
+            'statuses' => $statuses,
             'memberRoles' => ['viewer', 'editor', 'admin'],
             'folders' => $this->folderTree(auth()->user()),
         ]);
@@ -473,6 +487,19 @@ class ProjectController extends Controller
     public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
         $validated = $request->validated();
+
+        // Archiving is gated separately from the rest of the edit form: a
+        // project admin may change the status between active/on_hold/completed,
+        // but moving into or out of 'archived' is the owner's call. Blocked here
+        // as well as on the dedicated archive action so the edit form cannot be
+        // used as a side door.
+        $newStatus = $validated['status'] ?? $project->status;
+        $archiveChanging = ($project->status === 'archived') !== ($newStatus === 'archived');
+        if ($archiveChanging && ! $project->userCanArchiveOrDelete($request->user())) {
+            throw ValidationException::withMessages([
+                'status' => 'Only the project owner can archive or unarchive this project.',
+            ]);
+        }
 
         $oldValues = $project->only(['name', 'description', 'status', 'owner_id', 'folder_id', 'due_date']);
         $oldValues['due_date'] = $project->due_date?->toDateString();
@@ -541,7 +568,9 @@ class ProjectController extends Controller
 
     public function archive(Project $project): RedirectResponse
     {
-        $this->authorize('update', $project);
+        // Not 'update' — archiving is the owner's to do, so a project admin who
+        // can edit everything else is deliberately kept out of this one.
+        $this->authorize('archive', $project);
 
         $oldStatus = $project->status;
         $newStatus = $oldStatus === 'archived' ? 'active' : 'archived';

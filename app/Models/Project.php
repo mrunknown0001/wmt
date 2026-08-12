@@ -267,6 +267,20 @@ class Project extends Model
             || $this->isProjectAdmin($user);
     }
 
+    /**
+     * Who may retire the project — archive/unarchive it or delete it.
+     *
+     * The owner and global project managers only. A project admin runs the
+     * project day to day and can change everything inside it, but taking the
+     * whole project out of circulation stays with the person who owns it. This
+     * is the one thing that separates a project admin from the owner.
+     */
+    public function userCanArchiveOrDelete(User $user): bool
+    {
+        return $user->can('manage-projects')
+            || $this->owner_id === $user->id;
+    }
+
     public function customFields(): HasMany
     {
         return $this->hasMany(CustomField::class)->orderBy('position');

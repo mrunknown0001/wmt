@@ -52,10 +52,18 @@ class ProjectPolicy
             || $project->isProjectAdmin($user);
     }
 
+    /**
+     * Delete and archive are the owner's to keep. A project admin can edit the
+     * project and everything in it, but not retire it — so, unlike update(),
+     * these deliberately do not include isProjectAdmin().
+     */
     public function delete(User $user, Project $project): bool
     {
-        return $user->hasPermissionTo('manage-projects')
-            || $project->owner_id === $user->id
-            || $project->isProjectAdmin($user);
+        return $project->userCanArchiveOrDelete($user);
+    }
+
+    public function archive(User $user, Project $project): bool
+    {
+        return $project->userCanArchiveOrDelete($user);
     }
 }

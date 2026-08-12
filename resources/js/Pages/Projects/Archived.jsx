@@ -15,6 +15,9 @@ export default function Archived() {
     const { projects, auth, filters, owners = [] } = usePage().props;
     const canManageAll = auth.user?.permissions?.includes('manage-projects');
     const canManage = (project) => canManageAll || project.owner_id === auth.user?.id || project.user_is_admin;
+    // Unarchiving and deleting are the owner's (or a global manager's) — a
+    // project admin can open the project but not bring it back or remove it.
+    const canArchiveOrDelete = (project) => canManageAll || project.owner_id === auth.user?.id;
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [duplicateTarget, setDuplicateTarget] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
@@ -148,6 +151,8 @@ export default function Archived() {
                                                             onDuplicate={() => setDuplicateTarget(project)}
                                                             onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
                                                             onDelete={() => setDeleteTarget(project)}
+                                                            canArchive={canArchiveOrDelete(project)}
+                                                            canDelete={canArchiveOrDelete(project)}
                                                         />
                                                     </div>
                                                 )}

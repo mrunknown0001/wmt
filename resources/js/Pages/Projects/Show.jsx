@@ -1425,7 +1425,7 @@ function AutomationToast({ toast, onDismiss }) {
 }
 
 export default function Show() {
-    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, canManageCharts = false, charts = [], automationRules, customFields: initialCustomFields = [], forms = [], auth, users } = usePage().props;
+    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, canManageCharts = false, canArchiveProject = false, charts = [], automationRules, customFields: initialCustomFields = [], forms = [], auth, users } = usePage().props;
 
     const [localCustomFields, setLocalCustomFields] = useState(initialCustomFields);
     const [showDetails, setShowDetails] = useState(false);
@@ -3168,6 +3168,8 @@ export default function Show() {
                         onDuplicate={() => setDuplicateTarget(project)}
                         onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
                         onDelete={handleDeleteProject}
+                        canArchive={canArchiveProject}
+                        canDelete={canArchiveProject}
                     />
                 )}
                 breadcrumbs={[

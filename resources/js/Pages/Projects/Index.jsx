@@ -27,6 +27,9 @@ export default function Index() {
     const canCreateProject = auth.user?.can_create_project !== false;
     const canManageAll = auth.user?.permissions?.includes('manage-projects');
     const canManage = (project) => canManageAll || project.owner_id === auth.user?.id || project.user_is_admin;
+    // Archive and delete stay with the owner (or a global manager) — a project
+    // admin can edit but not retire the project.
+    const canArchiveOrDelete = (project) => canManageAll || project.owner_id === auth.user?.id;
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [duplicateTarget, setDuplicateTarget] = useState(null);
     const [moveTarget, setMoveTarget] = useState(null);
@@ -303,6 +306,8 @@ export default function Index() {
                                                             onTogglePin={() => handleTogglePin(project)}
                                                             onArchive={() => router.patch(`/projects/${project.id}/archive`, {}, { preserveScroll: true })}
                                                             onDelete={() => setDeleteTarget(project)}
+                                                            canArchive={canArchiveOrDelete(project)}
+                                                            canDelete={canArchiveOrDelete(project)}
                                                         />
                                                     </div>
                                                 )}

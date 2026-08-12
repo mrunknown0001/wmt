@@ -62,6 +62,9 @@ class ProjectController extends Controller
             'canManageTasks' => $request->user()->can('manage-tasks')
                 || $project->owner_id === $request->user()->id
                 || $isProjectAdmin,
+            // Archive and delete are the owner's (or a global manager's), not a
+            // project admin's — so this deliberately omits isProjectAdmin.
+            'canArchiveProject' => $project->userCanArchiveOrDelete($request->user()),
         ]);
     }
 

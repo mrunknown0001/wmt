@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Tooltip from './Tooltip';
 
-export default function ProjectContextMenu({ project, isArchived, onEdit, onCopyLink, onDuplicate, onMoveToFolder, onTogglePin, onArchive, onDelete, align = 'right' }) {
+export default function ProjectContextMenu({ project, isArchived, onEdit, onCopyLink, onDuplicate, onMoveToFolder, onTogglePin, onArchive, onDelete, canArchive = true, canDelete = true, align = 'right' }) {
     const [isOpen, setIsOpen] = useState(false);
     const buttonRef = useRef(null);
     const menuRef = useRef(null);
@@ -135,34 +135,44 @@ export default function ProjectContextMenu({ project, isArchived, onEdit, onCopy
                         </button>
                     )}
 
-                    <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                    {/* Archive and delete are owner-only; a project admin sees
+                        everything above but not these. */}
+                    {canArchive && (
+                        <>
+                            <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
 
-                    <button className={itemClass} onClick={() => { setIsOpen(false); onArchive(); }}>
-                        {isArchived ? (
-                            <>
-                                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4l2-2m0 0l2 2m-2-2v4" />
+                            <button className={itemClass} onClick={() => { setIsOpen(false); onArchive(); }}>
+                                {isArchived ? (
+                                    <>
+                                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4l2-2m0 0l2 2m-2-2v4" />
+                                        </svg>
+                                        Unarchive
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                        </svg>
+                                        Archive
+                                    </>
+                                )}
+                            </button>
+                        </>
+                    )}
+
+                    {canDelete && (
+                        <>
+                            <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+
+                            <button className={dangerClass} onClick={() => { setIsOpen(false); onDelete(); }}>
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                Unarchive
-                            </>
-                        ) : (
-                            <>
-                                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                                </svg>
-                                Archive
-                            </>
-                        )}
-                    </button>
-
-                    <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-
-                    <button className={dangerClass} onClick={() => { setIsOpen(false); onDelete(); }}>
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                    </button>
+                                Delete
+                            </button>
+                        </>
+                    )}
                 </div>,
                 document.body
             )}
