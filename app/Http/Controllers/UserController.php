@@ -6,6 +6,7 @@ use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\ApprovalProject;
 use App\Models\Department;
+use App\Models\Division;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskDelegation;
@@ -20,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
@@ -176,6 +178,104 @@ class UserController extends Controller
             'success',
             implode(' and ', $parts) . " moved to {$recipient->name}."
         );
+    }
+
+    /**
+     * A read-only account of everything one person can do.
+     *
+     * Admin-only (the route carries role:admin). Three layers: the roles they
+     * hold, the full permission catalogue with each one marked granted or not
+     * and where it comes from, and the abilities that are not permissions at all
+     * — headship on the org chart, project-level roles, and the derived flags the
+     * rest of the app reads off the shared auth props.
+     */
+    public function capabilities(User $user): Response
+    {
+        $user->load('department.division', 'team', 'roles.permissions');
+
+        // Where each granted permission comes from: which of the user's roles
+        // carry it, and whether it was also granted to them directly.
+        $roleGrants = [];
+        foreach ($user->roles as $role) {
+            foreach ($role->permissions as $permission) {
+                $roleGrants[$permission->name][] = $role->name;
+            }
+        }
+
+        $granted = $user->getAllPermissions()->pluck('name')->flip();
+        $direct = $user->getDirectPermissions()->pluck('name')->flip();
+
+        // The whole catalogue, grouped by the resource each permission acts on
+        // (users, projects, …) so the page reads as a matrix rather than a flat
+        // list, and so a capability the user does NOT have is visible too.
+        $groups = [];
+        foreach (Permission::orderBy('name')->pluck('name') as $name) {
+            [$action, $resource] = array_pad(explode('-', $name, 2), 2, null);
+            $resource = $resource ?: $name;
+
+            $groups[$resource][] = [
+                'name' => $name,
+                'action' => $action ?: $name,
+                'has' => $granted->has($name),
+                'via' => array_values(array_unique($roleGrants[$name] ?? [])),
+                'direct' => $direct->has($name),
+            ];
+        }
+
+        $permissionGroups = collect($groups)
+            ->map(fn ($permissions, $resource) => [
+                'resource' => $resource,
+                'label' => str($resource)->replace(['-', '_'], ' ')->title()->value(),
+                'permissions' => $permissions,
+            ])
+            ->values();
+
+        // Project-level roles are capabilities too, but they live on the
+        // project_members pivot rather than in the permission table.
+        $membershipCounts = $user->memberProjects()->get()
+            ->groupBy(fn ($p) => $p->pivot->role)
+            ->map->count();
+
+        return Inertia::render('Users/Capabilities', [
+            'profile' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'position' => $user->position,
+                'is_active' => (bool) $user->is_active,
+                'department' => $user->department?->name,
+                'division' => $user->department?->division?->name,
+                'team' => $user->team?->name,
+                'roles' => $user->roles->pluck('name'),
+            ],
+            'roles' => $user->roles->map(fn ($role) => [
+                'name' => $role->name,
+                'permissions' => $role->permissions->pluck('name')->sort()->values(),
+            ])->values(),
+            'permissionGroups' => $permissionGroups,
+            'directPermissions' => $direct->keys()->values(),
+            'permissionCount' => $granted->count(),
+            // Abilities that are not permissions: headship on the org chart.
+            'orgAuthority' => [
+                'divisions' => Division::where('head_id', $user->id)->orderBy('name')->pluck('name'),
+                'departments' => Department::where('head_id', $user->id)->orderBy('name')->pluck('name'),
+                'teams' => Team::where('leader_id', $user->id)->orderBy('name')->pluck('name'),
+            ],
+            'projectRoles' => [
+                'owner' => Project::where('owner_id', $user->id)->count(),
+                'admin' => (int) ($membershipCounts['admin'] ?? 0),
+                'editor' => (int) ($membershipCounts['editor'] ?? 0),
+                'viewer' => (int) ($membershipCounts['viewer'] ?? 0),
+            ],
+            // The same derived flags the shared auth props expose, in one place.
+            'derived' => [
+                ['label' => 'Create projects', 'note' => 'Start new projects', 'has' => $user->canCreateProjects()],
+                ['label' => 'Approve requests', 'note' => 'Can be named as an approver', 'has' => (bool) $user->can_approve],
+                ['label' => 'Create automation rules', 'note' => 'Build project automation', 'has' => (bool) $user->can_create_rules],
+                ['label' => 'Submit requests', 'note' => 'Raise approval requests', 'has' => (bool) $user->can_request],
+                ['label' => 'Organisation head', 'note' => 'Heads a unit or leads a team', 'has' => $user->headsAnyOrgUnit()],
+            ],
+        ]);
     }
 
     /**

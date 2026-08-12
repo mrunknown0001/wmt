@@ -1062,7 +1062,7 @@ function chartSubtitle(chart, customFields) {
     return chart.chart_type === 'line' ? label : `By ${label.toLowerCase()}${scopeLabel}`;
 }
 
-function ChartCard({ chart, allTasks, sections, customFields, formulaResults, canManage, onEdit, onDelete }) {
+function ChartCard({ chart, allTasks, sections, customFields, formulaResults, canManage, onEdit, onDelete, onDrillDown }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
 
@@ -1196,10 +1196,27 @@ function ChartCard({ chart, allTasks, sections, customFields, formulaResults, ca
                     />
                 )
             ) : metric ? (
-                <MetricCard
-                    result={computeMetric(chart, allTasks, sections, customFields, formulaResults)}
-                    filterSummary={describeFilters(chart, allTasks, sections, customFields)}
-                />
+                // Clickable when the dashboard passes a drill-down: the card
+                // opens the task list narrowed to exactly what it counts, like
+                // the summary cards at the top of the dashboard.
+                onDrillDown ? (
+                    <button
+                        type="button"
+                        onClick={() => onDrillDown(cardDrillFilters(chart))}
+                        title="View these tasks"
+                        className="block w-full text-left -m-1 p-1 rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                    >
+                        <MetricCard
+                            result={computeMetric(chart, allTasks, sections, customFields, formulaResults)}
+                            filterSummary={describeFilters(chart, allTasks, sections, customFields)}
+                        />
+                    </button>
+                ) : (
+                    <MetricCard
+                        result={computeMetric(chart, allTasks, sections, customFields, formulaResults)}
+                        filterSummary={describeFilters(chart, allTasks, sections, customFields)}
+                    />
+                )
             ) : type === 'bar' ? (
                 <BarChart
                     buckets={data} legend={categoryLegend} measure={measure} references={references}
@@ -2107,7 +2124,49 @@ export function ChartFormModal({ isOpen, onClose, onSave, chart, customFields, a
 
 /* ------------------------------- Section ------------------------------- */
 
-export default function ProjectCharts({ projectId, charts: initialCharts, tasks, sections, customFields, formulaResults = {}, canManage }) {
+/**
+ * Translate a card's scope + filters into the dashboard list's filter shape, so
+ * clicking the card drills into exactly the tasks it counts — the same drill-down
+ * the summary cards at the top of the dashboard use.
+ *
+ * Only the dimensions the list can express are carried across (status, priority,
+ * assignee, single/multi-select custom fields); a card built on section,
+ * created_by or a date window has no list equivalent, so those clauses are left
+ * off and the list shows the closest superset rather than nothing.
+ */
+export function cardDrillFilters(chart) {
+    const out = [];
+
+    const scope = chart.config?.scope;
+    if (scope === 'active') {
+        out.push({ fieldId: 'status', operator: 'is_not', value: 'done' });
+        out.push({ fieldId: 'status', operator: 'is_not', value: 'cancelled' });
+    } else if (scope === 'done') {
+        out.push({ fieldId: 'status', operator: 'is', value: 'done' });
+    }
+
+    for (const f of (chart.config?.filters || [])) {
+        const value = String(f.value);
+
+        if (f.field === 'status' || f.field === 'priority') {
+            out.push({ fieldId: f.field, value });
+        } else if (f.field === 'assignee') {
+            out.push(value === 'unassigned'
+                ? { fieldId: 'assignee', operator: 'is_empty', value: '' }
+                : { fieldId: 'assignee', value });
+        } else if (f.field === 'custom_field' && f.custom_field_id) {
+            out.push(value === 'none'
+                ? { fieldId: `cf_${f.custom_field_id}`, operator: 'is_empty', value: '' }
+                : { fieldId: `cf_${f.custom_field_id}`, value });
+        }
+        // section, created_by, overdue, has_due_date and date windows have no
+        // list-filter equivalent — skipped rather than mistranslated.
+    }
+
+    return out;
+}
+
+export default function ProjectCharts({ projectId, charts: initialCharts, tasks, sections, customFields, formulaResults = {}, canManage, onDrillDown }) {
     const [charts, setCharts] = useState(initialCharts || []);
     const [modalOpen, setModalOpen] = useState(false);
     const [newType, setNewType] = useState('bar');
@@ -2232,6 +2291,7 @@ export default function ProjectCharts({ projectId, charts: initialCharts, tasks,
                                 customFields={customFields}
                                 formulaResults={formulaResults}
                                 canManage={canManage}
+                                onDrillDown={onDrillDown}
                                 onEdit={(c) => { setEditingChart(c); setError(null); setModalOpen(true); }}
                                 onDelete={(c) => setDeletingChart(c)}
                             />

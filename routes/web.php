@@ -124,6 +124,11 @@ Route::middleware('auth')->group(function () {
     // User management (admin)
     // whereNumber keeps this from shadowing /users/create.
     Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show')->whereNumber('user');
+    // Admin only: a read-only view of everything a person can do — their roles,
+    // every capability those roles grant, and the abilities derived from the org
+    // chart and their project memberships.
+    Route::get('/users/{user}/capabilities', [UserController::class, 'capabilities'])
+        ->name('users.capabilities')->whereNumber('user')->middleware('role:admin');
     // Admin only: hand a departing person's unfinished work to somebody else.
     Route::post('/users/{user}/transfer-tasks', [UserController::class, 'transferTasks'])
         ->name('users.transfer-tasks')->whereNumber('user');

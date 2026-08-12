@@ -44,6 +44,12 @@ const CoverIcon = () => (
     </svg>
 );
 
+const CapabilitiesIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+);
+
 /** "12 Aug" — enough to read at a glance in a table cell. */
 const shortDate = (value) => {
     if (!value) return '';
@@ -60,6 +66,8 @@ export default function Index() {
     // Reassigning somebody's whole workload is an admin action, not something
     // an executive who can merely read this list should be able to do.
     const canTransfer = auth?.user?.permissions?.includes('manage-users');
+    // Viewing a person's full roles & capabilities is an admin-only feature.
+    const isAdmin = auth?.user?.roles?.includes('admin');
 
     const openTaskCount = useMemo(
         () => new Map(openTasks.map((row) => [row.user_id, row.total])),
@@ -265,6 +273,16 @@ export default function Index() {
                                                             <EyeIcon />
                                                         </Link>
                                                     </Tooltip>
+                                                    {isAdmin && (
+                                                        <Tooltip content="Roles & capabilities">
+                                                            <Link
+                                                                href={`/users/${user.id}/capabilities`}
+                                                                className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                                                            >
+                                                                <CapabilitiesIcon />
+                                                            </Link>
+                                                        </Tooltip>
+                                                    )}
                                                     <Tooltip content="Edit">
                                                         <Link
                                                             href={`/users/${user.id}/edit`}

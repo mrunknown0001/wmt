@@ -4831,6 +4831,9 @@ export default function Show() {
                             // without them.
                             formulaResults={formulaResults}
                             canManage={canManageCharts}
+                            // Lets a custom card drill into its tasks, the same
+                            // way the summary cards above do.
+                            onDrillDown={drillDown}
                         />
                     </div>
                 );
