@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskDelegation;
+use App\Models\TaskDelegationItem;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogger;
@@ -197,6 +198,9 @@ class UserController extends Controller
         }
 
         return TaskDelegation::with('delegates:id,name')
+            // Whole-person cover only — the list column is about someone being
+            // away, not a single task on loan.
+            ->whereNull('task_id')
             ->whereIn('user_id', $users->pluck('id'))
             ->whereIn('status', [TaskDelegation::SCHEDULED, TaskDelegation::ACTIVE])
             ->whereDate('ends_on', '>=', now()->toDateString())
@@ -277,6 +281,13 @@ class UserController extends Controller
                 'created_at' => $a->created_at,
             ]);
 
+        // Who is looking, and what they may do here. Arranging cover — whole
+        // workload or a single task — is a manager's act over someone they run;
+        // a permanent hand-over is admin-only. Both are gated again server-side.
+        $viewer = $request->user();
+        $canArrangeCover = OrgScope::hasAnyScope($viewer) && OrgScope::manages($viewer, $user->id);
+        $canHandover = $viewer->can('manage-users');
+
         return Inertia::render('Users/Show', [
             'profile' => [
                 'id' => $user->id,
@@ -289,6 +300,40 @@ class UserController extends Controller
                 'team' => $user->team?->name,
                 'roles' => $user->roles->pluck('name'),
             ],
+            // Records behind whichever card was clicked, or null for the default
+            // Tasks view. A partial reload refreshes only this key.
+            'filtered' => $this->buildFilter($user, $request->query('filter')),
+            // Tasks this person has out on cover right now (single-task or swept
+            // up by whole-person cover): assigned elsewhere, still owed back.
+            'delegatedAway' => $this->delegatedAwayTasks($user),
+            'canArrangeCover' => $canArrangeCover,
+            'canHandover' => $canHandover,
+            // The stand-ins a manager may pick from — only loaded when they can
+            // actually arrange cover, and narrowed to the people they run.
+            'coverPeople' => $canArrangeCover
+                ? OrgScope::manageablePeople($viewer)
+                    ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name])
+                    ->values()
+                : [],
+            // Whole-person cover currently set up for this person, if any.
+            'currentCover' => $this->currentCoverFor($user),
+            // Counts for the permanent hand-over prompt, admin-only.
+            'handover' => $canHandover ? [
+                'open_tasks' => UserHandover::pendingFor($user)->count(),
+                'owned_projects' => UserHandover::ownedProjects($user),
+            ] : null,
+            // Recipients for a permanent hand-over. Kept separate from
+            // coverPeople because that one is empty for an inactive person —
+            // exactly the case a hand-over is for — and would leave nobody to
+            // pick. Any active person other than the one leaving.
+            'handoverPeople' => $canHandover
+                ? User::where('is_active', true)
+                    ->where('id', '!=', $user->id)
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name])
+                    ->values()
+                : [],
             'kpis' => [
                 'projectsOwned' => $projectsOwned,
                 'projectsMember' => $projectsMember,
@@ -391,6 +436,222 @@ class UserController extends Controller
 
     /** Enough to be useful on an overview without turning it into a task list. */
     private const UPCOMING_LIMIT = 50;
+
+    /** A filtered list is a drill-down, not a report — cap it and say so. */
+    private const FILTER_LIMIT = 100;
+
+    /**
+     * The records behind a clicked card.
+     *
+     * Every headline number on the page is an entry point: click it and the
+     * page shows exactly the rows it counts. The keys mirror how each card is
+     * computed in show(), so the list can never disagree with the figure that
+     * opened it. Unknown or empty keys mean "no filter" — the default Tasks card
+     * shows instead.
+     *
+     * @return array{key: string, type: string, label: string, items: array, count: int, limit: int}|null
+     */
+    private function buildFilter(User $user, ?string $filter): ?array
+    {
+        if (! $filter) {
+            return null;
+        }
+
+        // Projects and activity are their own kinds of list; everything else is
+        // a slice of this person's tasks.
+        if (str_starts_with($filter, 'projects:')) {
+            return $this->filteredProjects($user, substr($filter, strlen('projects:')));
+        }
+
+        if ($filter === 'activity') {
+            return $this->filteredActivity($user);
+        }
+
+        return $this->filteredTasks($user, $filter);
+    }
+
+    /** Task slices, one per task-counting card. */
+    private function filteredTasks(User $user, string $key): ?array
+    {
+        $base = fn () => Task::query()->where('assigned_to', $user->id);
+
+        [$label, $query] = match ($key) {
+            'all' => ['All tasks', $base()],
+            'active' => ['Active tasks', $base()->whereNotIn('status', Task::CLOSING_STATUSES)],
+            'completed' => ['Completed tasks', $base()->where('status', 'done')],
+            'overdue' => ['Overdue tasks', $base()->whereNotIn('status', Task::CLOSING_STATUSES)->pastDue()],
+            // Completed on or before the due date — the on-time numerator.
+            'ontime' => ['Completed on time', $base()->where('status', 'done')
+                ->whereNotNull('due_date')->whereNotNull('completed_at')
+                ->whereColumn('completed_at', '<=', 'due_date')],
+            default => [null, null],
+        };
+
+        if ($label === null) {
+            return null;
+        }
+
+        $count = (clone $query)->count();
+
+        // Open work by soonest due; finished work by most recently done.
+        $ordered = in_array($key, ['completed', 'ontime'], true)
+            ? $query->orderByDesc('completed_at')
+            : $query->orderByRaw('due_date is null, due_date');
+
+        $today = now()->startOfDay();
+
+        $items = $ordered->with('project:id,name')
+            ->limit(self::FILTER_LIMIT)
+            ->get(['id', 'project_id', 'title', 'status', 'priority', 'due_date', 'due_time', 'completed_at', 'assigned_to'])
+            ->map(fn (Task $t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+                'status' => $t->status,
+                'priority' => $t->priority,
+                'due_date' => $t->due_date?->toDateString(),
+                'due_time' => $t->due_time,
+                'completed_at' => $t->completed_at?->toDateString(),
+                'url' => $t->getEditUrl(),
+                'project' => $t->project ? ['id' => $t->project->id, 'name' => $t->project->name] : null,
+                'is_overdue' => ! in_array($t->status, Task::CLOSING_STATUSES, true)
+                    && $t->due_date && $t->due_date->startOfDay()->lessThan($today),
+                // Open tasks still assigned to this person can be handed over.
+                'reassignable' => ! in_array($t->status, Task::CLOSING_STATUSES, true),
+            ])
+            ->all();
+
+        return ['key' => "tasks:{$key}", 'type' => 'tasks', 'label' => $label, 'items' => $items, 'count' => $count, 'limit' => self::FILTER_LIMIT];
+    }
+
+    /** Project slices, one per Projects-card row. */
+    private function filteredProjects(User $user, string $key): ?array
+    {
+        [$label, $query] = match ($key) {
+            'owned' => ['Owned projects', Project::where('owner_id', $user->id)],
+            'member' => ['Projects they are a member of', Project::whereHas('members', fn ($q) => $q->where('users.id', $user->id))],
+            'involved' => ['Projects involved in', Project::where('owner_id', $user->id)
+                ->orWhereHas('members', fn ($q) => $q->where('users.id', $user->id))
+                ->orWhereHas('tasks', fn ($q) => $q->where('assigned_to', $user->id))],
+            default => [null, null],
+        };
+
+        if ($label === null) {
+            return null;
+        }
+
+        $count = (clone $query)->count();
+
+        $ownedIds = Project::where('owner_id', $user->id)->pluck('id')->flip();
+
+        $items = $query->orderByDesc('id')
+            ->limit(self::FILTER_LIMIT)
+            ->get(['id', 'name', 'status', 'owner_id', 'due_date'])
+            ->map(fn (Project $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'status' => $p->status,
+                'due_date' => $p->due_date?->toDateString(),
+                'url' => "/projects/{$p->id}",
+                'role' => $ownedIds->has($p->id) ? 'owner' : 'member',
+            ])
+            ->all();
+
+        return ['key' => "projects:{$key}", 'type' => 'projects', 'label' => $label, 'items' => $items, 'count' => $count, 'limit' => self::FILTER_LIMIT];
+    }
+
+    /** This person's actions over the last 30 days. */
+    private function filteredActivity(User $user): array
+    {
+        $since = now()->subDays(30);
+
+        $query = \App\Models\ActivityLog::where('user_id', $user->id)
+            ->where('created_at', '>=', $since);
+
+        $count = (clone $query)->count();
+
+        $items = $query->orderByDesc('created_at')
+            ->limit(self::FILTER_LIMIT)
+            ->get(['action', 'entity_type', 'entity_name', 'description', 'created_at'])
+            ->map(fn ($a) => [
+                'action' => $a->action,
+                'entity' => $a->entity_name ?: class_basename($a->entity_type ?? ''),
+                'description' => $a->description,
+                'created_at' => $a->created_at,
+            ])
+            ->all();
+
+        return ['key' => 'activity', 'type' => 'activity', 'label' => 'Activity in the last 30 days', 'items' => $items, 'count' => $count, 'limit' => self::FILTER_LIMIT];
+    }
+
+    /**
+     * Tasks this person owns that are sitting with a stand-in right now.
+     *
+     * Read from the ledger, not from assigned_to: once a task is covered it is
+     * assigned to the stand-in, so it drops out of every count on this page.
+     * Surfacing it here keeps a reassigned task visible to the manager who moved
+     * it, and gives them somewhere to end a single-task cover early.
+     */
+    private function delegatedAwayTasks(User $user): array
+    {
+        return TaskDelegationItem::query()
+            ->whereNull('restored_at')
+            ->where('original_assignee_id', $user->id)
+            ->with([
+                'task:id,project_id,title,status,priority,due_date',
+                'task.project:id,name',
+                'delegate:id,name',
+                'delegation:id,ends_on,task_id,status',
+            ])
+            ->get()
+            // A task that was hard-deleted leaves a dangling item; skip it.
+            ->filter(fn (TaskDelegationItem $i) => $i->task && $i->delegation)
+            ->map(fn (TaskDelegationItem $i) => [
+                'task' => [
+                    'id' => $i->task->id,
+                    'title' => $i->task->title,
+                    'status' => $i->task->status,
+                    'priority' => $i->task->priority,
+                    'url' => $i->task->getEditUrl(),
+                    'project' => $i->task->project ? ['id' => $i->task->project->id, 'name' => $i->task->project->name] : null,
+                ],
+                'delegate' => $i->delegate?->name,
+                'ends_on' => $i->delegation->ends_on?->toDateString(),
+                'delegation_id' => $i->delegation->id,
+                // Only a single-task cover can be ended for this one task alone;
+                // ending whole-person cover would return everything at once.
+                'per_task' => $i->delegation->task_id !== null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Whole-person cover set up for this person, scheduled or running, whose
+     * last day has not passed. The soonest is the useful one.
+     */
+    private function currentCoverFor(User $user): ?array
+    {
+        $cover = TaskDelegation::with('delegates:id,name')
+            ->whereNull('task_id')
+            ->where('user_id', $user->id)
+            ->whereIn('status', [TaskDelegation::SCHEDULED, TaskDelegation::ACTIVE])
+            ->whereDate('ends_on', '>=', now()->toDateString())
+            ->orderBy('starts_on')
+            ->first();
+
+        if (! $cover) {
+            return null;
+        }
+
+        return [
+            'id' => $cover->id,
+            'running' => $cover->isRunning(),
+            'period' => $cover->periodLabel(),
+            'starts_on' => $cover->starts_on->toDateString(),
+            'ends_on' => $cover->ends_on->toDateString(),
+            'delegates' => $cover->delegates->pluck('name')->all(),
+        ];
+    }
 
     /**
      * Who may view a user's overview: managers, the user themselves, or a head

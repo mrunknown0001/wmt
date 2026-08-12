@@ -31,6 +31,9 @@ class TaskDelegation extends Model
 
     protected $fillable = [
         'user_id',
+        // Null covers everything the person holds; set narrows this arrangement
+        // to a single task, leaving the rest of their workload with them.
+        'task_id',
         'starts_on',
         'ends_on',
         'reason',
@@ -53,6 +56,18 @@ class TaskDelegation extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /** The one task this arrangement covers, or null for whole-person cover. */
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class, 'task_id');
+    }
+
+    /** Cover for a single task rather than the person's whole workload. */
+    public function isPerTask(): bool
+    {
+        return $this->task_id !== null;
     }
 
     public function creator(): BelongsTo

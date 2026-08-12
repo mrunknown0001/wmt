@@ -229,6 +229,9 @@ Route::middleware('auth')->group(function () {
     // back on their own when the period ends.
     Route::get('/task-delegations', [TaskDelegationController::class, 'index'])->name('task-delegations.index');
     Route::post('/task-delegations', [TaskDelegationController::class, 'store'])->name('task-delegations.store');
+    // Cover for one task rather than a person's whole workload — arranged from
+    // the User Overview page.
+    Route::post('/task-delegations/task', [TaskDelegationController::class, 'storeTask'])->name('task-delegations.store-task');
     Route::post('/task-delegations/{taskDelegation}/end', [TaskDelegationController::class, 'end'])->name('task-delegations.end');
     Route::delete('/task-delegations/{taskDelegation}', [TaskDelegationController::class, 'destroy'])->name('task-delegations.destroy');
 

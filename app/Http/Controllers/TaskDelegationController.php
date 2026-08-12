@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Task;
 use App\Models\TaskDelegation;
+use App\Models\TaskDelegationItem;
 use App\Models\User;
 use App\Services\OrgScope;
 use App\Services\TaskDelegationService;
@@ -41,6 +43,9 @@ class TaskDelegationController extends Controller
                 'items as covered_count' => fn ($q) => $q->whereNull('restored_at'),
                 'items as returned_count' => fn ($q) => $q->whereNotNull('restored_at'),
             ])
+            // This page is whole-person cover; single-task arrangements are
+            // managed from the User Overview where they are made.
+            ->whereNull('task_id')
             ->orderByDesc('starts_on');
 
         if (!$manages) {
@@ -130,8 +135,11 @@ class TaskDelegationController extends Controller
         }
 
         // Two live arrangements for the same person would fight over the same
-        // tasks, and the second hand-back would find them already moved.
+        // tasks, and the second hand-back would find them already moved. Only
+        // other whole-person cover conflicts — a single-task arrangement leaves
+        // the rest of their workload alone, so it does not block this.
         $overlapping = TaskDelegation::where('user_id', $data['user_id'])
+            ->whereNull('task_id')
             ->whereIn('status', [TaskDelegation::SCHEDULED, TaskDelegation::ACTIVE])
             ->whereDate('ends_on', '>=', $data['starts_on'])
             ->whereDate('starts_on', '<=', $data['ends_on'])
@@ -167,6 +175,108 @@ class TaskDelegationController extends Controller
         }
 
         return back()->with('success', 'Cover scheduled. Tasks move over on ' . $delegation->starts_on->format('j M Y') . '.');
+    }
+
+    /**
+     * Cover a single task rather than a person's whole workload.
+     *
+     * Arranged from the User Overview, where a manager is looking at one
+     * person's task list and wants to move just one item to a stand-in for a
+     * spell — a deadline they cannot make, one project they are handing off for
+     * a fortnight. Same engine as whole-person cover: the task moves now (or on
+     * the start date) and returns on its own the morning after it ends.
+     */
+    public function storeTask(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'task_id' => ['required', 'integer', 'exists:tasks,id'],
+            'delegate_id' => ['required', 'integer', 'exists:users,id'],
+            'starts_on' => ['required', 'date'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        abort_unless(OrgScope::hasAnyScope($user), 403);
+
+        $task = Task::findOrFail($data['task_id']);
+        $ownerId = (int) $task->assigned_to;
+        $delegateId = (int) $data['delegate_id'];
+
+        if (! $ownerId) {
+            throw ValidationException::withMessages([
+                'task_id' => 'This task is not assigned to anyone, so there is nothing to cover.',
+            ]);
+        }
+
+        // Reassigning someone's task is arranging their cover — same authority
+        // as the whole-person form. Both ends must be within the manager's org
+        // scope: the person the task belongs to, and the stand-in taking it.
+        abort_unless(OrgScope::manages($user, $ownerId), 403);
+
+        if (! OrgScope::manages($user, $delegateId)) {
+            throw ValidationException::withMessages([
+                'delegate_id' => 'You can only hand work to people you are responsible for.',
+            ]);
+        }
+
+        if ($delegateId === $ownerId) {
+            throw ValidationException::withMessages([
+                'delegate_id' => 'Somebody cannot stand in for themselves.',
+            ]);
+        }
+
+        $delegate = User::find($delegateId);
+
+        if (! $delegate || ! $delegate->is_active) {
+            throw ValidationException::withMessages([
+                'delegate_id' => 'That person is not active and could not pick the task up.',
+            ]);
+        }
+
+        // Already sitting with a stand-in — under its own cover or swept up by a
+        // whole-person one. A second arrangement would fight the first over the
+        // same task, and the later hand-back would find it already moved.
+        $held = TaskDelegationItem::where('task_id', $task->id)
+            ->whereNull('restored_at')
+            ->exists();
+
+        $overlapping = TaskDelegation::where('task_id', $task->id)
+            ->whereIn('status', [TaskDelegation::SCHEDULED, TaskDelegation::ACTIVE])
+            ->whereDate('ends_on', '>=', $data['starts_on'])
+            ->whereDate('starts_on', '<=', $data['ends_on'])
+            ->exists();
+
+        if ($held || $overlapping) {
+            throw ValidationException::withMessages([
+                'starts_on' => 'This task is already being covered for those dates.',
+            ]);
+        }
+
+        $delegation = TaskDelegation::create([
+            'user_id' => $ownerId,
+            'task_id' => $task->id,
+            'starts_on' => $data['starts_on'],
+            'ends_on' => $data['ends_on'],
+            'reason' => $data['reason'] ?? null,
+            'status' => TaskDelegation::SCHEDULED,
+            'created_by' => $user->id,
+        ]);
+
+        $delegation->delegates()->attach($delegateId, ['position' => 0]);
+
+        // Starting today means starting now, so the task does not sit with the
+        // wrong person until the overnight run.
+        if ($delegation->covers()) {
+            $moved = TaskDelegationService::activate($delegation->fresh('delegates'));
+
+            return back()->with('success', $moved > 0
+                ? "Task reassigned to {$delegate->name} until " . $delegation->ends_on->format('j M Y') . '.'
+                : 'That task could not be handed over — it may have been reassigned or closed already.');
+        }
+
+        return back()->with('success', "Task cover scheduled — it moves to {$delegate->name} on " . $delegation->starts_on->format('j M Y') . '.');
     }
 
     /**

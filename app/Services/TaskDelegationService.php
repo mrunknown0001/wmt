@@ -51,13 +51,23 @@ class TaskDelegationService
      */
     private static function isCovered(int $userId): bool
     {
-        return TaskDelegation::running()->where('user_id', $userId)->exists();
+        return TaskDelegation::running()
+            ->whereNull('task_id')
+            ->where('user_id', $userId)
+            ->exists();
     }
 
-    /** The delegation currently holding this person's work, if any. */
+    /**
+     * The whole-person delegation currently holding this person's work, if any.
+     *
+     * Whole-person only: a single-task arrangement covers exactly the task it
+     * names and must never sweep up the rest of what someone is assigned, so the
+     * capture path that reads this ignores per-task cover (task_id set).
+     */
     public static function runningFor(int $userId, ?Carbon $date = null): ?TaskDelegation
     {
         return TaskDelegation::running($date)
+            ->whereNull('task_id')
             ->where('user_id', $userId)
             ->with('delegates')
             ->first();
@@ -83,7 +93,12 @@ class TaskDelegationService
             return 0;
         }
 
-        $tasks = self::coverableTasks((int) $delegation->user_id)->get();
+        // Whole-person cover deals everything the person still holds; per-task
+        // cover deals only the one task it names, if it is still theirs to hand
+        // over. Either way the ledger and hand-back below are identical.
+        $tasks = $delegation->isPerTask()
+            ? self::coverableTask($delegation)
+            : self::coverableTasks((int) $delegation->user_id)->get();
 
         $dealt = self::deal($delegation, $tasks, $delegates);
 
@@ -258,6 +273,28 @@ class TaskDelegationService
         });
 
         return $dealt;
+    }
+
+    /**
+     * The single task a per-task arrangement covers, as a 0-or-1 collection so
+     * deal() can treat it exactly like the whole-person set.
+     *
+     * Handed over only if it is still the owner's, still open, and not already
+     * held under some other cover — the same three tests coverableTasks() makes,
+     * so a task someone reassigned by hand before the start date is left alone.
+     */
+    private static function coverableTask(TaskDelegation $delegation): Collection
+    {
+        return Task::query()
+            ->whereKey($delegation->task_id)
+            ->where('assigned_to', $delegation->user_id)
+            ->whereNotIn('status', Task::CLOSING_STATUSES)
+            ->whereNotExists(fn ($q) => $q
+                ->selectRaw(1)
+                ->from('task_delegation_items')
+                ->whereColumn('task_delegation_items.task_id', 'tasks.id')
+                ->whereNull('task_delegation_items.restored_at'))
+            ->get();
     }
 
     /** Unfinished tasks this person holds that are not already covered. */
