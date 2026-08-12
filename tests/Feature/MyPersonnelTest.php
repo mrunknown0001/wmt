@@ -288,6 +288,36 @@ class MyPersonnelTest extends TestCase
             });
     }
 
+    public function test_a_single_task_reassignment_does_not_flag_someone_as_away(): void
+    {
+        // Covering one task is not the same as being away, so it must not light
+        // the "Away" badge on this page.
+        $project = Project::create(['name' => 'P', 'status' => 'active', 'owner_id' => $this->teamLead->id]);
+        $task = Task::create([
+            'project_id' => $project->id, 'title' => 'One task',
+            'status' => 'to_do', 'priority' => 'medium', 'assigned_to' => $this->member->id,
+        ]);
+
+        $delegation = TaskDelegation::create([
+            'user_id' => $this->member->id,
+            'task_id' => $task->id,
+            'starts_on' => now()->subDay()->toDateString(),
+            'ends_on' => now()->addDays(5)->toDateString(),
+            'status' => TaskDelegation::SCHEDULED,
+        ]);
+        $delegation->delegates()->attach($this->otherMember->id, ['position' => 0]);
+        TaskDelegationService::activate($delegation->fresh('delegates'));
+
+        $this->actingAs($this->teamLead)
+            ->get('/my-personnel')
+            ->assertOk()
+            ->assertInertia(function ($page) {
+                $cover = $page->toArray()['props']['coveredBy'];
+
+                $this->assertArrayNotHasKey($this->member->id, $cover);
+            });
+    }
+
     // ---- the link through to the overview ----
 
     public function test_a_team_leader_may_open_their_members_overview(): void

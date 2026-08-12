@@ -219,6 +219,15 @@ export default function Index() {
                                                     <Link href={`/users/${user.id}`} className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
                                                         {user.name}
                                                     </Link>
+                                                    {coverFor(user.id)?.running && (
+                                                        <span
+                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                                            title={`Covered${coverFor(user.id).delegates?.length ? ` by ${coverFor(user.id).delegates.join(' & ')}` : ''} · ${coverFor(user.id).period}`}
+                                                        >
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                                            Away
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">{user.email}</td>

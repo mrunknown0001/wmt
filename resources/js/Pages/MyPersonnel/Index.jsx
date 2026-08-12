@@ -47,7 +47,8 @@ function PersonRow({ person, cover }) {
                     {person.name}
                     {cover && (
                         <Tooltip content={`Covered by ${cover.delegates.join(' & ')} · ${cover.period}`}>
-                            <span className="ml-2 text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            <span className="ml-2 inline-flex items-center gap-1 align-middle text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                                 Away
                             </span>
                         </Tooltip>

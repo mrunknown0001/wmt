@@ -132,6 +132,9 @@ class MyPersonnelController extends Controller
         }
 
         return TaskDelegation::running()
+            // Whole-person cover only — a single-task reassignment does not make
+            // someone "away", so it must not light the badge here.
+            ->whereNull('task_id')
             ->whereIn('user_id', $peopleIds)
             ->with('delegates:id,name')
             ->get()

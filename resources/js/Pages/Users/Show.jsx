@@ -726,6 +726,15 @@ export default function Show() {
                             {!profile.is_active && (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">Inactive</span>
                             )}
+                            {currentCover?.running && (
+                                <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                    title={`Covered${currentCover.delegates?.length ? ` by ${currentCover.delegates.join(' & ')}` : ''} · ${currentCover.period}`}
+                                >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                    Away
+                                </span>
+                            )}
                             {profile.roles?.map((r) => (
                                 <span key={r} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">{r}</span>
                             ))}
