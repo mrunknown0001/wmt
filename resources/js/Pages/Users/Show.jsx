@@ -645,10 +645,17 @@ export default function Show() {
         profile, kpis, recentActivity = [], upcoming, canManage,
         filtered = null, delegatedAway = [], canArrangeCover = false, canHandover = false,
         coverPeople = [], currentCover = null, handover = null, handoverPeople = [],
+        canViewUsers = false,
         errors = {},
     } = usePage().props;
 
     const tier = activityTier(kpis.activity30);
+
+    // "Back" goes to the Users list for anyone who can open it; otherwise to My
+    // Personnel, which is how a head or team leader reaches this page.
+    const backCrumb = canViewUsers
+        ? { label: 'Users', href: '/users' }
+        : { label: 'My Personnel', href: '/my-personnel' };
 
     const [reassignTask, setReassignTask] = useState(null);
     const [showWholeCover, setShowWholeCover] = useState(false);
@@ -703,7 +710,7 @@ export default function Show() {
                 title="User Overview"
                 breadcrumbs={[
                     { label: 'Dashboard', href: '/dashboard' },
-                    { label: 'Users', href: '/users' },
+                    backCrumb,
                     { label: profile.name },
                 ]}
                 actions={headerActions}

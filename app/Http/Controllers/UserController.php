@@ -351,6 +351,10 @@ class UserController extends Controller
             'recentActivity' => $recentActivity,
             'upcoming' => $this->upcomingTasks($user),
             'canManage' => $request->user()->can('manage-users'),
+            // Drives where "back" goes: to the Users list for someone who can
+            // open it, otherwise to My Personnel (how a head or team leader
+            // without user-management access reached this page).
+            'canViewUsers' => $viewer->can('view-users'),
         ]);
     }
 

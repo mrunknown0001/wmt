@@ -356,8 +356,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/workload', [WorkloadController::class, 'index'])
         ->middleware('can:view-workload')->name('workload.index');
 
-    // Organization structure
-    Route::resource('divisions', DivisionController::class)->except(['show']);
-    Route::resource('departments', DepartmentController::class)->except(['show']);
-    Route::resource('teams', TeamController::class)->except(['show']);
+    // Organization structure — admin-only. Managing divisions, departments and
+    // teams is an administrator's job; the role gate here matches the sidebar,
+    // which shows these links to admins alone, and covers every action on the
+    // resource (store/update authorize in their form requests, not the
+    // controller, so a route-level gate is the one place that catches them all).
+    Route::middleware('role:admin')->group(function () {
+        Route::resource('divisions', DivisionController::class)->except(['show']);
+        Route::resource('departments', DepartmentController::class)->except(['show']);
+        Route::resource('teams', TeamController::class)->except(['show']);
+    });
 });

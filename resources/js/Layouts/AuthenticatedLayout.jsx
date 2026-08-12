@@ -366,23 +366,20 @@ export default function AuthenticatedLayout({ children, title, contained = false
                     </div>
                 )}
 
-                {(hasPermission('view-divisions') || hasPermission('view-departments') || hasPermission('view-teams')) && (
+                {/* Organization structure is an admin concern — Divisions,
+                    Departments and Teams are shown to admins only, regardless of
+                    the view-* permissions other roles may still hold. */}
+                {hasRole('admin') && (
                     <NavSection title="Organization" collapsed={collapsed}>
-                        {hasPermission('view-divisions') && (
-                            <NavLink href="/divisions" icon={<BuildingIcon />} active={isActive('/divisions')} collapsed={collapsed}>
-                                Divisions
-                            </NavLink>
-                        )}
-                        {hasPermission('view-departments') && (
-                            <NavLink href="/departments" icon={<SitemapIcon />} active={isActive('/departments')} collapsed={collapsed}>
-                                Departments
-                            </NavLink>
-                        )}
-                        {hasPermission('view-teams') && (
-                            <NavLink href="/teams" icon={<UsersGroupIcon />} active={isActive('/teams')} collapsed={collapsed}>
-                                Teams
-                            </NavLink>
-                        )}
+                        <NavLink href="/divisions" icon={<BuildingIcon />} active={isActive('/divisions')} collapsed={collapsed}>
+                            Divisions
+                        </NavLink>
+                        <NavLink href="/departments" icon={<SitemapIcon />} active={isActive('/departments')} collapsed={collapsed}>
+                            Departments
+                        </NavLink>
+                        <NavLink href="/teams" icon={<UsersGroupIcon />} active={isActive('/teams')} collapsed={collapsed}>
+                            Teams
+                        </NavLink>
                     </NavSection>
                 )}
 
