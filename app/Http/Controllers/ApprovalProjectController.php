@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ApprovalItem;
 use App\Models\ApprovalProject;
 use App\Models\User;
 use App\Http\Requests\StoreApprovalProjectRequest;
@@ -23,7 +24,67 @@ class ApprovalProjectController extends Controller
         return Inertia::render('ApprovalProjects/Index', [
             'projects' => $projects,
             'archivedCount' => ApprovalProject::where('status', 'archived')->count(),
+            'trashedCount' => ApprovalProject::onlyTrashed()->count(),
         ]);
+    }
+
+    /**
+     * Soft-deleted approval projects — the recycle bin. From here a project can
+     * be restored (its pending items reappear in approvers' queues) or deleted
+     * for good, which removes every item under it.
+     */
+    public function trash()
+    {
+        $this->authorize('viewAny', ApprovalProject::class);
+
+        $projects = ApprovalProject::onlyTrashed()
+            ->with('owner')
+            ->withCount('approvalItems')
+            ->orderByDesc('deleted_at')
+            ->paginate(15);
+
+        return Inertia::render('ApprovalProjects/Trash', [
+            'projects' => $projects,
+        ]);
+    }
+
+    /** Bring a soft-deleted project back; its items return with it. */
+    public function restore(ApprovalProject $approvalProject)
+    {
+        $this->authorize('restore', $approvalProject);
+
+        $approvalProject->restore();
+
+        return redirect()->route('approval-projects.trash')
+            ->with('success', 'Approval project restored.');
+    }
+
+    /**
+     * Permanently delete a project and everything under it.
+     *
+     * Items are force-deleted first, in their own statement: that clears the two
+     * restrictOnDelete guards (items→chain_versions, step_instances→steps) by
+     * removing the referencing rows before the project's cascade reaches the
+     * steps and versions. Deleting the items cascades to their step instances,
+     * approvers, decisions and custom-field values at the database level; the
+     * project delete then cascades to chains, versions, steps, sections,
+     * members, forms and automation rules. withTrashed() covers items that were
+     * already soft-deleted.
+     */
+    public function forceDestroy(ApprovalProject $approvalProject)
+    {
+        $this->authorize('forceDelete', $approvalProject);
+
+        DB::transaction(function () use ($approvalProject) {
+            ApprovalItem::withTrashed()
+                ->where('approval_project_id', $approvalProject->id)
+                ->forceDelete();
+
+            $approvalProject->forceDelete();
+        });
+
+        return redirect()->route('approval-projects.trash')
+            ->with('success', 'Approval project and all its items permanently deleted.');
     }
 
     public function archived()
@@ -173,6 +234,6 @@ class ApprovalProjectController extends Controller
         $approvalProject->delete();
 
         return redirect()->route('approval-projects.index')
-            ->with('success', 'Approval project deleted successfully.');
+            ->with('success', 'Approval project moved to Trash. Its pending items are hidden from approvers; restore it to bring them back.');
     }
 }

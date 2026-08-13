@@ -29,9 +29,9 @@ const ArchiveIcon = () => (
     </svg>
 );
 
-export default function Index({ projects, archivedCount = 0 }) {
+export default function Index({ projects, archivedCount = 0, trashedCount = 0 }) {
     const handleDelete = (id) => {
-        if (confirm('Are you sure? This will delete the approval project.')) {
+        if (confirm('Move this approval project to Trash? Its pending items will be hidden from approvers. You can restore it, or delete it permanently from the Trash.')) {
             router.delete(route('approval-projects.destroy', id));
         }
     };
@@ -58,6 +58,14 @@ export default function Index({ projects, archivedCount = 0 }) {
                                 className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                             >
                                 Archived ({archivedCount})
+                            </Link>
+                        )}
+                        {trashedCount > 0 && (
+                            <Link
+                                href={route('approval-projects.trash')}
+                                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                            >
+                                Trash ({trashedCount})
                             </Link>
                         )}
                         <Link href={route('approval-projects.create')}>

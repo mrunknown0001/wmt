@@ -43,6 +43,12 @@ class MyApprovalsController extends Controller
             ->whereHas('instance', function ($q) {
                 $q->where('status', 'active');
             })
+            // Hide items whose project has been archived or deleted. The nested
+            // relation carries each model's soft-delete scope, so a trashed
+            // project (or item) drops out too — not just an archived one.
+            ->whereHas('instance.item.approvalProject', function ($q) {
+                $q->where('status', '!=', 'archived');
+            })
             ->get()
             ->pluck('instance.item')
             ->filter() // drop nulls (e.g. soft-deleted items with a lingering active instance)
@@ -66,6 +72,10 @@ class MyApprovalsController extends Controller
                     ]);
                 }
             ])
+            // Same as above: an archived or deleted project's items leave the list.
+            ->whereHas('instance.item.approvalProject', function ($q) {
+                $q->where('status', '!=', 'archived');
+            })
             ->get()
             ->pluck('instance.item')
             ->filter(fn ($item) => $item && $item->requested_by === $user->id)

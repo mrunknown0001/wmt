@@ -66,7 +66,10 @@ class HandleInertiaRequests extends Middleware
             'unreadNotificationsCount' => fn () => $request->user()?->unreadNotifications()->count() ?? 0,
             'pendingApprovalsCount' => fn () => $request->user()
                 ? \App\Models\ApprovalStepInstance::where('status', 'active')
-                    ->whereHas('item') // excludes soft-deleted items
+                    // Item must exist (excludes soft-deleted items) and its project
+                    // must be live — archived or soft-deleted projects drop out, so
+                    // their pending items stop counting toward the badge.
+                    ->whereHas('item.approvalProject', fn ($q) => $q->where('status', '!=', 'archived'))
                     ->whereHas('approvers', fn ($q) => $q->where('user_id', $request->user()->id))
                     ->count()
                 : 0,

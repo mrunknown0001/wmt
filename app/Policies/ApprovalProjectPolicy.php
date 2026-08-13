@@ -54,4 +54,16 @@ class ApprovalProjectPolicy
             || $project->owner_id === $user->id
             || $project->isProjectAdmin($user);
     }
+
+    /** Restoring from Trash is the same authority as deleting. */
+    public function restore(User $user, ApprovalProject $project): bool
+    {
+        return $this->delete($user, $project);
+    }
+
+    /** Permanent deletion (project + all its items) — same authority as delete. */
+    public function forceDelete(User $user, ApprovalProject $project): bool
+    {
+        return $this->delete($user, $project);
+    }
 }

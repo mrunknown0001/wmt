@@ -160,10 +160,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/projects/{project}/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment'])->name('tasks.attachments.download');
 
     // Approval Projects
-    // Archived list must be declared before the resource so it isn't captured by {approvalProject}
+    // Archived + Trash lists must be declared before the resource so they aren't captured by {approvalProject}
     Route::get('/approval-projects/archived', [ApprovalProjectController::class, 'archived'])->name('approval-projects.archived');
+    Route::get('/approval-projects/trash', [ApprovalProjectController::class, 'trash'])->name('approval-projects.trash');
     Route::resource('approval-projects', ApprovalProjectController::class);
     Route::patch('/approval-projects/{approvalProject}/archive', [ApprovalProjectController::class, 'archive'])->name('approval-projects.archive');
+    // Trash actions — withTrashed() so the binding resolves a soft-deleted project.
+    Route::patch('/approval-projects/{approvalProject}/restore', [ApprovalProjectController::class, 'restore'])->withTrashed()->name('approval-projects.restore');
+    Route::delete('/approval-projects/{approvalProject}/force', [ApprovalProjectController::class, 'forceDestroy'])->withTrashed()->name('approval-projects.force-destroy');
     Route::patch('/approval-projects/{approvalProject}/items/{item}/archive', [ApprovalItemController::class, 'archive'])->name('approval-projects.items.archive');
     Route::patch('/approval-projects/{approvalProject}/items/{item}/section', [ApprovalItemController::class, 'setSection'])->name('approval-projects.items.section');
     Route::get('/approval-projects/{approvalProject}/custom-fields', [ApprovalCustomFieldController::class, 'index'])->name('approval-projects.custom-fields.index');
