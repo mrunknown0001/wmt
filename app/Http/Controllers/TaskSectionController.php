@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskSectionUpdated;
 use App\Models\Project;
 use App\Models\TaskSection;
 use App\Services\ActivityLogger;
@@ -53,6 +54,8 @@ class TaskSectionController extends Controller
 
         ActivityLogger::logCreated($section, auth()->user());
 
+        broadcast(new TaskSectionUpdated($project->id, $section->toArray(), 'created', (int) auth()->id()))->toOthers();
+
         return response()->json($section, 201);
     }
 
@@ -81,6 +84,8 @@ class TaskSectionController extends Controller
 
         ActivityLogger::logChanges($section, $oldValues, auth()->user());
 
+        broadcast(new TaskSectionUpdated($project->id, $section->fresh()->toArray(), 'updated', (int) auth()->id()))->toOthers();
+
         return response()->json($section);
     }
 
@@ -103,7 +108,20 @@ class TaskSectionController extends Controller
 
         ActivityLogger::logDeleted($section, auth()->user());
 
+        $sectionId = $section->id;
+        $childIds = $section->children->pluck('id')->all();
+
         $section->delete();
+
+        // Children cascade with the parent, so the listener is told about them
+        // too — otherwise a sub-section would linger on everyone else's board
+        // until they reloaded.
+        broadcast(new TaskSectionUpdated(
+            $project->id,
+            ['id' => $sectionId, 'child_ids' => $childIds],
+            'deleted',
+            (int) auth()->id(),
+        ))->toOthers();
 
         return response()->json(['success' => true]);
     }
@@ -145,6 +163,16 @@ class TaskSectionController extends Controller
                 $section->save();
             }
         });
+
+        // The whole ordered list, not the moves: a reorder has no single subject
+        // and replaying drags on the receiving end would be guesswork.
+        broadcast(new TaskSectionUpdated(
+            $project->id,
+            [],
+            'reordered',
+            (int) auth()->id(),
+            $project->sections()->orderBy('position')->get()->toArray(),
+        ))->toOthers();
 
         return response()->json(['success' => true]);
     }

@@ -1955,6 +1955,36 @@ export default function Show() {
             }));
         });
 
+        channel.listen('.section.updated', (e) => {
+            switch (e.change_type) {
+                case 'created':
+                    setLocalSections((prev) =>
+                        prev.some((s) => s.id === e.section.id) ? prev : [...prev, e.section]
+                    );
+                    break;
+                case 'updated':
+                    setLocalSections((prev) =>
+                        prev.map((s) => (s.id === e.section.id ? { ...s, ...e.section } : s))
+                    );
+                    break;
+                case 'deleted': {
+                    // Sub-sections cascade with their parent, so both go.
+                    const gone = new Set([e.section.id, ...(e.section.child_ids || [])]);
+                    setLocalSections((prev) => prev.filter((s) => !gone.has(s.id)));
+                    // The server unassigns their tasks rather than deleting them;
+                    // without this they would vanish from the board instead of
+                    // falling back to the unsectioned group.
+                    setLocalTasks((prev) =>
+                        prev.map((t) => (gone.has(t.section_id) ? { ...t, section_id: null } : t))
+                    );
+                    break;
+                }
+                case 'reordered':
+                    if (Array.isArray(e.sections)) setLocalSections(e.sections);
+                    break;
+            }
+        });
+
         channel.listen('.automation.executed', (e) => {
             const id = `auto-${Date.now()}-${Math.random()}`;
             const actionLabels = (e.actions || []).map(a => a.replace(/_/g, ' ')).join(', ');
