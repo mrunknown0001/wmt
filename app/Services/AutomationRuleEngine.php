@@ -374,7 +374,17 @@ class AutomationRuleEngine
                     'send_notification' => self::actionSendNotification($task, $params),
                     'add_comment' => self::actionAddComment($task, $params),
                     'set_custom_field' => self::actionSetCustomField($task, $params),
-                    default => null,
+                    // An unrecognised type used to fall through to null, so a rule
+                    // with a misspelt or unsupported action reported itself as
+                    // having run while doing nothing at all — the hardest kind of
+                    // "the automation isn't working" to get to the bottom of.
+                    default => Log::warning('Automation action type not recognised', [
+                        'task_id' => $task->id,
+                        'rule' => $ruleName,
+                        'action' => $type,
+                        'supported' => ['change_status', 'change_priority', 'assign_user',
+                            'move_to_section', 'send_notification', 'add_comment', 'set_custom_field'],
+                    ]),
                 };
             } catch (ValidationException $e) {
                 // A project rule refused this action — typically "change status to
