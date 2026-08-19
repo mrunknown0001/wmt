@@ -57,6 +57,20 @@ function notificationMessage(data) {
             return <>{data.message || <>Update on <strong>{data.item_title}</strong></>}</>;
         case 'external_webhook':
             return <>{data.message || <>You have an item to review in <strong>{data.platform}</strong></>}</>;
+        case 'approval_item_shared':
+            return <><strong>{data.shared_by}</strong> shared the request <strong>{data.item_title}</strong>{data.series_number ? <> ({data.series_number})</> : null} with you{data.status ? <> — {data.status.replace(/_/g, ' ')}</> : null}</>;
+        case 'approval_due_soon':
+            return <>Approval <strong>{data.item_title}</strong> is {data.timing}{data.step_name ? <> at {data.step_name}</> : null}</>;
+        case 'approval_overdue':
+            return <>Approval <strong>{data.item_title}</strong> is <strong>{data.timing}</strong>{data.step_name ? <> at {data.step_name}</> : null}</>;
+        case 'note_shared':
+            return <><strong>{data.shared_by}</strong> shared the note <strong>{data.note_title}</strong> with you{data.role ? <> ({data.role})</> : null}</>;
+        case 'note_folder_shared':
+            return <><strong>{data.shared_by}</strong> shared the notes folder <strong>{data.folder_name}</strong> with you{data.note_count ? <> — {data.note_count} note{data.note_count === 1 ? '' : 's'}</> : null}</>;
+        case 'task_delegation_started':
+            return <>{data.message || <>You are covering <strong>{data.owner_name}</strong>{data.task_count ? <> — {data.task_count} task{data.task_count === 1 ? '' : 's'}</> : null}{data.period ? <> ({data.period})</> : null}</>}</>;
+        case 'task_delegation_returned':
+            return <>{data.message || <>Cover for <strong>{data.owner_name}</strong> has ended{data.task_count ? <> — {data.task_count} task{data.task_count === 1 ? '' : 's'} returned</> : null}</>}</>;
         default:
             return 'New notification';
     }
@@ -169,6 +183,41 @@ function notificationIcon(type) {
                 <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
                     <svg className="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+            );
+        case 'approval_item_shared':
+        case 'note_shared':
+        case 'note_folder_shared':
+            return (
+                <div className="h-8 w-8 rounded-full bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342a3 3 0 100-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684zm0-12a3 3 0 105.368-2.684A3 3 0 0015.316 7.658z" />
+                    </svg>
+                </div>
+            );
+        case 'approval_due_soon':
+            return (
+                <div className="h-8 w-8 rounded-full bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            );
+        case 'approval_overdue':
+            return (
+                <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                </div>
+            );
+        case 'task_delegation_started':
+        case 'task_delegation_returned':
+            return (
+                <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                 </div>
             );

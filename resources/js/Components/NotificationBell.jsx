@@ -47,6 +47,12 @@ function notificationMessage(data) {
             return <>{data.message || <>Update on <strong>{data.item_title}</strong></>}</>;
         case 'external_webhook':
             return <>{data.message || <>You have an item to review in <strong>{data.platform}</strong></>}</>;
+        case 'approval_item_shared':
+            return <><strong>{data.shared_by}</strong> shared the request <strong>{data.item_title}</strong> with you</>;
+        case 'task_delegation_started':
+            return <>{data.message || <>You are covering <strong>{data.owner_name}</strong>{data.task_count ? <> — {data.task_count} task{data.task_count === 1 ? '' : 's'}</> : null}</>}</>;
+        case 'task_delegation_returned':
+            return <>{data.message || <>Cover for <strong>{data.owner_name}</strong> has ended</>}</>;
         default:
             return 'New notification';
     }

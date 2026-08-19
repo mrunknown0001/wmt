@@ -20,6 +20,34 @@ function toastMessage(data) {
             return `${data.deleted_by} deleted a comment mentioning you in "${data.task_title}"`;
         case 'task_escalated':
             return `Task "${data.task_title}" escalated — ${data.escalation_label}`;
+        case 'approval_requested':
+            return `New approval request: "${data.item_title}"`;
+        case 'approval_approved':
+            return `Your request "${data.item_title}" was approved`;
+        case 'approval_rejected':
+            return `Your request "${data.item_title}" was rejected`;
+        case 'approval_changes_requested':
+            return `Changes requested on "${data.item_title}"`;
+        case 'approval_item_shared':
+            return `${data.shared_by} shared the request "${data.item_title}" with you`;
+        case 'approval_due_soon':
+            return `Approval "${data.item_title}" is ${data.timing}`;
+        case 'approval_overdue':
+            return `Approval "${data.item_title}" is ${data.timing}`;
+        case 'approval_automation':
+            return data.message || `Update on "${data.item_title}"`;
+        case 'automation_blocked':
+            return `Could not complete "${data.task_title}" — ${data.reason || 'it needs an attachment'}`;
+        case 'note_shared':
+            return `${data.shared_by} shared the note "${data.note_title}" with you`;
+        case 'note_folder_shared':
+            return `${data.shared_by} shared the notes folder "${data.folder_name}" with you`;
+        case 'task_delegation_started':
+            return data.message || `You are covering ${data.owner_name}`;
+        case 'task_delegation_returned':
+            return data.message || `Cover for ${data.owner_name} has ended`;
+        case 'external_webhook':
+            return data.message || `You have an item to review in ${data.platform}`;
         default:
             return 'New notification';
     }
