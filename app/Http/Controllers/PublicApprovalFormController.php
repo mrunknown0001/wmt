@@ -139,30 +139,23 @@ class PublicApprovalFormController extends Controller
                     ]);
                 }
 
-                // Email must belong to a registered, active user
+                // Email must belong to a registered, active user.
+                //
+                // Nothing here is logged. This runs on an unauthenticated public
+                // form, so every submission was writing a real person's address
+                // into laravel.log at INFO level — a plain-text record of who
+                // submits what, kept for as long as the logs are.
                 $user = \App\Models\User::where('email', $emailFieldValue)->first();
 
-                \Log::info('Email validation check', [
-                    'email' => $emailFieldValue,
-                    'user_found' => $user ? 'yes' : 'no',
-                    'is_active' => $user ? $user->is_active : 'N/A',
-                ]);
-
-                if (!$user) {
-                    \Log::warning('Email not found in database', ['email' => $emailFieldValue]);
+                if (!$user || !$user->is_active) {
+                    // One message for both cases on purpose. Saying "not
+                    // registered" and "inactive" separately let anyone on the
+                    // internet test an address against the staff list and learn
+                    // whether it exists and whether the account is live.
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        $emailFieldKey => 'This email is not registered in the system. Only registered users can submit this form.',
+                        $emailFieldKey => 'This email address cannot submit this form. Please contact an administrator.',
                     ]);
                 }
-
-                if (!$user->is_active) {
-                    \Log::warning('User is inactive', ['email' => $emailFieldValue, 'user_id' => $user->id]);
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        $emailFieldKey => 'This email account is inactive. Please contact an administrator.',
-                    ]);
-                }
-
-                \Log::info('Email validation passed', ['email' => $emailFieldValue, 'user_id' => $user->id]);
             }
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Public forms are submitted via fetch/AJAX. This app only renders JSON
