@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\TaskUpdated;
 use App\Models\Task;
 
 /**
@@ -60,9 +61,24 @@ class TaskCompletionService
 
         try {
             // A normal update, not saveQuietly: the model's own hooks stamp
-            // completed_at and broadcast the change, and the cascade to a
-            // grandparent depends on this coming back through the observer.
+            // completed_at, and the cascade to a grandparent depends on this
+            // coming back through the observer.
             $parent->update(['status' => 'done']);
+
+            // Broadcast explicitly. Nothing broadcasts from the model layer —
+            // every other task event is raised by the controller that caused it
+            // — so without this the parent closes only for whoever completed the
+            // last subtask, and everyone else sees it still open until they
+            // reload. Not ->toOthers(): nobody asked for this change directly,
+            // so the person who triggered it needs to see it too.
+            if ($parent->project_id) {
+                broadcast(new TaskUpdated(
+                    $parent->project_id,
+                    $parent->fresh()->toArray(),
+                    'updated',
+                    (int) (auth()->id() ?? $task->assigned_to ?? 0),
+                ));
+            }
         } finally {
             unset(self::$closing[$parent->id]);
         }

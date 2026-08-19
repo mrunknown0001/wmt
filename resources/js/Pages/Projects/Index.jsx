@@ -257,6 +257,13 @@ export default function Index() {
                                                 e.stopPropagation();
                                                 setDraggedProject(project);
                                                 e.dataTransfer.effectAllowed = 'move';
+                                                // Two drop targets read this drag in different ways.
+                                                // Reordering onto another row uses draggedProject
+                                                // above; FolderTree reads the id off the drag itself,
+                                                // so it has to be set here or a drop on a folder is
+                                                // silently ignored. Firefox also refuses to start a
+                                                // drag at all unless setData is called.
+                                                e.dataTransfer.setData('project-id', String(project.id));
                                             }}
                                             onDragEnd={() => setDraggedProject(null)}
                                             onDragOver={handleDragOver}
