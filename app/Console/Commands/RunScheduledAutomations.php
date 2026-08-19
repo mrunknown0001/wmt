@@ -53,10 +53,24 @@ class RunScheduledAutomations extends Command
 
         $dryRun = (bool) $this->option('dry-run');
 
-        $rules = ProjectAutomationRule::query()
+        $active = ProjectAutomationRule::query()
             ->where('is_active', true)
             ->where('trigger_type', 'scheduled')
-            ->get()
+            ->get();
+
+        // A scheduled rule with no hour can never match any run, so it sits
+        // enabled and silent forever. That is indistinguishable from a rule that
+        // simply has not come round yet, which is why it is said out loud.
+        foreach ($active->filter(fn ($r) => !isset($r->trigger_config['hour'])) as $rule) {
+            Log::warning('Scheduled automation rule has no time set — it can never fire', [
+                'rule_id' => $rule->id,
+                'rule' => $rule->name,
+                'project_id' => $rule->project_id,
+                'trigger_config' => $rule->trigger_config,
+            ]);
+        }
+
+        $rules = $active
             // Filtered in PHP rather than SQL: trigger_config is a JSON column and
             // this set is small enough that a portable comparison is worth more
             // than an index.

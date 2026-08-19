@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectAutomationRule;
 use App\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -89,5 +90,31 @@ class ScheduledAutomationMinuteTest extends TestCase
         $this->artisan('automation:run-scheduled --hour=9 --minute=60')
             ->expectsOutputToContain('Minute must be between 0 and 59.')
             ->assertFailed();
+    }
+
+    public function test_a_rule_with_no_time_set_is_reported_rather_than_silently_skipped(): void
+    {
+        // The shape the builder used to save when the pickers were left alone:
+        // the UI showed 09:00 but nothing was stored, so the rule matched no run
+        // and sat enabled and silent.
+        $this->rule([]);
+
+        Log::shouldReceive('warning')
+            ->once()
+            ->withArgs(fn (string $message, array $ctx = []) =>
+                str_contains($message, 'no time set'));
+
+        $this->artisan('automation:run-scheduled --hour=9 --minute=0 --dry-run')
+            ->assertSuccessful();
+    }
+
+    public function test_a_rule_with_a_time_is_not_reported(): void
+    {
+        $this->rule(['hour' => 9, 'minute' => 0]);
+
+        Log::shouldReceive('warning')->never();
+
+        $this->artisan('automation:run-scheduled --hour=9 --minute=0 --dry-run')
+            ->assertSuccessful();
     }
 }

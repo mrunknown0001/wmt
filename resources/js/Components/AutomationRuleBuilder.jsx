@@ -35,6 +35,16 @@ const MINUTES = Array.from({ length: 60 }, (_, m) => ({
 const scheduledAt = (cfg) =>
     `${String(cfg?.hour ?? 9).padStart(2, '0')}:${String(cfg?.minute ?? 0).padStart(2, '0')}`;
 
+// The time a new scheduled rule starts on. Stored the moment the trigger is
+// chosen rather than only shown by the pickers: a value that exists only as a
+// `?? 9` fallback in a `value` prop is never written to state, so saving without
+// touching the dropdowns stored no time at all and the rule could never fire.
+const DEFAULT_SCHEDULE = { hour: 9, minute: 0 };
+
+// What a trigger type needs in trigger_config before it can do anything.
+const defaultTriggerConfig = (triggerType) =>
+    triggerType === 'scheduled' ? { ...DEFAULT_SCHEDULE } : null;
+
 const CONDITION_FIELDS = [
     { value: 'status', label: 'Status' },
     { value: 'priority', label: 'Priority' },
@@ -543,7 +553,7 @@ function ActionRow({ action, index, onChange, onRemove, users, sections, customF
 const emptyRule = () => ({
     name: '',
     trigger_type: 'task_status_changed',
-    trigger_config: null,
+    trigger_config: defaultTriggerConfig('task_status_changed'),
     conditions: [],
     actions: [{ type: 'change_status', params: {} }],
 });
@@ -885,7 +895,12 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                         <div className={`grid gap-2 ${['custom_field_changed', 'form_submitted', 'scheduled'].includes(form.trigger_type) ? 'grid-cols-2' : ''}`}>
                             <select
                                 value={form.trigger_type}
-                                onChange={(e) => setForm(prev => ({ ...prev, trigger_type: e.target.value, trigger_config: null }))}
+                                onChange={(e) => setForm(prev => ({
+                                    ...prev,
+                                    trigger_type: e.target.value,
+                                    // Seeded, not nulled — see defaultTriggerConfig.
+                                    trigger_config: defaultTriggerConfig(e.target.value),
+                                }))}
                                 className={selectClass}
                             >
                                 {TRIGGER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -909,7 +924,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                 <div className="flex items-center gap-1.5">
                                     <select
                                         aria-label="Hour"
-                                        value={form.trigger_config?.hour ?? 9}
+                                        value={form.trigger_config?.hour ?? DEFAULT_SCHEDULE.hour}
                                         onChange={(e) => setForm(prev => ({
                                             ...prev,
                                             // Spread the existing config: replacing it
@@ -918,7 +933,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                             trigger_config: {
                                                 ...prev.trigger_config,
                                                 hour: Number(e.target.value),
-                                                minute: prev.trigger_config?.minute ?? 0,
+                                                minute: prev.trigger_config?.minute ?? DEFAULT_SCHEDULE.minute,
                                             },
                                         }))}
                                         className={selectClass}
@@ -928,12 +943,12 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                     <span className="text-gray-400 dark:text-gray-500">:</span>
                                     <select
                                         aria-label="Minute"
-                                        value={form.trigger_config?.minute ?? 0}
+                                        value={form.trigger_config?.minute ?? DEFAULT_SCHEDULE.minute}
                                         onChange={(e) => setForm(prev => ({
                                             ...prev,
                                             trigger_config: {
                                                 ...prev.trigger_config,
-                                                hour: prev.trigger_config?.hour ?? 9,
+                                                hour: prev.trigger_config?.hour ?? DEFAULT_SCHEDULE.hour,
                                                 minute: Number(e.target.value),
                                             },
                                         }))}
