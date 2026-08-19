@@ -2,8 +2,8 @@
 
 namespace App\Notifications;
 
-use App\Models\Setting;
 use App\Models\Task;
+use App\Notifications\Concerns\ChecksEmailPreference;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -11,6 +11,7 @@ use Illuminate\Notifications\Notification;
 
 class TaskOverdueNotification extends Notification implements ShouldQueue
 {
+    use ChecksEmailPreference;
     use Queueable;
 
     public function __construct(
@@ -19,11 +20,7 @@ class TaskOverdueNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = ['database', 'broadcast'];
-        if (Setting::current()->wantsEmail('task_overdue')) {
-            $channels[] = 'mail';
-        }
-        return $channels;
+        return $this->channelsFor($notifiable, 'task_overdue');
     }
 
     public function toMail(object $notifiable): MailMessage

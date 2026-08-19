@@ -361,7 +361,7 @@ class PublicFormController extends Controller
                     continue;
                 }
 
-                $path = $file->store('form-attachments', 'public');
+                $path = $file->store('form-attachments', TaskAttachment::DISK);
 
                 TaskAttachment::create([
                     'task_id' => $task->id,

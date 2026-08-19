@@ -6,8 +6,10 @@
 
 // Columns that exist but stay hidden until a user asks for them. Date Completed
 // is only interesting once tasks are closed, so it does not clutter an
-// in-progress project with a column of dashes.
-export const DEFAULT_HIDDEN_COLUMN_IDS = ['completed'];
+// in-progress project with a column of dashes. Completion % is derived from
+// status and subtasks rather than entered, so it is a reporting view most
+// projects will not want taking up width by default.
+export const DEFAULT_HIDDEN_COLUMN_IDS = ['completed', 'completion'];
 
 /**
  * The hidden-column set a project should open with.

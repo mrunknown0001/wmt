@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\CommentAttachment;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
@@ -51,7 +52,7 @@ class TaskController extends Controller
                     'file_type' => $a->file_type,
                     'file_size' => $a->file_size,
                     'url' => $a->url,
-                    'download_url' => url("/api/projects/{$project->id}/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
+                    'download_url' => $a->url,
                     'is_image' => $a->isImage(),
                     'is_video' => $a->isVideo(),
                 ]),
@@ -166,7 +167,7 @@ class TaskController extends Controller
 
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $path = $file->store("comment-attachments/{$comment->id}", 'public');
+                $path = $file->store("comment-attachments/{$comment->id}", CommentAttachment::DISK);
                 $comment->attachments()->create([
                     'file_name' => $file->getClientOriginalName(),
                     'file_path' => $path,
@@ -190,7 +191,7 @@ class TaskController extends Controller
                 'file_name' => $a->file_name,
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
-                'url' => asset('storage/'.$a->file_path),
+                'url' => $a->url,
                 'is_image' => str_starts_with($a->file_type, 'image/'),
                 'is_video' => str_starts_with($a->file_type, 'video/'),
             ])->toArray(),
@@ -208,7 +209,7 @@ class TaskController extends Controller
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
                 'url' => $a->url,
-                'download_url' => url("/api/projects/{$project->id}/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
+                'download_url' => $a->url,
                 'is_image' => $a->isImage(),
                 'is_video' => $a->isVideo(),
             ]),

@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\ExecutiveDashboardController;
 use App\Http\Controllers\Api\MyTaskController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\NotificationPreferenceController;
 use App\Http\Controllers\Api\PersonalTodoController;
 use App\Http\Controllers\TaskTimeLogController;
 use App\Http\Controllers\Api\ProjectController;
@@ -96,6 +97,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/notifications/{id}/bookmark', [NotificationController::class, 'toggleBookmark']);
     Route::patch('/notifications/{id}/archive', [NotificationController::class, 'archive']);
     Route::patch('/notifications/{id}/unarchive', [NotificationController::class, 'unarchive']);
+
+    // The signed-in person's own email preferences. No user id in the path —
+    // these always resolve to the authenticated user.
+    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'show']);
+    Route::post('/notification-preferences', [NotificationPreferenceController::class, 'update']);
 
     // Personal to-dos
     // Time tracking. The timer routes come before /time-logs/{timeLog} so

@@ -21,9 +21,9 @@ class TaskCommentController extends Controller
         }
 
         foreach ($comment->attachments as $attachment) {
-            Storage::disk('public')->delete($attachment->file_path);
+            Storage::disk(CommentAttachment::DISK)->delete($attachment->file_path);
         }
-        Storage::disk('public')->deleteDirectory("comment-attachments/{$comment->id}");
+        Storage::disk(CommentAttachment::DISK)->deleteDirectory("comment-attachments/{$comment->id}");
 
         $comment->delete();
 
@@ -36,6 +36,8 @@ class TaskCommentController extends Controller
             abort(404);
         }
 
-        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
+        $this->authorize('view', $task);
+
+        return $attachment->toDownloadResponse();
     }
 }

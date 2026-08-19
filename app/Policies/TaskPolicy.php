@@ -12,9 +12,32 @@ class TaskPolicy
         return $user->hasPermissionTo('view-tasks');
     }
 
+    /**
+     * Whether this person may read a specific task — and, through it, the files
+     * attached to it. Distinct from viewAny(), which only asks whether task
+     * lists are available to them at all.
+     *
+     * The old body here returned hasPermissionTo('view-tasks'), which every role
+     * holds, so it granted every task to everyone. Nothing called it, so this
+     * tightening changes no existing behaviour; AttachmentController is the
+     * first caller.
+     */
     public function view(User $user, Task $task): bool
     {
-        return $user->hasPermissionTo('view-tasks');
+        if ($user->hasPermissionTo('manage-tasks')) {
+            return true;
+        }
+
+        if ($task->isStandalone()) {
+            return $task->created_by === $user->id
+                || $task->assigned_to === $user->id
+                || $task->collaborators()->where('users.id', $user->id)->exists();
+        }
+
+        // Reading a task inside a project is the same question as reading the
+        // project, so defer rather than restating those rules (owner, member,
+        // overseeing head/leader, executive, assignee) and risk drift.
+        return $user->can('view', $task->project);
     }
 
     public function create(User $user): bool

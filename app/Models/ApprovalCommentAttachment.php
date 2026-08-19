@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasAttachmentFile;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class ApprovalCommentAttachment extends Model
 {
-    use HasFactory;
+    use HasAttachmentFile, HasFactory;
 
     protected $fillable = [
         'approval_item_comment_id',
@@ -26,8 +26,12 @@ class ApprovalCommentAttachment extends Model
 
     public function getUrlAttribute(): string
     {
-        return Storage::disk('public')->url($this->file_path);
+        return route('attachments.approval-comment', $this);
     }
+
+    // These three deliberately override the trait's prefix matching with a
+    // narrower allowlist, so only types the UI can actually render inline are
+    // treated as previewable.
 
     public function isImage(): bool
     {

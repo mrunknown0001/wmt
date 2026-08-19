@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\ApprovalCommentAttachment;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreApprovalItemCommentRequest;
 use App\Http\Requests\UpdateApprovalItemCommentRequest;
@@ -51,7 +52,7 @@ class ApprovalItemCommentController extends Controller
                 }
                 $comment->attachments()->create([
                     'file_name' => $file->getClientOriginalName(),
-                    'file_path' => $file->store("comment-attachments/{$comment->id}", 'public'),
+                    'file_path' => $file->store("comment-attachments/{$comment->id}", ApprovalCommentAttachment::DISK),
                     'file_type' => $file->getMimeType(),
                     'file_size' => $file->getSize(),
                 ]);

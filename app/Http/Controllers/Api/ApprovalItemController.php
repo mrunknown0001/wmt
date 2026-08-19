@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\ApprovalItemAttachment;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreApprovalItemRequest;
 use App\Http\Requests\UpdateApprovalItemRequest;
@@ -92,7 +93,7 @@ class ApprovalItemController extends Controller
                 if (!$file || !$file->isValid()) {
                     continue;
                 }
-                $path = $file->store("approval-items/{$item->id}", 'public');
+                $path = $file->store("approval-items/{$item->id}", ApprovalItemAttachment::DISK);
                 $item->attachments()->create([
                     'file_name' => $file->getClientOriginalName(),
                     'file_path' => $path,
@@ -115,14 +116,14 @@ class ApprovalItemController extends Controller
         return response()->json([
             'item' => $this->itemPayload($item),
             'canDecide' => $request->user()->can('decide', $item),
-            'canEdit' => $request->user()->can('update', $item),
+            'canEdit' => $request->user()->can('updateContent', $item),
             'sections' => $approvalProject->sections()->get(['id', 'name', 'color']),
         ]);
     }
 
     public function update(UpdateApprovalItemRequest $request, ApprovalProject $approvalProject, ApprovalItem $item): JsonResponse
     {
-        $this->authorize('update', $item);
+        $this->authorize('updateContent', $item);
         abort_if($item->approval_project_id !== $approvalProject->id, 404);
 
         $item->update($request->only(['title', 'description']));

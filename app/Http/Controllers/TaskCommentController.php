@@ -54,7 +54,7 @@ class TaskCommentController extends Controller
 
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $path = $file->store("comment-attachments/{$comment->id}", 'public');
+                $path = $file->store("comment-attachments/{$comment->id}", CommentAttachment::DISK);
 
                 $comment->attachments()->create([
                     'file_name' => $file->getClientOriginalName(),
@@ -79,8 +79,8 @@ class TaskCommentController extends Controller
                 'file_name' => $a->file_name,
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
-                'url' => asset('storage/'.$a->file_path),
-                'download_url' => url("/projects/{$project->id}/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
+                'url' => $a->url,
+                'download_url' => $a->url,
                 'is_image' => str_starts_with($a->file_type, 'image/'),
                 'is_video' => str_starts_with($a->file_type, 'video/'),
             ])->toArray(),
@@ -153,7 +153,9 @@ class TaskCommentController extends Controller
             abort(404);
         }
 
-        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
+        $this->authorize('view', $task);
+
+        return $attachment->toDownloadResponse();
     }
 
     public function update(Request $request, Project $project, Task $task, TaskComment $comment): RedirectResponse
@@ -197,9 +199,9 @@ class TaskCommentController extends Controller
 
         // Delete attached files from disk
         foreach ($comment->attachments as $attachment) {
-            Storage::disk('public')->delete($attachment->file_path);
+            Storage::disk(CommentAttachment::DISK)->delete($attachment->file_path);
         }
-        Storage::disk('public')->deleteDirectory("comment-attachments/{$comment->id}");
+        Storage::disk(CommentAttachment::DISK)->deleteDirectory("comment-attachments/{$comment->id}");
 
         $commentId = $comment->id;
         $comment->delete();
@@ -218,7 +220,7 @@ class TaskCommentController extends Controller
 
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $path = $file->store("comment-attachments/{$comment->id}", 'public');
+                $path = $file->store("comment-attachments/{$comment->id}", CommentAttachment::DISK);
 
                 $comment->attachments()->create([
                     'file_name' => $file->getClientOriginalName(),
@@ -243,8 +245,8 @@ class TaskCommentController extends Controller
                 'file_name' => $a->file_name,
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
-                'url' => asset('storage/'.$a->file_path),
-                'download_url' => url("/tasks/{$task->id}/comments/{$comment->id}/attachments/{$a->id}/download"),
+                'url' => $a->url,
+                'download_url' => $a->url,
                 'is_image' => str_starts_with($a->file_type, 'image/'),
                 'is_video' => str_starts_with($a->file_type, 'video/'),
             ])->toArray(),
@@ -260,7 +262,9 @@ class TaskCommentController extends Controller
             abort(404);
         }
 
-        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
+        $this->authorize('view', $task);
+
+        return $attachment->toDownloadResponse();
     }
 
     public function updateStandalone(Request $request, Task $task, TaskComment $comment): RedirectResponse
@@ -303,9 +307,9 @@ class TaskCommentController extends Controller
         $this->notifyMentionedUsersOfDeletion($comment, $task, $request->user());
 
         foreach ($comment->attachments as $attachment) {
-            Storage::disk('public')->delete($attachment->file_path);
+            Storage::disk(CommentAttachment::DISK)->delete($attachment->file_path);
         }
-        Storage::disk('public')->deleteDirectory("comment-attachments/{$comment->id}");
+        Storage::disk(CommentAttachment::DISK)->deleteDirectory("comment-attachments/{$comment->id}");
 
         $commentId = $comment->id;
         $comment->delete();

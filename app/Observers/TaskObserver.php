@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Task;
+use App\Services\TaskCompletionService;
 use App\Services\TaskDelegationService;
 
 class TaskObserver
@@ -17,6 +18,11 @@ class TaskObserver
     public function saved(Task $task): void
     {
         TaskDelegationService::capture($task);
+
+        // A parent whose subtasks have all finished is finished too. Runs after
+        // the delegation capture so a task that changes hands and completes in
+        // the same save is handed over before the parent is closed.
+        TaskCompletionService::syncParent($task);
     }
 
     public function deleted(Task $task): void

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ApprovalItemAttachment;
 use App\Models\ApprovalProject;
 use App\Models\ApprovalItem;
 use App\Models\User;
@@ -209,7 +210,7 @@ class ApprovalItemController extends Controller
                 if (!$file || !$file->isValid()) {
                     continue;
                 }
-                $path = $file->store("approval-items/{$item->id}", 'public');
+                $path = $file->store("approval-items/{$item->id}", ApprovalItemAttachment::DISK);
                 $item->attachments()->create([
                     'file_name' => $file->getClientOriginalName(),
                     'file_path' => $path,
@@ -268,7 +269,11 @@ class ApprovalItemController extends Controller
             'project' => $approvalProject->load('customFields.options', 'sections'),
             'item' => $item,
             'canDecide' => auth()->user()->can('decide', $item),
-            'canEdit' => auth()->user()->can('update', $item),
+            // Editing what the request *says* stops once an approver has signed;
+            // filing it into a section does not. Two separate flags because the
+            // page offers both and they diverge for most of a request's life.
+            'canEdit' => auth()->user()->can('updateContent', $item),
+            'canOrganize' => auth()->user()->can('update', $item),
             // Requester-only, and only while the request is awaiting their changes.
             'canResubmit' => auth()->user()->can('resubmit', $item),
         ]);
@@ -276,7 +281,7 @@ class ApprovalItemController extends Controller
 
     public function edit(ApprovalProject $approvalProject, ApprovalItem $item)
     {
-        $this->authorize('update', $item);
+        $this->authorize('updateContent', $item);
         abort_if($item->approval_project_id !== $approvalProject->id, 404);
 
         return Inertia::render('ApprovalItems/Edit', [
@@ -287,7 +292,7 @@ class ApprovalItemController extends Controller
 
     public function update(UpdateApprovalItemRequest $request, ApprovalProject $approvalProject, ApprovalItem $item)
     {
-        $this->authorize('update', $item);
+        $this->authorize('updateContent', $item);
         abort_if($item->approval_project_id !== $approvalProject->id, 404);
 
         $item->update([

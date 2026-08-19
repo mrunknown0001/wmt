@@ -2,8 +2,8 @@
 
 namespace App\Notifications;
 
-use App\Models\Setting;
 use App\Models\Task;
+use App\Notifications\Concerns\ChecksEmailPreference;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
@@ -12,6 +12,7 @@ use Illuminate\Notifications\Notification;
 
 class TaskDueReminderNotification extends Notification implements ShouldQueue
 {
+    use ChecksEmailPreference;
     use Queueable;
 
     public function __construct(
@@ -21,11 +22,7 @@ class TaskDueReminderNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = ['database', 'broadcast'];
-        if (Setting::current()->wantsEmail('task_due_reminder')) {
-            $channels[] = 'mail';
-        }
-        return $channels;
+        return $this->channelsFor($notifiable, 'task_due_reminder');
     }
 
     public function toMail(object $notifiable): MailMessage

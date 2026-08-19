@@ -9,7 +9,6 @@ use App\Models\ApprovalCommentAttachment;
 use App\Http\Requests\StoreApprovalItemCommentRequest;
 use App\Http\Requests\UpdateApprovalItemCommentRequest;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Response;
 
 class ApprovalItemCommentController extends Controller
 {
@@ -26,7 +25,7 @@ class ApprovalItemCommentController extends Controller
         // Handle file attachments
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $filePath = $file->store("comment-attachments/{$comment->id}", 'public');
+                $filePath = $file->store("comment-attachments/{$comment->id}", ApprovalCommentAttachment::DISK);
 
                 $comment->attachments()->create([
                     'file_name' => $file->getClientOriginalName(),
@@ -63,8 +62,8 @@ class ApprovalItemCommentController extends Controller
 
         // Delete attachments from disk
         foreach ($comment->attachments as $attachment) {
-            if (Storage::disk('public')->exists($attachment->file_path)) {
-                Storage::disk('public')->delete($attachment->file_path);
+            if (Storage::disk(ApprovalCommentAttachment::DISK)->exists($attachment->file_path)) {
+                Storage::disk(ApprovalCommentAttachment::DISK)->delete($attachment->file_path);
             }
         }
 
@@ -80,7 +79,6 @@ class ApprovalItemCommentController extends Controller
         abort_if($comment->approval_item_id !== $item->id, 404);
         abort_if($attachment->approval_item_comment_id !== $comment->id, 404);
 
-        $path = Storage::disk('public')->path($attachment->file_path);
-        return Response::download($path, $attachment->file_name);
+        return $attachment->toDownloadResponse();
     }
 }

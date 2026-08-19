@@ -26,24 +26,25 @@ class ApprovalWorkflowEngine
         self::$executing = true;
 
         try {
-            // Resolve which chain to use based on selector_conditions
-            $chainVersion = self::resolveChainForItem($item);
-            if (!$chainVersion) {
-                $item->update(['status' => 'rejected']);
-                return;
-            }
+            self::withLockedItem($item, function () use ($item) {
+                // Resolve which chain to use based on selector_conditions
+                $chainVersion = self::resolveChainForItem($item);
+                if (!$chainVersion) {
+                    $item->update(['status' => 'rejected']);
+                    return;
+                }
 
-            $item->update([
-                'approval_chain_version_id' => $chainVersion->id,
-                'submitted_at' => now(),
-            ]);
+                $item->update([
+                    'approval_chain_version_id' => $chainVersion->id,
+                    'submitted_at' => now(),
+                ]);
 
-            // Activate the first step
-            self::materializeAndActivateStep($item, 1, 1);
+                // Activate the first step
+                self::materializeAndActivateStep($item, 1, 1);
 
-            // Fire automation on submission
-            ApprovalAutomationRuleEngine::evaluate($item, 'item_submitted');
-
+                // Fire automation on submission
+                ApprovalAutomationRuleEngine::evaluate($item, 'item_submitted');
+            });
         } finally {
             self::$executing = false;
         }
@@ -58,44 +59,53 @@ class ApprovalWorkflowEngine
         self::$executing = true;
 
         try {
-            $currentInstance = $item->stepInstances()
-                ->where('status', 'active')
-                ->first();
+            return self::withLockedItem($item, function () use ($item, $action, $actor, $comment) {
+                $currentInstance = $item->stepInstances()
+                    ->where('status', 'active')
+                    ->first();
 
-            if (!$currentInstance) {
-                abort(409, 'No active approval step found.');
-            }
+                if (!$currentInstance) {
+                    abort(409, 'No active approval step found.');
+                }
 
-            // Authorize: actor must be an eligible approver
-            if (!$currentInstance->approvers()->where('user_id', $actor->id)->exists()) {
-                abort(403, 'You are not authorized to approve this step.');
-            }
+                // Authorize: actor must be an eligible approver
+                if (!$currentInstance->approvers()->where('user_id', $actor->id)->exists()) {
+                    abort(403, 'You are not authorized to approve this step.');
+                }
 
-            // Record decision
-            $decision = $currentInstance->decisions()->create([
-                'decided_by' => $actor->id,
-                'decision' => $action,
-                'comment' => $comment,
-                'decided_at' => now(),
-            ]);
+                // One decision per approver per attempt. The unique index on
+                // (instance, decided_by) enforces this as well, but holding the
+                // item lock lets a double-submitted form get a clean 409 instead
+                // of surfacing as a constraint violation.
+                if ($currentInstance->decisions()->where('decided_by', $actor->id)->exists()) {
+                    abort(409, 'You have already recorded a decision on this step.');
+                }
 
-            // Evaluate step outcome
-            $outcome = self::evaluateStepOutcome($currentInstance);
+                // Record decision
+                $decision = $currentInstance->decisions()->create([
+                    'decided_by' => $actor->id,
+                    'decision' => $action,
+                    'comment' => $comment,
+                    'decided_at' => now(),
+                ]);
 
-            // Fire automation on step decision
-            ApprovalAutomationRuleEngine::evaluate($item, 'approval_step_decided');
+                // Evaluate step outcome
+                $outcome = self::evaluateStepOutcome($currentInstance);
 
-            if ($outcome === 'approved') {
-                self::progressToNextStep($item, $currentInstance);
-                // Fire automation on next step activation
-                ApprovalAutomationRuleEngine::evaluate($item, 'approval_requested');
-            } elseif ($outcome === 'rejected') {
-                self::applyRejectionBehavior($item, $currentInstance);
-            }
-            // else: still waiting on more approvers, do nothing
+                // Fire automation on step decision
+                ApprovalAutomationRuleEngine::evaluate($item, 'approval_step_decided');
 
-            return $decision;
+                if ($outcome === 'approved') {
+                    self::progressToNextStep($item, $currentInstance);
+                    // Fire automation on next step activation
+                    ApprovalAutomationRuleEngine::evaluate($item, 'approval_requested');
+                } elseif ($outcome === 'rejected') {
+                    self::applyRejectionBehavior($item, $currentInstance);
+                }
+                // else: still waiting on more approvers, do nothing
 
+                return $decision;
+            });
         } finally {
             self::$executing = false;
         }
@@ -110,19 +120,20 @@ class ApprovalWorkflowEngine
         self::$executing = true;
 
         try {
-            $item->update([
-                'status' => 'cancelled',
-                'decided_at' => now(),
-            ]);
+            self::withLockedItem($item, function () use ($item) {
+                $item->update([
+                    'status' => 'cancelled',
+                    'decided_at' => now(),
+                ]);
 
-            // Close any active instances
-            $item->stepInstances()
-                ->where('status', 'active')
-                ->update(['status' => 'cancelled', 'completed_at' => now()]);
+                // Close any active instances
+                $item->stepInstances()
+                    ->where('status', 'active')
+                    ->update(['status' => 'cancelled', 'completed_at' => now()]);
 
-            // Fire automation on cancellation
-            ApprovalAutomationRuleEngine::evaluate($item, 'approval_cancelled');
-
+                // Fire automation on cancellation
+                ApprovalAutomationRuleEngine::evaluate($item, 'approval_cancelled');
+            });
         } finally {
             self::$executing = false;
         }
@@ -137,26 +148,55 @@ class ApprovalWorkflowEngine
         self::$executing = true;
 
         try {
-            // A requester can revive a request that was sent back for changes or
-            // outright rejected.
-            if (!in_array($item->status, ['changes_requested', 'rejected'], true)) {
-                abort(409, 'Only a rejected or changes-requested item can be resubmitted.');
-            }
+            self::withLockedItem($item, function () use ($item) {
+                // A requester can revive a request that was sent back for changes or
+                // outright rejected. Checked under the lock, so two resubmits fired
+                // at once can't both open a fresh attempt.
+                if (!in_array($item->status, ['changes_requested', 'rejected'], true)) {
+                    abort(409, 'Only a rejected or changes-requested item can be resubmitted.');
+                }
 
-            // decided_at is set when a request is finalised as rejected; clear it so
-            // the revived request isn't reported as already decided.
-            $item->update(['status' => 'pending', 'decided_at' => null]);
+                // decided_at is set when a request is finalised as rejected; clear it so
+                // the revived request isn't reported as already decided.
+                $item->update(['status' => 'pending', 'decided_at' => null]);
 
-            // Re-enter at step 1 with new attempt number
-            $maxAttempt = $item->stepInstances()
-                ->where('step_number', 1)
-                ->max('attempt_number') ?? 0;
+                // Re-enter at step 1 with new attempt number
+                $maxAttempt = $item->stepInstances()
+                    ->where('step_number', 1)
+                    ->max('attempt_number') ?? 0;
 
-            self::materializeAndActivateStep($item, 1, $maxAttempt + 1);
-
+                self::materializeAndActivateStep($item, 1, $maxAttempt + 1);
+            });
         } finally {
             self::$executing = false;
         }
+    }
+
+    /**
+     * Run a workflow mutation atomically with the request's own row locked.
+     *
+     * The lock is taken on approval_items rather than on a step instance because
+     * progressing a chain *creates* instances: two approvers deciding at the same
+     * moment would otherwise lock different rows, both see the quorum met, and
+     * both activate the next step. The item is the one row every path touches.
+     *
+     * The locking read runs first so it, not a later plain SELECT, establishes
+     * what this transaction sees — everything below reads state committed by
+     * whichever request held the lock before us.
+     *
+     * withTrashed() because ApprovalItem soft-deletes: the default scope would
+     * match no row for a trashed request and quietly take no lock at all, which
+     * is exactly the case (cancelling, finalising) we still need serialized.
+     */
+    private static function withLockedItem(ApprovalItem $item, callable $callback)
+    {
+        return DB::transaction(function () use ($item, $callback) {
+            ApprovalItem::withTrashed()->whereKey($item->getKey())->lockForUpdate()->first();
+
+            $item->refresh();
+
+            return $callback();
+        });
     }
 
     private static function resolveChainForItem(ApprovalItem $item): ?ApprovalChainVersion
@@ -382,7 +422,7 @@ class ApprovalWorkflowEngine
         // that an item is now awaiting their decision.
         foreach ($approvers as $approver) {
             $instance->approvers()->create(['user_id' => $approver->id]);
-            $approver->notify(new \App\Notifications\ApprovalRequestedNotification($item, $step));
+            self::notifyAfterCommit($approver, new \App\Notifications\ApprovalRequestedNotification($item, $step));
         }
 
         // Anyone away has their stand-in added, and told, so the step does not
@@ -397,7 +437,8 @@ class ApprovalWorkflowEngine
                 'delegated_from_user_id' => $delegation->user_id,
             ]);
 
-            $delegation->delegate?->notify(
+            self::notifyAfterCommit(
+                $delegation->delegate,
                 new \App\Notifications\ApprovalRequestedNotification($item, $step)
             );
         }
@@ -486,9 +527,7 @@ class ApprovalWorkflowEngine
     }
 
     /**
-     * Notify the requester that their item reached a terminal state. Failures are
-     * swallowed: a dead mail/queue connection must not roll back a decision that
-     * has already been recorded.
+     * Notify the requester that their item reached a terminal state.
      */
     private static function notifyRequester(ApprovalItem $item, string $outcome): void
     {
@@ -496,17 +535,38 @@ class ApprovalWorkflowEngine
             return;
         }
 
-        $requester = $item->requester;
+        // $item->requester is null for e.g. an item raised through a public form
+        // with no account behind it; notifyAfterCommit tolerates that.
+        self::notifyAfterCommit(
+            $item->requester,
+            new \App\Notifications\ApprovalDecisionNotification($item, $outcome)
+        );
+    }
 
-        if (!$requester) {
-            return; // e.g. an item raised through a public form with no account behind it
+    /**
+     * Queue a notification to go out once the surrounding transaction commits.
+     *
+     * Workflow mutations run inside a transaction that may roll back, and mail
+     * cannot be unsent — so nothing is dispatched until the decision it announces
+     * is durable. With no transaction open the callback fires immediately, which
+     * keeps any future non-transactional caller working unchanged.
+     *
+     * Failures are swallowed: a dead mail/queue connection must not take down a
+     * decision that has already been committed.
+     */
+    private static function notifyAfterCommit(?User $user, $notification): void
+    {
+        if (!$user) {
+            return;
         }
 
-        try {
-            $requester->notify(new \App\Notifications\ApprovalDecisionNotification($item, $outcome));
-        } catch (\Throwable $e) {
-            report($e);
-        }
+        DB::afterCommit(function () use ($user, $notification) {
+            try {
+                $user->notify($notification);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
     }
 
     private static function evaluateStepOutcome(ApprovalStepInstance $instance): ?string

@@ -52,6 +52,7 @@ import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import { orderSections, moveSection } from '../../sectionTree';
 import { initialHiddenColumns, DEFAULT_HIDDEN_COLUMN_IDS } from '../../columnPrefs';
+import { taskCompletionPercent } from '../../taskCompletion';
 import { request } from '../../apiClient';
 import InlinePopover from '../../Components/InlinePopover';
 
@@ -470,6 +471,25 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                             : <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </td>
                 );
+            case 'completion': {
+                // Derived, never entered: subtasks if there are any, otherwise
+                // the task's own status. The bar makes a column of numbers
+                // scannable without reading each one.
+                const pct = taskCompletionPercent(task);
+                return (
+                    <td key="completion" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
+                        <div className="flex items-center gap-2" title={`${pct}% complete`}>
+                            <div className="flex-1 min-w-[2.5rem] h-1.5 rounded-full bg-gray-200 dark:bg-gray-700">
+                                <div
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${pct === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                                    style={{ width: `${pct}%` }}
+                                />
+                            </div>
+                            <span className="tabular-nums text-xs text-gray-600 dark:text-gray-300 w-9 text-right">{pct}%</span>
+                        </div>
+                    </td>
+                );
+            }
             default:
                 if (colId.startsWith('cf-')) {
                     const cfId = Number(colId.replace('cf-', ''));
@@ -561,7 +581,7 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Default reorderable column IDs (excluding sticky checkbox, title, actions)
-const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'estimate', 'logged'];
+const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'completion', 'estimate', 'logged'];
 
 // Resize handle for column headers
 function ColumnResizeHandle({ onResize }) {
@@ -931,6 +951,25 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             : <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </td>
                 );
+            case 'completion': {
+                // Derived, never entered: subtasks if there are any, otherwise
+                // the task's own status. The bar makes a column of numbers
+                // scannable without reading each one.
+                const pct = taskCompletionPercent(task);
+                return (
+                    <td key="completion" className="px-6 py-4 text-sm overflow-hidden" style={cStyle}>
+                        <div className="flex items-center gap-2" title={`${pct}% complete`}>
+                            <div className="flex-1 min-w-[2.5rem] h-1.5 rounded-full bg-gray-200 dark:bg-gray-700">
+                                <div
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${pct === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                                    style={{ width: `${pct}%` }}
+                                />
+                            </div>
+                            <span className="tabular-nums text-xs text-gray-600 dark:text-gray-300 w-9 text-right">{pct}%</span>
+                        </div>
+                    </td>
+                );
+            }
             default:
                 if (colId.startsWith('cf-')) {
                     const cfId = Number(colId.replace('cf-', ''));
@@ -1726,6 +1765,7 @@ export default function Show() {
             case 'assignee': return 'Assignee';
             case 'dates': return 'Due date';
             case 'completed': return 'Date Completed';
+            case 'completion': return 'Completion %';
             default:
                 if (colId.startsWith('cf-')) {
                     const cfId = Number(colId.replace('cf-', ''));
@@ -1756,6 +1796,7 @@ export default function Show() {
             // ISO timestamps sort lexically; unfinished tasks have none and
             // sort last, as every other column here treats "missing".
             case 'completed': return task.completed_at || '\uffff';
+            case 'completion': return taskCompletionPercent(task);
             default:
                 if (key.startsWith('cf-')) {
                     const cfId = Number(key.replace('cf-', ''));

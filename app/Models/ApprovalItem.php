@@ -125,4 +125,50 @@ class ApprovalItem extends Model
     {
         return $this->hasMany(ApprovalItemAttachment::class);
     }
+
+    /** Whether any approver has recorded a decision against this request yet. */
+    public function hasAnyDecision(): bool
+    {
+        return $this->stepInstances()->whereHas('decisions')->exists();
+    }
+
+    /**
+     * Whether this request's content — its title, description and custom field
+     * values — is sealed against further editing.
+     *
+     * An approval is a signature against a specific version of a request. Once
+     * an approver has signed, letting the content change underneath them would
+     * leave their name on something they never saw, which is the one thing an
+     * approval trail exists to prevent.
+     *
+     * Note the seal covers *content* only. Filing a request into a section,
+     * archiving it, commenting on it and cancelling it all stay available, and
+     * automation rules may still write custom fields — those fire on decision
+     * and completion triggers by design, and are themselves recorded.
+     */
+    public function isContentFrozen(): bool
+    {
+        // Back with the requester for changes, or rejected outright. Revising
+        // and resubmitting is the entire purpose of both states, so the earlier
+        // decisions that produced them do not seal the request.
+        if (in_array($this->status, ['changes_requested', 'rejected'], true)) {
+            return false;
+        }
+
+        // Settled. Nothing about an approved or cancelled request should move
+        // again, whether or not a decision was ever recorded (a chain whose
+        // steps were all skipped can reach 'approved' with none).
+        if (in_array($this->status, ['approved', 'cancelled'], true)) {
+            return true;
+        }
+
+        // In flight: sealed from the moment the first approver signs.
+        //
+        // A resubmitted request is therefore sealed as soon as it goes back out,
+        // since the decisions from its previous round still stand. That is
+        // deliberate — it had its editing window while it sat with the
+        // requester, and approvers looking at it again should not have it change
+        // under them either.
+        return $this->hasAnyDecision();
+    }
 }

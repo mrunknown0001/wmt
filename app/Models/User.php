@@ -29,13 +29,20 @@ class User extends Authenticatable
         'showTeamWorkload' => true,
     ];
 
-    public const NOTIFICATION_DEFAULTS = [
-        'task_assigned'  => true,
-        'task_comments'  => true,
-        'mentions'       => true,
-        'due_reminders'  => true,
-        'task_escalated' => true,
-    ];
+    /**
+     * Per-user email notification preferences.
+     *
+     * Deliberately the same key set as Setting::NOTIFICATION_CHANNEL_DEFAULTS
+     * rather than a list of its own: the two are the same question asked at two
+     * levels — the administrator decides which emails the system may send at
+     * all, and each person decides which of those they personally want. Deriving
+     * it means a type added to one cannot go missing from the other.
+     *
+     * This replaced an earlier five-key set (task_assigned, task_comments,
+     * mentions, due_reminders, task_escalated) that nothing ever read or wrote;
+     * getNotificationPreferences() filters those stale keys out of stored data.
+     */
+    public const NOTIFICATION_DEFAULTS = Setting::NOTIFICATION_CHANNEL_DEFAULTS;
 
     protected $fillable = [
         'name',
@@ -82,9 +89,39 @@ class User extends Authenticatable
         return array_merge(self::DASHBOARD_DEFAULTS, $this->dashboard_preferences ?? []);
     }
 
+    /**
+     * This person's preferences, with anything they have not expressed an
+     * opinion on falling back to the default.
+     *
+     * Stored values are intersected with the known keys first, so preferences
+     * written under the previous schema — or a type since retired — cannot leak
+     * into the API response as phantom settings.
+     */
     public function getNotificationPreferences(): array
     {
-        return array_merge(self::NOTIFICATION_DEFAULTS, $this->notification_preferences ?? []);
+        return array_merge(
+            self::NOTIFICATION_DEFAULTS,
+            array_intersect_key($this->notification_preferences ?? [], self::NOTIFICATION_DEFAULTS)
+        );
+    }
+
+    /**
+     * Whether this person wants the email for a given notification type.
+     * Mirrors Setting::wantsEmail(), which asks the same of the whole system.
+     *
+     * NOT YET CONSULTED WHEN SENDING. The via() methods on the eight task
+     * notifications currently gate on the global Setting alone, so a preference
+     * stored through the API is recorded but does not suppress anything. Wiring
+     * it is a one-line change per notification:
+     *
+     *     if (Setting::current()->wantsEmail('task_assigned')
+     *         && $notifiable->wantsEmail('task_assigned')) {
+     *
+     * Treat a preference as advisory until that is done.
+     */
+    public function wantsEmail(string $type): bool
+    {
+        return $this->getNotificationPreferences()["email_{$type}"] ?? false;
     }
 
     public function department(): BelongsTo

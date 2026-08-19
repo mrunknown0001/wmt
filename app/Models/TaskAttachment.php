@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Events\TaskMetaUpdated;
+use App\Models\Concerns\HasAttachmentFile;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TaskAttachment extends Model
 {
+    use HasAttachmentFile;
+
     protected $fillable = [
         'task_id',
         'file_name',
@@ -40,27 +43,14 @@ class TaskAttachment extends Model
         return $this->belongsTo(Task::class);
     }
 
+    /**
+     * Points at the authorizing download route, not at the file. The route is
+     * flat (keyed on the attachment alone) so rendering a list of attachments
+     * doesn't have to load each one's task to work out whether it belongs to a
+     * project or is standalone.
+     */
     public function getUrlAttribute(): string
     {
-        return asset('storage/' . $this->file_path);
-    }
-
-    public function isImage(): bool
-    {
-        return str_starts_with($this->file_type, 'image/');
-    }
-
-    public function isVideo(): bool
-    {
-        return str_starts_with($this->file_type, 'video/');
-    }
-
-    public function isSpreadsheet(): bool
-    {
-        return in_array($this->file_type, [
-            'text/csv',
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ]);
+        return route('attachments.task', $this);
     }
 }

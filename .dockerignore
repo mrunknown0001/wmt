@@ -1,0 +1,36 @@
+# Keep the build context — and the image layers — free of things that either
+# belong to the host or get produced inside the build.
+#
+# The env files matter most: the Dockerfile does `COPY . .`, so without this an
+# APP_KEY and database password would be baked into a layer and travel with the
+# image wherever it is pushed.
+
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+.gitattributes
+
+# Rebuilt inside the image by the vendor and assets stages.
+vendor
+node_modules
+public/build
+public/hot
+
+# Host-side state that must never become image content.
+storage/app/attachments
+storage/app/public
+storage/app/private
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+bootstrap/cache
+
+# Local tooling and scratch.
+.idea
+.vscode
+.phpunit.result.cache
+*.log

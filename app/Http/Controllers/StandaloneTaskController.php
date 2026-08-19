@@ -85,8 +85,8 @@ class StandaloneTaskController extends Controller
                 'file_name' => $a->file_name,
                 'file_type' => $a->file_type,
                 'file_size' => $a->file_size,
-                'url' => asset('storage/'.$a->file_path),
-                'download_url' => url("/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
+                'url' => $a->url,
+                'download_url' => $a->url,
                 'is_image' => str_starts_with($a->file_type, 'image/'),
                 'is_video' => str_starts_with($a->file_type, 'video/'),
             ]),
@@ -150,8 +150,8 @@ class StandaloneTaskController extends Controller
             'file_name' => $a->file_name,
             'file_type' => $a->file_type,
             'file_size' => $a->file_size,
-            'url' => asset('storage/' . $a->file_path),
-            'download_url' => url("/tasks/{$task->id}/attachments/{$a->id}/download"),
+            'url' => $a->url,
+            'download_url' => $a->url,
             'is_image' => $a->isImage(),
             'is_video' => $a->isVideo(),
             'is_spreadsheet' => $a->isSpreadsheet(),
@@ -298,8 +298,8 @@ class StandaloneTaskController extends Controller
                     'file_name' => $a->file_name,
                     'file_type' => $a->file_type,
                     'file_size' => $a->file_size,
-                    'url' => asset('storage/'.$a->file_path),
-                    'download_url' => url("/tasks/{$task->id}/comments/{$c->id}/attachments/{$a->id}/download"),
+                    'url' => $a->url,
+                    'download_url' => $a->url,
                     'is_image' => str_starts_with($a->file_type, 'image/'),
                     'is_video' => str_starts_with($a->file_type, 'video/'),
                 ]),
@@ -329,6 +329,8 @@ class StandaloneTaskController extends Controller
             abort(404);
         }
 
-        return \Illuminate\Support\Facades\Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
+        $this->authorize('view', $task);
+
+        return $attachment->toDownloadResponse();
     }
 }

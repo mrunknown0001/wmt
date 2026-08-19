@@ -7,7 +7,6 @@ use App\Models\Setting;
 use App\Models\TaskAttachment;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class PurgeOldAttachments extends Command
 {
@@ -53,7 +52,7 @@ class PurgeOldAttachments extends Command
     private function purgeModel(string $modelClass, $cutoffDate, bool $dryRun): int
     {
         $count = 0;
-        $disk = Storage::disk('public');
+        $disk = $modelClass::disk();
 
         $modelClass::where('created_at', '<', $cutoffDate)
             ->chunkById(100, function ($attachments) use ($disk, $dryRun, &$count) {

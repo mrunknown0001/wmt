@@ -11,6 +11,7 @@ use App\Notifications\TaskOverdueNotification;
 use App\Services\ProjectEscalationService;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\Log;
 
 class SendTaskReminders extends Command
 {
@@ -123,12 +124,22 @@ class SendTaskReminders extends Command
         }
 
         $label = Setting::ESCALATION_LABELS[$newLevel] ?? "Level {$newLevel}";
+        $recipients = $this->getEscalationRecipients($task, $newLevel);
 
-        foreach ($this->getEscalationRecipients($task, $newLevel) as $recipient) {
+        foreach ($recipients as $recipient) {
             $recipient->notify(new TaskEscalatedNotification($task, $newLevel, $label));
         }
 
+        // Recorded even when the rung resolved to nobody, matching the project
+        // ladder below: retrying it every run would pin the task to this rung
+        // and stop it ever reaching the ones above.
         $task->update(['escalation_level' => $newLevel]);
+
+        if ($recipients === []) {
+            $this->warnEscalationReachedNobody($task, $newLevel, $label);
+
+            return 0;
+        }
 
         return 1;
     }
@@ -162,7 +173,34 @@ class SendTaskReminders extends Command
         // block the rungs above it from ever being reached.
         $task->update(['escalation_level' => $reached['level']]);
 
-        return $recipients === [] ? 0 : 1;
+        if ($recipients === []) {
+            $this->warnEscalationReachedNobody($task, $reached['level'], $rule->name);
+
+            return 0;
+        }
+
+        return 1;
+    }
+
+    /**
+     * An escalation that resolves to nobody is otherwise invisible: the rung is
+     * recorded like any other, so it is never retried, and the command reports a
+     * clean run. That is indistinguishable from success until somebody asks why
+     * an overdue task was never chased.
+     *
+     * Most often the audience is simply vacant — an assignee with no team or
+     * department, or a project whose owner is the assignee and so is excluded
+     * from their own escalation.
+     */
+    private function warnEscalationReachedNobody(Task $task, int $level, string $rung): void
+    {
+        Log::warning('Task escalation reached nobody.', [
+            'task_id' => $task->id,
+            'project_id' => $task->project_id,
+            'assigned_to' => $task->assigned_to,
+            'level' => $level,
+            'rung' => $rung,
+        ]);
     }
 
     private function alreadyNotifiedToday(Task $task, string $type, ?int $daysBefore = null): bool

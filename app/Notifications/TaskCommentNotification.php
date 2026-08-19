@@ -2,10 +2,10 @@
 
 namespace App\Notifications;
 
-use App\Models\Setting;
 use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Notifications\Concerns\ChecksEmailPreference;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 
 class TaskCommentNotification extends Notification implements ShouldQueue
 {
+    use ChecksEmailPreference;
     use Queueable;
 
     public function __construct(
@@ -25,11 +26,7 @@ class TaskCommentNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = ['database', 'broadcast'];
-        if (Setting::current()->wantsEmail('task_comment')) {
-            $channels[] = 'mail';
-        }
-        return $channels;
+        return $this->channelsFor($notifiable, 'task_comment');
     }
 
     public function toMail(object $notifiable): MailMessage

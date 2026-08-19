@@ -20,6 +20,7 @@ use App\Http\Controllers\NoteShareController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\ProjectAutomationRuleController;
@@ -58,9 +59,10 @@ use Illuminate\Support\Facades\Route;
 
 // Guest routes
 Route::middleware('guest')->group(function () {
-    Route::get('/', function () {
-        return redirect()->route('login');
-    });
+    // Route::redirect rather than a closure: closures cannot be serialized, so
+    // a closure here makes `php artisan route:cache` fail outright — which the
+    // staging entrypoint runs under `set -e`, taking the container down with it.
+    Route::redirect('/', '/login');
 
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store']);
@@ -117,6 +119,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroyStandalone'])->name('standalone-tasks.comments.destroy');
     Route::get('/tasks/{task}/comments/{comment}/attachments/{attachment}/download', [TaskCommentController::class, 'downloadStandalone'])->name('standalone-tasks.comments.attachments.download');
     Route::get('/tasks/{task}/attachments/{attachment}/download', [StandaloneTaskController::class, 'downloadAttachment'])->name('standalone-tasks.attachments.download');
+
+    // Attachment downloads. Every uploaded file is read through here so the
+    // request is authorized against the task or approval request it belongs to
+    // — see AttachmentController.
+    Route::get('/attachments/task/{attachment}', [AttachmentController::class, 'task'])->name('attachments.task');
+    Route::get('/attachments/task-comment/{attachment}', [AttachmentController::class, 'taskComment'])->name('attachments.task-comment');
+    Route::get('/attachments/approval-item/{attachment}', [AttachmentController::class, 'approvalItem'])->name('attachments.approval-item');
+    Route::get('/attachments/approval-comment/{attachment}', [AttachmentController::class, 'approvalItemComment'])->name('attachments.approval-comment');
 
     // Calendar
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');

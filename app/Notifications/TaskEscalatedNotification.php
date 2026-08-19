@@ -2,8 +2,8 @@
 
 namespace App\Notifications;
 
-use App\Models\Setting;
 use App\Models\Task;
+use App\Notifications\Concerns\ChecksEmailPreference;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -11,6 +11,7 @@ use Illuminate\Notifications\Notification;
 
 class TaskEscalatedNotification extends Notification implements ShouldQueue
 {
+    use ChecksEmailPreference;
     use Queueable;
 
     public function __construct(
@@ -41,11 +42,7 @@ class TaskEscalatedNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = ['database', 'broadcast'];
-        if (Setting::current()->wantsEmail('task_escalated')) {
-            $channels[] = 'mail';
-        }
-        return $channels;
+        return $this->channelsFor($notifiable, 'task_escalated');
     }
 
     public function toMail(object $notifiable): MailMessage

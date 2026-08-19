@@ -29,7 +29,7 @@ const formatDecisionDate = (value) => {
     });
 };
 
-export default function Show({ item, project, canDecide, canEdit, canResubmit, auth }) {
+export default function Show({ item, project, canDecide, canEdit, canOrganize, canResubmit, auth }) {
     const [isDeciding, setIsDeciding] = useState(false);
     const [decisionComment, setDecisionComment] = useState('');
     const [decidingAction, setDecidingAction] = useState(null);
@@ -323,7 +323,7 @@ export default function Show({ item, project, canDecide, canEdit, canResubmit, a
                         {project.sections?.length > 0 && (
                             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Section</h3>
-                                {canEdit ? (
+                                {canOrganize ? (
                                     <select
                                         value={item.approval_section_id || ''}
                                         onChange={(e) => router.patch(

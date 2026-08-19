@@ -41,16 +41,22 @@ class ApprovalProjectPolicy
         return true;
     }
 
+    // can() rather than hasPermissionTo() throughout, for the reason given on
+    // viewAny above: hasPermissionTo() throws when the permission row itself is
+    // missing, so an unseeded install turns a plain "no" into a 500. That now
+    // matters more than it did — ApprovalItemPolicy defers to update() below for
+    // its own update and cancel decisions.
+
     public function update(User $user, ApprovalProject $project): bool
     {
-        return $user->hasPermissionTo('manage-approval-projects')
+        return $user->can('manage-approval-projects')
             || $project->owner_id === $user->id
             || $project->isProjectAdmin($user);
     }
 
     public function delete(User $user, ApprovalProject $project): bool
     {
-        return $user->hasPermissionTo('manage-approval-projects')
+        return $user->can('manage-approval-projects')
             || $project->owner_id === $user->id
             || $project->isProjectAdmin($user);
     }

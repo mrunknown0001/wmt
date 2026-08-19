@@ -33,7 +33,11 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Off deliberately. With this on, the framework registers an
+            // unauthenticated GET /storage/{path} route over this disk's root —
+            // which is where AI chat attachments are written. Nothing in the app
+            // reads files through that route, so turning it off costs nothing.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],
@@ -43,6 +47,27 @@ return [
             'root' => storage_path('app/public'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
+        /*
+         * User-uploaded attachments — task files, comment files, approval
+         * documents. Deliberately NOT the 'public' disk: that one is symlinked
+         * into the webroot, so anything written there is downloadable by anyone
+         * holding the URL, with no session and no way to revoke. Every read of
+         * this disk goes through an authorizing route in AttachmentController.
+         *
+         * 'serve' is off for the same reason. The framework registers an
+         * unauthenticated GET /storage/{path} route for any local disk with
+         * serve enabled (which is why the 'local' disk above is unsuitable
+         * here), and that route would hand these files straight back out.
+         */
+        'attachments' => [
+            'driver' => 'local',
+            'root' => storage_path('app/attachments'),
+            'serve' => false,
+            'visibility' => 'private',
             'throw' => false,
             'report' => false,
         ],

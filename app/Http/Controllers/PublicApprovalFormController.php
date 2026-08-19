@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ApprovalItemAttachment;
 use App\Models\ApprovalForm;
 use App\Services\ApprovalWorkflowEngine;
 use Illuminate\Http\Request;
@@ -283,7 +284,7 @@ class PublicApprovalFormController extends Controller
                 $files = $request->file($fieldKey);
                 $files = is_array($files) ? $files : [$files];
                 foreach ($files as $file) {
-                    $path = $file->store("approval-form-submissions/{$item->id}", 'public');
+                    $path = $file->store("approval-form-submissions/{$item->id}", ApprovalItemAttachment::DISK);
                     $item->attachments()->create([
                         'file_name' => $file->getClientOriginalName(),
                         'file_path' => $path,
