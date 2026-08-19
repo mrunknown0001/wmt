@@ -18,12 +18,22 @@ const TRIGGER_TYPES = [
     { value: 'scheduled', label: 'Scheduled (Time of Day)' },
 ];
 
-// Hours offered by the scheduled trigger. The runner sweeps hourly, so a rule
-// can only pick the hour, not the minute.
+// The scheduled trigger picks an hour and a minute; the runner sweeps every
+// minute and fires on the one that matches.
 const HOURS = Array.from({ length: 24 }, (_, h) => ({
     value: h,
-    label: `${String(h).padStart(2, '0')}:00`,
+    label: String(h).padStart(2, '0'),
 }));
+
+const MINUTES = Array.from({ length: 60 }, (_, m) => ({
+    value: m,
+    label: String(m).padStart(2, '0'),
+}));
+
+// A rule saved before minutes existed has no minute and fired on the hour, so
+// absent reads as :00 here exactly as it does in the runner.
+const scheduledAt = (cfg) =>
+    `${String(cfg?.hour ?? 9).padStart(2, '0')}:${String(cfg?.minute ?? 0).padStart(2, '0')}`;
 
 const CONDITION_FIELDS = [
     { value: 'status', label: 'Status' },
@@ -777,7 +787,7 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                             <> &middot; {customFields.find(cf => cf.id === rule.trigger_config.custom_field_id)?.name || 'Unknown'}</>
                                         )}
                                         {rule.trigger_type === 'scheduled' && (
-                                            <> &middot; {String(rule.trigger_config?.hour ?? 9).padStart(2, '0')}:00 daily</>
+                                            <> &middot; {scheduledAt(rule.trigger_config)} daily</>
                                         )}
                                         {rule.trigger_type === 'form_submitted' && rule.trigger_config?.form_id && (
                                             <> &middot; {forms.find(f => f.id === rule.trigger_config.form_id)?.name || 'Unknown'}</>
@@ -896,16 +906,42 @@ export default function AutomationRuleBuilder({ projectId, rules: initialRules, 
                                 </select>
                             )}
                             {form.trigger_type === 'scheduled' && (
-                                <select
-                                    value={form.trigger_config?.hour ?? 9}
-                                    onChange={(e) => setForm(prev => ({
-                                        ...prev,
-                                        trigger_config: { hour: Number(e.target.value) },
-                                    }))}
-                                    className={selectClass}
-                                >
-                                    {HOURS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
-                                </select>
+                                <div className="flex items-center gap-1.5">
+                                    <select
+                                        aria-label="Hour"
+                                        value={form.trigger_config?.hour ?? 9}
+                                        onChange={(e) => setForm(prev => ({
+                                            ...prev,
+                                            // Spread the existing config: replacing it
+                                            // wholesale is what would drop the minute
+                                            // every time the hour changed.
+                                            trigger_config: {
+                                                ...prev.trigger_config,
+                                                hour: Number(e.target.value),
+                                                minute: prev.trigger_config?.minute ?? 0,
+                                            },
+                                        }))}
+                                        className={selectClass}
+                                    >
+                                        {HOURS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
+                                    </select>
+                                    <span className="text-gray-400 dark:text-gray-500">:</span>
+                                    <select
+                                        aria-label="Minute"
+                                        value={form.trigger_config?.minute ?? 0}
+                                        onChange={(e) => setForm(prev => ({
+                                            ...prev,
+                                            trigger_config: {
+                                                ...prev.trigger_config,
+                                                hour: prev.trigger_config?.hour ?? 9,
+                                                minute: Number(e.target.value),
+                                            },
+                                        }))}
+                                        className={selectClass}
+                                    >
+                                        {MINUTES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                    </select>
+                                </div>
                             )}
                             {form.trigger_type === 'form_submitted' && (
                                 <select

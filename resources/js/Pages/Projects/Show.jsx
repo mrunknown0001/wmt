@@ -583,6 +583,22 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 // Default reorderable column IDs (excluding sticky checkbox, title, actions)
 const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'completion', 'estimate', 'logged'];
 
+// What each built-in column means, shown on hover. Worth having because several
+// of these are not self-evident from a one-word heading: two are derived rather
+// than entered, and two are easily read as each other.
+const COLUMN_DESCRIPTIONS = {
+    title: 'The task name. Click a row to open it.',
+    series: "The task's number in this project's series.",
+    status: 'Where the task has reached, from Backlog to Done.',
+    priority: 'How urgent the task is, from Low to Urgent.',
+    assignee: 'The person responsible for the task.',
+    dates: 'When the task is due. Overdue dates are shown in red.',
+    completed: 'When the task was closed. Empty until it is.',
+    completion: 'Progress. Taken from subtasks when there are any, otherwise from status.',
+    estimate: 'How long the task was expected to take.',
+    logged: 'Time actually tracked. Turns red once it passes the estimate.',
+};
+
 // Resize handle for column headers
 function ColumnResizeHandle({ onResize }) {
     const handleMouseDown = useCallback((e) => {
@@ -749,7 +765,7 @@ function HiddenColumnsMenu({ hiddenColumns, getColumnLabel, onShowColumn }) {
 }
 
 // Draggable column header for list view
-function SortableColumnHeader({ id, children, width, onResize, sortConfig, onSort, onHide, onEditField, onDeleteField }) {
+function SortableColumnHeader({ id, children, description, width, onResize, sortConfig, onSort, onHide, onEditField, onDeleteField }) {
     const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id });
     const isCustomField = id.startsWith('cf-');
     const isSorted = sortConfig?.key === id;
@@ -771,7 +787,12 @@ function SortableColumnHeader({ id, children, width, onResize, sortConfig, onSor
                     <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
                     <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
                 </svg>
-                <span className="truncate">{children}</span>
+                {/* On the label rather than the whole cell: the <th> carries the
+                    drag listeners, and a tooltip that followed a drag would trail
+                    the column across the header. */}
+                <Tooltip content={description}>
+                    <span className="truncate">{children}</span>
+                </Tooltip>
                 {isSorted && (
                     <svg className="h-3 w-3 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortConfig.direction === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'} />
@@ -1781,6 +1802,20 @@ export default function Show() {
                 }
                 return colId;
         }
+    }, [localCustomFields]);
+
+    /**
+     * Hover text for a column heading. A custom field describes itself by type —
+     * its name is already the heading, so repeating it would say nothing.
+     */
+    const getColumnDescription = useCallback((colId) => {
+        if (colId.startsWith('cf-')) {
+            const cfId = Number(colId.replace('cf-', ''));
+            const cf = localCustomFields.find((f) => f.id === cfId);
+            return cf ? `Custom field (${formatLabel(cf.type)}).` : null;
+        }
+
+        return COLUMN_DESCRIPTIONS[colId] ?? null;
     }, [localCustomFields]);
 
     // Sort comparator for tasks
@@ -3714,7 +3749,9 @@ export default function Show() {
                                             style={columnWidths['title'] ? { width: columnWidths['title'], minWidth: 60, maxWidth: columnWidths['title'] } : { width: 300, minWidth: 60 }}
                                         >
                                             <div className="flex items-center gap-1.5 pr-5">
-                                                <span className="truncate">Title</span>
+                                                <Tooltip content={COLUMN_DESCRIPTIONS.title}>
+                                                    <span className="truncate">Title</span>
+                                                </Tooltip>
                                                 {sortConfig?.key === 'title' && (
                                                     <svg className="h-3 w-3 shrink-0 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortConfig.direction === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'} />
@@ -3730,7 +3767,8 @@ export default function Show() {
                                             {visibleColumnOrder.map(colId => (
                                                 <SortableColumnHeader key={colId} id={colId} width={getColumnWidth(colId)} onResize={(w) => handleColumnResize(colId, w)}
                                                     sortConfig={sortConfig} onSort={handleSortColumn} onHide={handleHideColumn}
-                                                    onEditField={handleEditColumnField} onDeleteField={handleDeleteColumnField}>
+                                                    onEditField={handleEditColumnField} onDeleteField={handleDeleteColumnField}
+                                                    description={getColumnDescription(colId)}>
                                                     {getColumnLabel(colId)}
                                                 </SortableColumnHeader>
                                             ))}

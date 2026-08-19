@@ -16,9 +16,11 @@ Schedule::command('tasks:send-reminders')->dailyAt('08:00');
 // reminders, so nobody is chased about a task that is about to change hands.
 Schedule::command('tasks:process-delegations')->dailyAt('00:10')->withoutOverlapping();
 
-// Scheduled automation rules pick their own hour, so this has to run every hour
-// and match rules against the current one.
-Schedule::command('automation:run-scheduled')->hourlyAt(5)->withoutOverlapping();
+// Scheduled automation rules pick an hour and a minute, so this has to run every
+// minute and match rules against the current one. A run that matches nothing
+// costs one query, so the sweep only happens on the minute a rule asked for.
+// withoutOverlapping so a long sweep cannot be started twice.
+Schedule::command('automation:run-scheduled')->everyMinute()->withoutOverlapping();
 
 // Approval SLAs are set in hours, so a daily check would miss most of them.
 Schedule::command('approvals:check-deadlines')->hourlyAt(10)->withoutOverlapping();
