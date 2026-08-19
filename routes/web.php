@@ -47,6 +47,7 @@ use App\Http\Controllers\ApprovalCustomFieldController;
 use App\Http\Controllers\ApprovalChainController;
 use App\Http\Controllers\ApprovalItemController;
 use App\Http\Controllers\ApprovalItemCommentController;
+use App\Http\Controllers\ApprovalItemShareController;
 use App\Http\Controllers\ApprovalFormController;
 use App\Http\Controllers\PublicApprovalFormController;
 use App\Http\Controllers\ApprovalAutomationRuleController;
@@ -205,6 +206,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/approval-projects/{approvalProject}/items/{item}', [ApprovalItemController::class, 'destroy'])->name('approval-projects.items.destroy');
     Route::post('/approval-projects/{approvalProject}/items/{item}/advance', [ApprovalItemController::class, 'advance'])->name('approval-projects.items.advance');
     Route::post('/approval-projects/{approvalProject}/items/{item}/resubmit', [ApprovalItemController::class, 'resubmit'])->name('approval-projects.items.resubmit');
+
+    // Sharing a decided request with people who were not part of it.
+    Route::post('/approval-projects/{approvalProject}/items/{item}/shares', [ApprovalItemShareController::class, 'store'])->name('approval-projects.items.shares.store');
+    Route::delete('/approval-projects/{approvalProject}/items/{item}/shares/{user}', [ApprovalItemShareController::class, 'destroy'])->name('approval-projects.items.shares.destroy');
 
     // Approval Item Comments
     Route::post('/approval-projects/{approvalProject}/items/{item}/comments', [ApprovalItemCommentController::class, 'store'])->name('approval-projects.items.comments.store');

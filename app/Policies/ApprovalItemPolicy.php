@@ -33,6 +33,14 @@ class ApprovalItemPolicy
         if ($item->requested_by === $user->id) {
             return true;
         }
+
+        // Shared with this person after the fact. AttachmentController authorizes
+        // attachment reads against this same ability, so the files travel with
+        // the grant rather than needing a rule of their own.
+        if ($item->shares()->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+
         // Check if user is an eligible approver in the current active step
         $activeInstance = $item->stepInstances()->where('status', 'active')->first();
         if ($activeInstance && $activeInstance->approvers()->where('user_id', $user->id)->exists()) {
@@ -128,6 +136,30 @@ class ApprovalItemPolicy
         $project = $item->approvalProject;
 
         return $project && $user->can('update', $project);
+    }
+
+    /**
+     * May hand this request to people who were not part of it.
+     *
+     * Only once it is decided: circulating a request still in flight would put
+     * it in front of people while approvers are still forming a view of it.
+     *
+     * Deliberately not granted to everyone who can view it, and so not to share
+     * recipients either — otherwise access would spread on its own, one forward
+     * at a time, with nobody able to see where it had reached. Sharing stays
+     * with the requester and whoever administers the project.
+     */
+    public function share(User $user, ApprovalItem $item): bool
+    {
+        if (!in_array($item->status, ['approved', 'rejected'], true)) {
+            return false;
+        }
+
+        if ($item->requested_by === $user->id) {
+            return true;
+        }
+
+        return $this->administersProject($user, $item);
     }
 
     public function decide(User $user, ApprovalItem $item): bool

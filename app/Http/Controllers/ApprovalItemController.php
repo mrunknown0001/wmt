@@ -242,6 +242,8 @@ class ApprovalItemController extends Controller
             'comments.user',
             'comments.attachments',
             'attachments',
+            'shares.user:id,name,position',
+            'shares.sharedBy:id,name',
         ]);
 
         // Append URL to each attachment for proper serialization
@@ -276,6 +278,15 @@ class ApprovalItemController extends Controller
             'canOrganize' => auth()->user()->can('update', $item),
             // Requester-only, and only while the request is awaiting their changes.
             'canResubmit' => auth()->user()->can('resubmit', $item),
+            // Handing a decided request to people who were not part of it.
+            'canShare' => auth()->user()->can('share', $item),
+            'sharedWith' => $item->shares->map(fn ($share) => [
+                'id' => $share->user_id,
+                'name' => $share->user?->name,
+                'position' => $share->user?->position,
+                'shared_by' => $share->sharedBy?->name,
+                'shared_at' => $share->created_at,
+            ])->values(),
         ]);
     }
 

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import ApprovalItemComments from '../../Components/ApprovalItemComments';
+import ApprovalItemShare from '../../Components/ApprovalItemShare';
 
 const statusColors = {
     pending: 'bg-gray-100 text-gray-800',
@@ -29,7 +30,7 @@ const formatDecisionDate = (value) => {
     });
 };
 
-export default function Show({ item, project, canDecide, canEdit, canOrganize, canResubmit, auth }) {
+export default function Show({ item, project, canDecide, canEdit, canOrganize, canResubmit, canShare, sharedWith = [], auth }) {
     const [isDeciding, setIsDeciding] = useState(false);
     const [decisionComment, setDecisionComment] = useState('');
     const [decidingAction, setDecidingAction] = useState(null);
@@ -317,6 +318,10 @@ export default function Show({ item, project, canDecide, canEdit, canOrganize, c
                                     </button>
                                 )}
                             </div>
+                        )}
+
+                        {canShare && (
+                            <ApprovalItemShare item={item} project={project} sharedWith={sharedWith} />
                         )}
 
                         {/* Section — assign or move the request between project sections. */}

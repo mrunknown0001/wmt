@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -124,6 +125,19 @@ class ApprovalItem extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(ApprovalItemAttachment::class);
+    }
+
+    /** People this request has been shared with, beyond those involved in it. */
+    public function shares(): HasMany
+    {
+        return $this->hasMany(ApprovalItemShare::class);
+    }
+
+    public function sharedWith(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'approval_item_shares')
+            ->withPivot('shared_by')
+            ->withTimestamps();
     }
 
     /** Whether any approver has recorded a decision against this request yet. */
