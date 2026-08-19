@@ -1646,13 +1646,21 @@ export default function Show() {
     const [hiddenColumns, setHiddenColumns] = useState(() => {
         try {
             const saved = localStorage.getItem(`wmt-col-hidden-${project.id}`);
-            const migrated = localStorage.getItem(`wmt-col-hidden-init-${project.id}`);
-            const { hidden, persist } = initialHiddenColumns(saved ? JSON.parse(saved) : null, !!migrated);
+            // Which defaults have already been folded in. Stored as a list so a
+            // newly added default-hidden column is still hidden once for people
+            // whose saved preference predates it; the old boolean '1' is read as
+            // "completed only", which is what it meant when it was written.
+            const rawApplied = localStorage.getItem(`wmt-col-hidden-init-${project.id}`);
+            let applied = null;
+            try { applied = rawApplied && rawApplied !== '1' ? JSON.parse(rawApplied) : rawApplied; } catch { applied = rawApplied; }
+
+            const { hidden, persist, applied: nowApplied } =
+                initialHiddenColumns(saved ? JSON.parse(saved) : null, applied);
 
             if (persist) {
                 try {
                     localStorage.setItem(`wmt-col-hidden-${project.id}`, JSON.stringify(hidden));
-                    localStorage.setItem(`wmt-col-hidden-init-${project.id}`, '1');
+                    localStorage.setItem(`wmt-col-hidden-init-${project.id}`, JSON.stringify(nowApplied));
                 } catch {}
             }
             return new Set(hidden);
