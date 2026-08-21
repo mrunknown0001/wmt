@@ -55,6 +55,41 @@ echo " ready."
 echo "==> Starting app, workers, web…"
 $COMPOSE up -d app queue scheduler nginx
 
+# The application lives in the image, not in a mount, so what is running is only
+# the code that was just rsynced if the build genuinely picked it up. A cached
+# layer, an interrupted build or a container that was never recreated all leave
+# the stack serving the previous release while every line above still prints
+# success. Compare the two rather than trust it.
+echo "==> Checking the running container has the code that was just deployed…"
+fingerprint() {
+    # Sorted names and sorted contents, so a changed, added, removed or renamed
+    # file all move the hash. LC_ALL=C keeps the ordering identical either side.
+    find app routes config database/migrations -type f -name '*.php' 2>/dev/null | LC_ALL=C sort
+    find app routes config database/migrations -type f -name '*.php' -print0 2>/dev/null | LC_ALL=C sort -z | xargs -0 cat
+}
+
+HOST_FP=$(cd "$(dirname "$0")" && fingerprint | sha256sum | cut -c1-16)
+# </dev/null so the exec cannot swallow this script's own stdin.
+CONTAINER_FP=$($COMPOSE exec -T app sh -c "cd /var/www/html && $(declare -f fingerprint); fingerprint | sha256sum" </dev/null 2>/dev/null | cut -c1-16)
+
+if [ -z "$CONTAINER_FP" ]; then
+    echo "Refusing to continue: could not read the application code out of the app container."
+    echo "The container may not be running. Check: $COMPOSE ps"
+    exit 1
+fi
+
+if [ "$HOST_FP" != "$CONTAINER_FP" ]; then
+    echo "Refusing to continue: the running container is not serving the deployed code."
+    echo "    host:      $HOST_FP"
+    echo "    container: $CONTAINER_FP"
+    echo
+    echo "The image is stale. Rebuild without the layer cache and recreate:"
+    echo "    $COMPOSE build --no-cache app"
+    echo "    $COMPOSE up -d --force-recreate app queue scheduler nginx"
+    exit 1
+fi
+echo "    match ($HOST_FP)."
+
 echo "==> Publishing built assets for nginx…"
 $COMPOSE run --rm assets
 
@@ -62,11 +97,26 @@ echo "==> Migrating (once, from here — never in the entrypoint)…"
 $COMPOSE exec -T app php artisan migrate --force
 
 # Seeders only when the DB has no roles yet, so re-deploys don't re-run them.
-# HOME=/tmp because tinker (psysh) writes a config file and www-data has no home
-# — without it the command errors, the count comes back empty, and seeding is
-# silently skipped.
-ROLES=$($COMPOSE exec -T -e HOME=/tmp app php artisan tinker --execute='echo \Spatie\Permission\Models\Role::count();' 2>/dev/null | tr -dc 0-9)
-if [ "${ROLES:-0}" = "0" ]; then
+# HOME=/tmp because tinker (psysh) writes a config file and www-data has no home,
+# and without it the command errors out instead of answering.
+set +e
+ROLES_OUT=$($COMPOSE exec -T -e HOME=/tmp app php artisan tinker --execute='echo \Spatie\Permission\Models\Role::count();' 2>&1)
+ROLES_RC=$?
+set -e
+ROLES=$(printf '%s' "$ROLES_OUT" | tr -d '[:space:]')
+
+# Three outcomes, not two. Discarding stderr and defaulting an empty result to 0
+# turned "I could not tell" into "the database is empty", which does not skip the
+# seeders — it runs them over populated staging data. Only a clean exit whose
+# output is nothing but digits is an answer.
+if [ "$ROLES_RC" -ne 0 ] || ! printf '%s' "$ROLES" | grep -qE '^[0-9]+$'; then
+    echo "Refusing to continue: could not read the role count, so it is not known whether"
+    echo "this database is fresh. Seeding on a guess would re-run seeders over real data."
+    printf '%s\n' "$ROLES_OUT" | sed 's/^/    /'
+    exit 1
+fi
+
+if [ "$ROLES" = "0" ]; then
     echo "==> Fresh database — seeding roles / org / settings…"
     $COMPOSE exec -T -e HOME=/tmp app php artisan db:seed --force
     echo
@@ -76,7 +126,23 @@ else
     echo "==> Database already seeded ($ROLES roles) — skipping seeders."
 fi
 
-$COMPOSE exec -T app php artisan storage:link 2>/dev/null || true
+# Swallow only the one benign outcome. `|| true` over a discarded stderr hid a
+# genuinely missing symlink just as readily as an already-correct one.
+set +e
+LINK_OUT=$($COMPOSE exec -T app php artisan storage:link 2>&1)
+LINK_RC=$?
+set -e
+if [ "$LINK_RC" -ne 0 ] && ! printf '%s' "$LINK_OUT" | grep -q "already exists"; then
+    echo "Refusing to continue: storage:link failed."
+    printf '%s\n' "$LINK_OUT" | sed 's/^/    /'
+    exit 1
+fi
+
+# Prove the stack actually boots before calling the deploy done, so a bad cached
+# config or a broken autoloader surfaces here rather than on the first request.
+echo "==> Smoke check…"
+$COMPOSE exec -T -e HOME=/tmp app php artisan about --only=environment > /dev/null
+echo "    application boots."
 
 echo
 echo "Done. WMT staging is up on http://127.0.0.1:${HTTP_PORT:-9081} (loopback)."
