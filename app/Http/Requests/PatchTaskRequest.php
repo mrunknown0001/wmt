@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ScopesSectionToProject;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PatchTaskRequest extends FormRequest
 {
+    use ScopesSectionToProject;
+
     public function authorize(): bool
     {
         $task = $this->route('task');
@@ -35,7 +38,7 @@ class PatchTaskRequest extends FormRequest
             // input; H:i:s accepted so a value read back from the DB round-trips.
             'due_time' => ['nullable', 'date_format:H:i,H:i:s'],
             'estimated_minutes' => ['nullable', 'integer', 'min:0', 'max:100000'],
-            'section_id' => ['sometimes', 'nullable', 'exists:task_sections,id'],
+            'section_id' => ['sometimes', 'nullable', $this->sectionIdRule()],
             'collaborator_ids' => ['sometimes', 'array'],
             'collaborator_ids.*' => ['integer', 'exists:users,id'],
         ];
