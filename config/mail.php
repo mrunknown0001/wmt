@@ -14,7 +14,31 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    /*
+    |--------------------------------------------------------------------------
+    | Email On/Off
+    |--------------------------------------------------------------------------
+    |
+    | A system-wide switch for outbound email, separate from which mailer is
+    | used. It exists because "off" was previously expressed as MAIL_MAILER=log,
+    | and `log` is not a way of not sending: Laravel still renders every message
+    | in full and writes it — recipients, subjects, body — into laravel.log. The
+    | mail was never delivered and the contents accumulated on disk instead.
+    |
+    | With this false the mailer resolves to the array transport, which discards
+    | the message rather than persisting it, so nothing reaching the mail layer
+    | from anywhere — this application, a package's own notifications, a
+    | password reset — can write personal data to the log.
+    |
+    | Notifications also drop their mail channel outright (see
+    | App\Notifications\Concerns\ChecksEmailPreference) so a message that has
+    | nowhere to go is never built in the first place.
+    |
+    */
+
+    'enabled' => env('MAIL_ENABLED', true),
+
+    'default' => env('MAIL_ENABLED', true) ? env('MAIL_MAILER', 'log') : 'array',
 
     /*
     |--------------------------------------------------------------------------

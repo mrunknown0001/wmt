@@ -109,15 +109,11 @@ class User extends Authenticatable
      * Whether this person wants the email for a given notification type.
      * Mirrors Setting::wantsEmail(), which asks the same of the whole system.
      *
-     * NOT YET CONSULTED WHEN SENDING. The via() methods on the eight task
-     * notifications currently gate on the global Setting alone, so a preference
-     * stored through the API is recorded but does not suppress anything. Wiring
-     * it is a one-line change per notification:
-     *
-     *     if (Setting::current()->wantsEmail('task_assigned')
-     *         && $notifiable->wantsEmail('task_assigned')) {
-     *
-     * Treat a preference as advisory until that is done.
+     * Consulted when sending, via ChecksEmailPreference::channelsFor(): the
+     * administrator's setting decides which types the system may send, and this
+     * decides which of those the person actually receives. A preference can
+     * therefore turn an email off, but cannot turn on one the administrator has
+     * disabled — and neither applies where email is switched off entirely.
      */
     public function wantsEmail(string $type): bool
     {

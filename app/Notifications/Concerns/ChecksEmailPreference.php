@@ -8,10 +8,12 @@ use App\Models\User;
 /**
  * Channel selection for the notifications a person can opt out of by email.
  *
- * Two gates, and mail needs both: the administrator decides which types the
- * system may send at all (Setting), and the recipient decides which of those
- * they personally want (User). A person can therefore turn off an email the
- * administrator allows, but cannot turn on one the administrator has disabled.
+ * Three gates, and mail needs all of them: the deployment decides whether it
+ * sends email at all (config/mail.php), the administrator decides which types
+ * the system may send (Setting), and the recipient decides which of those they
+ * personally want (User). A person can therefore turn off an email the
+ * administrator allows, but cannot turn on one the administrator has disabled,
+ * and none of it applies where email is switched off entirely.
  */
 trait ChecksEmailPreference
 {
@@ -24,7 +26,14 @@ trait ChecksEmailPreference
     {
         $channels = ['database', 'broadcast'];
 
-        if (Setting::current()->wantsEmail($type) && $this->recipientWantsEmail($notifiable, $type)) {
+        // Three gates now, and the first is the deployment's own. With email
+        // switched off the channel is dropped here rather than left to fail
+        // further down, so the message is never rendered at all — which is the
+        // whole point, given the previous way of turning email off wrote every
+        // message into the log instead of sending it.
+        if (config('mail.enabled')
+            && Setting::current()->wantsEmail($type)
+            && $this->recipientWantsEmail($notifiable, $type)) {
             $channels[] = 'mail';
         }
 
