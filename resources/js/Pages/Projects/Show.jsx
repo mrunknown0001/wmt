@@ -1619,7 +1619,64 @@ export default function Show() {
     const [celebration, setCelebration] = useState(null); // { x, y } or null
     const [automationToasts, setAutomationToasts] = useState([]);
     // Why a status change was refused (project close rule), shown as a toast.
+    // Also carries export failures — see handleExport.
     const [blockedMessage, setBlockedMessage] = useState(null);
+    const [exporting, setExporting] = useState(false);
+
+    /**
+     * Download the project's tasks as a spreadsheet.
+     *
+     * Fetched rather than navigated to. Assigning window.location.href hands the
+     * request to the browser, which gives the app no callback and no status — so
+     * a server error produced a button that looked like it did nothing at all,
+     * leaving the user unable to tell a failure from an empty export or a
+     * missing permission. Going through fetch means a failure can be seen and
+     * said out loud.
+     */
+    const handleExport = useCallback(async () => {
+        if (exporting) return;
+        setExporting(true);
+
+        try {
+            const response = await fetch(`/projects/${project.id}/export`, {
+                headers: { Accept: 'application/octet-stream' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                // 419 is a stale CSRF/session, which reads as "you are logged out"
+                // rather than as a broken export.
+                setBlockedMessage(
+                    response.status === 419
+                        ? 'Your session has expired. Reload the page and try the export again.'
+                        : `Export failed (HTTP ${response.status}). Please try again, and tell an administrator if it keeps happening.`
+                );
+                return;
+            }
+
+            const blob = await response.blob();
+
+            // Prefer the filename the server chose, so the export keeps its name.
+            const disposition = response.headers.get('Content-Disposition') || '';
+            const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+            const filename = match ? decodeURIComponent(match[1]) : `project-${project.id}-tasks.xlsx`;
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            // Offline, DNS, a dropped connection — fetch rejects rather than
+            // returning a response, and this is the only place it can surface.
+            setBlockedMessage(`Export could not start: ${e.message}. Check your connection and try again.`);
+        } finally {
+            setExporting(false);
+        }
+    }, [project.id, exporting]);
 
     // Auto-dismiss so it doesn't linger over the board.
     useEffect(() => {
@@ -3322,10 +3379,11 @@ export default function Show() {
                         <Button
                             variant="secondary"
                             size="sm"
-                            onClick={() => window.location.href = `/projects/${project.id}/export`}
+                            onClick={handleExport}
+                            disabled={exporting}
                         >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            Export
+                            {exporting ? 'Exporting…' : 'Export'}
                         </Button>
                         {canManageProject && (
                             <>
