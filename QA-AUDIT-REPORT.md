@@ -180,6 +180,14 @@ a same-project section still works; existing task/section tests pass.
 ### QA-002 — Production has never delivered an email
 
 **Severity:** CRITICAL · **Confidence:** CONFIRMED · **Category:** Configuration / data exposure
+**Status:** PARTIALLY FIXED 2026-08-22 — `MAIL_ENABLED` added and set to `false` on production,
+so email is now deliberately off rather than accidentally rendered to disk. Verified live: a real
+`Mail::raw()` writes nothing to the log, and notification channels resolve to database+broadcast.
+Two items remain and both need a decision, not a code change:
+  1. **No real mailer is configured** — delivery still does not happen. Needs SMTP/API credentials.
+     Set `MAIL_ENABLED=true` at the same time as configuring one.
+  2. **The already-rendered mail is still in the log** — 109 messages, 12 recipients (7 external
+     personal addresses), in a 24k-line file that does not rotate. Awaiting approval to scrub.
 
 **Location:** production `.env` — `MAIL_MAILER=log` (staging identical)
 
