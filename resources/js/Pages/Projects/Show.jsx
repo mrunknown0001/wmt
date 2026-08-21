@@ -1535,6 +1535,10 @@ export default function Show() {
         setFilterSearch('');
         setShowAdvancedFilters(true);
         setView('list');
+        // Same reason the view tabs do this: those panels sit above the list, so
+        // drilling down with one open lands on a list the panel is covering.
+        setShowCustomFields(false);
+        setShowAutomation(false);
     }, []);
 
     /**
@@ -1616,6 +1620,23 @@ export default function Show() {
     const [addingSubsectionName, setAddingSubsectionName] = useState('');
     const [showAutomation, setShowAutomation] = useState(false);
     const [showCustomFields, setShowCustomFields] = useState(false);
+
+    /**
+     * Switch the main view, closing the Custom Fields and Automation panels.
+     *
+     * Those panels render above the view content rather than in place of it, so
+     * setting the view alone left the tab highlighted and the content below
+     * genuinely changed while the panel went on filling the screen — which reads
+     * as the click having done nothing, and needed a page reload to clear.
+     *
+     * showCustomFields only hides its panel; CustomFieldManager stays mounted so
+     * the column header's edit and delete still reach it through cfManagerRef.
+     */
+    const selectView = useCallback((next) => {
+        setView(next);
+        setShowCustomFields(false);
+        setShowAutomation(false);
+    }, []);
     const [celebration, setCelebration] = useState(null); // { x, y } or null
     const [automationToasts, setAutomationToasts] = useState([]);
     // Why a status change was refused (project close rule), shown as a toast.
@@ -3463,7 +3484,7 @@ export default function Show() {
                     {/* View Toggle */}
                     <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-0.5">
                         <button
-                            onClick={() => setView('list')}
+                            onClick={() => selectView('list')}
                             className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'list'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
@@ -3473,7 +3494,7 @@ export default function Show() {
                             <ListIcon /> <span className="hidden sm:inline">List</span>
                         </button>
                         <button
-                            onClick={() => setView('board')}
+                            onClick={() => selectView('board')}
                             className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'board'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
@@ -3483,7 +3504,7 @@ export default function Show() {
                             <BoardIcon /> <span className="hidden sm:inline">Board</span>
                         </button>
                         <button
-                            onClick={() => setView('calendar')}
+                            onClick={() => selectView('calendar')}
                             className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'calendar'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
@@ -3493,7 +3514,7 @@ export default function Show() {
                             <CalendarIcon /> <span className="hidden sm:inline">Calendar</span>
                         </button>
                         <button
-                            onClick={() => setView('gantt')}
+                            onClick={() => selectView('gantt')}
                             className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'gantt'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
@@ -3503,7 +3524,7 @@ export default function Show() {
                             <GanttIcon /> <span className="hidden sm:inline">Gantt</span>
                         </button>
                         <button
-                            onClick={() => setView('dashboard')}
+                            onClick={() => selectView('dashboard')}
                             className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                 view === 'dashboard'
                                     ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
