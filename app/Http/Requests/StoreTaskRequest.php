@@ -3,11 +3,14 @@
 namespace App\Http\Requests;
 
 use App\Models\Task;
+use App\Http\Requests\Concerns\ScopesSectionToProject;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreTaskRequest extends FormRequest
 {
+    use ScopesSectionToProject;
+
     public function authorize(): bool
     {
         $project = $this->route('project');
@@ -55,7 +58,7 @@ class StoreTaskRequest extends FormRequest
             // -1 is "last week of the month"; 1..5 are the ordinals.
             'recurrence_config.week' => ['nullable', 'integer', 'min:-1', 'max:5', 'not_in:0'],
             'recurrence_config.weekday' => ['nullable', 'integer', 'min:1', 'max:7'],
-            'section_id' => ['nullable', 'exists:task_sections,id'],
+            'section_id' => ['nullable', $this->sectionIdRule()],
             'custom_field_values' => ['nullable', 'array'],
         ];
     }

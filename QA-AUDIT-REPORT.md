@@ -76,7 +76,7 @@ jobs. This matters for §10 — there is no `$tries`/`$backoff`/`failed()` surfa
 |---|---|---|
 | Authentication | Yes | PASS |
 | Authorization / IDOR | Yes | PASS |
-| Validation | Yes | **FAIL** (QA-001) |
+| Validation | Yes | **FAIL** (QA-001 — since fixed) |
 | Approval workflow | Yes | PASS |
 | Task recurrence | Yes | PASS (reported defect not reproduced) |
 | Realtime (Echo/soketi) | Yes | PASS (infra), **WARNING** (coverage gaps) |
@@ -97,6 +97,11 @@ jobs. This matters for §10 — there is no `$tries`/`$backoff`/`failed()` surfa
 ### QA-001 — A task can be filed into another project's section
 
 **Severity:** CRITICAL · **Confidence:** CONFIRMED · **Category:** Data integrity / cross-tenant
+**Status:** FIXED 2026-08-21 — `section_id` now validated against the resolved project in all three
+task Form Requests via `ScopesSectionToProject`. Regression tests in
+`tests/Feature/TaskSectionScopingTest.php`. The fix also closes a case not in the original finding:
+a standalone task (no project) could likewise be given any section, since `patchField` applies
+`validated()` wholesale.
 
 **Location:** `app/Http/Requests/PatchTaskRequest.php:38`,
 `app/Http/Requests/StoreTaskRequest.php:58`, `app/Http/Requests/UpdateTaskRequest.php:63`
@@ -470,7 +475,7 @@ unchanged** and is a deliberate design decision awaiting a product call.
 | IDOR — personal to-dos | PASS — explicit ownership check on update/destroy/reorder |
 | IDOR — activity log | PASS — `hasRole('admin')` inside the controller |
 | Mass assignment | PASS — no `update($request->all())` found in controllers |
-| **Cross-project FK** | **FAIL — QA-001** |
+| **Cross-project FK** | **FAIL — QA-001 (fixed)** |
 | File upload / download | PASS — private disk + authorizing route (fixed earlier this session) |
 | Secrets in VCS | **FAIL — QA-006** |
 | PII in logs | **FAIL — QA-002, QA-007** |
@@ -624,7 +629,7 @@ automatically.
 ## 17. Recommended Fix Order
 
 **Phase 1 — Immediate**
-1. QA-001 — scope `section_id` to the project (3 Form Requests + regression test).
+1. ~~QA-001 — scope `section_id` to the project (3 Form Requests + regression test).~~ **Done.**
 2. QA-002 — configure a real mailer or an explicit off switch; scrub rendered mail.
 
 **Phase 2 — High**
@@ -795,7 +800,7 @@ Automated Tests:  511 passed, 0 failed
 4. No CI, and zero coverage on attachments and folders.
 
 **Recommended immediate actions**
-1. Fix QA-001 (cross-project section).
+1. ~~Fix QA-001 (cross-project section).~~ **Done.**
 2. Decide email: real mailer or explicit off — then scrub the log.
 3. Rotate the exposed local `APP_KEY`.
 4. Confirm tomorrow's 02:00 backup and 08:00 escalation actually run.
