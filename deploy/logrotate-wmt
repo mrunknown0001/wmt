@@ -1,0 +1,28 @@
+# Rotation for the one log Laravel does not manage.
+#
+# storage/logs/schedule.log is written by cron redirecting the output of
+# `artisan schedule:run` every minute, so it is not a Laravel channel: switching
+# LOG_STACK to daily rotates laravel.log and leaves this one growing forever.
+# It is worth keeping rather than sending to /dev/null — a scheduler that stops
+# running is invisible without it, which is how the missing cron went unnoticed.
+#
+# Install with:
+#     sudo cp deploy/logrotate-wmt /etc/logrotate.d/wmt
+#     sudo logrotate --debug /etc/logrotate.d/wmt      # dry run
+#
+# Deliberately does not cover laravel-*.log: Laravel's daily driver prunes those
+# itself, and two things rotating the same files tread on each other.
+/var/www/wmt/storage/logs/schedule.log {
+    weekly
+    rotate 4
+    missingok
+    notifempty
+    compress
+    delaycompress
+    # cron reopens the file on each run, so copytruncate is not needed; but the
+    # minute-by-minute schedule means a rename can land mid-write, and truncating
+    # in place keeps that append going to the same inode.
+    copytruncate
+    su www-data www-data
+    create 0644 www-data www-data
+}
