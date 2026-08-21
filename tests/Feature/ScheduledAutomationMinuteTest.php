@@ -117,4 +117,18 @@ class ScheduledAutomationMinuteTest extends TestCase
         $this->artisan('automation:run-scheduled --hour=9 --minute=0 --dry-run')
             ->assertSuccessful();
     }
+
+    public function test_the_no_time_warning_is_not_repeated_every_sweep(): void
+    {
+        // The sweep runs every minute and the condition is permanent, so an
+        // unthrottled warning would write 1,440 identical lines a day per rule.
+        $this->rule([]);
+
+        Log::shouldReceive('warning')->once();
+
+        foreach (range(1, 5) as $ignored) {
+            $this->artisan('automation:run-scheduled --hour=9 --minute=0 --dry-run')
+                ->assertSuccessful();
+        }
+    }
 }

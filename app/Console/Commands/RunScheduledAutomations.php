@@ -6,6 +6,7 @@ use App\Models\ProjectAutomationRule;
 use App\Models\Task;
 use App\Services\AutomationRuleEngine;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -61,7 +62,17 @@ class RunScheduledAutomations extends Command
         // A scheduled rule with no hour can never match any run, so it sits
         // enabled and silent forever. That is indistinguishable from a rule that
         // simply has not come round yet, which is why it is said out loud.
+        //
+        // Once an hour per rule, not once a minute. The condition is permanent —
+        // it stays true on every sweep until somebody edits the rule — so an
+        // unthrottled warning writes 1,440 identical lines a day per bad rule and
+        // buries whatever else is in the log. An hour is often enough to notice
+        // and rare enough to read.
         foreach ($active->filter(fn ($r) => !isset($r->trigger_config['hour'])) as $rule) {
+            if (! Cache::add("automation-rule-no-time:{$rule->id}", true, now()->addHour())) {
+                continue;
+            }
+
             Log::warning('Scheduled automation rule has no time set — it can never fire', [
                 'rule_id' => $rule->id,
                 'rule' => $rule->name,
