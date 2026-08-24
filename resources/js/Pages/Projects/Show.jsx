@@ -4576,6 +4576,27 @@ export default function Show() {
                 const rowIndex = new Map();
                 tasksWithDate.forEach((t, i) => rowIndex.set(t.id, i));
 
+                // Which tasks are actually held up *now*.
+                //
+                // Every task in a chain is technically blocked — in A→B→C→D with A
+                // open, C waits on B and D waits on C — so badging all of them
+                // marked nine rows out of nine and told nobody anything. A badge
+                // is worth reading only where clearing one specific open task
+                // would release this one: that is the frontier of the work.
+                //
+                // So a dependency counts as an *immediate* blocker when it is
+                // open and is not itself waiting on something open.
+                const byId = new Map(allTasks.map((t) => [t.id, t]));
+                const isOpen = (t) => !!t && t.status !== 'done' && t.status !== 'cancelled';
+                const openDepsOf = (t) => (t?.dependencies || []).filter(isOpen);
+                const immediateBlockers = (t) => openDepsOf(t).filter((d) => {
+                    const dep = byId.get(d.id);
+                    // A blocker that is not on this chart cannot be shown to be
+                    // waiting on anything, so treat it as immediate rather than
+                    // silently dropping the warning.
+                    return !dep || openDepsOf(dep).length === 0;
+                });
+
                 // One edge per dependency whose other end is also on the chart.
                 const edges = [];
                 tasksWithDate.forEach((t) => {
@@ -4705,7 +4726,7 @@ export default function Show() {
                                                 const barWidth = Math.max(spanDays * PX_PER_DAY, 6);
                                                 const barColor = PRIORITY_BAR[task.priority] || PRIORITY_BAR.low;
                                                 const opacityCls = STATUS_OPACITY[task.status] || '';
-                                                const blocked = (task.dependencies || []).some((d) => d.status !== 'done' && d.status !== 'cancelled');
+                                                const blockers = immediateBlockers(task);
                                                 const tooltipDate = task.start_date && task.due_date && !isMilestone
                                                     ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}`
                                                     : formatDate(endStr);
@@ -4722,8 +4743,8 @@ export default function Show() {
                                                                 </button>
                                                             </Tooltip>
                                                             <div className="flex items-center gap-1.5 mt-0.5">
-                                                                {blocked && (
-                                                                    <Tooltip content={`Waiting on: ${(task.dependencies || []).filter((d) => d.status !== 'done' && d.status !== 'cancelled').map((d) => d.title).join(', ')}`}>
+                                                                {blockers.length > 0 && (
+                                                                    <Tooltip content={`Waiting on: ${blockers.map((d) => d.title).join(', ')}`}>
                                                                         <span className="text-[10px] text-amber-600 dark:text-amber-400">Blocked</span>
                                                                     </Tooltip>
                                                                 )}
