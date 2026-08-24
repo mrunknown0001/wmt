@@ -289,7 +289,7 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, use
 
 
 export default function Edit() {
-    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
+    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, canFlagMilestone = false, dependencies: initialDependencies = [], dependencyOptions = [], settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -303,6 +303,7 @@ export default function Edit() {
         estimated_minutes: task.estimated_minutes ?? null,
         collaborator_ids: (task.collaborators || []).map((c) => c.id),
         is_recurring: task.is_recurring || false,
+        is_milestone: task.is_milestone || false,
         recurrence_frequency: task.recurrence_frequency || 'weekly',
         recurrence_interval: task.recurrence_interval || 1,
         recurrence_config: task.recurrence_config || null,
@@ -318,9 +319,61 @@ export default function Edit() {
                 else if (cf.type === 'single_select') vals[fieldId] = cfv.value_option_id ? String(cfv.value_option_id) : '';
                 else if (cf.type === 'multi_select') vals[fieldId] = cfv.value_json || [];
             });
+
+
             return vals;
         })(),
     });
+
+    // Dependencies are managed through their own endpoints rather than the form:
+    // adding one can be refused (a loop, another project), and that refusal
+    // should surface immediately, not on save.
+    const [deps, setDeps] = useState(initialDependencies);
+    const [depError, setDepError] = useState(null);
+    const [depBusy, setDepBusy] = useState(false);
+
+    const addDependency = async (id) => {
+        if (!id) return;
+        setDepBusy(true); setDepError(null);
+        try {
+            const res = await fetch(`/tasks/${task.id}/dependencies`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({ depends_on_task_id: Number(id) }),
+            });
+            const body = await res.json();
+            if (!res.ok) {
+                setDepError(body?.errors?.depends_on_task_id?.[0] || body?.message || 'Could not add that dependency.');
+                return;
+            }
+            setDeps(body.dependencies || []);
+        } catch {
+            setDepError('Could not reach the server.');
+        } finally {
+            setDepBusy(false);
+        }
+    };
+
+    const removeDependency = async (id) => {
+        setDepBusy(true); setDepError(null);
+        try {
+            const res = await fetch(`/tasks/${task.id}/dependencies/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+            });
+            const body = await res.json();
+            if (res.ok) setDeps(body.dependencies || []);
+        } finally {
+            setDepBusy(false);
+        }
+    };
 
     const [showStartDate, setShowStartDate] = useState(!!task.start_date);
     const [activeTab, setActiveTab] = useState('comments');
@@ -659,6 +712,67 @@ export default function Edit() {
                                         Remove start date
                                     </button>
                                 )}
+                            </div>
+
+                            {canFlagMilestone && (
+                                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.is_milestone}
+                                            onChange={(e) => setData('is_milestone', e.target.checked)}
+                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                        />
+                                        <span className="inline-block w-2.5 h-2.5 bg-purple-600 rotate-45" />
+                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Milestone</span>
+                                    </label>
+                                    <p className="mt-1.5 ml-6 text-xs text-gray-500 dark:text-gray-400">
+                                        A moment rather than a stretch of work. The Gantt shows it as a diamond, and the
+                                        start date follows the due date.
+                                    </p>
+                                    {errors.is_milestone && <p className="mt-1 ml-6 text-xs text-red-600">{errors.is_milestone}</p>}
+                                </div>
+                            )}
+
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Waiting on</div>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    This task cannot be marked Done or Cancelled until everything listed here is done.
+                                </p>
+
+                                {deps.length > 0 ? (
+                                    <ul className="mt-3 space-y-1.5">
+                                        {deps.map((d) => (
+                                            <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
+                                                <span className="flex items-center gap-2 min-w-0">
+                                                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${d.status === 'done' || d.status === 'cancelled' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                                                    <span className="truncate text-gray-700 dark:text-gray-200">{d.title}</span>
+                                                </span>
+                                                {canManageTaskDetails && (
+                                                    <button type="button" onClick={() => removeDependency(d.id)} disabled={depBusy}
+                                                        className="text-xs text-gray-400 hover:text-red-600 shrink-0">Remove</button>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="mt-3 text-sm text-gray-400 dark:text-gray-500">Nothing yet.</p>
+                                )}
+
+                                {canManageTaskDetails && dependencyOptions.length > 0 && (
+                                    <select
+                                        value=""
+                                        disabled={depBusy}
+                                        onChange={(e) => { addDependency(e.target.value); e.target.value = ''; }}
+                                        className="mt-3 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 text-sm"
+                                    >
+                                        <option value="">Add a task this one waits on…</option>
+                                        {dependencyOptions
+                                            .filter((o) => !deps.some((d) => d.id === o.id))
+                                            .map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+                                    </select>
+                                )}
+                                {depError && <p className="mt-2 text-xs text-red-600">{depError}</p>}
                             </div>
 
                             {!task.parent_id && (

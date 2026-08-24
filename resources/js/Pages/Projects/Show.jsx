@@ -1490,6 +1490,22 @@ export default function Show() {
     const [localCustomFields, setLocalCustomFields] = useState(initialCustomFields);
     const [showDetails, setShowDetails] = useState(false);
     const [view, setView] = useState('list');
+
+    // Gantt time scale. A day grid at 40px per day makes a two-year project a
+    // 29,000px canvas, so anything longer than a few weeks needs coarser units.
+    // Remembered per project, the same way column preferences are.
+    const [ganttScale, setGanttScale] = useState(() => {
+        try {
+            return localStorage.getItem(`gantt-scale-${project?.id}`) || 'day';
+        } catch {
+            return 'day';
+        }
+    });
+    const changeGanttScale = (next) => {
+        setGanttScale(next);
+        try { localStorage.setItem(`gantt-scale-${project?.id}`, next); } catch { /* private mode */ }
+    };
+
     const [filterSearch, setFilterSearch] = useState('');
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [dynamicFilters, setDynamicFilters] = useState([]); // [{id, fieldId, operator, value}]
@@ -4441,11 +4457,30 @@ export default function Show() {
                 };
                 const STATUS_OPACITY = { done: 'opacity-50', cancelled: 'opacity-30' };
 
+                // Geometry is a pure function of dates: every x is
+                // daysFromRangeStart * PX_PER_DAY. Columns are only what the
+                // header and grid lines draw, so changing scale never has to
+                // touch the bar, diamond or arrow maths.
+                const SCALES = {
+                    day:   { pxPerDay: 40,  step: 'day' },
+                    week:  { pxPerDay: 8,   step: 'week' },
+                    month: { pxPerDay: 3.2, step: 'month' },
+                };
+                const scale = SCALES[ganttScale] || SCALES.day;
+                const PX_PER_DAY = scale.pxPerDay;
+                const ROW_H = 44;          // fixed, so arrows can be positioned by row index
+                const LABEL_W = 240;       // matches the w-60 name column
+                const MS_DAY = 1000 * 60 * 60 * 24;
+
+                const dayOf = (v) => new Date(String(v).split('T')[0] + 'T00:00:00');
+
                 // Flatten all tasks with due dates for range calculation
+                // filteredTasks, not the raw list: the Gantt has to honour the
+                // same filters as every other view on this page.
                 const allTasks = [];
                 filteredTasks.forEach((t) => {
                     allTasks.push({ ...t, isSubtask: false });
-                    if (t.subtasks) t.subtasks.forEach((s) => allTasks.push({ ...s, isSubtask: true, parentTitle: t.title }));
+                    (t.subtasks || []).forEach((st) => allTasks.push({ ...st, isSubtask: true, parentId: t.id }));
                 });
 
                 const tasksWithDate = allTasks.filter((t) => t.due_date || t.start_date);
@@ -4454,16 +4489,14 @@ export default function Show() {
                 // Calculate date range
                 let rangeStart, rangeEnd;
                 if (tasksWithDate.length > 0) {
-                    const dates = tasksWithDate.flatMap((t) => [t.start_date, t.due_date].filter(Boolean).map((d) => new Date(d.split('T')[0])));
+                    const dates = tasksWithDate.flatMap((t) => [t.start_date, t.due_date].filter(Boolean).map((d) => dayOf(d).getTime()));
                     const minDate = new Date(Math.min(...dates));
                     const maxDate = new Date(Math.max(...dates));
-                    // Pad range by 3 days on each side
                     rangeStart = new Date(minDate);
                     rangeStart.setDate(rangeStart.getDate() - 3);
                     rangeEnd = new Date(maxDate);
                     rangeEnd.setDate(rangeEnd.getDate() + 3);
-                    // Minimum 14 days range
-                    const diffDays = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24));
+                    const diffDays = Math.ceil((rangeEnd - rangeStart) / MS_DAY);
                     if (diffDays < 14) {
                         rangeEnd = new Date(rangeStart);
                         rangeEnd.setDate(rangeEnd.getDate() + 14);
@@ -4475,36 +4508,92 @@ export default function Show() {
                     rangeEnd = new Date(now);
                     rangeEnd.setDate(rangeEnd.getDate() + 14);
                 }
+                rangeStart.setHours(0, 0, 0, 0);
 
-                // Generate day columns
-                const days = [];
-                const d = new Date(rangeStart);
-                while (d <= rangeEnd) {
-                    days.push(new Date(d));
-                    d.setDate(d.getDate() + 1);
+                // Whole weeks at week scale, whole months at month scale, so the
+                // first column is not a stub.
+                if (scale.step === 'week') {
+                    rangeStart.setDate(rangeStart.getDate() - rangeStart.getDay());
+                } else if (scale.step === 'month') {
+                    rangeStart.setDate(1);
                 }
 
-                const todayStr = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; })();
-                const COL_WIDTH = 40; // px per day column
-                const totalWidth = days.length * COL_WIDTH;
+                const totalDays = Math.max(Math.ceil((rangeEnd - rangeStart) / MS_DAY) + 1, 1);
+                const totalWidth = totalDays * PX_PER_DAY;
 
-                // Group days by month for header
-                const monthGroups = [];
-                let current = null;
-                days.forEach((day, idx) => {
-                    const key = `${day.getFullYear()}-${day.getMonth()}`;
-                    if (!current || current.key !== key) {
-                        current = { key, label: day.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), start: idx, span: 1 };
-                        monthGroups.push(current);
+                const xFor = (dateStr) => ((dayOf(dateStr) - rangeStart) / MS_DAY) * PX_PER_DAY;
+
+                // Columns for the grid and the lower header row.
+                const columns = [];
+                {
+                    const cur = new Date(rangeStart);
+                    while (cur <= rangeEnd) {
+                        const start = new Date(cur);
+                        let span;                     // in days
+                        if (scale.step === 'day') {
+                            span = 1;
+                            cur.setDate(cur.getDate() + 1);
+                        } else if (scale.step === 'week') {
+                            span = 7;
+                            cur.setDate(cur.getDate() + 7);
+                        } else {
+                            span = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+                            cur.setMonth(cur.getMonth() + 1);
+                        }
+                        columns.push({ start, span, width: span * PX_PER_DAY });
+                    }
+                }
+
+                // Upper header row: months when zoomed into days or weeks, years
+                // when zoomed out to months.
+                const groups = [];
+                columns.forEach((col) => {
+                    const key = scale.step === 'month'
+                        ? `${col.start.getFullYear()}`
+                        : `${col.start.getFullYear()}-${col.start.getMonth()}`;
+                    const label = scale.step === 'month'
+                        ? String(col.start.getFullYear())
+                        : col.start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    const last = groups[groups.length - 1];
+                    if (last && last.key === key) {
+                        last.width += col.width;
                     } else {
-                        current.span++;
+                        groups.push({ key, label, width: col.width });
                     }
                 });
 
-                const getDayOffset = (dateStr) => {
-                    const target = new Date(dateStr.split('T')[0]);
-                    return Math.round((target - rangeStart) / (1000 * 60 * 60 * 24));
+                const colLabel = (col) => {
+                    if (scale.step === 'day') return String(col.start.getDate());
+                    if (scale.step === 'week') return col.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    return col.start.toLocaleDateString('en-US', { month: 'short' });
                 };
+
+                const todayX = xFor(new Date().toISOString());
+                const showToday = todayX >= 0 && todayX <= totalWidth;
+
+                // Row index by task id — the arrows need to know which row each
+                // end of an edge sits on.
+                const rowIndex = new Map();
+                tasksWithDate.forEach((t, i) => rowIndex.set(t.id, i));
+
+                // One edge per dependency whose other end is also on the chart.
+                const edges = [];
+                tasksWithDate.forEach((t) => {
+                    (t.dependencies || []).forEach((dep) => {
+                        if (!rowIndex.has(dep.id)) return;   // off-chart: nothing to draw to
+                        const from = tasksWithDate[rowIndex.get(dep.id)];
+                        const fromDate = from.due_date || from.start_date;
+                        const toDate = t.start_date || t.due_date;
+                        if (!fromDate || !toDate) return;
+                        edges.push({
+                            key: `${dep.id}-${t.id}`,
+                            x1: xFor(fromDate) + (from.is_milestone ? 0 : PX_PER_DAY),
+                            y1: rowIndex.get(dep.id) * ROW_H + ROW_H / 2,
+                            x2: xFor(toDate),
+                            y2: rowIndex.get(t.id) * ROW_H + ROW_H / 2,
+                        });
+                    });
+                });
 
                 return (
                     <div className="h-full flex flex-col min-h-0">
@@ -4515,107 +4604,168 @@ export default function Show() {
                             />
                         ) : (
                             <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex-1 min-h-0 flex flex-col">
+                                {/* Zoom */}
+                                <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <span className="inline-block w-4 h-2 rounded-sm bg-blue-500" /> Task
+                                        </span>
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <span className="inline-block w-2.5 h-2.5 bg-purple-600 rotate-45" /> Milestone
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-[11px] text-gray-500 dark:text-gray-400 mr-1">Zoom</span>
+                                        {[['day', 'Day'], ['week', 'Week'], ['month', 'Month']].map(([val, label]) => (
+                                            <button
+                                                key={val}
+                                                onClick={() => changeGanttScale(val)}
+                                                className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
+                                                    ganttScale === val
+                                                        ? 'border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300'
+                                                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                                }`}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div className="overflow-auto flex-1 min-h-0">
-                                    <div style={{ minWidth: `${240 + totalWidth}px` }}>
-                                        {/* Header: month row */}
+                                    <div style={{ minWidth: `${LABEL_W + totalWidth}px` }}>
+                                        {/* Header: month (or year) row */}
                                         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                                            <div className="w-60 shrink-0 px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase border-r border-gray-200 dark:border-gray-700">Task</div>
+                                            <div className="w-60 shrink-0 px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-r border-gray-200 dark:border-gray-700">Task</div>
                                             <div className="flex">
-                                                {monthGroups.map((mg) => (
-                                                    <div key={mg.key} style={{ width: `${mg.span * COL_WIDTH}px` }} className="text-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 py-1.5 border-r border-gray-100 dark:border-gray-700/50">{mg.label}</div>
+                                                {groups.map((g) => (
+                                                    <div key={g.key} style={{ width: `${g.width}px` }} className="text-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 py-1 border-r border-gray-200 dark:border-gray-700">{g.label}</div>
                                                 ))}
                                             </div>
                                         </div>
 
-                                        {/* Header: day row */}
+                                        {/* Header: unit row */}
                                         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                                             <div className="w-60 shrink-0 border-r border-gray-200 dark:border-gray-700" />
                                             <div className="flex">
-                                                {days.map((day) => {
-                                                    const ds = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-                                                    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                                                {columns.map((col, i) => {
+                                                    const isWeekend = scale.step === 'day' && (col.start.getDay() === 0 || col.start.getDay() === 6);
                                                     return (
                                                         <div
-                                                            key={ds}
-                                                            style={{ width: `${COL_WIDTH}px` }}
-                                                            className={`text-center text-[10px] py-1 border-r border-gray-100 dark:border-gray-700/50 ${ds === todayStr ? 'bg-blue-50 dark:bg-blue-900/20 font-bold text-blue-600 dark:text-blue-400' : isWeekend ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}
+                                                            key={i}
+                                                            style={{ width: `${col.width}px` }}
+                                                            className={`text-center text-[10px] py-1 border-r border-gray-100 dark:border-gray-700/50 overflow-hidden whitespace-nowrap ${isWeekend ? 'bg-gray-100 dark:bg-gray-800 text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}
                                                         >
-                                                            <div>{day.getDate()}</div>
-                                                            <div className="text-[9px]">{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][day.getDay()]}</div>
+                                                            {colLabel(col)}
                                                         </div>
                                                     );
                                                 })}
                                             </div>
                                         </div>
 
-                                        {/* Task rows */}
-                                        {tasksWithDate.map((task) => {
-                                            const startOffset = task.start_date ? getDayOffset(task.start_date) : null;
-                                            const endOffset = task.due_date ? getDayOffset(task.due_date) : null;
-                                            const hasRange = startOffset !== null && endOffset !== null;
-                                            const barOffset = hasRange ? startOffset : (endOffset ?? startOffset);
-                                            const barSpan = hasRange ? Math.max(endOffset - startOffset + 1, 1) : 1;
-                                            const barWidth = hasRange ? barSpan * COL_WIDTH : 96; // 96px = w-24 for single-date pill
-                                            const isDone = task.status === 'done';
-                                            const barColor = PRIORITY_BAR[task.priority] || PRIORITY_BAR.low;
-                                            const opacityCls = STATUS_OPACITY[task.status] || '';
-                                            const tooltipDate = hasRange ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}` : task.due_date ? `Due: ${formatDate(task.due_date)}` : `Start: ${formatDate(task.start_date)}`;
-                                            return (
-                                                <div key={task.id} className={`flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${opacityCls}`}>
-                                                    <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-8' : ''}`}>
-                                                        <Tooltip content={task.title}>
-                                                            <button
-                                                                onClick={() => setDetailTaskId(task.id)}
-                                                                className={`text-sm truncate block max-w-full text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}
-                                                            >
-                                                                {task.isSubtask && (
-                                                                    <svg className="inline h-3 w-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                                                                )}
-                                                                {task.title}
-                                                            </button>
-                                                        </Tooltip>
-                                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                                            {task.assignee && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate">{task.assignee.name}</span>}
-                                                        </div>
-                                                    </div>
-                                                    <div className="relative flex-1" style={{ width: `${totalWidth}px` }}>
-                                                        {/* Grid lines */}
-                                                        <div className="absolute inset-0 flex">
-                                                            {days.map((day) => {
-                                                                const ds = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-                                                                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                                                                return (
-                                                                    <div
-                                                                        key={ds}
-                                                                        style={{ width: `${COL_WIDTH}px` }}
-                                                                        className={`border-r border-gray-100 dark:border-gray-700/30 ${ds === todayStr ? 'bg-blue-50/50 dark:bg-blue-900/10' : isWeekend ? 'bg-gray-50/30 dark:bg-gray-800/20' : ''}`}
-                                                                    />
-                                                                );
-                                                            })}
-                                                        </div>
-                                                        {/* Task bar */}
-                                                        {barOffset >= 0 && barOffset < days.length && (
-                                                            <Tooltip content={`${task.title} — ${tooltipDate} — ${formatLabel(task.status)}`}>
-                                                            <Link
-                                                                href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                                className="absolute top-1/2 -translate-y-1/2 group z-10"
-                                                                style={{ left: `${barOffset * COL_WIDTH + (hasRange ? 0 : COL_WIDTH / 2 - 12)}px` }}
-                                                            >
-                                                                <div
-                                                                    className={`h-5 rounded-full ${barColor} shadow-sm group-hover:shadow-md transition-shadow flex items-center justify-center`}
-                                                                    style={{ width: `${barWidth}px` }}
-                                                                >
-                                                                    <span className="text-[9px] text-white font-medium truncate px-1.5">{task.title}</span>
-                                                                </div>
-                                                            </Link>
-                                                            </Tooltip>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                        {/* Rows + dependency arrows share one positioned container, so
+                                            the overlay scrolls with the bars instead of drifting. */}
+                                        <div className="relative">
+                                            {edges.length > 0 && (
+                                                <svg
+                                                    className="absolute pointer-events-none z-10"
+                                                    style={{ left: `${LABEL_W}px`, top: 0, width: `${totalWidth}px`, height: `${tasksWithDate.length * ROW_H}px` }}
+                                                >
+                                                    <defs>
+                                                        <marker id="gantt-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                                                            <path d="M0,0 L6,3 L0,6 z" className="fill-gray-400 dark:fill-gray-500" />
+                                                        </marker>
+                                                    </defs>
+                                                    {edges.map((e) => {
+                                                        // Elbow: out of the predecessor, across, then into the
+                                                        // left edge of the dependent task.
+                                                        const midX = Math.max(e.x1 + 10, e.x2 - 12);
+                                                        return (
+                                                            <path
+                                                                key={e.key}
+                                                                d={`M ${e.x1} ${e.y1} H ${midX} V ${e.y2} H ${e.x2 - 4}`}
+                                                                fill="none"
+                                                                strokeWidth="1.5"
+                                                                className="stroke-gray-400 dark:stroke-gray-500"
+                                                                markerEnd="url(#gantt-arrow)"
+                                                            />
+                                                        );
+                                                    })}
+                                                </svg>
+                                            )}
 
-                                        {/* Tasks without due date */}
+                                            {tasksWithDate.map((task) => {
+                                                const isMilestone = !!task.is_milestone;
+                                                const startStr = task.start_date || task.due_date;
+                                                const endStr = task.due_date || task.start_date;
+                                                const left = xFor(isMilestone ? endStr : startStr);
+                                                const spanDays = Math.max(((dayOf(endStr) - dayOf(startStr)) / MS_DAY) + 1, 1);
+                                                // Below about 6px a bar stops reading as a bar; at month
+                                                // scale a one-day task would otherwise be 3px of nothing.
+                                                const barWidth = Math.max(spanDays * PX_PER_DAY, 6);
+                                                const barColor = PRIORITY_BAR[task.priority] || PRIORITY_BAR.low;
+                                                const opacityCls = STATUS_OPACITY[task.status] || '';
+                                                const blocked = (task.dependencies || []).some((d) => d.status !== 'done' && d.status !== 'cancelled');
+                                                const tooltipDate = task.start_date && task.due_date && !isMilestone
+                                                    ? `${formatDate(task.start_date)} → ${formatDate(task.due_date)}`
+                                                    : formatDate(endStr);
+                                                return (
+                                                    <div key={task.id} className="flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-800/30" style={{ height: `${ROW_H}px` }}>
+                                                        <div className={`w-60 shrink-0 px-3 py-2 border-r border-gray-200 dark:border-gray-700 ${task.isSubtask ? 'pl-7' : ''}`}>
+                                                            <Tooltip content={task.title}>
+                                                                <button
+                                                                    onClick={() => setDetailTaskId(task.id)}
+                                                                    className="text-sm truncate block max-w-full text-left hover:text-blue-600 dark:hover:text-blue-400 text-gray-700 dark:text-gray-200"
+                                                                >
+                                                                    {isMilestone && <span className="inline-block w-2 h-2 mr-1.5 bg-purple-600 rotate-45 align-middle" />}
+                                                                    {task.title}
+                                                                </button>
+                                                            </Tooltip>
+                                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                                {blocked && (
+                                                                    <Tooltip content={`Waiting on: ${(task.dependencies || []).filter((d) => d.status !== 'done' && d.status !== 'cancelled').map((d) => d.title).join(', ')}`}>
+                                                                        <span className="text-[10px] text-amber-600 dark:text-amber-400">Blocked</span>
+                                                                    </Tooltip>
+                                                                )}
+                                                                {task.assignee && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate">{task.assignee.name}</span>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="relative" style={{ width: `${totalWidth}px` }}>
+                                                            {/* Grid lines */}
+                                                            <div className="absolute inset-0 flex">
+                                                                {columns.map((col, i) => {
+                                                                    const isWeekend = scale.step === 'day' && (col.start.getDay() === 0 || col.start.getDay() === 6);
+                                                                    return <div key={i} style={{ width: `${col.width}px` }} className={`border-r border-gray-100 dark:border-gray-700/30 ${isWeekend ? 'bg-gray-50 dark:bg-gray-800/40' : ''}`} />;
+                                                                })}
+                                                            </div>
+                                                            {showToday && (
+                                                                <div className="absolute top-0 bottom-0 border-l border-red-400/70 dark:border-red-500/60" style={{ left: `${todayX}px` }} />
+                                                            )}
+
+                                                            {isMilestone ? (
+                                                                <Tooltip content={`${task.title} — ${tooltipDate} — milestone`}>
+                                                                    <Link
+                                                                        href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                                                        className={`absolute z-20 ${opacityCls}`}
+                                                                        style={{ left: `${left - 6}px`, top: `${ROW_H / 2 - 6}px` }}
+                                                                    >
+                                                                        <span className="block w-3 h-3 bg-purple-600 rotate-45 hover:scale-110 transition-transform" />
+                                                                    </Link>
+                                                                </Tooltip>
+                                                            ) : (
+                                                                <Tooltip content={`${task.title} — ${tooltipDate} — ${formatLabel(task.status)}`}>
+                                                                    <Link
+                                                                        href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                                                        className={`absolute h-5 rounded ${barColor} ${opacityCls} hover:brightness-110 transition-all z-20`}
+                                                                        style={{ left: `${left}px`, width: `${barWidth}px`, top: `${ROW_H / 2 - 10}px` }}
+                                                                    />
+                                                                </Tooltip>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                         {tasksNoDate.length > 0 && (
                                             <>
                                                 <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30">

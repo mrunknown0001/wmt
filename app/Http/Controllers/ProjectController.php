@@ -367,6 +367,9 @@ class ProjectController extends Controller
                     // value — an N+1 across every task on the page.
                     'customFieldValues.selectedOption', 'customFieldValues.customField',
                     'subtasks.customFieldValues.selectedOption', 'subtasks.customFieldValues.customField',
+                    // Just the ends of each edge: the Gantt needs an id to draw an
+                    // arrow to, and a status to know whether it is still blocking.
+                    'dependencies' => fn ($q) => $q->select('tasks.id', 'title', 'status'),
                 ])
                 ->withCount('subtasks')
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')])
@@ -392,6 +395,9 @@ class ProjectController extends Controller
                     'subtasks.assignee', 'subtasks.collaborators',
                     'customFieldValues.selectedOption', 'customFieldValues.customField',
                     'subtasks.customFieldValues.selectedOption', 'subtasks.customFieldValues.customField',
+                    // Just the ends of each edge: the Gantt needs an id to draw an
+                    // arrow to, and a status to know whether it is still blocking.
+                    'dependencies' => fn ($q) => $q->select('tasks.id', 'title', 'status'),
                 ])
                 ->withCount(['subtasks' => fn ($q) => $q->where('assigned_to', $userId)])
                 ->withCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('assigned_to', $userId)->where('status', 'done')])
