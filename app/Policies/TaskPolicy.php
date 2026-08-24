@@ -76,4 +76,18 @@ class TaskPolicy
         // assigned to a task does not let you delete it.
         return $task->project->userCanManageTasks($user);
     }
+
+    /**
+     * May mark this task as a milestone, or clear the mark.
+     *
+     * Narrower than update() on purpose: an assignee owns the progress of their
+     * task, but a milestone is a statement about the project's shape, so it
+     * stays with whoever runs the project.
+     */
+    public function flagMilestone(User $user, Task $task): bool
+    {
+        $project = $task->project;
+
+        return $project !== null && $user->can('update', $project);
+    }
 }

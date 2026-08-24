@@ -40,6 +40,7 @@ class Task extends Model
         'description',
         'status',
         'priority',
+        'is_milestone',
         'assigned_to',
         'created_by',
         'start_date',
@@ -60,6 +61,7 @@ class Task extends Model
     protected function casts(): array
     {
         return [
+            'is_milestone' => 'boolean',
             // Date-only columns, serialised as a plain calendar date.
             //
             // Plain 'date' serialises through Carbon::toJSON(), which converts
@@ -131,6 +133,14 @@ class Task extends Model
         });
 
         static::saving(function (Task $task) {
+            // A milestone marks a moment, not a span, so its dates are held
+            // equal. Collapsing here rather than validating means a caller can
+            // simply tick the box: every write path lands on the same rule, and
+            // the UI has nothing to keep in sync.
+            if ($task->is_milestone) {
+                $task->start_date = $task->due_date;
+            }
+
             if ($task->isDirty('status')) {
                 $newStatus = $task->status;
                 $oldStatus = $task->getOriginal('status');
@@ -139,6 +149,10 @@ class Task extends Model
                 // carries an attachment. Enforced here rather than per-controller so
                 // every path (edit, patch, kanban drag, bulk update) is covered.
                 $task->assertClosableUnderProjectRules($newStatus, $oldStatus);
+
+                // Same reasoning for dependencies: a task waiting on unfinished
+                // work cannot be closed, whichever path is trying to close it.
+                $task->assertDependenciesSatisfied($newStatus, $oldStatus);
 
                 if ($newStatus === 'done' && $oldStatus !== 'done') {
                     $task->completed_at = now();
@@ -511,5 +525,84 @@ class Task extends Model
         }
 
         return "/tasks/{$this->id}/edit";
+    }
+
+    /**
+     * Tasks this one waits on. It cannot be closed until all of them are done.
+     */
+    public function dependencies(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'task_dependencies', 'task_id', 'depends_on_task_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Tasks waiting on this one — the other side of the same edge. Used to draw
+     * the arrows, and to warn before deleting something others depend on.
+     */
+    public function dependents(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'task_dependencies', 'depends_on_task_id', 'task_id')
+            ->withTimestamps();
+    }
+
+    /** Dependencies that are not finished yet, and so are blocking this task. */
+    public function blockingDependencies()
+    {
+        return $this->dependencies()->whereNotIn('status', ['done', 'cancelled']);
+    }
+
+    /**
+     * Refuse to close a task while something it depends on is unfinished.
+     *
+     * Deliberately mirrors assertClosableUnderProjectRules: same trigger (the
+     * transition *into* a closing status), same hard refusal, same choke point
+     * in saving(). That is what makes the kanban drag, the API, bulk update and
+     * automation all obey it without each having to remember to ask.
+     *
+     * 'cancelled' counts as satisfied. A dependency that was called off is not
+     * going to complete, and leaving it to block everything downstream forever
+     * would make cancelling a task a way to deadlock a project.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    public function assertDependenciesSatisfied(?string $newStatus, ?string $oldStatus): void
+    {
+        if (!in_array($newStatus, self::CLOSING_STATUSES, true)
+            || in_array($oldStatus, self::CLOSING_STATUSES, true)) {
+            return;
+        }
+
+        if (!$this->exists) {
+            return; // nothing can depend on a task that is not saved yet
+        }
+
+        $blocking = $this->blockingDependencies()->pluck('title')->all();
+
+        if (empty($blocking)) {
+            return;
+        }
+
+        $list = count($blocking) === 1
+            ? '"' . $blocking[0] . '"'
+            : '"' . implode('", "', array_slice($blocking, 0, 3)) . '"'
+                . (count($blocking) > 3 ? ' and ' . (count($blocking) - 3) . ' more' : '');
+
+        $message = count($blocking) === 1
+            ? "This task is waiting on {$list}, which is not done yet."
+            : "This task is waiting on {$list}, which are not done yet.";
+
+        // Flash for Inertia callers so they get a toast; JSON callers read the
+        // 422 body instead. Same split as the attachment rule, for the same
+        // reason — a flash a JSON caller never renders resurfaces later as a
+        // stale toast on an unrelated page.
+        $request = request();
+        if ($request && !$request->expectsJson() && $request->hasSession()) {
+            $request->session()->flash('error', $message);
+        }
+
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'status' => $message,
+        ]);
     }
 }

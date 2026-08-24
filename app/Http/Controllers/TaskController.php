@@ -357,6 +357,18 @@ class TaskController extends Controller
             'recurrenceFrequencies' => Task::RECURRENCE_FREQUENCIES,
             'recurrenceChain' => $recurrenceChain,
             'canManageTaskDetails' => $canManageTaskDetails,
+
+            // Milestones and dependencies. The flag is gated more tightly than
+            // the rest of the form — see TaskPolicy::flagMilestone.
+            'canFlagMilestone' => auth()->user()->can('flagMilestone', $task),
+            'dependencies' => $task->dependencies()->get(['tasks.id', 'title', 'status'])->all(),
+            'dependencyOptions' => $task->project_id
+                ? Task::where('project_id', $task->project_id)
+                    ->where('id', '!=', $task->id)
+                    ->orderBy('title')
+                    ->get(['id', 'title', 'status'])
+                    ->all()
+                : [],
             'isStandalone' => false,
             'customFields' => $customFields,
             'customFieldValues' => $customFieldValues,

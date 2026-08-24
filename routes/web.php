@@ -9,6 +9,7 @@ use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\StandaloneTaskController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\MyTaskController;
 use App\Http\Controllers\NoteController;
@@ -113,6 +114,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/tasks/{task}/edit', [StandaloneTaskController::class, 'edit'])->name('tasks.edit');
     Route::put('/tasks/{task}', [StandaloneTaskController::class, 'update'])->name('tasks.update');
     Route::delete('/tasks/{task}', [StandaloneTaskController::class, 'destroy'])->name('tasks.destroy');
+    // Task dependencies: "this task waits on that one".
+    Route::post('/tasks/{task}/dependencies', [TaskDependencyController::class, 'store'])->name('tasks.dependencies.store');
+    Route::delete('/tasks/{task}/dependencies/{dependency}', [TaskDependencyController::class, 'destroy'])->name('tasks.dependencies.destroy');
     Route::patch('/tasks/{task}/patch', [StandaloneTaskController::class, 'patchField'])->name('tasks.patch');
     Route::get('/tasks/{task}/timeline', [StandaloneTaskController::class, 'timeline'])->name('tasks.timeline');
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'storeStandalone'])->name('standalone-tasks.comments.store');

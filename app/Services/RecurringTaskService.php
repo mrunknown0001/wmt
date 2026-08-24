@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CustomField;
 use App\Models\Task;
+use App\Services\TaskDependencyService;
 use App\Models\TaskActivity;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
@@ -119,6 +120,11 @@ class RecurringTaskService
         if (!empty($collaboratorIds)) {
             $newTask->collaborators()->sync($collaboratorIds);
         }
+
+        // A recurring task that waits on something waits on it every cycle, so
+        // the edges come along. The helper skips any edge that would point the
+        // new occurrence at the one it replaces.
+        TaskDependencyService::copyTo($task, $newTask);
 
         // Custom fields on a new occurrence:
         //
