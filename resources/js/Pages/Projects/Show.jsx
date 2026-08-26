@@ -2333,7 +2333,20 @@ export default function Show() {
     // Palette for option columns. Status columns keep their own semantic colours;
     // an arbitrary field has no inherent meaning, so options are coloured by
     // position purely to tell the columns apart.
-    const OPTION_DOTS = ['bg-blue-500', 'bg-purple-500', 'bg-teal-500', 'bg-amber-500', 'bg-rose-500', 'bg-lime-500'];
+    //
+    // Each entry carries the pill as well as the dot. A status column gets its
+    // colours from taskStatusColors; an option column has no equivalent, and
+    // leaving the pill unstyled left the label taking whatever colour it
+    // inherited — which on a dark ground was dark grey on near-black.
+    const OPTION_STYLES = [
+        { dot: 'bg-blue-500',   pill: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' },
+        { dot: 'bg-purple-500', pill: 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300' },
+        { dot: 'bg-teal-500',   pill: 'bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300' },
+        { dot: 'bg-amber-500',  pill: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' },
+        { dot: 'bg-rose-500',   pill: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300' },
+        { dot: 'bg-lime-500',   pill: 'bg-lime-50 text-lime-700 dark:bg-lime-500/15 dark:text-lime-300' },
+    ];
+    const NOT_SET_STYLE = { dot: 'bg-gray-400', pill: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' };
 
     /**
      * The Board's columns, and the tasks in each.
@@ -2355,19 +2368,24 @@ export default function Show() {
         const valueOf = (t) => (t.custom_field_values || [])
             .find((v) => v.custom_field_id === boardField.id)?.value_option_id ?? null;
 
-        const cols = (boardField.options || []).map((o, i) => ({
-            id: `opt-${o.id}`,
-            optionId: o.id,
-            label: o.label,
-            dotClass: OPTION_DOTS[i % OPTION_DOTS.length],
-            tasks: filteredTasks.filter((t) => String(valueOf(t)) === String(o.id)),
-        }));
+        const cols = (boardField.options || []).map((o, i) => {
+            const style = OPTION_STYLES[i % OPTION_STYLES.length];
+            return {
+                id: `opt-${o.id}`,
+                optionId: o.id,
+                label: o.label,
+                dotClass: style.dot,
+                badgeClass: style.pill,
+                tasks: filteredTasks.filter((t) => String(valueOf(t)) === String(o.id)),
+            };
+        });
 
         cols.push({
             id: 'opt-none',
             optionId: null,
             label: 'Not set',
-            dotClass: 'bg-gray-400',
+            dotClass: NOT_SET_STYLE.dot,
+            badgeClass: NOT_SET_STYLE.pill,
             tasks: filteredTasks.filter((t) => !valueOf(t)),
         });
 
@@ -4375,7 +4393,7 @@ export default function Show() {
                                 ))}
                             </select>
                             {boardField && (
-                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
                                     Dragging a card sets its {boardField.name}.
                                 </span>
                             )}
@@ -4396,6 +4414,7 @@ export default function Show() {
                                         columnId={col.id}
                                         label={col.label}
                                         dotClass={col.dotClass}
+                                        badgeClass={col.badgeClass}
                                         tasks={col.tasks}
                                         projectId={project.id}
                                         canManageTasks={canManageTasks}
