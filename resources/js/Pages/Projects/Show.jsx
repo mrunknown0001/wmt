@@ -4,6 +4,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import {
     DndContext,
     DragOverlay,
+    closestCenter,
     closestCorners,
     KeyboardSensor,
     PointerSensor,
@@ -3144,10 +3145,18 @@ export default function Show() {
 
             // If dropping on a specific task, insert before/after it
             if (!overId.startsWith('column-')) {
-                const overIdx = targetTasks.findIndex((t) => t.id === over.id);
                 const movedTask = targetTasks.find((t) => t.id === active.id);
                 const withoutMoved = targetTasks.filter((t) => t.id !== active.id);
-                withoutMoved.splice(overIdx, 0, movedTask);
+
+                // Index within the list the card is being inserted *into*.
+                // Taken from targetTasks it was one too high whenever the moved
+                // card happened to sort above the card being dropped on — the
+                // status was already reassigned above, so targetTasks still
+                // contained it, carrying its old position from the other column.
+                const overIdx = withoutMoved.findIndex((t) => t.id === over.id);
+                const insertAt = overIdx === -1 ? withoutMoved.length : overIdx;
+
+                withoutMoved.splice(insertAt, 0, movedTask);
                 withoutMoved.forEach((t, i) => {
                     const idx = updated.findIndex((u) => u.id === t.id);
                     updated[idx].position = i;
@@ -4399,9 +4408,15 @@ export default function Show() {
                             )}
                         </div>
                     )}
+                    {/* closestCenter, not closestCorners: a column's droppable spans
+                        the full height of the list, so by corner distance it beat the
+                        card actually under the pointer and nearly every cross-column
+                        drop fell through to "dropped on empty space" — which appends.
+                        Comparing centres lets the card win, so where you drop decides
+                        where it lands. */}
                     <DndContext
                         sensors={sensors}
-                        collisionDetection={closestCorners}
+                        collisionDetection={closestCenter}
                         onDragStart={handleDragStart}
                         onDragEnd={handleBoardDragEnd}
                     >
