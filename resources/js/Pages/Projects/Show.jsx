@@ -1494,6 +1494,22 @@ export default function Show() {
     // Gantt time scale. A day grid at 40px per day makes a two-year project a
     // 29,000px canvas, so anything longer than a few weeks needs coarser units.
     // Remembered per project, the same way column preferences are.
+    // What the Board's columns stand for: task status, or the options of one of
+    // the project's single-select custom fields. Only single-select qualifies —
+    // a column has to be one value, and text, numbers, dates and multi-select
+    // give either an unbounded set of columns or a task belonging in several.
+    const [boardGroupBy, setBoardGroupBy] = useState(() => {
+        try {
+            return localStorage.getItem(`board-group-${project?.id}`) || 'status';
+        } catch {
+            return 'status';
+        }
+    });
+    const changeBoardGroupBy = (next) => {
+        setBoardGroupBy(next);
+        try { localStorage.setItem(`board-group-${project?.id}`, next); } catch { /* private mode */ }
+    };
+
     const [ganttScale, setGanttScale] = useState(() => {
         try {
             return localStorage.getItem(`gantt-scale-${project?.id}`) || 'day';
@@ -2302,6 +2318,62 @@ export default function Show() {
         return grouped;
     }, [filteredTasks]);
 
+    /** The single-select fields this project offers as a Board grouping. */
+    const boardGroupableFields = useMemo(
+        () => (localCustomFields || []).filter((f) => f.type === 'single_select'),
+        [localCustomFields]
+    );
+
+    /** The field currently grouping the Board, or null when grouping by status. */
+    const boardField = useMemo(
+        () => boardGroupableFields.find((f) => String(f.id) === String(boardGroupBy)) || null,
+        [boardGroupableFields, boardGroupBy]
+    );
+
+    // Palette for option columns. Status columns keep their own semantic colours;
+    // an arbitrary field has no inherent meaning, so options are coloured by
+    // position purely to tell the columns apart.
+    const OPTION_DOTS = ['bg-blue-500', 'bg-purple-500', 'bg-teal-500', 'bg-amber-500', 'bg-rose-500', 'bg-lime-500'];
+
+    /**
+     * The Board's columns, and the tasks in each.
+     *
+     * A task with no value for the field lands in a trailing "not set" column
+     * rather than being dropped — otherwise switching grouping would silently
+     * hide work, which is the one thing a board must never do.
+     */
+    const boardColumns = useMemo(() => {
+        if (!boardField) {
+            return TASK_STATUSES.map((st) => ({
+                id: st,
+                label: formatLabel(st),
+                isStatus: true,
+                tasks: tasksByStatus[st] || [],
+            }));
+        }
+
+        const valueOf = (t) => (t.custom_field_values || [])
+            .find((v) => v.custom_field_id === boardField.id)?.value_option_id ?? null;
+
+        const cols = (boardField.options || []).map((o, i) => ({
+            id: `opt-${o.id}`,
+            optionId: o.id,
+            label: o.label,
+            dotClass: OPTION_DOTS[i % OPTION_DOTS.length],
+            tasks: filteredTasks.filter((t) => String(valueOf(t)) === String(o.id)),
+        }));
+
+        cols.push({
+            id: 'opt-none',
+            optionId: null,
+            label: 'Not set',
+            dotClass: 'bg-gray-400',
+            tasks: filteredTasks.filter((t) => !valueOf(t)),
+        });
+
+        return cols;
+    }, [boardField, filteredTasks, tasksByStatus]);
+
     /**
      * Split a group's tasks into what to show and how many were held back.
      * Revealing a section is per-section and resets on reload — it's a peek at
@@ -2951,6 +3023,33 @@ export default function Show() {
     }, [project.id]);
 
     // --- Board view drag handlers ---
+    /**
+     * Move a task between columns when the Board is grouped by a custom field.
+     *
+     * A separate path from the status drag on purpose: this writes one field
+     * value and nothing else. Status ordering is persisted as a position within
+     * a status, which has no meaning here, so a drop only changes which column
+     * the task belongs to.
+     */
+    const persistBoardFieldMove = useCallback((task, optionId) => {
+        const fieldId = boardField?.id;
+        if (!fieldId) return;
+
+        setLocalTasks((prev) => prev.map((t) => {
+            if (t.id !== task.id) return t;
+            const values = (t.custom_field_values || []).filter((v) => v.custom_field_id !== fieldId);
+            if (optionId) values.push({ custom_field_id: fieldId, value_option_id: optionId });
+            return { ...t, custom_field_values: values };
+        }));
+
+        apiFetch(`/projects/${project.id}/tasks/${task.id}/custom-field-values`, {
+            method: 'PATCH',
+            body: JSON.stringify({ values: { [fieldId]: optionId } }),
+        }).then((res) => {
+            if (!res.ok) setLocalTasks(serverTasks);   // put it back where it was
+        }).catch(() => setLocalTasks(serverTasks));
+    }, [boardField, project.id, serverTasks]);
+
     const handleBoardDragEnd = useCallback((event) => {
         const { active, over } = event;
         setActiveId(null);
@@ -2959,6 +3058,27 @@ export default function Show() {
 
         const activeTask = localTasks.find((t) => t.id === active.id);
         if (!activeTask) return;
+
+        // Grouped by a custom field: the columns are that field's options, so a
+        // drop sets the value rather than touching status or position.
+        if (boardField) {
+            const overId = String(over.id);
+            let targetCol = null;
+            if (overId.startsWith('column-')) {
+                targetCol = boardColumns.find((c) => c.id === overId.replace('column-', ''));
+            } else {
+                const overTask = localTasks.find((t) => t.id === over.id);
+                targetCol = boardColumns.find((c) => c.tasks.some((t) => t.id === overTask?.id));
+            }
+            if (!targetCol) return;
+
+            const current = (activeTask.custom_field_values || [])
+                .find((v) => v.custom_field_id === boardField.id)?.value_option_id ?? null;
+            if (String(current) === String(targetCol.optionId)) return;   // same column
+
+            persistBoardFieldMove(activeTask, targetCol.optionId);
+            return;
+        }
 
         // Determine target status: could be dropping on a column or on a task
         let targetStatus;
@@ -3034,7 +3154,7 @@ export default function Show() {
 
         setLocalTasks(updated);
         if (toPersist) persistReorder(toPersist);
-    }, [localTasks, persistReorder]);
+    }, [localTasks, persistReorder, boardField, boardColumns, persistBoardFieldMove]);
 
     const handleDragStart = useCallback((event) => {
         setActiveId(event.active.id);
@@ -4241,6 +4361,26 @@ export default function Show() {
             {/* Board View */}
             {view === 'board' && (
                 <div className="h-full flex flex-col min-h-0">
+                    {boardGroupableFields.length > 0 && (
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Group by</span>
+                            <select
+                                value={boardGroupBy}
+                                onChange={(e) => changeBoardGroupBy(e.target.value)}
+                                className="text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 py-1 pr-7"
+                            >
+                                <option value="status">Status</option>
+                                {boardGroupableFields.map((f) => (
+                                    <option key={f.id} value={String(f.id)}>{f.name}</option>
+                                ))}
+                            </select>
+                            {boardField && (
+                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                    Dragging a card sets its {boardField.name}.
+                                </span>
+                            )}
+                        </div>
+                    )}
                     <DndContext
                         sensors={sensors}
                         collisionDetection={closestCorners}
@@ -4249,11 +4389,14 @@ export default function Show() {
                     >
                         <div className="overflow-auto flex-1 min-h-0 pb-2">
                             <div className="inline-flex gap-4 min-w-full">
-                                {TASK_STATUSES.map((status) => (
+                                {boardColumns.map((col) => (
                                     <KanbanColumn
-                                        key={status}
-                                        status={status}
-                                        tasks={tasksByStatus[status]}
+                                        key={col.id}
+                                        status={col.isStatus ? col.id : undefined}
+                                        columnId={col.id}
+                                        label={col.label}
+                                        dotClass={col.dotClass}
+                                        tasks={col.tasks}
                                         projectId={project.id}
                                         canManageTasks={canManageTasks}
                                         auth={auth}
