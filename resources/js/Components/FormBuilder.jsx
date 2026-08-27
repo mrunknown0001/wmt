@@ -17,6 +17,7 @@ import {
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Input from './Input';
+import Textarea from './Textarea';
 import Select from './Select';
 import Button from './Button';
 import Modal, { ConfirmModal } from './Modal';
@@ -212,12 +213,13 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                     />
 
                     {!isStatic && !FILE_TYPES.includes(field.type) && (
-                        <Input
+                        <Textarea
                             label="Help Text"
                             id={`field-${fieldIndex}-help`}
+                            rows={2}
                             value={field.help_text || ''}
                             onChange={(e) => update('help_text', e.target.value)}
-                            placeholder="Optional help text"
+                            placeholder="Optional help text — line breaks are kept"
                         />
                     )}
 
@@ -1106,6 +1108,26 @@ export default function FormBuilder({ fields = [], onChange, customFields = [], 
         // A persisted field's id must not travel, or the save would treat the
         // copy as an edit of the original.
         delete copy.id;
+
+        // A mapped choice field draws its options from the custom field rather
+        // than from its own config, so dropping the mapping would leave the copy
+        // an empty dropdown — a duplicate of a question, minus the question.
+        // Take a copy of the list so the field still asks what it asked before.
+        if (source.custom_field_id && ['select', 'multi_select'].includes(source.type)) {
+            const cf = safeCustomFields.find((f) => f.id === source.custom_field_id);
+            const existing = copy.config?.options || [];
+            if (!existing.length && cf?.options?.length) {
+                const ordered = [...cf.options].sort((a, b) =>
+                    cf.config?.sort_mode === 'manual'
+                        ? (a.position ?? 0) - (b.position ?? 0)
+                        : a.label.localeCompare(b.label)
+                );
+                copy.config = {
+                    ...(copy.config || {}),
+                    options: ordered.map((o) => ({ value: o.label, label: o.label })),
+                };
+            }
+        }
 
         const inserted = [
             ...safeFields.slice(0, index + 1),
