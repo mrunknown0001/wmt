@@ -5010,8 +5010,11 @@ export default function Show() {
                                                             )}
 
                                                             {/* Date custom fields, drawn as pins so they read as
-                                                                points in time rather than another span of work. */}
-                                                            {shownDateFields.map((f) => {
+                                                                points in time rather than another span of work.
+                                                                Never on a milestone: that is already a single moment,
+                                                                so an actual start and end against it says nothing, and
+                                                                the pins only crowd the diamond that carries the date. */}
+                                                            {!isMilestone && shownDateFields.map((f) => {
                                                                 const val = dateValueOf(task, f.id);
                                                                 if (!val) return null;
                                                                 const x = xFor(val);
