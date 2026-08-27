@@ -18,6 +18,17 @@ class ApprovalDeadlineNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    /**
+     * Discard rather than fail when the record this is about has been deleted.
+     *
+     * A queued notification restores its models from the payload when the worker
+     * picks it up. If the task, note or request has been removed in between, that
+     * lookup throws and the job lands in failed_jobs — for a message that no
+     * longer has anything to say. Six of these accumulated from delegations whose
+     * subject was deleted before delivery.
+     */
+    public $deleteWhenMissingModels = true;
+
     public const DUE_SOON = 'approval_due_soon';
     public const OVERDUE = 'approval_overdue';
 

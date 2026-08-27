@@ -1509,6 +1509,23 @@ export default function Show() {
             return [];
         }
     });
+    // Whether two shown date fields should be joined into a range bar rather
+    // than left as two separate pins. Only meaningful with exactly two on.
+    const [ganttLinkDates, setGanttLinkDates] = useState(() => {
+        try {
+            return localStorage.getItem(`gantt-link-dates-${project?.id}`) === '1';
+        } catch {
+            return false;
+        }
+    });
+    const toggleGanttLinkDates = () => {
+        setGanttLinkDates((prev) => {
+            const next = !prev;
+            try { localStorage.setItem(`gantt-link-dates-${project?.id}`, next ? '1' : '0'); } catch { /* private mode */ }
+            return next;
+        });
+    };
+
     const toggleGanttDateField = (id) => {
         setGanttDateFields((prev) => {
             const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
@@ -1850,6 +1867,29 @@ export default function Show() {
     const cfManagerRef = useRef(null);
 
 
+    /**
+     * What the toolbar's Sort control offers.
+     *
+     * Built from the same keys getTaskSortValue understands, so the control and
+     * the column-header menus cannot disagree about what is sortable. Date
+     * custom fields come along on their own, which is the point — a project that
+     * tracks an actual start can order by it without anyone wiring it up.
+     */
+    const sortOptions = useMemo(() => {
+        const base = [
+            { key: 'title', label: 'Title' },
+            { key: 'status', label: 'Status' },
+            { key: 'priority', label: 'Priority' },
+            { key: 'assignee', label: 'Assignee' },
+            { key: 'dates', label: 'Due date' },
+            { key: 'completion', label: 'Completion' },
+        ];
+        const fields = (localCustomFields || [])
+            .filter((f) => ['date', 'number', 'single_select', 'text', 'textarea'].includes(f.type))
+            .map((f) => ({ key: `cf-${f.id}`, label: f.name }));
+        return [...base, ...fields];
+    }, [localCustomFields]);
+
     const handleSortColumn = useCallback((colId, direction) => {
         setSortConfig(prev => {
             if (prev?.key === colId && prev?.direction === direction) return null; // toggle off
@@ -2013,14 +2053,28 @@ export default function Show() {
         }
 
         const { key, direction } = sortConfig;
-        const sorted = [...tasks].sort((a, b) => {
+
+        // "No value" is represented by a sentinel that sorts after everything —
+        // which put blanks last ascending and, by the same token, *first*
+        // descending. Sorting a date column newest-first then opened with every
+        // task that has no date at all. Missing stays at the bottom either way;
+        // only the tasks that actually have a value get reversed.
+        const isMissing = (v) => v === '\uffff' || v === Infinity || v === null || v === undefined;
+
+        return [...tasks].sort((a, b) => {
             const av = getTaskSortValue(a, key);
             const bv = getTaskSortValue(b, key);
+
+            const am = isMissing(av);
+            const bm = isMissing(bv);
+            if (am && bm) return 0;
+            if (am) return 1;
+            if (bm) return -1;
+
             if (av < bv) return direction === 'asc' ? -1 : 1;
             if (av > bv) return direction === 'asc' ? 1 : -1;
             return 0;
         });
-        return sorted;
     }, [sortConfig, getTaskSortValue]);
 
     // Pre-compute formula field values for all tasks
@@ -3753,6 +3807,39 @@ export default function Show() {
                             <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-xs font-medium bg-primary-500 text-white rounded-full">{activeFilterCount}</span>
                         )}
                     </button>
+                    {view === 'list' && (
+                        <div className="flex items-center gap-1">
+                            <select
+                                value={sortConfig?.key || ''}
+                                onChange={(e) => setSortConfig(e.target.value ? { key: e.target.value, direction: sortConfig?.direction || 'asc' } : null)}
+                                title="Order the list by a column"
+                                className="text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5 pl-2.5 pr-7"
+                            >
+                                {/* Empty is the order people arranged by hand — the default,
+                                    and it has to stay reachable once sorting is on. */}
+                                <option value="">Sort: Manual</option>
+                                {sortOptions.map((o) => (
+                                    <option key={o.key} value={o.key}>Sort: {o.label}</option>
+                                ))}
+                            </select>
+                            {sortConfig && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSortConfig((prev) => prev && { ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' })}
+                                    aria-label={sortConfig.direction === 'asc' ? 'Sort descending' : 'Sort ascending'}
+                                    title={sortConfig.direction === 'asc' ? 'Ascending — click for descending' : 'Descending — click for ascending'}
+                                    className="inline-flex items-center px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                            d={sortConfig.direction === 'asc'
+                                                ? 'M3 5h10M3 9h7M3 13h4m6 6V5m0 14l3-3m-3 3l-3-3'
+                                                : 'M3 5h10M3 9h7M3 13h4m6-8v14m0-14l3 3m-3-3l-3 3'} />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    )}
                     {hasActiveFilters && (
                         <button
                             onClick={() => { setFilterSearch(''); setDynamicFilters([]); setShowAdvancedFilters(false); }}
@@ -4777,6 +4864,14 @@ export default function Show() {
                     .filter((f) => ganttDateFields.includes(f.id))
                     .map((f, i) => ({ ...f, ...DATE_MARKS[i % DATE_MARKS.length] }));
 
+                // Two fields joined read as a span: "it actually ran from here to
+                // here". The pair is taken in the order the fields are defined on
+                // the project, so the earlier one is the start — rather than the
+                // order someone happened to click them on.
+                const dateRange = (ganttLinkDates && shownDateFields.length === 2)
+                    ? { from: shownDateFields[0], to: shownDateFields[1] }
+                    : null;
+
                 /** The value a task holds for one of those fields, if any. */
                 const dateValueOf = (task, fieldId) => (task.custom_field_values || [])
                     .find((v) => v.custom_field_id === fieldId)?.value_date || null;
@@ -4849,7 +4944,14 @@ export default function Show() {
                                         </span>
                                         {/* One legend entry per date field on show, so a pin on the
                                             chart can be told from every other pin. */}
-                                        {shownDateFields.map((f) => (
+                                        {dateRange ? (
+                                            <span className={`inline-flex items-center gap-1.5 ${dateRange.from.text}`}>
+                                                <span className={`inline-block w-1.5 h-1.5 rounded-full ${dateRange.from.dot}`} />
+                                                <span className={`inline-block w-4 h-0.5 ${dateRange.from.dot}`} />
+                                                <span className={`inline-block w-1.5 h-1.5 rounded-full ${dateRange.to.dot}`} />
+                                                {dateRange.from.name} → {dateRange.to.name}
+                                            </span>
+                                        ) : shownDateFields.map((f) => (
                                             <span key={f.id} className={`inline-flex items-center gap-1.5 ${f.text}`}>
                                                 <span className={`inline-block w-1.5 h-1.5 rounded-full ${f.dot}`} />
                                                 {f.name}
@@ -4860,6 +4962,25 @@ export default function Show() {
                                         {dateFieldDefs.length > 0 && (
                                             <div className="flex items-center gap-1 mr-3">
                                                 <span className="text-[11px] text-gray-500 dark:text-gray-400 mr-1">Dates</span>
+                                                {shownDateFields.length === 2 && (
+                                                    <button
+                                                        onClick={toggleGanttLinkDates}
+                                                        aria-pressed={ganttLinkDates}
+                                                        title={ganttLinkDates ? 'Show the two dates separately' : 'Join the two dates into a range'}
+                                                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border transition-colors mr-1 ${
+                                                            ganttLinkDates
+                                                                ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800'
+                                                                : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                                                        }`}
+                                                    >
+                                                        <span className="inline-flex items-center gap-0.5">
+                                                            <span className="inline-block w-1 h-1 rounded-full bg-current" />
+                                                            <span className="inline-block w-2.5 h-px bg-current" />
+                                                            <span className="inline-block w-1 h-1 rounded-full bg-current" />
+                                                        </span>
+                                                        Range
+                                                    </button>
+                                                )}
                                                 {dateFieldDefs.map((f) => {
                                                     const on = ganttDateFields.includes(f.id);
                                                     const mark = DATE_MARKS[shownDateFields.findIndex((x) => x.id === f.id) % DATE_MARKS.length];
@@ -5010,8 +5131,42 @@ export default function Show() {
                                                             )}
 
                                                             {/* Date custom fields, drawn as pins so they read as
-                                                                points in time rather than another span of work. */}
-                                                            {shownDateFields.map((f) => {
+                                                                points in time rather than another span of work.
+                                                                Never on a milestone: that is already a single moment,
+                                                                so an actual start and end against it says nothing, and
+                                                                the pins only crowd the diamond that carries the date. */}
+                                                            {/* Two linked fields become a span under the planned
+                                                                bar, so the difference between plan and actual is a
+                                                                length rather than two dots to measure by eye. */}
+                                                            {!isMilestone && dateRange && (() => {
+                                                                const a = dateValueOf(task, dateRange.from.id);
+                                                                const z = dateValueOf(task, dateRange.to.id);
+                                                                if (!a && !z) return null;
+
+                                                                // One end missing is the ordinary in-flight case:
+                                                                // started but not finished. Run it to today so the
+                                                                // bar shows elapsed time, and leave the end open.
+                                                                const open = !a || !z;
+                                                                const x1 = xFor(a || z);
+                                                                const x2 = z ? xFor(z) : todayX;
+                                                                const left = Math.min(x1, x2);
+                                                                const width = Math.max(Math.abs(x2 - x1), 3);
+
+                                                                return (
+                                                                    <Tooltip content={`${dateRange.from.name} → ${dateRange.to.name}: ${a ? formatDate(a) : '—'} → ${z ? formatDate(z) : 'in progress'}`}>
+                                                                        <div
+                                                                            className="absolute z-30 flex items-center"
+                                                                            style={{ left: `${left}px`, width: `${width}px`, top: `${ROW_H / 2 + 11}px` }}
+                                                                        >
+                                                                            <span className={`block h-1.5 w-1.5 rounded-full ring-1 ring-white dark:ring-gray-900 shrink-0 ${dateRange.from.dot}`} />
+                                                                            <span className={`block h-0.5 flex-1 ${dateRange.from.dot} ${open ? 'opacity-50' : ''}`} />
+                                                                            {!open && <span className={`block h-1.5 w-1.5 rounded-full ring-1 ring-white dark:ring-gray-900 shrink-0 ${dateRange.to.dot}`} />}
+                                                                        </div>
+                                                                    </Tooltip>
+                                                                );
+                                                            })()}
+
+                                                            {!isMilestone && !dateRange && shownDateFields.map((f) => {
                                                                 const val = dateValueOf(task, f.id);
                                                                 if (!val) return null;
                                                                 const x = xFor(val);
