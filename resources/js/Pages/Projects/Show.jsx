@@ -2030,14 +2030,28 @@ export default function Show() {
         }
 
         const { key, direction } = sortConfig;
-        const sorted = [...tasks].sort((a, b) => {
+
+        // "No value" is represented by a sentinel that sorts after everything —
+        // which put blanks last ascending and, by the same token, *first*
+        // descending. Sorting a date column newest-first then opened with every
+        // task that has no date at all. Missing stays at the bottom either way;
+        // only the tasks that actually have a value get reversed.
+        const isMissing = (v) => v === '\uffff' || v === Infinity || v === null || v === undefined;
+
+        return [...tasks].sort((a, b) => {
             const av = getTaskSortValue(a, key);
             const bv = getTaskSortValue(b, key);
+
+            const am = isMissing(av);
+            const bm = isMissing(bv);
+            if (am && bm) return 0;
+            if (am) return 1;
+            if (bm) return -1;
+
             if (av < bv) return direction === 'asc' ? -1 : 1;
             if (av > bv) return direction === 'asc' ? 1 : -1;
             return 0;
         });
-        return sorted;
     }, [sortConfig, getTaskSortValue]);
 
     // Pre-compute formula field values for all tasks
