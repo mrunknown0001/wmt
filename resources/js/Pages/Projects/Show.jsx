@@ -1867,6 +1867,29 @@ export default function Show() {
     const cfManagerRef = useRef(null);
 
 
+    /**
+     * What the toolbar's Sort control offers.
+     *
+     * Built from the same keys getTaskSortValue understands, so the control and
+     * the column-header menus cannot disagree about what is sortable. Date
+     * custom fields come along on their own, which is the point — a project that
+     * tracks an actual start can order by it without anyone wiring it up.
+     */
+    const sortOptions = useMemo(() => {
+        const base = [
+            { key: 'title', label: 'Title' },
+            { key: 'status', label: 'Status' },
+            { key: 'priority', label: 'Priority' },
+            { key: 'assignee', label: 'Assignee' },
+            { key: 'dates', label: 'Due date' },
+            { key: 'completion', label: 'Completion' },
+        ];
+        const fields = (localCustomFields || [])
+            .filter((f) => ['date', 'number', 'single_select', 'text', 'textarea'].includes(f.type))
+            .map((f) => ({ key: `cf-${f.id}`, label: f.name }));
+        return [...base, ...fields];
+    }, [localCustomFields]);
+
     const handleSortColumn = useCallback((colId, direction) => {
         setSortConfig(prev => {
             if (prev?.key === colId && prev?.direction === direction) return null; // toggle off
@@ -3784,6 +3807,39 @@ export default function Show() {
                             <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-xs font-medium bg-primary-500 text-white rounded-full">{activeFilterCount}</span>
                         )}
                     </button>
+                    {view === 'list' && (
+                        <div className="flex items-center gap-1">
+                            <select
+                                value={sortConfig?.key || ''}
+                                onChange={(e) => setSortConfig(e.target.value ? { key: e.target.value, direction: sortConfig?.direction || 'asc' } : null)}
+                                title="Order the list by a column"
+                                className="text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5 pl-2.5 pr-7"
+                            >
+                                {/* Empty is the order people arranged by hand — the default,
+                                    and it has to stay reachable once sorting is on. */}
+                                <option value="">Sort: Manual</option>
+                                {sortOptions.map((o) => (
+                                    <option key={o.key} value={o.key}>Sort: {o.label}</option>
+                                ))}
+                            </select>
+                            {sortConfig && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSortConfig((prev) => prev && { ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' })}
+                                    aria-label={sortConfig.direction === 'asc' ? 'Sort descending' : 'Sort ascending'}
+                                    title={sortConfig.direction === 'asc' ? 'Ascending — click for descending' : 'Descending — click for ascending'}
+                                    className="inline-flex items-center px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                            d={sortConfig.direction === 'asc'
+                                                ? 'M3 5h10M3 9h7M3 13h4m6 6V5m0 14l3-3m-3 3l-3-3'
+                                                : 'M3 5h10M3 9h7M3 13h4m6-8v14m0-14l3 3m-3-3l-3 3'} />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    )}
                     {hasActiveFilters && (
                         <button
                             onClick={() => { setFilterSearch(''); setDynamicFilters([]); setShowAdvancedFilters(false); }}
