@@ -34,3 +34,8 @@ Schedule::command('backup:clean')->dailyAt('02:30');
 Schedule::command('backup:check-token')->weeklyOn(1, '08:00')->withoutOverlapping();
 Schedule::command('attachments:purge')->dailyAt('03:00');
 Schedule::command('trash:purge')->dailyAt('03:30');
+
+// A failed job is silent: the queue records it and carries on. Once a day, say
+// so in the log if anything failed overnight — otherwise a notification that
+// has stopped being delivered looks the same as one nobody sent.
+Schedule::command('queue:report-failed')->dailyAt('07:15')->withoutOverlapping();
