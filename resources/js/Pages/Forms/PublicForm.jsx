@@ -263,7 +263,7 @@ export default function PublicForm() {
                         {field.config?.email_mode === 'registered_user' && (
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Must be a registered user's email address.</p>
                         )}
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
 
@@ -279,7 +279,7 @@ export default function PublicForm() {
                             placeholder={field.config?.placeholder || ''}
                             maxLength={255}
                         />
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
 
@@ -295,7 +295,7 @@ export default function PublicForm() {
                             placeholder={field.config?.placeholder || ''}
                             maxLength={10000}
                         />
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
 
@@ -312,7 +312,7 @@ export default function PublicForm() {
                             max={NUMBER_MAX}
                             min={NUMBER_MIN}
                         />
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
 
@@ -327,7 +327,7 @@ export default function PublicForm() {
                             onChange={(e) => setFieldValue(field.id, e.target.value)}
                             error={fieldError}
                         />
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
 
@@ -348,7 +348,7 @@ export default function PublicForm() {
                             placeholder="— Select —"
                             error={fieldError}
                         />
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
 
@@ -369,7 +369,7 @@ export default function PublicForm() {
                             placeholder={(field.options || []).length ? '— Select —' : 'No one available'}
                             error={fieldError}
                         />
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
 
@@ -404,7 +404,7 @@ export default function PublicForm() {
                             })}
                         </div>
                         {fieldError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{fieldError}</p>}
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
             }
@@ -477,7 +477,7 @@ export default function PublicForm() {
                         {fileErrors.map((err, i) => (
                             <p key={i} className="mt-1 text-sm text-red-600 dark:text-red-400">{err}</p>
                         ))}
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
             }
@@ -504,7 +504,7 @@ export default function PublicForm() {
                             onRemove={(index) => removeFile(field.id, index)}
                         />
                         {fieldError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{fieldError}</p>}
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
             }
@@ -534,7 +534,7 @@ export default function PublicForm() {
                             }}
                         />
                         {fieldError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{fieldError}</p>}
-                        {field.help_text && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
                     </div>
                 );
             }

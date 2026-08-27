@@ -1499,6 +1499,24 @@ export default function Show() {
     // the project's single-select custom fields. Only single-select qualifies —
     // a column has to be one value, and text, numbers, dates and multi-select
     // give either an unbounded set of columns or a task belonging in several.
+    // Date custom fields overlaid on the Gantt — an actual start and finish
+    // against the planned bar, a permit expiry, a follow-up. Stored as a list of
+    // field ids so several can be shown at once, each with its own legend entry.
+    const [ganttDateFields, setGanttDateFields] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem(`gantt-dates-${project?.id}`) || '[]');
+        } catch {
+            return [];
+        }
+    });
+    const toggleGanttDateField = (id) => {
+        setGanttDateFields((prev) => {
+            const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+            try { localStorage.setItem(`gantt-dates-${project?.id}`, JSON.stringify(next)); } catch { /* private mode */ }
+            return next;
+        });
+    };
+
     const [boardGroupBy, setBoardGroupBy] = useState(() => {
         try {
             return localStorage.getItem(`board-group-${project?.id}`) || 'status';
@@ -4745,6 +4763,24 @@ export default function Show() {
                     return col.start.toLocaleDateString('en-US', { month: 'short' });
                 };
 
+                // Date custom fields chosen for display. Each gets a colour of its
+                // own so the legend can name it — these are not statuses or
+                // priorities, so they borrow nothing from those palettes.
+                const DATE_MARKS = [
+                    { dot: 'bg-sky-500',     text: 'text-sky-600 dark:text-sky-400' },
+                    { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
+                    { dot: 'bg-fuchsia-500', text: 'text-fuchsia-600 dark:text-fuchsia-400' },
+                    { dot: 'bg-orange-500',  text: 'text-orange-600 dark:text-orange-400' },
+                ];
+                const dateFieldDefs = (localCustomFields || []).filter((f) => f.type === 'date');
+                const shownDateFields = dateFieldDefs
+                    .filter((f) => ganttDateFields.includes(f.id))
+                    .map((f, i) => ({ ...f, ...DATE_MARKS[i % DATE_MARKS.length] }));
+
+                /** The value a task holds for one of those fields, if any. */
+                const dateValueOf = (task, fieldId) => (task.custom_field_values || [])
+                    .find((v) => v.custom_field_id === fieldId)?.value_date || null;
+
                 const todayX = xFor(new Date().toISOString());
                 const showToday = todayX >= 0 && todayX <= totalWidth;
 
@@ -4804,15 +4840,48 @@ export default function Show() {
                             <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex-1 min-h-0 flex flex-col">
                                 {/* Zoom */}
                                 <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                                    <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+                                    <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400 flex-wrap">
                                         <span className="inline-flex items-center gap-1.5">
                                             <span className="inline-block w-4 h-2 rounded-sm bg-blue-500" /> Task
                                         </span>
                                         <span className="inline-flex items-center gap-1.5">
                                             <span className="inline-block w-2.5 h-2.5 bg-purple-600 rotate-45" /> Milestone
                                         </span>
+                                        {/* One legend entry per date field on show, so a pin on the
+                                            chart can be told from every other pin. */}
+                                        {shownDateFields.map((f) => (
+                                            <span key={f.id} className={`inline-flex items-center gap-1.5 ${f.text}`}>
+                                                <span className={`inline-block w-1.5 h-1.5 rounded-full ${f.dot}`} />
+                                                {f.name}
+                                            </span>
+                                        ))}
                                     </div>
                                     <div className="flex items-center gap-1">
+                                        {dateFieldDefs.length > 0 && (
+                                            <div className="flex items-center gap-1 mr-3">
+                                                <span className="text-[11px] text-gray-500 dark:text-gray-400 mr-1">Dates</span>
+                                                {dateFieldDefs.map((f) => {
+                                                    const on = ganttDateFields.includes(f.id);
+                                                    const mark = DATE_MARKS[shownDateFields.findIndex((x) => x.id === f.id) % DATE_MARKS.length];
+                                                    return (
+                                                        <button
+                                                            key={f.id}
+                                                            onClick={() => toggleGanttDateField(f.id)}
+                                                            aria-pressed={on}
+                                                            title={on ? `Hide ${f.name}` : `Show ${f.name} on the chart`}
+                                                            className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md border transition-colors ${
+                                                                on
+                                                                    ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800'
+                                                                    : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                                                            }`}
+                                                        >
+                                                            <span className={`inline-block w-1.5 h-1.5 rounded-full ${on && mark ? mark.dot : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                                            {f.name}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                         <span className="text-[11px] text-gray-500 dark:text-gray-400 mr-1">Zoom</span>
                                         {[['day', 'Day'], ['week', 'Week'], ['month', 'Month']].map(([val, label]) => (
                                             <button
@@ -4939,6 +5008,30 @@ export default function Show() {
                                                             {showToday && (
                                                                 <div className="absolute top-0 bottom-0 border-l border-red-400/70 dark:border-red-500/60" style={{ left: `${todayX}px` }} />
                                                             )}
+
+                                                            {/* Date custom fields, drawn as pins so they read as
+                                                                points in time rather than another span of work. */}
+                                                            {shownDateFields.map((f) => {
+                                                                const val = dateValueOf(task, f.id);
+                                                                if (!val) return null;
+                                                                const x = xFor(val);
+                                                                if (x < -8 || x > totalWidth + 8) return null;
+                                                                return (
+                                                                    <Tooltip key={f.id} content={`${f.name}: ${formatDate(val)}`}>
+                                                                        {/* Below the bar, not across it: the bar starts at
+                                                                            ROW_H/2 - 10 and is 20px tall, so a pin at the row's
+                                                                            centre sat inside it — a blue pin on a blue bar. The
+                                                                            tick points back up at the bar it marks. */}
+                                                                        <div
+                                                                            className="absolute z-30 flex flex-col items-center pointer-events-auto"
+                                                                            style={{ left: `${x - 2.5}px`, top: `${ROW_H / 2 + 10}px` }}
+                                                                        >
+                                                                            <span className={`block w-px h-1.5 ${f.dot}`} />
+                                                                            <span className={`block h-1.5 w-1.5 rounded-full ring-1 ring-white dark:ring-gray-900 ${f.dot}`} />
+                                                                        </div>
+                                                                    </Tooltip>
+                                                                );
+                                                            })}
 
                                                             {isMilestone ? (
                                                                 <Tooltip content={`${task.title} — ${tooltipDate} — milestone`}>

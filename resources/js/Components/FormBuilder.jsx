@@ -17,6 +17,7 @@ import {
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Input from './Input';
+import Textarea from './Textarea';
 import Select from './Select';
 import Button from './Button';
 import Modal, { ConfirmModal } from './Modal';
@@ -70,7 +71,7 @@ function getFieldTypeLabel(type) {
 }
 
 // --- Sortable Field Row ---
-function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRemove, customFields, allFields, onChange }) {
+function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRemove, onDuplicate, customFields, allFields, onChange }) {
     const sortableId = `field-${fieldIndex}`;
     const {
         attributes,
@@ -163,6 +164,18 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                         </svg>
                     </button>
                     </Tooltip>
+                    <Tooltip content="Duplicate — the copy keeps everything except the mapping">
+                    <button
+                        type="button"
+                        onClick={() => onDuplicate(fieldIndex)}
+                        aria-label="Duplicate field"
+                        className="p-1 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shrink-0"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2v-2" />
+                        </svg>
+                    </button>
+                    </Tooltip>
                     <Tooltip content="Remove">
                     <button
                         type="button"
@@ -200,12 +213,13 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                     />
 
                     {!isStatic && !FILE_TYPES.includes(field.type) && (
-                        <Input
+                        <Textarea
                             label="Help Text"
                             id={`field-${fieldIndex}-help`}
+                            rows={2}
                             value={field.help_text || ''}
                             onChange={(e) => update('help_text', e.target.value)}
-                            placeholder="Optional help text"
+                            placeholder="Optional help text — line breaks are kept"
                         />
                     )}
 
@@ -1069,6 +1083,77 @@ export default function FormBuilder({ fields = [], onChange, customFields = [], 
         onChange(newFields);
     };
 
+    /**
+     * Copy a field, placing the copy directly beneath the original.
+     *
+     * The mapping is deliberately dropped. A field that writes to a task column
+     * or a custom field owns that target: two fields carrying the same mapping
+     * would both write to it, and the last one submitted would silently win. The
+     * copy therefore arrives unmapped, and whoever made it chooses where it
+     * should go — which is also why duplicating is useful for a mapped field in
+     * the first place, since the shape is the laborious part, not the target.
+     *
+     * Everything else comes along: type, label, help text, required, visibility,
+     * default, config and conditions.
+     */
+    const duplicateField = (index) => {
+        const source = safeFields[index];
+        if (!source) return;
+
+        const copy = {
+            ...source,
+            maps_to: null,
+            custom_field_id: null,
+        };
+        // A persisted field's id must not travel, or the save would treat the
+        // copy as an edit of the original.
+        delete copy.id;
+
+        // A mapped choice field draws its options from the custom field rather
+        // than from its own config, so dropping the mapping would leave the copy
+        // an empty dropdown — a duplicate of a question, minus the question.
+        // Take a copy of the list so the field still asks what it asked before.
+        if (source.custom_field_id && ['select', 'multi_select'].includes(source.type)) {
+            const cf = safeCustomFields.find((f) => f.id === source.custom_field_id);
+            const existing = copy.config?.options || [];
+            if (!existing.length && cf?.options?.length) {
+                const ordered = [...cf.options].sort((a, b) =>
+                    cf.config?.sort_mode === 'manual'
+                        ? (a.position ?? 0) - (b.position ?? 0)
+                        : a.label.localeCompare(b.label)
+                );
+                copy.config = {
+                    ...(copy.config || {}),
+                    options: ordered.map((o) => ({ value: o.label, label: o.label })),
+                };
+            }
+        }
+
+        const inserted = [
+            ...safeFields.slice(0, index + 1),
+            copy,
+            ...safeFields.slice(index + 1),
+        ];
+
+        // Conditions address fields by position when the field has no id yet, so
+        // every pos: reference after the insertion point shifts by one — the
+        // same bookkeeping removeField does in the other direction.
+        const renumbered = inserted.map((f) => {
+            if (!f.conditions?.rules?.length) return f;
+            const rules = f.conditions.rules.map((r) => {
+                if (r.field_key?.startsWith('pos:')) {
+                    const oldPos = parseInt(r.field_key.split(':')[1]);
+                    if (oldPos > index) return { ...r, field_key: `pos:${oldPos + 1}` };
+                }
+                return r;
+            });
+            return { ...f, conditions: { ...f.conditions, rules } };
+        });
+
+        onChange(renumbered.map((f, i) => ({ ...f, position: i })));
+        setExpandedIndex(index + 1);   // open the copy, since it needs a mapping
+    };
+
     const removeField = (index) => {
         const removedField = safeFields[index];
         const removedKey = removedField?.id ? `id:${removedField.id}` : `pos:${index}`;
@@ -1195,6 +1280,7 @@ export default function FormBuilder({ fields = [], onChange, customFields = [], 
                                         isExpanded={expandedIndex === i}
                                         onToggleExpand={(idx) => setExpandedIndex(expandedIndex === idx ? null : idx)}
                                         onRemove={(idx) => setDeleteIndex(idx)}
+                                        onDuplicate={duplicateField}
                                         customFields={safeCustomFields}
                                         allFields={safeFields}
                                         onChange={updateField}
