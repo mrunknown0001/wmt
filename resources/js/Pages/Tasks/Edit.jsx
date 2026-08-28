@@ -1,6 +1,6 @@
 import { useForm, usePage, router, Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { orderTaskDates } from '../../taskDates';
+import { pickTaskDate } from '../../taskDates';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -668,7 +668,7 @@ export default function Edit() {
                             <div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {showStartDate && (
-                                        <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => { const o = orderTaskDates(e.target.value, data.due_date, 'start'); setData({ ...data, start_date: o.start, due_date: o.due }); if (o.start) setShowStartDate(true); }} error={errors.start_date} disabled={!canManageTaskDetails} />
+                                        <Input label="Start Date" id="start_date" type="date" value={data.start_date} onChange={(e) => { const o = pickTaskDate({ start: data.start_date, due: data.due_date }, 'start', e.target.value); setData({ ...data, start_date: o.start, due_date: o.due }); if (o.start) setShowStartDate(true); }} error={errors.start_date} disabled={!canManageTaskDetails} />
                                     )}
                                     <div>
                                         <Input
@@ -676,7 +676,7 @@ export default function Edit() {
                                             id="due_date"
                                             type="date"
                                             value={data.due_date}
-                                            onChange={(e) => { const o = orderTaskDates(data.start_date, e.target.value, 'due'); setData({ ...data, start_date: o.start, due_date: o.due }); if (o.start) setShowStartDate(true); }}
+                                            onChange={(e) => { const o = pickTaskDate({ start: data.start_date, due: data.due_date }, 'due', e.target.value); setData({ ...data, start_date: o.start, due_date: o.due }); if (o.start) setShowStartDate(true); }}
                                             error={errors.due_date}
                                             disabled={!canManageTaskDetails}
                                         />
