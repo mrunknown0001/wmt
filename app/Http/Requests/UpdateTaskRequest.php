@@ -4,13 +4,14 @@ namespace App\Http\Requests;
 
 use App\Models\Task;
 use App\Http\Requests\Concerns\GuardsMilestoneFlag;
+use App\Http\Requests\Concerns\GuardsCloseRuleExemption;
 use App\Http\Requests\Concerns\ScopesSectionToProject;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdateTaskRequest extends FormRequest
 {
-    use GuardsMilestoneFlag;
+    use GuardsMilestoneFlag, GuardsCloseRuleExemption;
     use ScopesSectionToProject;
 
     public function authorize(): bool
@@ -67,6 +68,8 @@ class UpdateTaskRequest extends FormRequest
             'recurrence_config.weekday' => ['nullable', 'integer', 'min:1', 'max:7'],
             'section_id' => ['nullable', $this->sectionIdRule()],
             'is_milestone' => ['boolean', $this->milestoneFlagRule()],
+            'close_rule_exempt' => ['boolean', $this->closeRuleExemptionRule()],
+            'close_rule_exempt_reason' => $this->closeRuleExemptionReasonRules(),
             'custom_field_values' => ['nullable', 'array'],
         ];
     }

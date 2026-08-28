@@ -3,12 +3,13 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\GuardsMilestoneFlag;
+use App\Http\Requests\Concerns\GuardsCloseRuleExemption;
 use App\Http\Requests\Concerns\ScopesSectionToProject;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PatchTaskRequest extends FormRequest
 {
-    use GuardsMilestoneFlag;
+    use GuardsMilestoneFlag, GuardsCloseRuleExemption;
     use ScopesSectionToProject;
 
     public function authorize(): bool
@@ -42,6 +43,8 @@ class PatchTaskRequest extends FormRequest
             'estimated_minutes' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'section_id' => ['sometimes', 'nullable', $this->sectionIdRule()],
             'is_milestone' => ['sometimes', 'boolean', $this->milestoneFlagRule()],
+            'close_rule_exempt' => ['sometimes', 'boolean', $this->closeRuleExemptionRule()],
+            'close_rule_exempt_reason' => $this->closeRuleExemptionReasonRules(),
             'collaborator_ids' => ['sometimes', 'array'],
             'collaborator_ids.*' => ['integer', 'exists:users,id'],
         ];

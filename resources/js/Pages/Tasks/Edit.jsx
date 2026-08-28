@@ -290,7 +290,7 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, use
 
 
 export default function Edit() {
-    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, canFlagMilestone = false, dependencies: initialDependencies = [], dependencyOptions = [], settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
+    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, canFlagMilestone = false, requiresAttachmentOnClose = false, canExemptFromCloseRules = false, dependencies: initialDependencies = [], dependencyOptions = [], settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -305,6 +305,8 @@ export default function Edit() {
         collaborator_ids: (task.collaborators || []).map((c) => c.id),
         is_recurring: task.is_recurring || false,
         is_milestone: task.is_milestone || false,
+        close_rule_exempt: task.close_rule_exempt || false,
+        close_rule_exempt_reason: task.close_rule_exempt_reason || '',
         recurrence_frequency: task.recurrence_frequency || 'weekly',
         recurrence_interval: task.recurrence_interval || 1,
         recurrence_config: task.recurrence_config || null,
@@ -734,6 +736,79 @@ export default function Edit() {
                                         start date follows the due date.
                                     </p>
                                     {errors.is_milestone && <p className="mt-1 ml-6 text-xs text-red-600">{errors.is_milestone}</p>}
+                                </div>
+                            )}
+
+                            {/* Waiver against the project's close rule. Only shown where the
+                                rule actually applies, so it never advertises an exception to
+                                a project that has nothing to except from. */}
+                            {requiresAttachmentOnClose && canExemptFromCloseRules && (
+                                <div className="rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.close_rule_exempt}
+                                            onChange={(e) => setData('close_rule_exempt', e.target.checked)}
+                                            className="rounded border-amber-400 dark:border-amber-600 text-amber-600 focus:ring-amber-500"
+                                        />
+                                        <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                                            Exempt this task from the attachment rule
+                                        </span>
+                                    </label>
+                                    <p className="mt-1.5 ml-6 text-xs text-amber-800/80 dark:text-amber-300/80">
+                                        This project requires a file before a task can be marked Done or Cancelled.
+                                        Exempting lets this one task close without it — for work that genuinely
+                                        produced no file. Everything else in the project stays under the rule.
+                                    </p>
+
+                                    {data.close_rule_exempt && (
+                                        <div className="mt-3 ml-6">
+                                            <label htmlFor="close_rule_exempt_reason" className="block text-xs font-medium text-amber-900 dark:text-amber-200">
+                                                Reason <span className="text-red-600">*</span>
+                                            </label>
+                                            <textarea
+                                                id="close_rule_exempt_reason"
+                                                rows={2}
+                                                maxLength={500}
+                                                value={data.close_rule_exempt_reason}
+                                                onChange={(e) => setData('close_rule_exempt_reason', e.target.value)}
+                                                placeholder="Why this task can close without a file"
+                                                className="mt-1 block w-full rounded-md border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-amber-500 focus:ring-amber-500"
+                                            />
+                                            <p className="mt-1 text-xs text-amber-800/70 dark:text-amber-300/70">
+                                                Recorded against the task with your name, so the decision can be
+                                                accounted for later.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {task.close_rule_exempt && task.close_rule_exempt_by && (
+                                        <p className="mt-3 ml-6 text-xs text-amber-900/80 dark:text-amber-300/80">
+                                            Granted by{' '}
+                                            <span className="font-medium">{task.close_rule_exempt_by?.name || task.close_rule_exempt_by_name || 'someone'}</span>
+                                            {task.close_rule_exempt_at && (
+                                                <> on {new Date(task.close_rule_exempt_at).toLocaleDateString()}</>
+                                            )}.
+                                        </p>
+                                    )}
+
+                                    {errors.close_rule_exempt && <p className="mt-2 ml-6 text-xs text-red-600">{errors.close_rule_exempt}</p>}
+                                    {errors.close_rule_exempt_reason && <p className="mt-1 ml-6 text-xs text-red-600">{errors.close_rule_exempt_reason}</p>}
+                                </div>
+                            )}
+
+                            {/* Read-only for everyone else: the person doing the work should be
+                                able to see the rule was waived, and by whom, without being able
+                                to waive it themselves. */}
+                            {requiresAttachmentOnClose && !canExemptFromCloseRules && task.close_rule_exempt && (
+                                <div className="rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-4">
+                                    <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                                        Exempt from the attachment rule
+                                    </p>
+                                    <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-300/80">
+                                        This task can be closed without a file.
+                                        {task.close_rule_exempt_reason && <> Reason: {task.close_rule_exempt_reason}</>}
+                                    </p>
                                 </div>
                             )}
 

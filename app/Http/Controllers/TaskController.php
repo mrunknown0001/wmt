@@ -247,7 +247,7 @@ class TaskController extends Controller
     {
         $this->authorize('update', $task);
 
-        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'attachments');
+        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'attachments', 'closeRuleExemptBy:id,name');
         $task->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
 
         $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [
@@ -361,6 +361,11 @@ class TaskController extends Controller
             // Milestones and dependencies. The flag is gated more tightly than
             // the rest of the form — see TaskPolicy::flagMilestone.
             'canFlagMilestone' => auth()->user()->can('flagMilestone', $task),
+
+            // The project close rule and the per-task waiver against it. The
+            // rule is sent so the waiver only appears where it could bite.
+            'requiresAttachmentOnClose' => (bool) $project->require_comment_attachment_on_close,
+            'canExemptFromCloseRules' => auth()->user()->can('exemptFromCloseRules', $task),
             'dependencies' => $task->dependencies()->get(['tasks.id', 'title', 'status'])->all(),
             'dependencyOptions' => $task->project_id
                 ? Task::where('project_id', $task->project_id)

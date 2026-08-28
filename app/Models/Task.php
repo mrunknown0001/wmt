@@ -41,6 +41,8 @@ class Task extends Model
         'status',
         'priority',
         'is_milestone',
+        'close_rule_exempt',
+        'close_rule_exempt_reason',
         'assigned_to',
         'created_by',
         'start_date',
@@ -62,6 +64,8 @@ class Task extends Model
     {
         return [
             'is_milestone' => 'boolean',
+            'close_rule_exempt' => 'boolean',
+            'close_rule_exempt_at' => 'datetime',
             // Date-only columns, serialised as a plain calendar date.
             //
             // Plain 'date' serialises through Carbon::toJSON(), which converts
@@ -139,6 +143,22 @@ class Task extends Model
             // the UI has nothing to keep in sync.
             if ($task->is_milestone) {
                 $task->start_date = $task->due_date;
+            }
+
+            // Stamp who granted the exemption and when, at the same choke point
+            // that enforces the rule. Any path that can set the flag — form,
+            // patch, API — records the decision without having to remember to.
+            if ($task->isDirty('close_rule_exempt')) {
+                if ($task->close_rule_exempt) {
+                    $task->close_rule_exempt_by = $task->close_rule_exempt_by ?: auth()->id();
+                    $task->close_rule_exempt_at = now();
+                } else {
+                    // Withdrawn: clear the record rather than leave a stale
+                    // grantor attached to a task that is no longer exempt.
+                    $task->close_rule_exempt_reason = null;
+                    $task->close_rule_exempt_by = null;
+                    $task->close_rule_exempt_at = null;
+                }
             }
 
             if ($task->isDirty('status')) {
@@ -230,6 +250,13 @@ class Task extends Model
         $project = $this->relationLoaded('project') ? $this->project : Project::find($this->project_id);
 
         if (!$project?->require_comment_attachment_on_close || $this->hasSupportingAttachment()) {
+            return;
+        }
+
+        // An exemption is granted per task by whoever runs the project, and is
+        // checked last: it only matters once the rule would otherwise bite, so
+        // an exempt task that does have an attachment never needs to lean on it.
+        if ($this->close_rule_exempt) {
             return;
         }
 
@@ -459,6 +486,12 @@ class Task extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Who waived this task's project close rules. */
+    public function closeRuleExemptBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'close_rule_exempt_by');
     }
 
     public function comments(): HasMany
