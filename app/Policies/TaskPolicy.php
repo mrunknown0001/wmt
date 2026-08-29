@@ -90,4 +90,19 @@ class TaskPolicy
 
         return $project !== null && $user->can('update', $project);
     }
+
+    /**
+     * May waive this task's project close rules, or withdraw the waiver.
+     *
+     * Deliberately not the assignee. The close rule exists to constrain the
+     * person finishing the work, so letting them exempt themselves would leave
+     * the rule enforcing nothing — it would be a prompt, not a rule. It sits
+     * with whoever set the rule: the project's owner, admins and managers.
+     */
+    public function exemptFromCloseRules(User $user, Task $task): bool
+    {
+        $project = $task->project;
+
+        return $project !== null && $user->can('update', $project);
+    }
 }

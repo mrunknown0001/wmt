@@ -174,6 +174,13 @@ class StandaloneTaskController extends Controller
             'recurrenceChain' => $recurrenceChain,
             'canManageTaskDetails' => $canManageTaskDetails,
             'isStandalone' => true,
+
+            // Same minutes contract as the project-nested edit page: they share
+            // the one Inertia component, so they must share its props.
+            'minutes' => $task->minutes()->with('updatedBy:id,name')->first(),
+            'minutesUpdatedBy' => $task->minutes?->updatedBy?->name,
+            'minutesUpdatedAt' => $task->minutes?->updated_at?->toIso8601String(),
+            'taskTypes' => Task::TASK_TYPES,
             'projects' => Project::where('status', '!=', 'archived')
                 ->orderBy('name')
                 ->get(['id', 'name']),

@@ -1,6 +1,7 @@
 import { useForm, usePage, router, Link } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { pickTaskDate } from '../../taskDates';
+import TaskMinutes from '../../Components/TaskMinutes';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -290,7 +291,7 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, use
 
 
 export default function Edit() {
-    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, canFlagMilestone = false, dependencies: initialDependencies = [], dependencyOptions = [], settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
+    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, canFlagMilestone = false, requiresAttachmentOnClose = false, canExemptFromCloseRules = false, minutes = null, minutesUpdatedBy = null, minutesUpdatedAt = null, dependencies: initialDependencies = [], dependencyOptions = [], settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -304,7 +305,10 @@ export default function Edit() {
         estimated_minutes: task.estimated_minutes ?? null,
         collaborator_ids: (task.collaborators || []).map((c) => c.id),
         is_recurring: task.is_recurring || false,
+        task_type: task.task_type || 'standard',
         is_milestone: task.is_milestone || false,
+        close_rule_exempt: task.close_rule_exempt || false,
+        close_rule_exempt_reason: task.close_rule_exempt_reason || '',
         recurrence_frequency: task.recurrence_frequency || 'weekly',
         recurrence_interval: task.recurrence_interval || 1,
         recurrence_config: task.recurrence_config || null,
@@ -378,6 +382,42 @@ export default function Edit() {
 
     const [showStartDate, setShowStartDate] = useState(!!task.start_date);
     const [activeTab, setActiveTab] = useState('comments');
+
+    // Switching tabs moves the page to what was asked for. Minutes take the full
+    // width and sit below the task form, so choosing them without scrolling
+    // leaves the reader looking at the form they just left; the other tabs live
+    // at the top of the column and have to be scrolled back up to.
+    const tabsRef = useRef(null);
+    const minutesRef = useRef(null);
+    const tabsMounted = useRef(false);
+
+    useEffect(() => {
+        // Only on an actual change — the first render must not yank the page.
+        if (!tabsMounted.current) {
+            tabsMounted.current = true;
+            return;
+        }
+
+        const target = activeTab === 'minutes' ? minutesRef.current : tabsRef.current;
+        if (!target) return;
+
+        // Scroll the container by hand rather than with scrollIntoView. The page
+        // scrolls inside <main>, under a sticky header, and scrollIntoView's own
+        // alignment put the tab bar eight pixels behind that header — close
+        // enough to look like a rendering fault. Positioning it explicitly leaves
+        // no doubt where the target lands.
+        const scroller = target.closest('main') || document.scrollingElement;
+        if (!scroller) return;
+
+        const GAP = 12; // a little air above the target, not flush to the edge
+        const top = target.getBoundingClientRect().top
+            - scroller.getBoundingClientRect().top
+            + scroller.scrollTop
+            - GAP;
+
+        const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        scroller.scrollTo({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
+    }, [activeTab]);
     const [commentBody, setCommentBody] = useState('');
     const [posting, setPosting] = useState(false);
     const [attachments, setAttachments] = useState([]);
@@ -616,7 +656,7 @@ export default function Edit() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Task Form */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 min-w-0">
                     <Card>
                         <OverdueNotice task={task} className="mb-5" />
                         <CompletedNotice task={task} className="mb-5" />
@@ -644,6 +684,26 @@ export default function Edit() {
                         )}
                         <form id="task-edit-form" onSubmit={handleSubmit} className="space-y-5">
                             <Input label="Title" id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} error={errors.title} />
+
+                            {/* What kind of task this is. A meeting keeps minutes; the tab
+                                appears as soon as the type is switched, before saving. */}
+                            <Select
+                                label="Task Type"
+                                id="task_type"
+                                value={data.task_type}
+                                onChange={(e) => setData('task_type', e.target.value)}
+                                options={[
+                                    { value: 'standard', label: 'Standard Task' },
+                                    { value: 'meeting', label: 'Meeting (keeps minutes)' },
+                                ]}
+                                error={errors.task_type}
+                                disabled={!canManageTaskDetails}
+                            />
+                            {data.task_type === 'meeting' && task.task_type !== 'meeting' && (
+                                <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    Save the task to open its Minutes tab.
+                                </p>
+                            )}
                             <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -734,6 +794,79 @@ export default function Edit() {
                                         start date follows the due date.
                                     </p>
                                     {errors.is_milestone && <p className="mt-1 ml-6 text-xs text-red-600">{errors.is_milestone}</p>}
+                                </div>
+                            )}
+
+                            {/* Waiver against the project's close rule. Only shown where the
+                                rule actually applies, so it never advertises an exception to
+                                a project that has nothing to except from. */}
+                            {requiresAttachmentOnClose && canExemptFromCloseRules && (
+                                <div className="rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.close_rule_exempt}
+                                            onChange={(e) => setData('close_rule_exempt', e.target.checked)}
+                                            className="rounded border-amber-400 dark:border-amber-600 text-amber-600 focus:ring-amber-500"
+                                        />
+                                        <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                                            Exempt this task from the attachment rule
+                                        </span>
+                                    </label>
+                                    <p className="mt-1.5 ml-6 text-xs text-amber-800/80 dark:text-amber-300/80">
+                                        This project requires a file before a task can be marked Done or Cancelled.
+                                        Exempting lets this one task close without it — for work that genuinely
+                                        produced no file. Everything else in the project stays under the rule.
+                                    </p>
+
+                                    {data.close_rule_exempt && (
+                                        <div className="mt-3 ml-6">
+                                            <label htmlFor="close_rule_exempt_reason" className="block text-xs font-medium text-amber-900 dark:text-amber-200">
+                                                Reason <span className="text-red-600">*</span>
+                                            </label>
+                                            <textarea
+                                                id="close_rule_exempt_reason"
+                                                rows={2}
+                                                maxLength={500}
+                                                value={data.close_rule_exempt_reason}
+                                                onChange={(e) => setData('close_rule_exempt_reason', e.target.value)}
+                                                placeholder="Why this task can close without a file"
+                                                className="mt-1 block w-full rounded-md border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-amber-500 focus:ring-amber-500"
+                                            />
+                                            <p className="mt-1 text-xs text-amber-800/70 dark:text-amber-300/70">
+                                                Recorded against the task with your name, so the decision can be
+                                                accounted for later.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {task.close_rule_exempt && task.close_rule_exempt_by && (
+                                        <p className="mt-3 ml-6 text-xs text-amber-900/80 dark:text-amber-300/80">
+                                            Granted by{' '}
+                                            <span className="font-medium">{task.close_rule_exempt_by?.name || task.close_rule_exempt_by_name || 'someone'}</span>
+                                            {task.close_rule_exempt_at && (
+                                                <> on {new Date(task.close_rule_exempt_at).toLocaleDateString()}</>
+                                            )}.
+                                        </p>
+                                    )}
+
+                                    {errors.close_rule_exempt && <p className="mt-2 ml-6 text-xs text-red-600">{errors.close_rule_exempt}</p>}
+                                    {errors.close_rule_exempt_reason && <p className="mt-1 ml-6 text-xs text-red-600">{errors.close_rule_exempt_reason}</p>}
+                                </div>
+                            )}
+
+                            {/* Read-only for everyone else: the person doing the work should be
+                                able to see the rule was waived, and by whom, without being able
+                                to waive it themselves. */}
+                            {requiresAttachmentOnClose && !canExemptFromCloseRules && task.close_rule_exempt && (
+                                <div className="rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-4">
+                                    <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                                        Exempt from the attachment rule
+                                    </p>
+                                    <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-300/80">
+                                        This task can be closed without a file.
+                                        {task.close_rule_exempt_reason && <> Reason: {task.close_rule_exempt_reason}</>}
+                                    </p>
                                 </div>
                             )}
 
@@ -999,10 +1132,14 @@ export default function Edit() {
                 </div>
 
                 {/* Activity & Comments */}
-                <div className="lg:col-span-1">
+                {/* min-w-0 so the wide minutes tables scroll inside this column
+                    rather than stretching the grid track — a grid item defaults to
+                    min-width:auto, which lets wide content push the layout out.
+                    Minutes are a full-page document, so they take the full width. */}
+                <div className={`min-w-0 ${activeTab === 'minutes' ? 'lg:col-span-3' : 'lg:col-span-1'}`}>
                     <Card>
                         {/* Tabs */}
-                        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+                        <div ref={tabsRef} className="flex border-b border-gray-200 dark:border-gray-700 mb-4 scroll-mt-4">
                             <button
                                 onClick={() => setActiveTab('comments')}
                                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -1023,6 +1160,18 @@ export default function Edit() {
                             >
                                 Activities {totalActivities > 0 && <span className="ml-1 text-xs text-gray-400">({totalActivities})</span>}
                             </button>
+                            {task.task_type === 'meeting' && (
+                                <button
+                                    onClick={() => setActiveTab('minutes')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        activeTab === 'minutes'
+                                            ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                    }`}
+                                >
+                                    Minutes
+                                </button>
+                            )}
                             {recurrenceChain && recurrenceChain.length > 0 && (
                                 <button
                                     onClick={() => setActiveTab('recurrence')}
@@ -1213,6 +1362,19 @@ export default function Edit() {
                         )}
 
                         {/* Activities Tab */}
+                        {activeTab === 'minutes' && task.task_type === 'meeting' && (
+                            <div ref={minutesRef} className="scroll-mt-4">
+                                <TaskMinutes
+                                    task={task}
+                                    users={users}
+                                    minutes={minutes}
+                                    updatedBy={minutesUpdatedBy}
+                                    updatedAt={minutesUpdatedAt}
+                                    canEdit={canManageTaskDetails !== false}
+                                />
+                            </div>
+                        )}
+
                         {activeTab === 'activities' && (
                             <>
                                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
