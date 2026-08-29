@@ -40,9 +40,16 @@ const BLANK = {
     issue: { issue: '', impact: '', recommended_action: '', user_id: '', name: '' },
 };
 
-const input = 'block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary-500 focus:ring-primary-500';
-const cell = 'px-2 py-2 align-top';
-const th = 'px-2 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60';
+// The same shape as Components/Input, so a field inside the minutes looks like
+// a field anywhere else in the application.
+const input = 'block w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm shadow-sm transition-all duration-200 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500';
+
+// Repeating sections are grids rather than tables. A table wide enough to need
+// a scrolling wrapper also clips anything that escapes it, and the person
+// picker's dropdown is exactly that — it was being cut in half by the wrapper.
+const headRow = 'hidden sm:grid gap-2 px-1 pb-1 text-xs font-semibold text-gray-600 dark:text-gray-400';
+const bodyRow = 'grid grid-cols-1 sm:grid-cols-12 gap-2 items-start px-1 py-2 border-t border-gray-200 dark:border-gray-700 first:border-t-0';
+const mobileLabel = 'sm:hidden block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1';
 
 function Section({ number, title, children }) {
     return (
@@ -249,49 +256,48 @@ export default function TaskMinutes({ task, users = [], minutes, updatedBy, upda
 
                 {/* 2 */}
                 <Section number="2" title="Attendees">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full border border-gray-200 dark:border-gray-700 rounded">
-                            <thead>
-                                <tr>
-                                    <th className={`${th} w-10`}>No.</th>
-                                    <th className={th}>Name</th>
-                                    <th className={th}>Position / Department</th>
-                                    <th className={`${th} w-32`}>Attendance</th>
-                                    <th className={`${th} w-8`} />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {form.attendees.map((row, i) => (
-                                    <tr key={i} className="border-t border-gray-200 dark:border-gray-700">
-                                        <td className={`${cell} text-gray-500`}>{i + 1}</td>
-                                        <td className={`${cell} min-w-[190px]`}>
-                                            <SearchableSelect
-                                                id={`attendee_${i}`}
-                                                value={row.user_id}
-                                                onChange={(v) => setRowPerson('attendees', i, v)}
-                                                options={userOptions}
-                                                placeholder="Search people…"
-                                                showAvatar
-                                            />
-                                        </td>
-                                        <td className={cell}>
-                                            <input type="text" className={input} value={row.position || ''}
-                                                onChange={(e) => setRow('attendees', i, 'position', e.target.value)} />
-                                        </td>
-                                        <td className={cell}>
-                                            <select className={input} value={row.attendance || 'present'}
-                                                onChange={(e) => setRow('attendees', i, 'attendance', e.target.value)}>
-                                                {ATTENDANCE.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-                                            </select>
-                                        </td>
-                                        <td className={cell}><RemoveRow onClick={() => removeRow('attendees', i)} /></td>
-                                    </tr>
-                                ))}
-                                {form.attendees.length === 0 && (
-                                    <tr><td colSpan={5} className="px-2 py-3 text-xs text-gray-400">No attendees recorded yet.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
+                    <div className={`${headRow} sm:grid-cols-12`}>
+                        <span className="sm:col-span-1">No.</span>
+                        <span className="sm:col-span-4">Name</span>
+                        <span className="sm:col-span-4">Position / Department</span>
+                        <span className="sm:col-span-2">Attendance</span>
+                        <span className="sm:col-span-1" />
+                    </div>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                        {form.attendees.map((row, i) => (
+                            <div key={i} className={bodyRow}>
+                                <span className="hidden sm:block sm:col-span-1 pt-2 text-sm text-gray-500">{i + 1}</span>
+                                <div className="sm:col-span-4">
+                                    <span className={mobileLabel}>Name</span>
+                                    <SearchableSelect
+                                        id={`attendee_${i}`}
+                                        value={row.user_id}
+                                        onChange={(v) => setRowPerson('attendees', i, v)}
+                                        options={userOptions}
+                                        placeholder="Search people…"
+                                        showAvatar
+                                    />
+                                </div>
+                                <div className="sm:col-span-4">
+                                    <span className={mobileLabel}>Position / Department</span>
+                                    <input type="text" className={input} value={row.position || ''}
+                                        onChange={(e) => setRow('attendees', i, 'position', e.target.value)} />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <span className={mobileLabel}>Attendance</span>
+                                    <select className={input} value={row.attendance || 'present'}
+                                        onChange={(e) => setRow('attendees', i, 'attendance', e.target.value)}>
+                                        {ATTENDANCE.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                                    </select>
+                                </div>
+                                <div className="sm:col-span-1 flex sm:justify-end pt-2">
+                                    <RemoveRow onClick={() => removeRow('attendees', i)} />
+                                </div>
+                            </div>
+                        ))}
+                        {form.attendees.length === 0 && (
+                            <p className="px-1 py-2 text-xs text-gray-400">No attendees recorded yet.</p>
+                        )}
                     </div>
                     <AddRow onClick={() => addRow('attendees', BLANK.attendee)}>+ Add attendee</AddRow>
 
@@ -347,54 +353,54 @@ export default function TaskMinutes({ task, users = [], minutes, updatedBy, upda
 
                 {/* 5 */}
                 <Section number="5" title="Action Items">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full border border-gray-200 dark:border-gray-700 rounded">
-                            <thead>
-                                <tr>
-                                    <th className={`${th} w-10`}>No.</th>
-                                    <th className={th}>Action Item / Deliverable</th>
-                                    <th className={th}>Person Responsible</th>
-                                    <th className={`${th} w-40`}>Target Date</th>
-                                    <th className={`${th} w-36`}>Status</th>
-                                    <th className={`${th} w-8`} />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {form.action_items.map((row, i) => (
-                                    <tr key={i} className="border-t border-gray-200 dark:border-gray-700">
-                                        <td className={`${cell} text-gray-500`}>{i + 1}</td>
-                                        <td className={`${cell} min-w-[200px]`}>
-                                            <textarea rows={2} className={input} value={row.action || ''}
-                                                onChange={(e) => setRow('action_items', i, 'action', e.target.value)} />
-                                        </td>
-                                        <td className={`${cell} min-w-[180px]`}>
-                                            <SearchableSelect
-                                                id={`action_person_${i}`}
-                                                value={row.user_id}
-                                                onChange={(v) => setRowPerson('action_items', i, v)}
-                                                options={userOptions}
-                                                placeholder="Search people…"
-                                                showAvatar
-                                            />
-                                        </td>
-                                        <td className={cell}>
-                                            <input type="date" className={input} value={(row.target_date || '').slice(0, 10)}
-                                                onChange={(e) => setRow('action_items', i, 'target_date', e.target.value)} />
-                                        </td>
-                                        <td className={cell}>
-                                            <select className={input} value={row.status || 'open'}
-                                                onChange={(e) => setRow('action_items', i, 'status', e.target.value)}>
-                                                {ACTION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                                            </select>
-                                        </td>
-                                        <td className={cell}><RemoveRow onClick={() => removeRow('action_items', i)} /></td>
-                                    </tr>
-                                ))}
-                                {form.action_items.length === 0 && (
-                                    <tr><td colSpan={6} className="px-2 py-3 text-xs text-gray-400">No action items yet.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
+                    <div className={`${headRow} sm:grid-cols-12`}>
+                        <span className="sm:col-span-1">No.</span>
+                        <span className="sm:col-span-4">Action Item / Deliverable</span>
+                        <span className="sm:col-span-3">Person Responsible</span>
+                        <span className="sm:col-span-2">Target Date</span>
+                        <span className="sm:col-span-1">Status</span>
+                        <span className="sm:col-span-1" />
+                    </div>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                        {form.action_items.map((row, i) => (
+                            <div key={i} className={bodyRow}>
+                                <span className="hidden sm:block sm:col-span-1 pt-2 text-sm text-gray-500">{i + 1}</span>
+                                <div className="sm:col-span-4">
+                                    <span className={mobileLabel}>Action Item / Deliverable</span>
+                                    <textarea rows={2} className={input} value={row.action || ''}
+                                        onChange={(e) => setRow('action_items', i, 'action', e.target.value)} />
+                                </div>
+                                <div className="sm:col-span-3">
+                                    <span className={mobileLabel}>Person Responsible</span>
+                                    <SearchableSelect
+                                        id={`action_person_${i}`}
+                                        value={row.user_id}
+                                        onChange={(v) => setRowPerson('action_items', i, v)}
+                                        options={userOptions}
+                                        placeholder="Search people…"
+                                        showAvatar
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <span className={mobileLabel}>Target Date</span>
+                                    <input type="date" className={input} value={(row.target_date || '').slice(0, 10)}
+                                        onChange={(e) => setRow('action_items', i, 'target_date', e.target.value)} />
+                                </div>
+                                <div className="sm:col-span-1">
+                                    <span className={mobileLabel}>Status</span>
+                                    <select className={input} value={row.status || 'open'}
+                                        onChange={(e) => setRow('action_items', i, 'status', e.target.value)}>
+                                        {ACTION_STATUSES.map((st) => <option key={st.value} value={st.value}>{st.label}</option>)}
+                                    </select>
+                                </div>
+                                <div className="sm:col-span-1 flex sm:justify-end pt-2">
+                                    <RemoveRow onClick={() => removeRow('action_items', i)} />
+                                </div>
+                            </div>
+                        ))}
+                        {form.action_items.length === 0 && (
+                            <p className="px-1 py-2 text-xs text-gray-400">No action items yet.</p>
+                        )}
                     </div>
                     <AddRow onClick={() => addRow('action_items', BLANK.action)}>+ Add action item</AddRow>
                 </Section>
@@ -421,50 +427,50 @@ export default function TaskMinutes({ task, users = [], minutes, updatedBy, upda
 
                 {/* 7 */}
                 <Section number="7" title="Issues / Concerns / Risks">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full border border-gray-200 dark:border-gray-700 rounded">
-                            <thead>
-                                <tr>
-                                    <th className={th}>Issue / Concern</th>
-                                    <th className={th}>Impact</th>
-                                    <th className={th}>Recommended Action</th>
-                                    <th className={th}>Responsible Person</th>
-                                    <th className={`${th} w-8`} />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {form.issues.map((row, i) => (
-                                    <tr key={i} className="border-t border-gray-200 dark:border-gray-700">
-                                        <td className={`${cell} min-w-[160px]`}>
-                                            <textarea rows={2} className={input} value={row.issue || ''}
-                                                onChange={(e) => setRow('issues', i, 'issue', e.target.value)} />
-                                        </td>
-                                        <td className={`${cell} min-w-[140px]`}>
-                                            <textarea rows={2} className={input} value={row.impact || ''}
-                                                onChange={(e) => setRow('issues', i, 'impact', e.target.value)} />
-                                        </td>
-                                        <td className={`${cell} min-w-[160px]`}>
-                                            <textarea rows={2} className={input} value={row.recommended_action || ''}
-                                                onChange={(e) => setRow('issues', i, 'recommended_action', e.target.value)} />
-                                        </td>
-                                        <td className={`${cell} min-w-[180px]`}>
-                                            <SearchableSelect
-                                                id={`issue_person_${i}`}
-                                                value={row.user_id}
-                                                onChange={(v) => setRowPerson('issues', i, v)}
-                                                options={userOptions}
-                                                placeholder="Search people…"
-                                                showAvatar
-                                            />
-                                        </td>
-                                        <td className={cell}><RemoveRow onClick={() => removeRow('issues', i)} /></td>
-                                    </tr>
-                                ))}
-                                {form.issues.length === 0 && (
-                                    <tr><td colSpan={5} className="px-2 py-3 text-xs text-gray-400">Nothing recorded yet.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
+                    <div className={`${headRow} sm:grid-cols-12`}>
+                        <span className="sm:col-span-3">Issue / Concern</span>
+                        <span className="sm:col-span-3">Impact</span>
+                        <span className="sm:col-span-3">Recommended Action</span>
+                        <span className="sm:col-span-2">Responsible Person</span>
+                        <span className="sm:col-span-1" />
+                    </div>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                        {form.issues.map((row, i) => (
+                            <div key={i} className={bodyRow}>
+                                <div className="sm:col-span-3">
+                                    <span className={mobileLabel}>Issue / Concern</span>
+                                    <textarea rows={2} className={input} value={row.issue || ''}
+                                        onChange={(e) => setRow('issues', i, 'issue', e.target.value)} />
+                                </div>
+                                <div className="sm:col-span-3">
+                                    <span className={mobileLabel}>Impact</span>
+                                    <textarea rows={2} className={input} value={row.impact || ''}
+                                        onChange={(e) => setRow('issues', i, 'impact', e.target.value)} />
+                                </div>
+                                <div className="sm:col-span-3">
+                                    <span className={mobileLabel}>Recommended Action</span>
+                                    <textarea rows={2} className={input} value={row.recommended_action || ''}
+                                        onChange={(e) => setRow('issues', i, 'recommended_action', e.target.value)} />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <span className={mobileLabel}>Responsible Person</span>
+                                    <SearchableSelect
+                                        id={`issue_person_${i}`}
+                                        value={row.user_id}
+                                        onChange={(v) => setRowPerson('issues', i, v)}
+                                        options={userOptions}
+                                        placeholder="Search people…"
+                                        showAvatar
+                                    />
+                                </div>
+                                <div className="sm:col-span-1 flex sm:justify-end pt-2">
+                                    <RemoveRow onClick={() => removeRow('issues', i)} />
+                                </div>
+                            </div>
+                        ))}
+                        {form.issues.length === 0 && (
+                            <p className="px-1 py-2 text-xs text-gray-400">Nothing recorded yet.</p>
+                        )}
                     </div>
                     <AddRow onClick={() => addRow('issues', BLANK.issue)}>+ Add issue</AddRow>
                 </Section>
