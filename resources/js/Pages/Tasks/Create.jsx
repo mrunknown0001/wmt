@@ -36,6 +36,7 @@ export default function Create() {
     const { data, setData, post, processing, errors } = useForm({
         title: '',
         description: '',
+        task_type: 'standard',
         status: 'to_do',
         priority: 'medium',
         start_date: '',
@@ -83,6 +84,20 @@ export default function Create() {
                     )}
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <Input label="Title" id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} error={errors.title} />
+
+                        {/* A meeting task keeps minutes; the tab for them appears on the
+                            task once it exists. */}
+                        <Select
+                            label="Task Type"
+                            id="task_type"
+                            value={data.task_type}
+                            onChange={(e) => setData('task_type', e.target.value)}
+                            options={[
+                                { value: 'standard', label: 'Standard Task' },
+                                { value: 'meeting', label: 'Meeting (keeps minutes)' },
+                            ]}
+                            error={errors.task_type}
+                        />
                         <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

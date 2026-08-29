@@ -67,6 +67,7 @@ class UpdateTaskRequest extends FormRequest
             'recurrence_config.week' => ['nullable', 'integer', 'min:-1', 'max:5', 'not_in:0'],
             'recurrence_config.weekday' => ['nullable', 'integer', 'min:1', 'max:7'],
             'section_id' => ['nullable', $this->sectionIdRule()],
+            'task_type' => ['nullable', Rule::in(Task::TASK_TYPES)],
             'is_milestone' => ['boolean', $this->milestoneFlagRule()],
             'close_rule_exempt' => ['boolean', $this->closeRuleExemptionRule()],
             'close_rule_exempt_reason' => $this->closeRuleExemptionReasonRules(),

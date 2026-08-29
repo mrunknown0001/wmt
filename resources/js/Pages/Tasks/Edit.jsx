@@ -1,6 +1,7 @@
 import { useForm, usePage, router, Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { pickTaskDate } from '../../taskDates';
+import TaskMinutes from '../../Components/TaskMinutes';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -290,7 +291,7 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, use
 
 
 export default function Edit() {
-    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, canFlagMilestone = false, requiresAttachmentOnClose = false, canExemptFromCloseRules = false, dependencies: initialDependencies = [], dependencyOptions = [], settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
+    const { project, task, taskAttachments = [], timeline: initialTimeline, totalComments, totalActivities, users, statuses, priorities, auth, recurrenceFrequencies, recurrenceChain, canManageTaskDetails, canFlagMilestone = false, requiresAttachmentOnClose = false, canExemptFromCloseRules = false, minutes = null, minutesUpdatedBy = null, minutesUpdatedAt = null, dependencies: initialDependencies = [], dependencyOptions = [], settings, isStandalone, projects, customFields = [], customFieldValues: initialCfValues = {}, subtasks: initialSubtasks = [] } = usePage().props;
 
     const { data, setData, put, processing, errors } = useForm({
         title: task.title || '',
@@ -304,6 +305,7 @@ export default function Edit() {
         estimated_minutes: task.estimated_minutes ?? null,
         collaborator_ids: (task.collaborators || []).map((c) => c.id),
         is_recurring: task.is_recurring || false,
+        task_type: task.task_type || 'standard',
         is_milestone: task.is_milestone || false,
         close_rule_exempt: task.close_rule_exempt || false,
         close_rule_exempt_reason: task.close_rule_exempt_reason || '',
@@ -618,7 +620,7 @@ export default function Edit() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Task Form */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 min-w-0">
                     <Card>
                         <OverdueNotice task={task} className="mb-5" />
                         <CompletedNotice task={task} className="mb-5" />
@@ -646,6 +648,21 @@ export default function Edit() {
                         )}
                         <form id="task-edit-form" onSubmit={handleSubmit} className="space-y-5">
                             <Input label="Title" id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} error={errors.title} />
+
+                            {/* What kind of task this is. A meeting keeps minutes; the tab
+                                appears as soon as the type is switched, before saving. */}
+                            <Select
+                                label="Task Type"
+                                id="task_type"
+                                value={data.task_type}
+                                onChange={(e) => setData('task_type', e.target.value)}
+                                options={[
+                                    { value: 'standard', label: 'Standard Task' },
+                                    { value: 'meeting', label: 'Meeting (keeps minutes)' },
+                                ]}
+                                error={errors.task_type}
+                                disabled={!canManageTaskDetails}
+                            />
                             <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1074,7 +1091,11 @@ export default function Edit() {
                 </div>
 
                 {/* Activity & Comments */}
-                <div className="lg:col-span-1">
+                {/* min-w-0 so the wide minutes tables scroll inside this column
+                    rather than stretching the grid track — a grid item defaults to
+                    min-width:auto, which lets wide content push the layout out.
+                    Minutes are a full-page document, so they take the full width. */}
+                <div className={`min-w-0 ${activeTab === 'minutes' ? 'lg:col-span-3' : 'lg:col-span-1'}`}>
                     <Card>
                         {/* Tabs */}
                         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
@@ -1098,6 +1119,18 @@ export default function Edit() {
                             >
                                 Activities {totalActivities > 0 && <span className="ml-1 text-xs text-gray-400">({totalActivities})</span>}
                             </button>
+                            {data.task_type === 'meeting' && (
+                                <button
+                                    onClick={() => setActiveTab('minutes')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        activeTab === 'minutes'
+                                            ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                    }`}
+                                >
+                                    Minutes
+                                </button>
+                            )}
                             {recurrenceChain && recurrenceChain.length > 0 && (
                                 <button
                                     onClick={() => setActiveTab('recurrence')}
@@ -1288,6 +1321,17 @@ export default function Edit() {
                         )}
 
                         {/* Activities Tab */}
+                        {activeTab === 'minutes' && data.task_type === 'meeting' && (
+                            <TaskMinutes
+                                task={task}
+                                users={users}
+                                minutes={minutes}
+                                updatedBy={minutesUpdatedBy}
+                                updatedAt={minutesUpdatedAt}
+                                canEdit={canManageTaskDetails !== false}
+                            />
+                        )}
+
                         {activeTab === 'activities' && (
                             <>
                                 <div className="divide-y divide-gray-100 dark:divide-gray-700">

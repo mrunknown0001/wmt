@@ -9,6 +9,7 @@ use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\StandaloneTaskController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskMinutesController;
 use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\MyTaskController;
@@ -119,6 +120,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tasks/{task}/dependencies/{dependency}', [TaskDependencyController::class, 'destroy'])->name('tasks.dependencies.destroy');
     Route::patch('/tasks/{task}/patch', [StandaloneTaskController::class, 'patchField'])->name('tasks.patch');
     Route::get('/tasks/{task}/timeline', [StandaloneTaskController::class, 'timeline'])->name('tasks.timeline');
+
+    // Minutes hang off the task itself: a meeting can be a standalone task or a
+    // project one, and the record is the same either way.
+    Route::put('/tasks/{task}/minutes', [TaskMinutesController::class, 'update'])->name('tasks.minutes.update');
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'storeStandalone'])->name('standalone-tasks.comments.store');
     Route::put('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'updateStandalone'])->name('standalone-tasks.comments.update');
     Route::delete('/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroyStandalone'])->name('standalone-tasks.comments.destroy');

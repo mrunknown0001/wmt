@@ -37,6 +37,7 @@ class Task extends Model
         'project_id',
         'parent_id',
         'title',
+        'task_type',
         'description',
         'status',
         'priority',
@@ -486,6 +487,25 @@ class Task extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** What kind of task this is. A meeting keeps minutes; standard work does not. */
+    public const TYPE_STANDARD = 'standard';
+
+    public const TYPE_MEETING = 'meeting';
+
+    public const TASK_TYPES = [self::TYPE_STANDARD, self::TYPE_MEETING];
+
+    /** True when this task is a meeting, and so has minutes to keep. */
+    public function isMeeting(): bool
+    {
+        return $this->task_type === self::TYPE_MEETING;
+    }
+
+    /** The minutes for this task. Only meetings have them. */
+    public function minutes(): HasOne
+    {
+        return $this->hasOne(TaskMinute::class);
     }
 
     /** Who waived this task's project close rules. */
