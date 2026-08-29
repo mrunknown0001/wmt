@@ -1,5 +1,5 @@
 import { useForm, usePage, router, Link } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { pickTaskDate } from '../../taskDates';
 import TaskMinutes from '../../Components/TaskMinutes';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
@@ -382,6 +382,42 @@ export default function Edit() {
 
     const [showStartDate, setShowStartDate] = useState(!!task.start_date);
     const [activeTab, setActiveTab] = useState('comments');
+
+    // Switching tabs moves the page to what was asked for. Minutes take the full
+    // width and sit below the task form, so choosing them without scrolling
+    // leaves the reader looking at the form they just left; the other tabs live
+    // at the top of the column and have to be scrolled back up to.
+    const tabsRef = useRef(null);
+    const minutesRef = useRef(null);
+    const tabsMounted = useRef(false);
+
+    useEffect(() => {
+        // Only on an actual change — the first render must not yank the page.
+        if (!tabsMounted.current) {
+            tabsMounted.current = true;
+            return;
+        }
+
+        const target = activeTab === 'minutes' ? minutesRef.current : tabsRef.current;
+        if (!target) return;
+
+        // Scroll the container by hand rather than with scrollIntoView. The page
+        // scrolls inside <main>, under a sticky header, and scrollIntoView's own
+        // alignment put the tab bar eight pixels behind that header — close
+        // enough to look like a rendering fault. Positioning it explicitly leaves
+        // no doubt where the target lands.
+        const scroller = target.closest('main') || document.scrollingElement;
+        if (!scroller) return;
+
+        const GAP = 12; // a little air above the target, not flush to the edge
+        const top = target.getBoundingClientRect().top
+            - scroller.getBoundingClientRect().top
+            + scroller.scrollTop
+            - GAP;
+
+        const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        scroller.scrollTo({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
+    }, [activeTab]);
     const [commentBody, setCommentBody] = useState('');
     const [posting, setPosting] = useState(false);
     const [attachments, setAttachments] = useState([]);
@@ -1103,7 +1139,7 @@ export default function Edit() {
                 <div className={`min-w-0 ${activeTab === 'minutes' ? 'lg:col-span-3' : 'lg:col-span-1'}`}>
                     <Card>
                         {/* Tabs */}
-                        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+                        <div ref={tabsRef} className="flex border-b border-gray-200 dark:border-gray-700 mb-4 scroll-mt-4">
                             <button
                                 onClick={() => setActiveTab('comments')}
                                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -1327,14 +1363,16 @@ export default function Edit() {
 
                         {/* Activities Tab */}
                         {activeTab === 'minutes' && task.task_type === 'meeting' && (
-                            <TaskMinutes
-                                task={task}
-                                users={users}
-                                minutes={minutes}
-                                updatedBy={minutesUpdatedBy}
-                                updatedAt={minutesUpdatedAt}
-                                canEdit={canManageTaskDetails !== false}
-                            />
+                            <div ref={minutesRef} className="scroll-mt-4">
+                                <TaskMinutes
+                                    task={task}
+                                    users={users}
+                                    minutes={minutes}
+                                    updatedBy={minutesUpdatedBy}
+                                    updatedAt={minutesUpdatedAt}
+                                    canEdit={canManageTaskDetails !== false}
+                                />
+                            </div>
                         )}
 
                         {activeTab === 'activities' && (
