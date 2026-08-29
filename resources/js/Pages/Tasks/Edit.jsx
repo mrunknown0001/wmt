@@ -663,6 +663,11 @@ export default function Edit() {
                                 error={errors.task_type}
                                 disabled={!canManageTaskDetails}
                             />
+                            {data.task_type === 'meeting' && task.task_type !== 'meeting' && (
+                                <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    Save the task to open its Minutes tab.
+                                </p>
+                            )}
                             <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1119,7 +1124,7 @@ export default function Edit() {
                             >
                                 Activities {totalActivities > 0 && <span className="ml-1 text-xs text-gray-400">({totalActivities})</span>}
                             </button>
-                            {data.task_type === 'meeting' && (
+                            {task.task_type === 'meeting' && (
                                 <button
                                     onClick={() => setActiveTab('minutes')}
                                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -1321,7 +1326,7 @@ export default function Edit() {
                         )}
 
                         {/* Activities Tab */}
-                        {activeTab === 'minutes' && data.task_type === 'meeting' && (
+                        {activeTab === 'minutes' && task.task_type === 'meeting' && (
                             <TaskMinutes
                                 task={task}
                                 users={users}
