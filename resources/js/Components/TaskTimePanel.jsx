@@ -208,17 +208,17 @@ export default function TaskTimePanel({ taskId, estimatedMinutes, canEdit, curre
                         <input
                             type="text" value={duration} onChange={(e) => setDuration(e.target.value)}
                             placeholder="1.5, 1:30, 90m" autoFocus
-                            className="w-28 text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
+                            className="w-28 text-xs rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
                         />
                         <input
                             type="date" value={loggedOn} onChange={(e) => setLoggedOn(e.target.value)}
-                            className="text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
+                            className="text-xs rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
                         />
                     </div>
                     <input
                         type="text" value={note} onChange={(e) => setNote(e.target.value)}
                         placeholder="Note (optional)" maxLength={255}
-                        className="w-full text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
+                        className="w-full text-xs rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
                     />
                     <div className="flex gap-2">
                         <button type="submit" disabled={busy || !duration.trim()}

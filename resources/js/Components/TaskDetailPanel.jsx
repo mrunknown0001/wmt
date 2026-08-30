@@ -108,7 +108,7 @@ function CollaboratorEditor({ collaborators, users, assigneeId, onUpdate }) {
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Search people..."
                             autoFocus
-                            className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                            className="w-full text-sm rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2.5 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                         />
                         {available.length > 0 && (
                             <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-36 overflow-y-auto">
@@ -578,7 +578,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                 <select
                                     value={taskData.status}
                                     onChange={(e) => handleFieldUpdate('status', e.target.value)}
-                                    className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5"
+                                    className="w-full text-sm rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5"
                                 >
                                     {['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'].map(s => (
                                         <option key={s} value={s}>{formatLabel(s)}</option>
@@ -592,7 +592,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                 <select
                                     value={taskData.priority}
                                     onChange={(e) => handleFieldUpdate('priority', e.target.value)}
-                                    className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5"
+                                    className="w-full text-sm rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5"
                                 >
                                     {['low', 'medium', 'high', 'urgent'].map(p => (
                                         <option key={p} value={p}>{formatLabel(p)}</option>
@@ -619,7 +619,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                     type="date"
                                     value={taskData.due_date ? taskData.due_date.split('T')[0] : ''}
                                     onChange={(e) => handleFieldUpdate('due_date', e.target.value || null)}
-                                    className={`w-full text-sm rounded-md py-1.5 dark:bg-gray-800 dark:text-gray-100 ${
+                                    className={`w-full text-sm rounded-md border py-1.5 dark:bg-gray-800 dark:text-gray-100 ${
                                         isOverdue
                                             ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 font-medium'
                                             : 'border-gray-300 dark:border-gray-600'
@@ -634,7 +634,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                     type="date"
                                     value={taskData.start_date ? taskData.start_date.split('T')[0] : ''}
                                     onChange={(e) => handleFieldUpdate('start_date', e.target.value || null)}
-                                    className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5"
+                                    className="w-full text-sm rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5"
                                 />
                             </div>
 
