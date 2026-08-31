@@ -3813,7 +3813,7 @@ export default function Show() {
                                 value={sortConfig?.key || ''}
                                 onChange={(e) => setSortConfig(e.target.value ? { key: e.target.value, direction: sortConfig?.direction || 'asc' } : null)}
                                 title="Order the list by a column"
-                                className="text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5 pl-2.5 pr-7"
+                                className="text-sm rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5 pl-2.5 pr-7"
                             >
                                 {/* Empty is the order people arranged by hand — the default,
                                     and it has to stay reachable once sorting is on. */}
@@ -4499,7 +4499,7 @@ export default function Show() {
                             <select
                                 value={boardGroupBy}
                                 onChange={(e) => changeBoardGroupBy(e.target.value)}
-                                className="text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 py-1 pr-7"
+                                className="text-xs rounded-md border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 py-1 pr-7"
                             >
                                 <option value="status">Status</option>
                                 {boardGroupableFields.map((f) => (

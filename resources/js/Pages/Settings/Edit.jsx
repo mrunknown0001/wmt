@@ -428,7 +428,7 @@ export default function Edit() {
                                                     value={tier.days}
                                                     onChange={(e) => updateEscalationTier(index, 'days', parseInt(e.target.value) || 1)}
                                                     disabled={!tier.enabled}
-                                                    className="w-16 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm text-center disabled:opacity-50"
+                                                    className="w-16 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm text-center disabled:opacity-50"
                                                 />
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">{tier.days === 1 ? 'day' : 'days'}</span>
                                             </div>
