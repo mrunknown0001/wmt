@@ -290,6 +290,9 @@ class StandaloneTaskController extends Controller
 
     public function timeline(Request $request, Task $task): JsonResponse
     {
+        abort_unless($task->isStandalone(), 404);
+        $this->authorize('view', $task);
+
         $type = $request->query('type');
         $offset = (int) $request->query('offset', 0);
         $limit = 10;

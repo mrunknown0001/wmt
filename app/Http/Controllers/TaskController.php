@@ -627,6 +627,9 @@ class TaskController extends Controller
 
     public function timeline(Request $request, Project $project, Task $task): JsonResponse
     {
+        abort_if($task->project_id !== $project->id, 404);
+        $this->authorize('view', $task);
+
         $type = $request->query('type'); // 'comment' or 'activity'
         $offset = (int) $request->query('offset', 0);
         $limit = 10;

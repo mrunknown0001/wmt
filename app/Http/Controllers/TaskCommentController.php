@@ -213,6 +213,19 @@ class TaskCommentController extends Controller
 
     public function storeStandalone(StoreTaskCommentRequest $request, Task $task): RedirectResponse
     {
+        // This route is for standalone tasks. Route binding accepts any task id,
+        // so a project task arriving here would have skipped that project's
+        // comment rules entirely — the guarded store() above is reached only
+        // through the project-nested route.
+        abort_unless($task->isStandalone(), 404);
+
+        // Everyone else was let straight through: this endpoint creates a
+        // comment, stores whatever files came with it, and notifies the task's
+        // assignees, all without asking who was calling. TaskPolicy::view is the
+        // matching set for a standalone task — its creator, its assignee, its
+        // collaborators, or someone who manages tasks globally.
+        $this->authorize('view', $task);
+
         $comment = $task->comments()->create([
             'user_id' => $request->user()->id,
             'body' => $request->body ?? '',

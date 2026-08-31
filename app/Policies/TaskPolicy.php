@@ -37,7 +37,13 @@ class TaskPolicy
         // Reading a task inside a project is the same question as reading the
         // project, so defer rather than restating those rules (owner, member,
         // overseeing head/leader, executive, assignee) and risk drift.
-        return $user->can('view', $task->project);
+        //
+        // Collaborators are named separately because the project rules do not
+        // mention them: someone added to a single task, without membership or an
+        // assignment, is still expected to work on it — the comment guard has
+        // always accepted them — so they must be able to read it.
+        return $user->can('view', $task->project)
+            || $task->collaborators()->where('users.id', $user->id)->exists();
     }
 
     public function create(User $user): bool
