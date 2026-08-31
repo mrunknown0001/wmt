@@ -22,6 +22,15 @@ class ApprovalCustomFieldController extends Controller
 
     public function index(ApprovalProject $approvalProject): JsonResponse
     {
+        // Every sibling action here calls authorizeProject; this one asked
+        // nothing, so any signed-in account could read another project's field
+        // definitions — names, types and option lists — by naming its id.
+        //
+        // Gated on view rather than authorizeProject: reading the definitions is
+        // what anyone filling in or reading a request needs, while creating and
+        // changing them stays with whoever runs the project.
+        $this->authorize('view', $approvalProject);
+
         return response()->json([
             'fields' => $approvalProject->customFields()
                 ->with('options')
