@@ -21,6 +21,9 @@ class TaskController extends Controller
 {
     public function show(Project $project, Task $task): JsonResponse
     {
+        abort_if($task->project_id !== $project->id, 404);
+        $this->authorize('view', $task);
+
         $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name', 'parent:id,title', 'project:id,name', 'subtasks.assignee:id,name');
         $task->loadMissing('project.owner:id,name', 'project.members:id,name');
         $task->loadCount('subtasks');
@@ -154,6 +157,20 @@ class TaskController extends Controller
 
     public function storeComment(Request $request, Project $project, Task $task): JsonResponse
     {
+        // The web endpoint has asked both of these since it was written; this one
+        // asked neither, so any authenticated caller could comment on any task,
+        // attach files to it and notify its assignees.
+        abort_if($task->project_id !== $project->id, 404);
+
+        $task->loadMissing('collaborators');
+        abort_unless(
+            $project->userCanManageTasks($request->user())
+                || $task->assigned_to === $request->user()->id
+                || $task->collaborators->contains('id', $request->user()->id),
+            403,
+            'You do not have permission to comment on this task.'
+        );
+
         $request->validate([
             'body' => ['required_without:attachments', 'nullable', 'string', 'max:2000'],
             'attachments' => ['nullable', 'array', 'max:5'],

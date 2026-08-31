@@ -63,6 +63,9 @@ class StandaloneTaskController extends Controller
 
     public function show(Task $task): JsonResponse
     {
+        abort_unless($task->isStandalone(), 404);
+        $this->authorize('view', $task);
+
         $task->load('assignee:id,name', 'creator:id,name', 'collaborators:id,name', 'parent:id,title', 'project:id,name', 'subtasks.assignee:id,name');
         $task->loadCount('subtasks');
         $task->loadCount(['subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
@@ -231,6 +234,12 @@ class StandaloneTaskController extends Controller
 
     public function storeComment(Request $request, Task $task): JsonResponse
     {
+        // Route binding accepts any task id, so without these a project task
+        // could be commented on through the standalone route, skipping that
+        // project's rules entirely.
+        abort_unless($task->isStandalone(), 404);
+        $this->authorize('view', $task);
+
         $request->validate([
             'body' => ['required_without:attachments', 'nullable', 'string', 'max:2000'],
             'attachments' => ['nullable', 'array', 'max:5'],
