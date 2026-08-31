@@ -19,11 +19,15 @@ class StoreTaskRequest extends FormRequest
         $project = $this->route('project');
 
         if (! $project) {
-            return true;
+            return true; // a standalone task has no project rules to apply
         }
 
-        return $this->user()->can('manage-tasks')
-            || $project->owner_id === $this->user()->id;
+        // Project::userCanManageTasks is the single definition of who may raise
+        // and change a project's tasks. Restating it here is what broke: this
+        // asked only for the global permission or the owner, so a project admin
+        // — who the controller and the policy both accept — could open the new
+        // task form and then be refused by the request that saves it.
+        return $project->userCanManageTasks($this->user());
     }
 
     public function rules(): array

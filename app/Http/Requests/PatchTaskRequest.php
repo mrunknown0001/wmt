@@ -18,17 +18,11 @@ class PatchTaskRequest extends FormRequest
     {
         $task = $this->route('task');
 
-        if ($this->user()->can('manage-tasks')) {
-            return true;
-        }
-
-        if ($task->isStandalone()) {
-            return $task->created_by === $this->user()->id
-                || $task->assigned_to === $this->user()->id;
-        }
-
-        return $task->project->owner_id === $this->user()->id
-            || $task->assigned_to === $this->user()->id;
+        // Ask the policy rather than paraphrasing it. This carried the same
+        // omission as the store request — owner or assignee, never membership —
+        // so a project admin who was neither could not edit any task in a
+        // project they administer, while TaskPolicy::update said they could.
+        return $task !== null && $this->user()->can('update', $task);
     }
 
     public function rules(): array
