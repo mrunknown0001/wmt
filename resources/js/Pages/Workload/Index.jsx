@@ -51,7 +51,9 @@ export default function WorkloadIndex() {
     const { days, rows } = workload;
 
     return (
-        <AuthenticatedLayout title="Workload">
+        <AuthenticatedLayout title="Workload" contained>
+          <div className="flex flex-col h-full min-h-0">
+            <div className="shrink-0 pt-6">
             <PageHeader
                 title="Workload"
                 // Named rather than left implicit: a head is looking at their own
@@ -60,9 +62,14 @@ export default function WorkloadIndex() {
                 description={scope ? `The people in ${scope}.` : undefined}
                 breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Workload' }]}
             />
+            </div>
 
-            <Card>
-                <div className="flex flex-wrap items-end gap-3 mb-4">
+            {/* The card takes the height it needs, up to whatever is left of the
+                screen, and the list scrolls inside it — so the filters and the
+                day header stay put however many people are listed, and a short
+                list still ends where it ends rather than in a tall empty box. */}
+            <Card className="flex flex-col min-h-0 mb-6">
+                <div className="shrink-0 flex flex-wrap items-end gap-3 mb-4">
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From</label>
                         <input
@@ -130,21 +137,21 @@ export default function WorkloadIndex() {
                         Nobody to show for these filters.
                     </p>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className="flex-1 min-h-0 overflow-auto">
                         <table className="min-w-full border-collapse text-sm">
                             <thead>
                                 <tr>
-                                    <th className="sticky left-0 z-10 bg-white dark:bg-gray-800 px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    <th className="sticky left-0 top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Person
                                     </th>
                                     {days.map((d) => (
-                                        <th key={d.date} className={`px-2 py-2 text-center text-[11px] font-medium whitespace-nowrap ${
+                                        <th key={d.date} className={`sticky top-0 z-20 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-2 py-2 text-center text-[11px] font-medium whitespace-nowrap ${
                                             d.weekday >= 6 ? 'text-gray-300 dark:text-gray-600' : 'text-gray-500 dark:text-gray-400'
                                         }`}>
                                             {d.label}
                                         </th>
                                     ))}
-                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                                    <th className="sticky top-0 z-20 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                         Total
                                     </th>
                                 </tr>
@@ -200,13 +207,14 @@ export default function WorkloadIndex() {
                     </div>
                 )}
 
-                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                <p className="shrink-0 mt-4 text-xs text-gray-500 dark:text-gray-400">
                     A task&rsquo;s estimate is spread evenly across the working days between its start
                     and due dates; with no start date it all lands on the due date. Tasks without an
                     estimate are counted separately and contribute nothing — a light-looking week may
                     just be an unestimated one. Windows are capped at {maxDays} days.
                 </p>
             </Card>
+          </div>
         </AuthenticatedLayout>
     );
 }
