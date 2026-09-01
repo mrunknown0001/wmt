@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\RichTextLength;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreApprovalFormRequest extends FormRequest
@@ -15,7 +16,7 @@ class StoreApprovalFormRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
-            'description' => 'nullable|string|max:1000',
+            'description' => ['nullable', 'string', new RichTextLength(1000)],
             'is_active' => 'nullable|boolean',
             'submit_button_text' => 'nullable|string|max:100',
             'success_message' => 'nullable|string|max:1000',
@@ -30,7 +31,7 @@ class StoreApprovalFormRequest extends FormRequest
             'fields' => 'required|array|min:1',
             'fields.*.type' => 'required|string|in:text,textarea,select,multi_select,date,number,email,heading,description,attachment,capture_photo,capture_video',
             'fields.*.label' => 'required|string|max:255',
-            'fields.*.help_text' => 'nullable|string|max:500',
+            'fields.*.help_text' => ['nullable', 'string', new RichTextLength(500)],
             'fields.*.is_required' => 'nullable|boolean',
             'fields.*.config' => 'nullable|array',
             'fields.*.maps_to' => 'nullable|string|in:description,custom_field,assignee',

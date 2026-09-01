@@ -3,6 +3,9 @@ import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
+import RichTextEditor from '../../Components/RichTextEditor';
+import CharacterCounter from '../../Components/CharacterCounter';
+import { APPROVAL_FORM_LIMITS } from '../../limits';
 import AddSectionModal from '../../Components/AddSectionModal';
 
 export default function Edit({ project, form }) {
@@ -82,9 +85,11 @@ export default function Edit({ project, form }) {
                                 type="text"
                                 value={data.name}
                                 onChange={(e) => setData('name', e.target.value)}
+                                maxLength={APPROVAL_FORM_LIMITS.name}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                                 required
                             />
+                            <CharacterCounter used={(data.name || '').length} limit={APPROVAL_FORM_LIMITS.name} />
                             {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
                         </div>
 
@@ -92,11 +97,12 @@ export default function Edit({ project, form }) {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Description
                             </label>
-                            <textarea
-                                value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                                rows="3"
+                            <RichTextEditor
+                                value={data.description || ''}
+                                onChange={(html) => setData('description', html)}
+                                placeholder="Describe what this form is for..."
+                                minimal
+                                limit={APPROVAL_FORM_LIMITS.description}
                             />
                         </div>
 
@@ -109,7 +115,9 @@ export default function Edit({ project, form }) {
                                 value={data.submit_button_text}
                                 onChange={(e) => setData('submit_button_text', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                maxLength={APPROVAL_FORM_LIMITS.submitButtonText}
                             />
+                            <CharacterCounter used={(data.submit_button_text || '').length} limit={APPROVAL_FORM_LIMITS.submitButtonText} />
                         </div>
 
                         <div>
@@ -120,8 +128,10 @@ export default function Edit({ project, form }) {
                                 value={data.success_message}
                                 onChange={(e) => setData('success_message', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                                maxLength={APPROVAL_FORM_LIMITS.successMessage}
                                 rows="2"
                             />
+                            <CharacterCounter used={(data.success_message || '').length} limit={APPROVAL_FORM_LIMITS.successMessage} />
                         </div>
 
                         <div>

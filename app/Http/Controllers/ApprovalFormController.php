@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\RichText;
 use App\Models\ApprovalProject;
 use App\Models\ApprovalForm;
 use App\Http\Requests\StoreApprovalFormRequest;
@@ -56,7 +57,7 @@ class ApprovalFormController extends Controller
 
         $form = $approvalProject->approvalForms()->create([
             'name' => $request->name,
-            'description' => $request->description,
+            'description' => RichText::sanitize($request->description),
             'uuid' => Str::uuid(),
             'is_active' => $request->is_active ?? true,
             'submit_button_text' => $request->submit_button_text ?? 'Submit',
@@ -84,7 +85,7 @@ class ApprovalFormController extends Controller
             $form->fields()->create([
                 'type' => $fieldData['type'],
                 'label' => $fieldData['label'],
-                'help_text' => $fieldData['help_text'] ?? null,
+                'help_text' => RichText::sanitize($fieldData['help_text'] ?? null),
                 'is_required' => $fieldData['is_required'] ?? false,
                 'position' => $index,
                 'config' => $fieldData['config'] ?? null,
@@ -140,7 +141,7 @@ class ApprovalFormController extends Controller
 
         $form->update([
             'name' => $request->name,
-            'description' => $request->description,
+            'description' => RichText::sanitize($request->description),
             'is_active' => $request->is_active ?? true,
             'submit_button_text' => $request->submit_button_text ?? 'Submit',
             'success_message' => $request->success_message,
@@ -190,7 +191,7 @@ class ApprovalFormController extends Controller
                 $form->fields()->find($fieldData['id'])?->update([
                     'type' => $fieldData['type'],
                     'label' => $fieldData['label'],
-                    'help_text' => $fieldData['help_text'] ?? null,
+                    'help_text' => RichText::sanitize($fieldData['help_text'] ?? null),
                     'is_required' => $fieldData['is_required'] ?? false,
                     'position' => $index,
                     'config' => $fieldData['config'] ?? null,
@@ -204,7 +205,7 @@ class ApprovalFormController extends Controller
                 $form->fields()->create([
                     'type' => $fieldData['type'],
                     'label' => $fieldData['label'],
-                    'help_text' => $fieldData['help_text'] ?? null,
+                    'help_text' => RichText::sanitize($fieldData['help_text'] ?? null),
                     'is_required' => $fieldData['is_required'] ?? false,
                     'position' => $index,
                     'config' => $fieldData['config'] ?? null,
