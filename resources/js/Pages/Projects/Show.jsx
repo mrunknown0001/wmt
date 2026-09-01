@@ -1530,7 +1530,7 @@ function AutomationToast({ toast, onDismiss }) {
 }
 
 export default function Show() {
-    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, canManageCharts = false, canArchiveProject = false, charts = [], automationRules, customFields: initialCustomFields = [], forms = [], auth, users } = usePage().props;
+    const { project, tasks: serverTasks, sections: serverSections = [], canManageProject, canManageTasks, canManageCharts = false, canArchiveProject = false, charts = [], automationRules, customFields: initialCustomFields = [], forms = [], savedSort = null, auth, users } = usePage().props;
 
     const [localCustomFields, setLocalCustomFields] = useState(initialCustomFields);
     const [showDetails, setShowDetails] = useState(false);
@@ -1904,38 +1904,54 @@ export default function Show() {
         });
     }, []);
 
-    // Sort config { key, direction }, kept per project alongside the column
-    // widths, order and hidden set — leaving a project and coming back to a list
-    // that has quietly reverted to creation order is the same annoyance as
-    // having to re-hide a column.
-    const SORT_KEY = `wmt-sort-${project.id}`;
+    // Sort config { key, direction }, saved against the person rather than the
+    // browser, so a sort chosen at a desk is still there on a laptop. The column
+    // widths, order and hidden set are still per browser — they describe a
+    // screen more than a preference.
+    const LEGACY_SORT_KEY = `wmt-sort-${project.id}`;
 
-    const [sortConfig, setSortConfigState] = useState(() => {
+    const readLegacySort = () => {
         try {
-            const saved = JSON.parse(localStorage.getItem(SORT_KEY) || 'null');
-            // Anything else in that slot is somebody else's data or a shape from
-            // a previous version; sorting by it would be a silent no-op.
+            const saved = JSON.parse(localStorage.getItem(LEGACY_SORT_KEY) || 'null');
             if (saved && typeof saved.key === 'string'
                 && (saved.direction === 'asc' || saved.direction === 'desc')) {
                 return saved;
             }
         } catch { /* private mode, or unparseable */ }
         return null;
-    });
+    };
+
+    const [sortConfig, setSortConfigState] = useState(() => savedSort || readLegacySort());
 
     // Wrapped rather than written at each call site: the toolbar, the arrow
-    // button and the column menus all set the sort, and one of them forgetting
-    // to save is exactly the bug this is fixing.
+    // button and the two column menus all set the sort, and one of them
+    // forgetting to save is the bug this is fixing.
+    const persistSort = useCallback((value) => {
+        apiFetch(`/projects/${project.id}/view-preferences`, {
+            method: 'PATCH',
+            body: JSON.stringify({ sort: value }),
+        }).catch(() => { /* the sort is a preference; a failed save is not worth a dialog */ });
+    }, [project.id]);
+
     const setSortConfig = useCallback((next) => {
         setSortConfigState((prev) => {
             const value = typeof next === 'function' ? next(prev) : next;
-            try {
-                if (value) localStorage.setItem(SORT_KEY, JSON.stringify(value));
-                else localStorage.removeItem(SORT_KEY);
-            } catch { /* private mode */ }
+            persistSort(value);
             return value;
         });
-    }, [SORT_KEY]);
+    }, [persistSort]);
+
+    // A sort chosen before this moved server-side lives in localStorage on
+    // whichever machine chose it. Adopt it once, then drop it, so nobody loses
+    // the sort they set yesterday and no stale copy is left to disagree later.
+    useEffect(() => {
+        const legacy = readLegacySort();
+        if (!legacy) return;
+        try { localStorage.removeItem(LEGACY_SORT_KEY); } catch { /* private mode */ }
+        if (savedSort) return;              // the server already has an opinion
+        persistSort(legacy);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [project.id]);
 
     // Custom field manager ref for edit/delete from column dropdown
     const cfManagerRef = useRef(null);

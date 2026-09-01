@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardPreferenceController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectViewPreferenceController;
 use App\Http\Controllers\StandaloneTaskController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskMinutesController;
@@ -87,6 +88,12 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::patch('/dashboard/preferences', [DashboardPreferenceController::class, 'update'])->name('dashboard.preferences.update');
+
+    // How one person likes to look at one project — the task sort, for now.
+    // Saved server-side rather than in the browser so it follows the person to
+    // their other machine.
+    Route::patch('/projects/{project}/view-preferences', [ProjectViewPreferenceController::class, 'update'])
+        ->name('projects.view-preferences.update');
 
     // Global search
     Route::get('/api/search', SearchController::class)->name('search');
