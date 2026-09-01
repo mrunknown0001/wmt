@@ -169,11 +169,36 @@ class User extends Authenticatable
         );
     }
 
-    /** Drop the cached headship flag — call after changing an org unit's head. */
+    /**
+     * Heads a division or a department, rather than any unit at all.
+     *
+     * Its own question because Workload answers to it: a head is shown the
+     * branch they run, which is a different thing from the whole organisation
+     * the admin permission opens. Team leaders are not included — a team's load
+     * is visible to whoever runs the department above it.
+     */
+    public function headsDivisionOrDepartment(): bool
+    {
+        return Cache::remember(
+            "user:{$this->id}:heads-div-or-dept",
+            now()->addMinutes(30),
+            fn () => Division::where('head_id', $this->id)->exists()
+                || Department::where('head_id', $this->id)->exists()
+        );
+    }
+
+    /** May look at the Workload page, over the whole org or their own branch. */
+    public function canViewWorkload(): bool
+    {
+        return $this->can('view-workload') || $this->headsDivisionOrDepartment();
+    }
+
+    /** Drop the cached headship flags — call after changing an org unit's head. */
     public static function forgetOrgHeadCache(?int $userId): void
     {
         if ($userId) {
             Cache::forget("user:{$userId}:heads-org-unit");
+            Cache::forget("user:{$userId}:heads-div-or-dept");
         }
     }
 

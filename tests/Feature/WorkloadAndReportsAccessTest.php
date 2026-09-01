@@ -13,9 +13,12 @@ use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * Workload and Reports show every person's numbers across the whole
- * organisation, so both are admin-only. Neither route checked anything before
- * this, so these are the tests that would have caught it.
+ * Reports shows every person's numbers across the whole organisation and is
+ * admin-only. Workload has the same admin door, plus one for division and
+ * department heads, who are shown their own branch rather than everybody —
+ * that half of the rule lives in WorkloadOrgScopeTest.
+ *
+ * Neither route checked anything at all before these tests existed.
  */
 class WorkloadAndReportsAccessTest extends TestCase
 {
@@ -96,8 +99,12 @@ class WorkloadAndReportsAccessTest extends TestCase
         $this->actingAs($this->withRole('supervisor'))->get($url)->assertForbidden();
     }
 
-    #[DataProvider('pages')]
-    public function test_heading_a_unit_is_not_enough(string $url): void
+    /**
+     * Reports is the whole organisation's numbers and nothing less, so running
+     * a unit is no way in. Workload is the exception and parts company here:
+     * heads get their own branch of it, which WorkloadOrgScopeTest covers.
+     */
+    public function test_heading_a_unit_is_not_enough_for_reports(): void
     {
         $this->permissions();
         $head = User::factory()->create(['is_active' => true]);
@@ -106,7 +113,21 @@ class WorkloadAndReportsAccessTest extends TestCase
         $department = Department::create(['name' => 'Support', 'division_id' => $division->id, 'head_id' => $head->id]);
         Team::create(['name' => 'Frontline', 'department_id' => $department->id, 'leader_id' => $head->id]);
 
-        $this->actingAs($head)->get($url)->assertForbidden();
+        $this->actingAs($head)->get('/reports')->assertForbidden();
+    }
+
+    /** Leading a team opens neither page — only heading a division or department does. */
+    #[DataProvider('pages')]
+    public function test_leading_a_team_is_not_enough(string $url): void
+    {
+        $this->permissions();
+        $leader = User::factory()->create(['is_active' => true]);
+
+        $division = Division::create(['name' => 'Field']);
+        $department = Department::create(['name' => 'Support', 'division_id' => $division->id]);
+        Team::create(['name' => 'Frontline', 'department_id' => $department->id, 'leader_id' => $leader->id]);
+
+        $this->actingAs($leader)->get($url)->assertForbidden();
     }
 
     /**
