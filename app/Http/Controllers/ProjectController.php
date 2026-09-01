@@ -444,6 +444,10 @@ class ProjectController extends Controller
             'forms' => $project->forms()->orderBy('name')->get(['id', 'name']),
             'statuses' => ['backlog', 'to_do', 'in_progress', 'in_review', 'done', 'cancelled'],
             'priorities' => ['low', 'medium', 'high', 'urgent'],
+            // This person's saved task sort. Server-side so it follows them
+            // between machines, unlike the column widths and hidden set, which
+            // are still per browser.
+            'savedSort' => \App\Models\ProjectViewPreference::sortFor(auth()->user(), $project),
         ]);
     }
 
