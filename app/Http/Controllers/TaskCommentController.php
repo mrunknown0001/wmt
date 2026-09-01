@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\CommentLength;
 use App\Events\TaskCommentCreated;
 use App\Events\TaskCommentDeleted;
 use App\Events\TaskCommentUpdated;
@@ -169,7 +170,7 @@ class TaskCommentController extends Controller
         }
 
         $request->validate([
-            'body' => ['required', 'string', 'max:2000'],
+            'body' => ['required', 'string', new CommentLength],
         ]);
 
         $comment->update(['body' => $request->body]);
@@ -291,7 +292,7 @@ class TaskCommentController extends Controller
         }
 
         $request->validate([
-            'body' => ['required', 'string', 'max:2000'],
+            'body' => ['required', 'string', new CommentLength],
         ]);
 
         $comment->update(['body' => $request->body]);

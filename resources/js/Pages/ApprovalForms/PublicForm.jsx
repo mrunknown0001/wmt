@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Head } from '@inertiajs/react';
 import TurnstileWidget from '../../Components/TurnstileWidget';
+import CharacterCounter from '../../Components/CharacterCounter';
 
 const NUMBER_MIN = -99999999999;
 const NUMBER_MAX = 99999999999;
@@ -23,6 +24,10 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
     const [errors, setErrors] = useState({});
     const [formErrors, setFormErrors] = useState('');
     const [turnstileToken, setTurnstileToken] = useState('');
+    // The inputs here are uncontrolled — the form posts them as FormData — so
+    // the counter needs its own record of how much has been typed.
+    const [typed, setTyped] = useState({});
+    const countChars = (id) => (e) => setTyped((prev) => ({ ...prev, [id]: e.target.value.length }));
 
     const handleTurnstileVerify = useCallback((token) => setTurnstileToken(token), []);
     const handleTurnstileExpire = useCallback(() => setTurnstileToken(''), []);
@@ -217,7 +222,9 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 maxLength={255}
+                                                onChange={countChars(field.id)}
                                             />
+                                            <CharacterCounter used={typed[field.id] || 0} limit={255} />
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -235,7 +242,9 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 maxLength={10000}
+                                                onChange={countChars(field.id)}
                                             />
+                                            <CharacterCounter used={typed[field.id] || 0} limit={10000} />
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -253,7 +262,9 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 maxLength={255}
+                                                onChange={countChars(field.id)}
                                             />
+                                            <CharacterCounter used={typed[field.id] || 0} limit={255} />
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}

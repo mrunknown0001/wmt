@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import CharacterCounter from './CharacterCounter';
+import { COMMENT_LIMIT } from '../limits';
 import { Link, router } from '@inertiajs/react';
 import Button from './Button';
 
@@ -145,7 +147,9 @@ export default function ApprovalItemComments({ project, item, comments, auth, re
                             placeholder="Add a comment..."
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white resize-none"
                             rows="3"
+                            maxLength={COMMENT_LIMIT}
                         />
+                        <CharacterCounter used={commentBody.length} limit={COMMENT_LIMIT} />
                     </div>
 
                     {/* Attachments */}
@@ -241,7 +245,9 @@ export default function ApprovalItemComments({ project, item, comments, auth, re
                                             onChange={(e) => setEditingBody(e.target.value)}
                                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white resize-none"
                                             rows="3"
+                                            maxLength={COMMENT_LIMIT}
                                         />
+                                        <CharacterCounter used={editingBody.length} limit={COMMENT_LIMIT} />
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => handleUpdateComment(comment)}

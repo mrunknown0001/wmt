@@ -1,6 +1,7 @@
 import { useForm, usePage, router, Link } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
 import { pickTaskDate } from '../../taskDates';
+import { COMMENT_LIMIT } from '../../limits';
 import TaskMinutes from '../../Components/TaskMinutes';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
@@ -200,6 +201,7 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, use
                             minimal
                             users={users}
                             onSubmit={handleSaveEdit}
+                            limit={COMMENT_LIMIT}
                         />
                         <div className="flex items-center gap-2 mt-2">
                             <button
@@ -1197,6 +1199,7 @@ export default function Edit() {
                                         minimal
                                         users={users}
                                         onSubmit={handleComment}
+                                        limit={COMMENT_LIMIT}
                                     />
 
                                     {attachments.length > 0 && (

@@ -1,4 +1,5 @@
 import { usePage, Head, router } from '@inertiajs/react';
+import CharacterCounter from '../../Components/CharacterCounter';
 import { useState, useCallback } from 'react';
 import Input from '../../Components/Input';
 import Textarea from '../../Components/Textarea';
@@ -263,7 +264,7 @@ export default function PublicForm() {
                         {field.config?.email_mode === 'registered_user' && (
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Must be a registered user's email address.</p>
                         )}
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <CharacterCounter used={(value || '').length} limit={255} help={field.help_text} />
                     </div>
                 );
 
@@ -279,7 +280,7 @@ export default function PublicForm() {
                             placeholder={field.config?.placeholder || ''}
                             maxLength={255}
                         />
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <CharacterCounter used={(value || '').length} limit={255} help={field.help_text} />
                     </div>
                 );
 
@@ -295,7 +296,7 @@ export default function PublicForm() {
                             placeholder={field.config?.placeholder || ''}
                             maxLength={10000}
                         />
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <CharacterCounter used={(value || '').length} limit={10000} help={field.help_text} />
                     </div>
                 );
 

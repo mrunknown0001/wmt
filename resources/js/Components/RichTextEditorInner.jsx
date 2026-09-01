@@ -1,8 +1,10 @@
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { CharacterCount } from '@tiptap/extensions';
+import CharacterCounter from './CharacterCounter';
 import Placeholder from '@tiptap/extension-placeholder';
 import Mention from '@tiptap/extension-mention';
-import { useEffect, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import tippy from 'tippy.js';
 import MentionList from './MentionList';
 import Tooltip from './Tooltip';
@@ -69,7 +71,7 @@ function Toolbar({ editor }) {
     );
 }
 
-export default function RichTextEditor({ label, id, value, onChange, error, placeholder, className = '', minimal = false, users = [], onSubmit }) {
+export default function RichTextEditor({ label, id, value, onChange, error, placeholder, className = '', minimal = false, users = [], onSubmit, limit = null, help = null }) {
     // Keep the latest onSubmit for the ProseMirror handler (editorProps are captured at editor creation)
     const onSubmitRef = useRef(onSubmit);
     onSubmitRef.current = onSubmit;
@@ -161,8 +163,17 @@ export default function RichTextEditor({ label, id, value, onChange, error, plac
             );
         }
 
+        if (limit) {
+            // textSize, not the default nodeSize: what a person is counting is
+            // the words they typed, not the markup around them. The server
+            // measures the same way.
+            exts.push(CharacterCount.configure({ limit, mode: 'textSize' }));
+        }
+
         return exts;
-    }, [minimal, placeholder, users.length > 0]);
+    }, [minimal, placeholder, users.length > 0, limit]);
+
+    const [used, setUsed] = useState(0);
 
     const editor = useEditor({
         extensions,
@@ -170,6 +181,7 @@ export default function RichTextEditor({ label, id, value, onChange, error, plac
         onUpdate: ({ editor }) => {
             const html = editor.getHTML();
             onChange(html === '<p></p>' ? '' : html);
+            if (limit) setUsed(editor.storage.characterCount?.characters() ?? 0);
         },
         editorProps: {
             attributes: {
@@ -203,8 +215,9 @@ export default function RichTextEditor({ label, id, value, onChange, error, plac
             if (normalizedValue !== normalizedCurrent) {
                 editor.commands.setContent(value || '');
             }
+            if (limit) setUsed(editor.storage.characterCount?.characters() ?? 0);
         }
-    }, [value, editor]);
+    }, [value, editor, limit]);
 
     return (
         <div className={className}>
@@ -224,6 +237,7 @@ export default function RichTextEditor({ label, id, value, onChange, error, plac
                 <EditorContent editor={editor} />
             </div>
             {error && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>}
+            {(limit || help) && <CharacterCounter used={used} limit={limit} help={help} />}
         </div>
     );
 }

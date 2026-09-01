@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\CommentLength;
 use App\Rules\CommentAttachmentFile;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -15,7 +16,7 @@ class StoreTaskCommentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['required_without:attachments', 'nullable', 'string', 'max:2000'],
+            'body' => ['required_without:attachments', 'nullable', 'string', new CommentLength],
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => ['file', new CommentAttachmentFile],
         ];
