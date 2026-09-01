@@ -174,7 +174,13 @@ export default function Dashboard() {
         return () => window.removeEventListener('wmt:notification', handler);
     }, []);
 
-    const isAdmin = auth.user?.roles?.some((r) => ['admin', 'supervisor'].includes(r));
+    // Whoever is responsible for somebody: admins and executives, who get the
+    // whole organisation, and anyone heading a division, department or team,
+    // who gets their own people. The same expression the sidebar uses for the
+    // other pages built on the org chart.
+    const supervisesSomebody = auth.user?.permissions?.includes('manage-users')
+        || auth.user?.roles?.some((r) => ['admin', 'executive'].includes(r))
+        || auth.user?.is_org_head;
 
     const handlePreferencesUpdate = (newPrefs) => {
         setPreferences(newPrefs);
@@ -214,7 +220,7 @@ export default function Dashboard() {
                         )}
                         <DashboardSettingsPopover
                             preferences={preferences}
-                            isAdmin={isAdmin}
+                            canSeeTeamWorkload={supervisesSomebody}
                             onUpdate={handlePreferencesUpdate}
                         />
                     </div>
@@ -498,8 +504,8 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* Team Workload — admin/supervisor only */}
-                {preferences.showTeamWorkload && isAdmin && teamWorkload?.length > 0 && (
+                {/* Team Workload — the people this person is responsible for. */}
+                {preferences.showTeamWorkload && supervisesSomebody && teamWorkload?.length > 0 && (
                     <div className="mb-6">
                         <TeamWorkload users={teamWorkload} />
                     </div>
