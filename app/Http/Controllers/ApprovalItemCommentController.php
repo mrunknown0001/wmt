@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\RichText;
 use App\Models\ApprovalProject;
 use App\Models\ApprovalItem;
 use App\Models\ApprovalItemComment;
@@ -19,7 +20,7 @@ class ApprovalItemCommentController extends Controller
 
         $comment = $item->comments()->create([
             'user_id' => auth()->id(),
-            'body' => $request->body ?? '',
+            'body' => RichText::sanitize($request->body) ?? '',
         ]);
 
         // Handle file attachments
@@ -47,7 +48,7 @@ class ApprovalItemCommentController extends Controller
         abort_if($comment->user_id !== auth()->id(), 403);
 
         $comment->update([
-            'body' => $request->body,
+            'body' => RichText::sanitize($request->body),
         ]);
 
         return redirect()->back()->with('success', 'Comment updated successfully.');

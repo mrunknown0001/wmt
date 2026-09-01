@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import CharacterCounter from './CharacterCounter';
+import RichTextEditor from './RichTextEditor';
+import RichContent from './RichContent';
 import { COMMENT_LIMIT } from '../limits';
 import { Link, router } from '@inertiajs/react';
 import Button from './Button';
@@ -30,6 +31,19 @@ const Tooltip = ({ content, children }) => (
         </span>
     </div>
 );
+
+/**
+ * Whether a comment says anything.
+ *
+ * The editor hands back HTML, so a box holding nothing but a formatted space
+ * is not empty by string length. What counts is whether a reader would see
+ * anything — the same question the server's length rule asks.
+ */
+const hasText = (html) => (html || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .trim()
+    .length > 0;
 
 /**
  * `resubmitOnPost` turns the comment box into the requester's way back into the
@@ -141,15 +155,13 @@ export default function ApprovalItemComments({ project, item, comments, auth, re
                 {/* Add Comment Form */}
                 <form onSubmit={handleAddComment} className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="mb-3">
-                        <textarea
+                        <RichTextEditor
                             value={commentBody}
-                            onChange={(e) => setCommentBody(e.target.value)}
+                            onChange={setCommentBody}
                             placeholder="Add a comment..."
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white resize-none"
-                            rows="3"
-                            maxLength={COMMENT_LIMIT}
+                            minimal
+                            limit={COMMENT_LIMIT}
                         />
-                        <CharacterCounter used={commentBody.length} limit={COMMENT_LIMIT} />
                     </div>
 
                     {/* Attachments */}
@@ -189,7 +201,7 @@ export default function ApprovalItemComments({ project, item, comments, auth, re
                         </label>
                         <button
                             type="submit"
-                            disabled={isAdding || (!commentBody.trim() && attachments.length === 0)}
+                            disabled={isAdding || (!hasText(commentBody) && attachments.length === 0)}
                             className="ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition"
                         >
                             {isAdding
@@ -240,18 +252,17 @@ export default function ApprovalItemComments({ project, item, comments, auth, re
 
                                 {editingCommentId === comment.id ? (
                                     <div className="space-y-2">
-                                        <textarea
+                                        <RichTextEditor
                                             value={editingBody}
-                                            onChange={(e) => setEditingBody(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white resize-none"
-                                            rows="3"
-                                            maxLength={COMMENT_LIMIT}
+                                            onChange={setEditingBody}
+                                            minimal
+                                            limit={COMMENT_LIMIT}
                                         />
-                                        <CharacterCounter used={editingBody.length} limit={COMMENT_LIMIT} />
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => handleUpdateComment(comment)}
-                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition"
+                                                disabled={!hasText(editingBody)}
+                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded transition"
                                             >
                                                 Save
                                             </button>
@@ -265,9 +276,12 @@ export default function ApprovalItemComments({ project, item, comments, auth, re
                                     </div>
                                 ) : (
                                     <>
-                                        <p className="text-gray-700 dark:text-gray-300 mb-3 whitespace-pre-wrap">
+                                        <RichContent
+                                            className="text-gray-700 dark:text-gray-300 mb-3"
+                                            breaks="whitespace-pre-wrap"
+                                        >
                                             {comment.body}
-                                        </p>
+                                        </RichContent>
 
                                         {/* Attachments Display */}
                                         {comment.attachments && comment.attachments.length > 0 && (

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\CommentLength;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateApprovalItemCommentRequest extends FormRequest
@@ -14,7 +15,7 @@ class UpdateApprovalItemCommentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => 'required|string|max:2000',
+            'body' => ['required', 'string', new CommentLength],
         ];
     }
 
@@ -22,7 +23,6 @@ class UpdateApprovalItemCommentRequest extends FormRequest
     {
         return [
             'body.required' => 'Comment body is required.',
-            'body.max' => 'Comment must not exceed 2000 characters.',
         ];
     }
 }
