@@ -46,7 +46,7 @@ class NavigationAccessTest extends TestCase
             ->assertOk()
             ->viewData('page')['props'];
 
-        foreach (['can_request', 'can_approve', 'is_org_head', 'roles', 'permissions'] as $flag) {
+        foreach (['can_request', 'can_approve', 'is_org_head', 'can_view_workload', 'roles', 'permissions'] as $flag) {
             $this->assertArrayHasKey(
                 $flag,
                 $props['auth']['user'],

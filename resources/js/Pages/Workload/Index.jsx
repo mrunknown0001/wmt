@@ -31,7 +31,7 @@ const cellClass = (cell) => {
 };
 
 export default function WorkloadIndex() {
-    const { workload, filters, teams = [], departments = [], projects = [], maxDays } = usePage().props;
+    const { workload, filters, teams = [], departments = [], projects = [], scope, maxDays } = usePage().props;
     const [range, setRange] = useState({ from: filters.from, to: filters.to });
 
     const go = (params) => router.get('/workload', { ...filters, ...params }, {
@@ -54,6 +54,10 @@ export default function WorkloadIndex() {
         <AuthenticatedLayout title="Workload">
             <PageHeader
                 title="Workload"
+                // Named rather than left implicit: a head is looking at their own
+                // branch of the org chart, not at everybody, and a quiet page
+                // should not be mistaken for a complete one.
+                description={scope ? `The people in ${scope}.` : undefined}
                 breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Workload' }]}
             />
 
@@ -83,6 +87,7 @@ export default function WorkloadIndex() {
                         <button onClick={() => shift(7)} className="px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">→</button>
                     </div>
 
+                    {teams.length > 0 && (
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Team</label>
                         <select
@@ -93,7 +98,9 @@ export default function WorkloadIndex() {
                             {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                     </div>
+                    )}
 
+                    {departments.length > 0 && (
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Department</label>
                         <select
@@ -104,6 +111,7 @@ export default function WorkloadIndex() {
                             {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                     </div>
+                    )}
 
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Project</label>

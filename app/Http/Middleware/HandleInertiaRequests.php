@@ -60,6 +60,9 @@ class HandleInertiaRequests extends Middleware
                     'can_request' => $request->user()->can_request,
                     // Heads a division/department/team → can reach completion monitoring.
                     'is_org_head' => $request->user()->headsAnyOrgUnit(),
+                    // Workload is wider than a permission: admins get the whole
+                    // organisation, a division or department head gets their branch.
+                    'can_view_workload' => $request->user()->canViewWorkload(),
                 ] : null,
             ],
             'settings' => fn () => \App\Models\Setting::current(),

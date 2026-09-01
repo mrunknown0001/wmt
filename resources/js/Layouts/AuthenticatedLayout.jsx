@@ -288,10 +288,11 @@ export default function AuthenticatedLayout({ children, title, contained = false
                             Task Cover
                         </NavLink>
                     )}
-                    {/* Workload and Reports cover the whole organisation, so both
-                        follow their admin-only permissions rather than being shown
-                        to everyone and refused on arrival. */}
-                    {hasPermission('view-workload') && (
+                    {/* Reports covers the whole organisation and follows its
+                        admin-only permission. Workload is shown to the same admins
+                        plus division and department heads, who get their own branch
+                        of the org chart rather than everybody. */}
+                    {auth.user?.can_view_workload && (
                     <NavLink
                         href="/workload"
                         icon={(

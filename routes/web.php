@@ -380,14 +380,17 @@ Route::middleware('auth')->group(function () {
     Route::put('/notes/{note}/shares/{share}', [NoteShareController::class, 'update'])->name('notes.shares.update');
     Route::delete('/notes/{note}/shares/{share}', [NoteShareController::class, 'destroy'])->name('notes.shares.destroy');
 
-    // Reports and Workload both show the whole organisation's numbers, so both
-    // are admin-only. Gated by permission rather than role name so the access
-    // can be granted from the roles table without a deploy.
+    // Reports shows the whole organisation's numbers, so it stays admin-only.
+    // Gated by permission rather than role name so the access can be granted
+    // from the roles table without a deploy.
     Route::get('/reports', [ReportController::class, 'index'])
         ->middleware('can:view-reports')->name('reports.index');
 
-    Route::get('/workload', [WorkloadController::class, 'index'])
-        ->middleware('can:view-workload')->name('workload.index');
+    // Workload has two doors: view-workload for the whole organisation, or
+    // heading a division or department for that branch. That is more than a
+    // permission string can say, so the controller authorises it — the same
+    // arrangement My Personnel uses for the same reason.
+    Route::get('/workload', [WorkloadController::class, 'index'])->name('workload.index');
 
     // Organization structure — admin-only. Managing divisions, departments and
     // teams is an administrator's job; the role gate here matches the sidebar,
