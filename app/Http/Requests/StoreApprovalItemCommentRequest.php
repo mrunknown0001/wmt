@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\CommentLength;
 use App\Rules\CommentAttachmentFile;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -15,7 +16,7 @@ class StoreApprovalItemCommentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => 'required_without:attachments|nullable|string|max:2000',
+            'body' => ['required_without:attachments', 'nullable', 'string', new CommentLength],
             'attachments' => 'nullable|array|max:5',
             'attachments.*' => ['file', new CommentAttachmentFile()],
         ];
@@ -25,7 +26,6 @@ class StoreApprovalItemCommentRequest extends FormRequest
     {
         return [
             'body.required_without' => 'Please provide a comment or attach files.',
-            'body.max' => 'Comment must not exceed 2000 characters.',
             'attachments.max' => 'You can attach a maximum of 5 files.',
         ];
     }
