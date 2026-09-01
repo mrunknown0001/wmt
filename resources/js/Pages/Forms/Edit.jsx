@@ -1,5 +1,6 @@
 import { usePage, useForm } from '@inertiajs/react';
 import { FORM_LIMITS } from '../../limits';
+import RichTextEditor from '../../Components/RichTextEditor';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -8,6 +9,23 @@ import Textarea from '../../Components/Textarea';
 import Button from '../../Components/Button';
 import FormBuilder from '../../Components/FormBuilder';
 import { useState } from 'react';
+
+/**
+ * Plain text written before these fields had an editor.
+ *
+ * TipTap reads its content as HTML, so a value with newlines in it would come
+ * back as one run-on paragraph and the breaks would be lost the first time
+ * somebody edited an old form. Anything already carrying markup is left alone.
+ */
+function asEditorHtml(value) {
+    if (!value) return '';
+    if (/<[a-z][\s\S]*>/i.test(value)) return value;
+
+    return value
+        .split(/\n{2,}/)
+        .map((para) => `<p>${para.replace(/\n/g, '<br>')}</p>`)
+        .join('');
+}
 
 export default function FormsEdit() {
     const { project, form: initialForm, customFields, sections } = usePage().props;
@@ -19,7 +37,7 @@ export default function FormsEdit() {
     const { data, setData, post, processing, errors } = useForm({
         _method: 'PUT',
         name: initialForm.name,
-        description: initialForm.description || '',
+        description: asEditorHtml(initialForm.description),
         is_active: initialForm.is_active,
         submit_button_text: initialForm.submit_button_text || 'Submit',
         success_message: initialForm.success_message || '',
@@ -40,7 +58,7 @@ export default function FormsEdit() {
             id: f.id,
             type: f.type,
             label: f.label,
-            help_text: f.help_text || '',
+            help_text: asEditorHtml(f.help_text),
             is_required: f.is_required,
             position: f.position,
             config: f.config,
@@ -151,14 +169,15 @@ export default function FormsEdit() {
                         />
                     </div>
                     <div className="mt-4">
-                        <Textarea
+                        <RichTextEditor
                             label="Description"
                             id="description"
-                            value={data.description}
-                            onChange={(e) => setData('description', e.target.value)}
+                            value={data.description || ''}
+                            onChange={(html) => setData('description', html)}
                             error={errors.description}
-                            maxLength={FORM_LIMITS.description}
-                            showCount
+                            placeholder="Shown at the top of the form"
+                            minimal
+                            limit={FORM_LIMITS.description}
                         />
                     </div>
                     <div className="mt-4">

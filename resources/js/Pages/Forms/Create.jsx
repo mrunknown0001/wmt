@@ -1,5 +1,6 @@
 import { usePage, useForm } from '@inertiajs/react';
 import { FORM_LIMITS } from '../../limits';
+import RichTextEditor from '../../Components/RichTextEditor';
 import { useState } from 'react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
@@ -89,15 +90,15 @@ export default function FormsCreate() {
                         />
                     </div>
                     <div className="mt-4">
-                        <Textarea
+                        <RichTextEditor
                             label="Description"
                             id="description"
                             value={data.description || ''}
-                            onChange={(e) => setData('description', e.target.value)}
+                            onChange={(html) => setData('description', html)}
                             error={errors.description}
-                            maxLength={FORM_LIMITS.description}
-                            showCount
                             placeholder="Shown at the top of the form"
+                            minimal
+                            limit={FORM_LIMITS.description}
                         />
                     </div>
                     <div className="mt-4">

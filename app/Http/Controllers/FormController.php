@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\RichText;
 use App\Http\Requests\StoreFormRequest;
 use App\Http\Requests\UpdateFormRequest;
 use App\Models\Form;
@@ -64,6 +65,8 @@ class FormController extends Controller
         $fields = $validated['fields'];
         unset($validated['fields'], $validated['logo'], $validated['banner'], $validated['remove_logo'], $validated['remove_banner']);
 
+        $validated = $this->sanitizeRichText($validated, $fields);
+
         if ($request->hasFile('logo')) {
             $validated['logo_path'] = $request->file('logo')->store('form-assets/logos', 'public');
         }
@@ -112,6 +115,28 @@ class FormController extends Controller
 
     // FormData submissions stringify numeric field positions; store them as ints
     // so checkbox state and title concatenation compare consistently
+    /**
+     * Clean the rich-text parts of a submitted form.
+     *
+     * The description and each question's help text are rendered as HTML on a
+     * page anybody with the link can open, so what an author writes is filtered
+     * here rather than trusted at the point it is displayed.
+     */
+    private function sanitizeRichText(array $validated, array &$fields): array
+    {
+        if (array_key_exists('description', $validated)) {
+            $validated['description'] = RichText::sanitize($validated['description']);
+        }
+
+        foreach ($fields as $i => $field) {
+            if (array_key_exists('help_text', $field)) {
+                $fields[$i]['help_text'] = RichText::sanitize($field['help_text']);
+            }
+        }
+
+        return $validated;
+    }
+
     private function normalizeTaskDefaults(array $validated): array
     {
         if (isset($validated['task_defaults']['title_field_ids'])) {
@@ -134,6 +159,8 @@ class FormController extends Controller
         $removeLogo = $validated['remove_logo'] ?? false;
         $removeBanner = $validated['remove_banner'] ?? false;
         unset($validated['fields'], $validated['logo'], $validated['banner'], $validated['remove_logo'], $validated['remove_banner']);
+
+        $validated = $this->sanitizeRichText($validated, $fields);
 
         if ($request->hasFile('logo')) {
             if ($form->logo_path) {

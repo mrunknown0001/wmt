@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\RichTextLength;
 use App\Models\FormField;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -16,7 +17,7 @@ class StoreFormRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:5000'],
+            'description' => ['nullable', 'string', new RichTextLength(5000)],
             'is_active' => ['sometimes', 'boolean'],
             'submit_button_text' => ['sometimes', 'string', 'max:255'],
             'success_message' => ['nullable', 'string', 'max:5000'],
@@ -36,7 +37,7 @@ class StoreFormRequest extends FormRequest
             'fields' => ['required', 'array', 'min:1'],
             'fields.*.type' => ['required', 'string', 'in:' . implode(',', FormField::TYPES)],
             'fields.*.label' => ['required', 'string', 'max:255'],
-            'fields.*.help_text' => ['nullable', 'string', 'max:1000'],
+            'fields.*.help_text' => ['nullable', 'string', new RichTextLength(1000)],
             'fields.*.is_required' => ['sometimes', 'boolean'],
             'fields.*.position' => ['required', 'integer', 'min:0'],
             'fields.*.config' => ['nullable', 'array'],
