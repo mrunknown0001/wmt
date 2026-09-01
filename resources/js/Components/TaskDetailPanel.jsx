@@ -4,6 +4,7 @@ import StatusBadge from './StatusBadge';
 import PriorityBadge from './PriorityBadge';
 import Avatar from './Avatar';
 import RichTextEditor from './RichTextEditor';
+import { COMMENT_LIMIT } from '../limits';
 import Tooltip from './Tooltip';
 import SearchableSelect from './SearchableSelect';
 import TaskTimePanel from './TaskTimePanel';
@@ -229,6 +230,7 @@ function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpd
                             minimal
                             users={users}
                             onSubmit={handleSaveEdit}
+                            limit={COMMENT_LIMIT}
                         />
                         <div className="flex items-center gap-2 mt-2">
                             <button
@@ -933,6 +935,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                                     minimal
                                                     users={users}
                                                     onSubmit={handleSubmitComment}
+                                                    limit={COMMENT_LIMIT}
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between mt-2">

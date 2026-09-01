@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Rules\CommentLength;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
@@ -241,7 +242,7 @@ class StandaloneTaskController extends Controller
         $this->authorize('view', $task);
 
         $request->validate([
-            'body' => ['required_without:attachments', 'nullable', 'string', 'max:2000'],
+            'body' => ['required_without:attachments', 'nullable', 'string', new CommentLength],
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => ['file', new \App\Rules\CommentAttachmentFile],
         ]);
