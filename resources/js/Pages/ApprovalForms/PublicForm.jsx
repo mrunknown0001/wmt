@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/react';
 import TurnstileWidget from '../../Components/TurnstileWidget';
 import CharacterCounter from '../../Components/CharacterCounter';
 import HelpText from '../../Components/HelpText';
+import { focusFirstError } from '../../focusFirstError';
 
 const NUMBER_MIN = -99999999999;
 const NUMBER_MAX = 99999999999;
@@ -115,7 +116,15 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                     if (responseData.errors.form) {
                         setFormErrors(responseData.errors.form[0]);
                     }
-                    window.scrollTo(0, 0);
+                    // Was window.scrollTo(0, 0): the top of the form is where
+                    // the problem is least likely to be.
+                    const focused = focusFirstError(
+                        fields.map((f) => f.id),
+                        (id) => Boolean(responseData.errors[`field_${id}`]),
+                    );
+                    if (!focused) {
+                        window.scrollTo(0, 0);
+                    }
                     setProcessing(false);
                     return;
                 } else {
@@ -195,7 +204,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                             <input type="hidden" name="_token" value={csrf_token || ''} />
 
                             {fields.map((field) => (
-                                <div key={field.id}>
+                                <div key={field.id} id={`field-wrap-${field.id}`}>
                                     {field.type === 'heading' && (
                                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-6 mb-2">
                                             {field.label}
@@ -217,6 +226,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="text"
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 maxLength={255}
@@ -235,6 +245,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             </label>
                                             <textarea
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                                                                 rows="4"
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
@@ -255,6 +266,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="email"
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 maxLength={255}
@@ -274,6 +286,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="number"
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 min={NUMBER_MIN}
@@ -294,6 +307,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="date"
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             />
@@ -310,6 +324,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             </label>
                                             <select
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             >
@@ -334,6 +349,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <select
                                                 multiple
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             >
@@ -360,6 +376,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="file"
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept=".pdf,.doc,.docx,.xls,.xlsx,.zip"
@@ -383,6 +400,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="file"
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept="image/jpeg,image/jpg,image/png"
@@ -406,6 +424,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="file"
                                                 name={`field_${field.id}`}
+                                                id={`field-${field.id}`}
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 accept="video/mp4,video/quicktime,video/webm"

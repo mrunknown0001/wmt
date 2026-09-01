@@ -1,6 +1,7 @@
 import { usePage, Head, router } from '@inertiajs/react';
 import CharacterCounter from '../../Components/CharacterCounter';
 import HelpText from '../../Components/HelpText';
+import { focusFirstError } from '../../focusFirstError';
 import { useState, useCallback } from 'react';
 import Input from '../../Components/Input';
 import Textarea from '../../Components/Textarea';
@@ -85,6 +86,9 @@ function evaluateConditions(field, allFields, fieldValues, visited = new Set()) 
 
     return logic === 'all' ? results.every(Boolean) : results.some(Boolean);
 }
+
+const STATIC_FIELD_TYPES = ['heading', 'description'];
+const FILE_FIELD_TYPES = ['attachment', 'capture_photo', 'capture_video'];
 
 export default function PublicForm() {
     const { form: formDef, turnstile } = usePage().props;
@@ -187,8 +191,39 @@ export default function PublicForm() {
         setErrors(prev => ({ ...prev, [`fields.${fieldId}`]: undefined }));
     };
 
+    /** The questions on screen right now, in the order they are asked. */
+    const askedFields = () => visibleFields.filter(
+        (f) => !STATIC_FIELD_TYPES.includes(f.type) && evaluateConditions(f, formDef.fields, fieldValues)
+    );
+
+    /** Whether a required question has been answered. */
+    const isAnswered = (field) => {
+        if (FILE_FIELD_TYPES.includes(field.type)) {
+            return (attachments[field.id] || []).length > 0;
+        }
+
+        const value = fieldValues[field.id];
+
+        return Array.isArray(value) ? value.length > 0 : String(value ?? '').trim() !== '';
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        // Checked here as well as on the server so somebody who missed a
+        // question is taken to it rather than to the top of a page they have
+        // already filled in, and without a round trip to be told so.
+        const asked = askedFields();
+        const missing = asked.filter((f) => f.is_required && !isAnswered(f));
+
+        if (missing.length > 0) {
+            const message = 'This field is required.';
+            setErrors(Object.fromEntries(missing.map((f) => [`fields.${f.id}`, message])));
+            focusFirstError(asked.map((f) => f.id), (id) => missing.some((f) => f.id === id));
+
+            return;
+        }
+
         setProcessing(true);
 
         const formData = new FormData();
@@ -223,6 +258,9 @@ export default function PublicForm() {
             onError: (errs) => {
                 setErrors(errs);
                 setProcessing(false);
+                // The server can refuse a field the browser was happy with — a
+                // rule the form does not know about, or a file it would not take.
+                focusFirstError(askedFields().map((f) => f.id), (id) => Boolean(errs[`fields.${id}`]));
             },
             onFinish: () => {
                 setProcessing(false);
@@ -251,7 +289,7 @@ export default function PublicForm() {
 
             case 'email':
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <Input
                             label={field.label + (field.is_required ? ' *' : '')}
                             id={`field-${field.id}`}
@@ -271,7 +309,7 @@ export default function PublicForm() {
 
             case 'text':
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <Input
                             label={field.label + (field.is_required ? ' *' : '')}
                             id={`field-${field.id}`}
@@ -287,7 +325,7 @@ export default function PublicForm() {
 
             case 'textarea':
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <Textarea
                             label={field.label + (field.is_required ? ' *' : '')}
                             id={`field-${field.id}`}
@@ -303,7 +341,7 @@ export default function PublicForm() {
 
             case 'number':
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <Input
                             label={field.label + (field.is_required ? ' *' : '')}
                             id={`field-${field.id}`}
@@ -320,7 +358,7 @@ export default function PublicForm() {
 
             case 'date':
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <Input
                             label={field.label + (field.is_required ? ' *' : '')}
                             id={`field-${field.id}`}
@@ -335,7 +373,7 @@ export default function PublicForm() {
 
             case 'select':
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <Select
                             label={field.label + (field.is_required ? ' *' : '')}
                             id={`field-${field.id}`}
@@ -359,7 +397,7 @@ export default function PublicForm() {
             // which reads far better as a dropdown than as a wall of checkboxes.
             case 'people':
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <Select
                             label={field.label + (field.is_required ? ' *' : '')}
                             id={`field-${field.id}`}
@@ -378,7 +416,7 @@ export default function PublicForm() {
             case 'multi_select': {
                 const selected = Array.isArray(value) ? value.map(String) : [];
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                             {field.label}{field.is_required ? ' *' : ''}
                         </label>
@@ -421,7 +459,7 @@ export default function PublicForm() {
                     }
                 }
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                             {field.label}{field.is_required ? ' *' : ''}
                         </label>
@@ -488,7 +526,7 @@ export default function PublicForm() {
                 const files = attachments[field.id] || [];
                 const maxPhotos = fieldMaxFiles(field);
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                             {field.label}{field.is_required ? ' *' : ''}
                         </label>
@@ -514,7 +552,7 @@ export default function PublicForm() {
             case 'capture_video': {
                 const files = attachments[field.id] || [];
                 return (
-                    <div key={field.id}>
+                    <div key={field.id} id={`field-wrap-${field.id}`}>
                         <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                             {field.label}{field.is_required ? ' *' : ''}
                         </label>
