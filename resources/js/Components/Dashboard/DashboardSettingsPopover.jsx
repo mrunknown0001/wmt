@@ -13,7 +13,7 @@ const WIDGET_LABELS = {
     showTeamWorkload: 'Team Workload',
 };
 
-export default function DashboardSettingsPopover({ preferences, onUpdate, isAdmin }) {
+export default function DashboardSettingsPopover({ preferences, onUpdate, canSeeTeamWorkload }) {
     const [isOpen, setIsOpen] = useState(false);
     const anchorRef = useRef(null);
 
@@ -26,8 +26,9 @@ export default function DashboardSettingsPopover({ preferences, onUpdate, isAdmi
         });
     };
 
+    // No sense offering a switch for a card this person is never shown.
     const entries = Object.entries(WIDGET_LABELS).filter(
-        ([key]) => key !== 'showTeamWorkload' || isAdmin
+        ([key]) => key !== 'showTeamWorkload' || canSeeTeamWorkload
     );
 
     return (

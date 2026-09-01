@@ -201,9 +201,15 @@ class DashboardController extends Controller
                 ->get();
         }
 
-        // Team Workload (admin/supervisor only)
-        if ($prefs['showTeamWorkload'] && ($user->hasRole('admin') || $user->hasRole('supervisor'))) {
-            $data['teamWorkload'] = User::select('id', 'name')
+        // Team Workload — the people this person is responsible for, busiest
+        // first. Scoped the same way the overdue card above is: it used to be
+        // gated on the supervisor role and then queried the whole organisation,
+        // so a supervisor read the names and open-task counts of people in
+        // divisions they had nothing to do with. Unlike that card this one
+        // keeps the viewer in, because a unit's load reads oddly with the
+        // person running it cut out of it.
+        if ($prefs['showTeamWorkload'] && OrgScope::hasAnyScope($user)) {
+            $teamWorkload = User::select('id', 'name')
                 ->where('is_active', true)
                 ->withCount(['assignedTasks' => fn ($q) => $q->whereNotIn('status', ['done', 'cancelled'])])
                 // whereHas rather than having(): MySQL tolerates HAVING with no
@@ -211,8 +217,13 @@ class DashboardController extends Controller
                 // keep people who have at least one open task.
                 ->whereHas('assignedTasks', fn ($q) => $q->whereNotIn('status', ['done', 'cancelled']))
                 ->orderByDesc('assigned_tasks_count')
-                ->take(10)
-                ->get();
+                ->take(10);
+
+            if (! OrgScope::seesEverything($user)) {
+                $teamWorkload->whereIn('id', OrgScope::manageablePeopleIds($user));
+            }
+
+            $data['teamWorkload'] = $teamWorkload->get();
         }
 
         return Inertia::render('Dashboard', $data);
