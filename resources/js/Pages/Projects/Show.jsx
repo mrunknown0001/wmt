@@ -161,6 +161,50 @@ function TaskMetaBadges({ task }) {
     );
 }
 
+/**
+ * One task's custom field values with `fieldId` set to `value`, in the shape the
+ * server sends back.
+ *
+ * Shared because the two places that change a value optimistically — editing a
+ * cell and dragging a card between Board columns — have to agree on that shape.
+ * They did not: the Board wrote `value_option_id` alone, and every reader that
+ * shows a label reads `selected_option`, so a dragged card showed its new column
+ * while the List view showed a dash until the page was reloaded.
+ *
+ * @param options  the field's options, for resolving a select to its label
+ * @param meta     extras the server would have derived (people_names)
+ */
+function mergeCustomFieldValue(existingValues, { fieldId, fieldType, value, options = [], meta = null }) {
+    const values = [...(existingValues || [])];
+    const idx = values.findIndex((v) => v.custom_field_id === fieldId);
+
+    const entry = {
+        custom_field_id: fieldId,
+        value_text: (fieldType === 'text' || fieldType === 'textarea') ? value : null,
+        value_number: fieldType === 'number' ? value : null,
+        value_date: fieldType === 'date' ? value : null,
+        value_option_id: fieldType === 'single_select' ? value : null,
+        value_json: (fieldType === 'multi_select' || fieldType === 'people') ? value : null,
+        selected_option: fieldType === 'single_select' && value
+            ? (options || []).find((o) => String(o.id) === String(value)) || null
+            : null,
+    };
+
+    // people_names is a server-side accessor and the PATCH response is not
+    // merged back, so it has to be carried from the editor or the cell blanks out.
+    if (fieldType === 'people') {
+        entry.people_names = meta?.people_names ?? null;
+    }
+
+    if (idx >= 0) {
+        values[idx] = { ...values[idx], ...entry };
+    } else {
+        values.push(entry);
+    }
+
+    return values;
+}
+
 function renderCustomFieldValue(task, customField) {
     if (customField.type === 'formula') {
         const val = customField._formulaValue;
@@ -2869,30 +2913,13 @@ export default function Show() {
 
     // Inline custom field value update (optimistic)
     const handleCustomFieldUpdate = useCallback((taskId, fieldId, fieldType, value, meta) => {
-        // Build optimistic custom_field_values entry
-        const buildOptimisticCfv = (existingValues) => {
-            const values = [...(existingValues || [])];
-            const idx = values.findIndex(v => v.custom_field_id === fieldId);
-            const entry = {
-                custom_field_id: fieldId,
-                value_text: (fieldType === 'text' || fieldType === 'textarea') ? value : null,
-                value_number: fieldType === 'number' ? value : null,
-                value_date: fieldType === 'date' ? value : null,
-                value_option_id: fieldType === 'single_select' ? value : null,
-                value_json: (fieldType === 'multi_select' || fieldType === 'people') ? value : null,
-                selected_option: fieldType === 'single_select' && value
-                    ? (localCustomFields.find(cf => cf.id === fieldId)?.options || []).find(o => o.id === Number(value)) || null
-                    : null,
-            };
-            // people_names is a server-side accessor; the PATCH response isn't merged
-            // back, so carry the names from the editor or the cell would blank out.
-            if (fieldType === 'people') {
-                entry.people_names = meta?.people_names ?? null;
-            }
-            if (idx >= 0) { values[idx] = { ...values[idx], ...entry }; }
-            else { values.push(entry); }
-            return values;
-        };
+        const buildOptimisticCfv = (existingValues) => mergeCustomFieldValue(existingValues, {
+            fieldId,
+            fieldType,
+            value,
+            options: localCustomFields.find((cf) => cf.id === fieldId)?.options || [],
+            meta,
+        });
 
         // Update in localTasks (could be parent or subtask)
         setLocalTasks((prev) => prev.map((t) => {
@@ -3128,9 +3155,15 @@ export default function Show() {
 
         setLocalTasks((prev) => prev.map((t) => {
             if (t.id !== task.id) return t;
-            const values = (t.custom_field_values || []).filter((v) => v.custom_field_id !== fieldId);
-            if (optionId) values.push({ custom_field_id: fieldId, value_option_id: optionId });
-            return { ...t, custom_field_values: values };
+            return {
+                ...t,
+                custom_field_values: mergeCustomFieldValue(t.custom_field_values, {
+                    fieldId,
+                    fieldType: 'single_select',
+                    value: optionId,
+                    options: boardField.options || [],
+                }),
+            };
         }));
 
         apiFetch(`/projects/${project.id}/tasks/${task.id}/custom-field-values`, {
