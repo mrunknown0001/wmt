@@ -1904,8 +1904,38 @@ export default function Show() {
         });
     }, []);
 
-    // Sort config { key, direction }
-    const [sortConfig, setSortConfig] = useState(null);
+    // Sort config { key, direction }, kept per project alongside the column
+    // widths, order and hidden set — leaving a project and coming back to a list
+    // that has quietly reverted to creation order is the same annoyance as
+    // having to re-hide a column.
+    const SORT_KEY = `wmt-sort-${project.id}`;
+
+    const [sortConfig, setSortConfigState] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(SORT_KEY) || 'null');
+            // Anything else in that slot is somebody else's data or a shape from
+            // a previous version; sorting by it would be a silent no-op.
+            if (saved && typeof saved.key === 'string'
+                && (saved.direction === 'asc' || saved.direction === 'desc')) {
+                return saved;
+            }
+        } catch { /* private mode, or unparseable */ }
+        return null;
+    });
+
+    // Wrapped rather than written at each call site: the toolbar, the arrow
+    // button and the column menus all set the sort, and one of them forgetting
+    // to save is exactly the bug this is fixing.
+    const setSortConfig = useCallback((next) => {
+        setSortConfigState((prev) => {
+            const value = typeof next === 'function' ? next(prev) : next;
+            try {
+                if (value) localStorage.setItem(SORT_KEY, JSON.stringify(value));
+                else localStorage.removeItem(SORT_KEY);
+            } catch { /* private mode */ }
+            return value;
+        });
+    }, [SORT_KEY]);
 
     // Custom field manager ref for edit/delete from column dropdown
     const cfManagerRef = useRef(null);
@@ -1934,12 +1964,22 @@ export default function Show() {
         return [...base, ...fields];
     }, [localCustomFields]);
 
+    // A custom field the sort was saved against can be deleted while nobody is
+    // looking, leaving a key that sorts everything equal and a Sort control
+    // showing nothing. Drop it rather than leave the list in a state the UI
+    // cannot explain.
+    useEffect(() => {
+        if (!sortConfig?.key?.startsWith('cf-')) return;
+        if (sortOptions.some((o) => o.key === sortConfig.key)) return;
+        setSortConfig(null);
+    }, [sortConfig, sortOptions, setSortConfig]);
+
     const handleSortColumn = useCallback((colId, direction) => {
         setSortConfig(prev => {
             if (prev?.key === colId && prev?.direction === direction) return null; // toggle off
             return { key: colId, direction };
         });
-    }, []);
+    }, [setSortConfig]);
 
     const handleHideColumn = useCallback((colId) => {
         setHiddenColumns(prev => {
