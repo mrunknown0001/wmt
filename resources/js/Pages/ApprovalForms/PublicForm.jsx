@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Head } from '@inertiajs/react';
 import TurnstileWidget from '../../Components/TurnstileWidget';
 import CharacterCounter from '../../Components/CharacterCounter';
+import HelpText from '../../Components/HelpText';
 
 const NUMBER_MIN = -99999999999;
 const NUMBER_MAX = 99999999999;
@@ -170,11 +171,9 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                             {form.name}
                         </h1>
-                        {form.description && (
-                            <p className="text-gray-600 dark:text-gray-400 mt-2">
-                                {form.description}
-                            </p>
-                        )}
+                        <HelpText className="text-gray-600 dark:text-gray-400 mt-2">
+                            {form.description}
+                        </HelpText>
                     </div>
 
                     {/* Form */}
@@ -218,13 +217,12 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="text"
                                                 name={`field_${field.id}`}
-                                                placeholder={field.help_text || ''}
-                                                className={inputClasses(field.id)}
+                                                                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 maxLength={255}
                                                 onChange={countChars(field.id)}
                                             />
-                                            <CharacterCounter used={typed[field.id] || 0} limit={255} />
+                                            <CharacterCounter used={typed[field.id] || 0} limit={255} help={<HelpText className="text-xs text-gray-500 dark:text-gray-400">{field.help_text}</HelpText>} />
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -237,14 +235,13 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             </label>
                                             <textarea
                                                 name={`field_${field.id}`}
-                                                placeholder={field.help_text || ''}
-                                                rows="4"
+                                                                                                rows="4"
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 maxLength={10000}
                                                 onChange={countChars(field.id)}
                                             />
-                                            <CharacterCounter used={typed[field.id] || 0} limit={10000} />
+                                            <CharacterCounter used={typed[field.id] || 0} limit={10000} help={<HelpText className="text-xs text-gray-500 dark:text-gray-400">{field.help_text}</HelpText>} />
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -258,13 +255,12 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="email"
                                                 name={`field_${field.id}`}
-                                                placeholder={field.help_text || ''}
-                                                className={inputClasses(field.id)}
+                                                                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 maxLength={255}
                                                 onChange={countChars(field.id)}
                                             />
-                                            <CharacterCounter used={typed[field.id] || 0} limit={255} />
+                                            <CharacterCounter used={typed[field.id] || 0} limit={255} help={<HelpText className="text-xs text-gray-500 dark:text-gray-400">{field.help_text}</HelpText>} />
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -278,13 +274,13 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <input
                                                 type="number"
                                                 name={`field_${field.id}`}
-                                                placeholder={field.help_text || ''}
-                                                className={inputClasses(field.id)}
+                                                                                                className={inputClasses(field.id)}
                                                 required={field.is_required}
                                                 min={NUMBER_MIN}
                                                 max={NUMBER_MAX}
                                                 onChange={(e) => { e.target.value = clampNumber(e.target.value); }}
                                             />
+                                            <HelpText>{field.help_text}</HelpText>
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -301,6 +297,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                 className={inputClasses(field.id)}
                                                 required={field.is_required}
                                             />
+                                            <HelpText>{field.help_text}</HelpText>
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -323,6 +320,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                                     </option>
                                                 ))}
                                             </select>
+                                            <HelpText>{field.help_text}</HelpText>
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -348,6 +346,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                 Hold Ctrl (or Cmd on Mac) to select multiple options
                                             </p>
+                                            <HelpText>{field.help_text}</HelpText>
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -370,6 +369,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                 Accepted formats: PDF, DOC, DOCX, XLS, XLSX, ZIP
                                             </p>
+                                            <HelpText>{field.help_text}</HelpText>
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -392,6 +392,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                 Accepted formats: JPG, PNG
                                             </p>
+                                            <HelpText>{field.help_text}</HelpText>
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}
@@ -414,6 +415,7 @@ export default function PublicForm({ form, fields, turnstile, csrf_token }) {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                 Accepted formats: MP4, MOV, WEBM
                                             </p>
+                                            <HelpText>{field.help_text}</HelpText>
                                             {renderFieldError(field.id)}
                                         </div>
                                     )}

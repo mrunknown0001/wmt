@@ -20,3 +20,16 @@ export const FORM_LIMITS = {
     fieldLabel: 255,
     fieldHelpText: 1000,
 };
+
+/**
+ * The approval form builder. Mirrored by Store/UpdateApprovalFormRequest, whose
+ * numbers are its own — an approval form's description is shorter than a
+ * project form's.
+ */
+export const APPROVAL_FORM_LIMITS = {
+    name: 255,
+    submitButtonText: 100,
+    description: 1000,
+    successMessage: 1000,
+    fieldHelpText: 500,
+};
