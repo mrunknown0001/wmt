@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FORM_LIMITS } from '../limits';
+import RichTextEditor from './RichTextEditor';
 import { createPortal } from 'react-dom';
 import {
     DndContext,
@@ -18,7 +19,6 @@ import {
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Input from './Input';
-import Textarea from './Textarea';
 import Select from './Select';
 import Button from './Button';
 import Modal, { ConfirmModal } from './Modal';
@@ -216,15 +216,14 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                     />
 
                     {!isStatic && !FILE_TYPES.includes(field.type) && (
-                        <Textarea
+                        <RichTextEditor
                             label="Help Text"
                             id={`field-${fieldIndex}-help`}
-                            rows={2}
                             value={field.help_text || ''}
-                            onChange={(e) => update('help_text', e.target.value)}
-                            placeholder="Optional help text — line breaks are kept"
-                            maxLength={FORM_LIMITS.fieldHelpText}
-                            showCount
+                            onChange={(html) => update('help_text', html)}
+                            placeholder="Optional help text — bold, links and lists are kept"
+                            minimal
+                            limit={FORM_LIMITS.fieldHelpText}
                         />
                     )}
 

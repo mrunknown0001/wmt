@@ -1,5 +1,6 @@
 import { usePage, Head, router } from '@inertiajs/react';
 import CharacterCounter from '../../Components/CharacterCounter';
+import HelpText from '../../Components/HelpText';
 import { useState, useCallback } from 'react';
 import Input from '../../Components/Input';
 import Textarea from '../../Components/Textarea';
@@ -264,7 +265,7 @@ export default function PublicForm() {
                         {field.config?.email_mode === 'registered_user' && (
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Must be a registered user's email address.</p>
                         )}
-                        <CharacterCounter used={(value || '').length} limit={255} help={field.help_text} />
+                        <CharacterCounter used={(value || '').length} limit={255} help={<HelpText className="text-xs text-gray-500 dark:text-gray-400">{field.help_text}</HelpText>} />
                     </div>
                 );
 
@@ -280,7 +281,7 @@ export default function PublicForm() {
                             placeholder={field.config?.placeholder || ''}
                             maxLength={255}
                         />
-                        <CharacterCounter used={(value || '').length} limit={255} help={field.help_text} />
+                        <CharacterCounter used={(value || '').length} limit={255} help={<HelpText className="text-xs text-gray-500 dark:text-gray-400">{field.help_text}</HelpText>} />
                     </div>
                 );
 
@@ -296,7 +297,7 @@ export default function PublicForm() {
                             placeholder={field.config?.placeholder || ''}
                             maxLength={10000}
                         />
-                        <CharacterCounter used={(value || '').length} limit={10000} help={field.help_text} />
+                        <CharacterCounter used={(value || '').length} limit={10000} help={<HelpText className="text-xs text-gray-500 dark:text-gray-400">{field.help_text}</HelpText>} />
                     </div>
                 );
 
@@ -313,7 +314,7 @@ export default function PublicForm() {
                             max={NUMBER_MAX}
                             min={NUMBER_MIN}
                         />
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <HelpText>{field.help_text}</HelpText>
                     </div>
                 );
 
@@ -328,7 +329,7 @@ export default function PublicForm() {
                             onChange={(e) => setFieldValue(field.id, e.target.value)}
                             error={fieldError}
                         />
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <HelpText>{field.help_text}</HelpText>
                     </div>
                 );
 
@@ -349,7 +350,7 @@ export default function PublicForm() {
                             placeholder="— Select —"
                             error={fieldError}
                         />
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <HelpText>{field.help_text}</HelpText>
                     </div>
                 );
 
@@ -370,7 +371,7 @@ export default function PublicForm() {
                             placeholder={(field.options || []).length ? '— Select —' : 'No one available'}
                             error={fieldError}
                         />
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <HelpText>{field.help_text}</HelpText>
                     </div>
                 );
 
@@ -405,7 +406,7 @@ export default function PublicForm() {
                             })}
                         </div>
                         {fieldError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{fieldError}</p>}
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <HelpText>{field.help_text}</HelpText>
                     </div>
                 );
             }
@@ -478,7 +479,7 @@ export default function PublicForm() {
                         {fileErrors.map((err, i) => (
                             <p key={i} className="mt-1 text-sm text-red-600 dark:text-red-400">{err}</p>
                         ))}
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <HelpText>{field.help_text}</HelpText>
                     </div>
                 );
             }
@@ -505,7 +506,7 @@ export default function PublicForm() {
                             onRemove={(index) => removeFile(field.id, index)}
                         />
                         {fieldError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{fieldError}</p>}
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <HelpText>{field.help_text}</HelpText>
                     </div>
                 );
             }
@@ -535,7 +536,7 @@ export default function PublicForm() {
                             }}
                         />
                         {fieldError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{fieldError}</p>}
-                        {field.help_text && <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{field.help_text}</p>}
+                        <HelpText>{field.help_text}</HelpText>
                     </div>
                 );
             }
@@ -566,9 +567,9 @@ export default function PublicForm() {
                             )}
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{formDef.project_name}</p>
                             <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{formDef.name}</h1>
-                            {formDef.description && (
-                                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{formDef.description}</p>
-                            )}
+                            <HelpText className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                {formDef.description}
+                            </HelpText>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-5" encType="multipart/form-data">

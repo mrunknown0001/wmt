@@ -13,10 +13,15 @@
  * @param help   the field's own help text, if it has any
  */
 export default function CharacterCounter({ used = 0, limit, help = null, id = undefined }) {
+    // Help may arrive as a string or as an element — a form's help text is rich
+    // text now, and wrapping a <div> in a <p> is invalid markup that React will
+    // render into a shape nobody intended.
+    const helpNode = typeof help === 'string'
+        ? <p className="text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{help}</p>
+        : help;
+
     if (!limit) {
-        return help
-            ? <p className="mt-1 text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{help}</p>
-            : null;
+        return help ? <div className="mt-1">{helpNode}</div> : null;
     }
 
     const left = Math.max(0, limit - used);
@@ -34,9 +39,7 @@ export default function CharacterCounter({ used = 0, limit, help = null, id = un
 
     return (
         <div className="mt-1 flex items-start justify-between gap-3">
-            {help
-                ? <p className="text-xs whitespace-pre-line text-gray-500 dark:text-gray-400">{help}</p>
-                : <span />}
+            {help ? <div className="min-w-0">{helpNode}</div> : <span />}
             <span
                 id={id}
                 className={`shrink-0 text-xs tabular-nums ${tone}`}
