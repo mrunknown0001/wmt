@@ -1,4 +1,5 @@
 import { usePage, useForm } from '@inertiajs/react';
+import { FORM_LIMITS } from '../../limits';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
@@ -136,6 +137,8 @@ export default function FormsEdit() {
                             value={data.name}
                             onChange={(e) => setData('name', e.target.value)}
                             error={errors.name}
+                            maxLength={FORM_LIMITS.name}
+                            showCount
                         />
                         <Input
                             label="Submit Button Text"
@@ -143,6 +146,8 @@ export default function FormsEdit() {
                             value={data.submit_button_text}
                             onChange={(e) => setData('submit_button_text', e.target.value)}
                             error={errors.submit_button_text}
+                            maxLength={FORM_LIMITS.submitButtonText}
+                            showCount
                         />
                     </div>
                     <div className="mt-4">
@@ -152,6 +157,8 @@ export default function FormsEdit() {
                             value={data.description}
                             onChange={(e) => setData('description', e.target.value)}
                             error={errors.description}
+                            maxLength={FORM_LIMITS.description}
+                            showCount
                         />
                     </div>
                     <div className="mt-4">
@@ -161,6 +168,8 @@ export default function FormsEdit() {
                             value={data.success_message}
                             onChange={(e) => setData('success_message', e.target.value)}
                             error={errors.success_message}
+                            maxLength={FORM_LIMITS.successMessage}
+                            showCount
                         />
                     </div>
                 </Card>

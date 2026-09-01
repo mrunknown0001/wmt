@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { FORM_LIMITS } from '../limits';
 import { createPortal } from 'react-dom';
 import {
     DndContext,
@@ -210,6 +211,8 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                         value={field.label}
                         onChange={(e) => update('label', e.target.value)}
                         placeholder={isStatic ? 'Heading text...' : 'Field label'}
+                        maxLength={FORM_LIMITS.fieldLabel}
+                        showCount
                     />
 
                     {!isStatic && !FILE_TYPES.includes(field.type) && (
@@ -220,6 +223,8 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                             value={field.help_text || ''}
                             onChange={(e) => update('help_text', e.target.value)}
                             placeholder="Optional help text — line breaks are kept"
+                            maxLength={FORM_LIMITS.fieldHelpText}
+                            showCount
                         />
                     )}
 

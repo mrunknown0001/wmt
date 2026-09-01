@@ -8,3 +8,15 @@
 
 /** Task and approval comments. See StoreTaskCommentRequest and its siblings. */
 export const COMMENT_LIMIT = 2000;
+
+/**
+ * The form builder. Mirrored by StoreFormRequest and UpdateFormRequest.
+ */
+export const FORM_LIMITS = {
+    name: 255,
+    submitButtonText: 255,
+    description: 5000,
+    successMessage: 5000,
+    fieldLabel: 255,
+    fieldHelpText: 1000,
+};
