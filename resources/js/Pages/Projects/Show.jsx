@@ -386,9 +386,15 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     const isOverdue = isPastDue(task.due_date) && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
+    // Hovering Delete turns the row's outline red, the way it does on a form's
+    // questions. Declared before stickyBg, which reads it.
+    const [deleteHovered, setDeleteHovered] = useState(false);
+
     const stickyBg = isDragging
         ? 'bg-blue-50 dark:bg-blue-900/30'
-        : 'bg-gray-50 dark:bg-gray-800 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50';
+        : deleteHovered
+            ? 'bg-red-50 dark:bg-red-900/20'
+            : 'bg-gray-50 dark:bg-gray-800 group-hover:bg-primary-50/40 dark:group-hover:bg-primary-900/10';
 
     const [openPopover, setOpenPopover] = useState(null);
 
@@ -558,7 +564,13 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     };
 
     return (
-        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} data-task-id={task.id} onClick={(e) => { if (e.target.closest('button, input, select, [role="listbox"], [data-no-select]')) return; if (onSelect) { e.preventDefault(); onSelect(task.id, e); } }} onContextMenu={(e) => onContextMenu?.(e, task)} className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''} ${isFocused ? 'ring-2 ring-inset ring-primary-400' : ''}`}>
+        <tr ref={setNodeRef} style={style} {...attributes} {...listeners} data-task-id={task.id} onClick={(e) => { if (e.target.closest('button, input, select, [role="listbox"], [data-no-select]')) return; if (onSelect) { e.preventDefault(); onSelect(task.id, e); } }} onContextMenu={(e) => onContextMenu?.(e, task)} className={`group transition-colors bg-gray-50/50 dark:bg-gray-800/30 cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-md' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''} ${
+                isFocused
+                    ? 'ring-2 ring-inset ring-primary-400'
+                    : deleteHovered
+                        ? 'ring-1 ring-inset ring-red-400 dark:ring-red-500 bg-red-50 dark:bg-red-900/20'
+                        : 'hover:ring-1 hover:ring-inset hover:ring-primary-300 dark:hover:ring-primary-600 hover:bg-primary-50/40 dark:hover:bg-primary-900/10'
+            }`}>
             <td className={`sticky left-0 z-10 ${stickyBg} relative pl-6 pr-2 py-3 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <Tooltip content={isDone ? 'Mark incomplete' : 'Mark complete'}>
@@ -613,6 +625,10 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                             <button
                                 onClick={() => handleDeleteTask(task.id, task.title)}
                                 onPointerDown={(e) => e.stopPropagation()}
+                                onMouseEnter={() => setDeleteHovered(true)}
+                                onMouseLeave={() => setDeleteHovered(false)}
+                                onFocus={() => setDeleteHovered(true)}
+                                onBlur={() => setDeleteHovered(false)}
                                 className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                             >
                                 <TrashIcon />
@@ -873,11 +889,19 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     const isOverdue = isPastDue(task.due_date) && task.status !== 'done' && task.status !== 'cancelled';
     const isDone = task.status === 'done';
 
+    // The frozen first column paints its own background; without this it stays
+    // white while the rest of the row lights up.
+    // Hovering Delete turns the row's outline red, the way it does on a form's
+    // questions. Declared before stickyBg, which reads it.
+    const [deleteHovered, setDeleteHovered] = useState(false);
+
     const stickyBg = isDragging
         ? 'bg-blue-50 dark:bg-blue-900/30'
         : isSelected
             ? 'bg-primary-100 dark:bg-primary-900/30'
-            : 'bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50';
+            : deleteHovered
+                ? 'bg-red-50 dark:bg-red-900/20'
+                : 'bg-white dark:bg-gray-800 group-hover:bg-primary-50/40 dark:group-hover:bg-primary-900/10';
 
     const [openPopover, setOpenPopover] = useState(null);
 
@@ -1070,7 +1094,19 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 if (onSelect) { e.preventDefault(); onSelect(task.id, e); }
             }}
             onContextMenu={(e) => onContextMenu?.(e, task)}
-            className={`group hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''} ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''} ${isFocused ? 'ring-2 ring-inset ring-primary-400' : ''}`}
+            // The outline matches the form builder's questions — ring-inset
+            // rather than a border, because a border on a table row shifts the
+            // grid. The keyboard-focused row keeps its heavier ring: being
+            // focused outranks being hovered.
+            className={`group transition-colors cursor-grab active:cursor-grabbing touch-none ${
+                isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+            } ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30' : ''} ${
+                isFocused
+                    ? 'ring-2 ring-inset ring-primary-400'
+                    : deleteHovered
+                        ? 'ring-1 ring-inset ring-red-400 dark:ring-red-500 bg-red-50 dark:bg-red-900/20'
+                        : 'hover:ring-1 hover:ring-inset hover:ring-primary-300 dark:hover:ring-primary-600 hover:bg-primary-50/40 dark:hover:bg-primary-900/10'
+            }`}
         >
             <td className={`sticky left-0 z-10 ${stickyBg} relative pl-4 pr-2 py-4 w-[52px] min-w-[52px]`}>
                 <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1146,6 +1182,10 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                         <Tooltip content="Delete">
                             <button
                                 onClick={() => handleDeleteTask(task.id, task.title)}
+                                onMouseEnter={() => setDeleteHovered(true)}
+                                onMouseLeave={() => setDeleteHovered(false)}
+                                onFocus={() => setDeleteHovered(true)}
+                                onBlur={() => setDeleteHovered(false)}
                                 className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                             >
                                 <TrashIcon />
