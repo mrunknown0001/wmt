@@ -1,7 +1,13 @@
+import { useState } from 'react';
 import Card from '../Card';
 import Avatar from '../Avatar';
+import PersonOpenTasks from '../PersonOpenTasks';
 
 export default function TeamWorkload({ users }) {
+    // The same list the executive chart opens: both bars count the same thing,
+    // so both answer with the same query rather than two that could drift.
+    const [person, setPerson] = useState(null);
+
     if (!users?.length) return null;
 
     const maxCount = Math.max(...users.map((u) => u.assigned_tasks_count), 1);
@@ -13,7 +19,13 @@ export default function TeamWorkload({ users }) {
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {users.map((user) => (
-                    <div key={user.id} className="flex items-center gap-3 px-6 py-3">
+                    <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => setPerson({ id: user.id, name: user.name, count: user.assigned_tasks_count })}
+                        title={`Open ${user.name}'s ${user.assigned_tasks_count} task${user.assigned_tasks_count === 1 ? '' : 's'}`}
+                        className="w-full flex items-center gap-3 px-6 py-3 text-left transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-900/10 cursor-pointer"
+                    >
                         <Avatar name={user.name} size="sm" />
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
@@ -27,9 +39,11 @@ export default function TeamWorkload({ users }) {
                                 />
                             </div>
                         </div>
-                    </div>
+                    </button>
                 ))}
             </div>
+
+            <PersonOpenTasks person={person} onClose={() => setPerson(null)} />
         </Card>
     );
 }

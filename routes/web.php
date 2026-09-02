@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardPreferenceController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DivisionController;
+use App\Http\Controllers\PersonOpenTasksController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectViewPreferenceController;
 use App\Http\Controllers\StandaloneTaskController;
@@ -295,9 +296,6 @@ Route::middleware('auth')->group(function () {
 
     // Executive Dashboard (admin + executive)
     Route::get('/executive-dashboard', [ExecutiveDashboardController::class, 'index'])->name('executive-dashboard');
-    // What one bar of the workload chart is made of.
-    Route::get('/executive-dashboard/person-tasks', [ExecutiveDashboardController::class, 'personTasks'])
-        ->name('executive-dashboard.person-tasks');
     Route::get('/executive-dashboard/tasks', [ExecutiveDashboardController::class, 'tasks'])->name('executive-dashboard.tasks');
     Route::get('/executive-dashboard/projects', [ExecutiveDashboardController::class, 'projects'])->name('executive-dashboard.projects');
     Route::get('/executive-dashboard/divisions/{division}', [ExecutiveDashboardController::class, 'division'])->name('executive-dashboard.division');
@@ -400,6 +398,10 @@ Route::middleware('auth')->group(function () {
     // heading a division or department for that branch. That is more than a
     // permission string can say, so the controller authorises it — the same
     // arrangement My Personnel uses for the same reason.
+    // Everything one person has open, behind a bar on either dashboard.
+    Route::get('/people/{user}/open-tasks', PersonOpenTasksController::class)
+        ->name('people.open-tasks');
+
     Route::get('/workload', [WorkloadController::class, 'index'])->name('workload.index');
 
     // What one cell on that grid is made of. Same gate as the page, and the
