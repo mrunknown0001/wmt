@@ -6,6 +6,7 @@ import Card from '../../Components/Card';
 import Avatar from '../../Components/Avatar';
 import Tooltip from '../../Components/Tooltip';
 import { formatMinutes } from '../../utils';
+import WorkloadBreakdown from '../../Components/WorkloadBreakdown';
 
 /**
  * Load per person per day.
@@ -33,6 +34,19 @@ const cellClass = (cell) => {
 export default function WorkloadIndex() {
     const { workload, filters, teams = [], departments = [], projects = [], scope, maxDays } = usePage().props;
     const [range, setRange] = useState({ from: filters.from, to: filters.to });
+
+    // Which number is being explained. Null when the panel is closed; the panel
+    // fetches its own contents, so the grid stays a grid.
+    const [drill, setDrill] = useState(null);
+
+    const openDrill = (row, cell) => setDrill({
+        userId: row.user.id,
+        userName: row.user.name,
+        date: cell ? cell.date : null,
+        from: filters.from,
+        to: filters.to,
+        project: filters.project || undefined,
+    });
 
     const go = (params) => router.get('/workload', { ...filters, ...params }, {
         preserveState: true,
@@ -182,23 +196,35 @@ export default function WorkloadIndex() {
                                             <td key={cell.date} className="px-1 py-1 text-center">
                                                 <Tooltip content={
                                                     cell.working
-                                                        ? `${formatMinutes(cell.minutes)} of ${formatMinutes(cell.capacity)}`
+                                                        ? `${formatMinutes(cell.minutes)} of ${formatMinutes(cell.capacity)} — click for what it is made of`
                                                         : cell.minutes > 0
                                                             ? `${formatMinutes(cell.minutes)} scheduled on a non-working day`
                                                             : 'Not a working day'
                                                 }>
-                                                    <div className={`rounded px-1.5 py-1 text-[11px] tabular-nums ${cellClass(cell)}`}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openDrill(row, cell)}
+                                                        className={`w-full rounded px-1.5 py-1 text-[11px] tabular-nums transition-all hover:ring-1 hover:ring-primary-400/70 dark:hover:ring-primary-400/60 cursor-pointer ${cellClass(cell)}`}
+                                                    >
                                                         {cell.minutes > 0 ? formatMinutes(cell.minutes) : '·'}
-                                                    </div>
+                                                    </button>
                                                 </Tooltip>
                                             </td>
                                         ))}
 
                                         <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
-                                            <span className={row.total_minutes > row.total_capacity ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-300'}>
-                                                {formatMinutes(row.total_minutes)}
-                                            </span>
-                                            <span className="text-gray-400"> / {formatMinutes(row.total_capacity)}</span>
+                                            <Tooltip content="Everything in this window, and what it is made of">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openDrill(row, null)}
+                                                    className="rounded px-1 py-0.5 transition-all hover:ring-1 hover:ring-primary-400/70 dark:hover:ring-primary-400/60 cursor-pointer"
+                                                >
+                                                    <span className={row.total_minutes > row.total_capacity ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-300'}>
+                                                        {formatMinutes(row.total_minutes)}
+                                                    </span>
+                                                    <span className="text-gray-400"> / {formatMinutes(row.total_capacity)}</span>
+                                                </button>
+                                            </Tooltip>
                                         </td>
                                     </tr>
                                 ))}
@@ -214,6 +240,12 @@ export default function WorkloadIndex() {
                     just be an unestimated one. Windows are capped at {maxDays} days.
                 </p>
             </Card>
+
+            <WorkloadBreakdown
+                open={drill !== null}
+                params={drill}
+                onClose={() => setDrill(null)}
+            />
           </div>
         </AuthenticatedLayout>
     );

@@ -399,6 +399,11 @@ Route::middleware('auth')->group(function () {
     // arrangement My Personnel uses for the same reason.
     Route::get('/workload', [WorkloadController::class, 'index'])->name('workload.index');
 
+    // What one cell on that grid is made of. Same gate as the page, and the
+    // same scope: a drill-down must not reach past what the grid shows.
+    Route::get('/workload/breakdown', [WorkloadController::class, 'breakdown'])
+        ->name('workload.breakdown');
+
     // Organization structure — admin-only. Managing divisions, departments and
     // teams is an administrator's job; the role gate here matches the sidebar,
     // which shows these links to admins alone, and covers every action on the
