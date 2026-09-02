@@ -4825,7 +4825,12 @@ export default function Show() {
                                                             <Tooltip key={task.id} content={task.title}>
                                                                 <button
                                                                     onClick={() => setDetailTaskId(task.id)}
-                                                                    className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity cursor-pointer ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
+                                                                    // The same primary ring the rows, cards and questions
+                                                                    // use, over the priority colour rather than instead of
+                                                                    // it — the pill's colour is what the entry means, and
+                                                                    // the old hover faded exactly that away. The ring sits
+                                                                    // outside the pill, inside the 2px gap between entries.
+                                                                    className={`block w-full text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate cursor-pointer transition-all hover:ring-1 hover:ring-primary-400/70 dark:hover:ring-primary-400/60 ${PRIORITY_PILL[task.priority] || PRIORITY_PILL.low}`}
                                                                 >
                                                                     {task.title}
                                                                 </button>
