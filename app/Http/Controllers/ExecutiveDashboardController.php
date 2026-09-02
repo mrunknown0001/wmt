@@ -10,6 +10,8 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\OrgScope;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -25,6 +27,65 @@ class ExecutiveDashboardController extends Controller
         if (!$user->hasRole('admin') && !$user->hasRole('executive')) {
             abort(403);
         }
+    }
+
+    /**
+     * The open tasks behind one bar of the workload chart.
+     *
+     * The chart counts a person's open tasks; this lists them. Deliberately the
+     * same predicate rather than a similar one — a list that disagreed with the
+     * bar it explains would be worse than no list, and this is the only place
+     * the two could drift.
+     *
+     * Note the chart counts every open task regardless of date, so this does
+     * too: the page's date filter shapes the metrics above it, not this bar.
+     */
+    public function personTasks(Request $request): JsonResponse
+    {
+        $viewer = $request->user();
+
+        // Not authorizeAccess(): that is the whole-organisation gate, and a
+        // division head reaches this chart through their own unit's page. The
+        // question here is whether they oversee anybody at all — whether they
+        // oversee this person is the query below.
+        abort_unless($this->seesEverything($viewer) || OrgScope::hasAnyScope($viewer), 403);
+
+        $validated = $request->validate([
+            'user' => ['required', 'integer'],
+        ]);
+
+        // Admins and executives monitor the whole organisation; a unit head may
+        // only look inside the branch they run, which is the same rule the unit
+        // pages themselves apply.
+        $subject = User::where('is_active', true)
+            ->when(! $this->seesEverything($viewer),
+                fn ($q) => $q->whereIn('id', OrgScope::manageablePeopleIds($viewer)))
+            ->find($validated['user']);
+
+        abort_unless($subject, 404);
+
+        $tasks = Task::query()
+            ->where('assigned_to', $subject->id)
+            ->whereNotIn('status', ['done', 'cancelled'])
+            ->with('project:id,name')
+            // Overdue first, then what is due soonest; undated work last, since
+            // it is the least pressing thing on somebody's plate today.
+            ->orderByRaw('due_date IS NULL')
+            ->orderBy('due_date')
+            ->get(['id', 'title', 'status', 'priority', 'due_date', 'project_id', 'estimated_minutes']);
+
+        return response()->json([
+            'user' => ['id' => $subject->id, 'name' => $subject->name],
+            'tasks' => $tasks->map(fn (Task $task) => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'status' => $task->status,
+                'priority' => $task->priority,
+                'due_date' => $task->due_date?->toDateString(),
+                'estimated_minutes' => $task->estimated_minutes ? (int) $task->estimated_minutes : null,
+                'project' => $task->project ? ['id' => $task->project->id, 'name' => $task->project->name] : null,
+            ])->all(),
+        ]);
     }
 
     /** Admins and executives can monitor the whole organization. */
