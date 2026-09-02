@@ -13,12 +13,13 @@ use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * The list behind one bar of the executive workload chart.
+ * The list behind a bar that counts somebody's open tasks.
  *
- * The bar counts somebody's open tasks, so the list has to be the same set —
- * a list that disagreed with the number above it would be worse than none.
+ * Two dashboards draw that bar and both open this list, so the list has to be
+ * the same set either of them counted — one that disagreed with the number
+ * above it would be worse than none.
  */
-class ExecutiveWorkloadDrillTest extends TestCase
+class PersonOpenTasksTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -59,7 +60,7 @@ class ExecutiveWorkloadDrillTest extends TestCase
 
     private function drill(User $viewer, int $userId)
     {
-        return $this->actingAs($viewer)->getJson("/executive-dashboard/person-tasks?user={$userId}");
+        return $this->actingAs($viewer)->getJson("/people/{$userId}/open-tasks");
     }
 
     public function test_the_list_is_the_same_set_the_bar_counts(): void
@@ -136,5 +137,28 @@ class ExecutiveWorkloadDrillTest extends TestCase
             ['Somewhere in the org'],
             array_column($this->drill($executive, $worker->id)->assertOk()->json('tasks'), 'title')
         );
+    }
+
+    /**
+     * The dashboard's Team Workload card counts with its own query. This is the
+     * assertion that keeps the two from drifting: whatever that card says a
+     * person is carrying, the drill-down lists exactly that many.
+     */
+    public function test_the_dashboard_card_count_matches_the_list(): void
+    {
+        $admin = $this->admin();
+        $worker = $this->worker();
+
+        $this->task($worker, ['title' => 'One']);
+        $this->task($worker, ['title' => 'Two', 'status' => 'to_do']);
+        $this->task($worker, ['title' => 'Finished', 'status' => 'done']);
+
+        $card = User::whereKey($worker->id)
+            ->withCount(['assignedTasks as assigned_tasks_count' => fn ($q) => $q->whereNotIn('status', ['done', 'cancelled'])])
+            ->firstOrFail();
+
+        $listed = $this->drill($admin, $worker->id)->assertOk()->json('tasks');
+
+        $this->assertSame($card->assigned_tasks_count, count($listed));
     }
 }
