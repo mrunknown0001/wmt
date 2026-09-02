@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from './ThemeContext';
 import './echo';
 import { route as ziggyRoute } from 'ziggy-js';
+import { focusFirstErrorField } from './focusFirstError';
 
 // Global route helper - will be updated when Inertia loads with Ziggy routes
 let route = function(name, params = {}) {
@@ -172,6 +173,15 @@ function clearNavTimers() {
     clearInterval(navTrickleTimer);
     navShowTimer = navDoneTimer = navTrickleTimer = null;
 }
+
+// A refused form should put you where the problem is. Registered once here
+// rather than in every page's onError: each in-app form hands Inertia the same
+// shape of error bag, and the alternative is dozens of call sites that have to
+// remember.
+router.on('error', (event) => {
+    // After React has painted the messages, so the field is in its final place.
+    requestAnimationFrame(() => focusFirstErrorField(event.detail?.errors));
+});
 
 router.on('start', () => {
     clearNavTimers();

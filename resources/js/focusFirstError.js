@@ -74,3 +74,51 @@ export function focusFirstError(fieldIds, hasError) {
 
     return true;
 }
+
+/**
+ * Focus the first field a server refused, on any page.
+ *
+ * The public forms know their own field order and say so. Everywhere else —
+ * task forms, project settings, the user admin — the page just hands Inertia a
+ * bag of errors keyed by field name, so the order is taken from the document:
+ * whichever offending field appears first is the one somebody scrolls to.
+ *
+ * Nothing is stolen from a field already being corrected: if the person is
+ * standing on one of the offending fields, they stay there.
+ *
+ * @param errors  Inertia's error bag, keyed by field name
+ */
+export function focusFirstErrorField(errors) {
+    const keys = Object.keys(errors || {});
+
+    if (keys.length === 0) {
+        return false;
+    }
+
+    const escape = (value) => (window.CSS?.escape ? window.CSS.escape(value) : value);
+
+    const elements = keys
+        .map((key) => document.getElementById(key)
+            || document.querySelector(`[name="${escape(key)}"]`)
+            || document.getElementById(`field-${key}`))
+        // A field on a tab nobody has opened has no box to scroll to.
+        .filter((el) => el && el.offsetParent !== null);
+
+    if (elements.length === 0) {
+        return false;
+    }
+
+    if (elements.includes(document.activeElement)) {
+        return false;
+    }
+
+    const first = elements.reduce((earliest, el) => (
+        earliest.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING ? el : earliest
+    ));
+
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    first.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+    first.focus({ preventScroll: true });
+
+    return true;
+}
