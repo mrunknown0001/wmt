@@ -295,6 +295,9 @@ Route::middleware('auth')->group(function () {
 
     // Executive Dashboard (admin + executive)
     Route::get('/executive-dashboard', [ExecutiveDashboardController::class, 'index'])->name('executive-dashboard');
+    // What one bar of the workload chart is made of.
+    Route::get('/executive-dashboard/person-tasks', [ExecutiveDashboardController::class, 'personTasks'])
+        ->name('executive-dashboard.person-tasks');
     Route::get('/executive-dashboard/tasks', [ExecutiveDashboardController::class, 'tasks'])->name('executive-dashboard.tasks');
     Route::get('/executive-dashboard/projects', [ExecutiveDashboardController::class, 'projects'])->name('executive-dashboard.projects');
     Route::get('/executive-dashboard/divisions/{division}', [ExecutiveDashboardController::class, 'division'])->name('executive-dashboard.division');
