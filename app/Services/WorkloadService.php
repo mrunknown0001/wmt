@@ -132,6 +132,110 @@ class WorkloadService
     }
 
     /**
+     * What a number on the grid is made of.
+     *
+     * The grid says a person carries 3h on a Tuesday; this says which tasks
+     * those three hours are, and how much of each landed on that day. It runs
+     * the same openTasksFor and spread() the grid does — a breakdown computed
+     * any other way would eventually disagree with the cell it explains, and
+     * the disagreement would be invisible until somebody added them up.
+     *
+     * @param  $day  one day to explain, or null for the whole window
+     * @return array{estimated: array, unestimated: array, undated: array, total_minutes: int}
+     */
+    public static function breakdown(User $user, Carbon $from, Carbon $to, ?int $projectId = null, ?Carbon $day = null): array
+    {
+        $tasks = self::openTasksFor(collect([$user->id]), $from, $to, $projectId)
+            ->load('project:id,name');
+
+        $windowStart = $from->toDateString();
+        $windowEnd = $to->toDateString();
+        $dayKey = $day?->toDateString();
+
+        $estimated = [];
+        $unestimated = [];
+        $undated = [];
+
+        foreach ($tasks as $task) {
+            $shape = [
+                'id' => $task->id,
+                'title' => $task->title,
+                'status' => $task->status,
+                'project' => $task->project ? ['id' => $task->project->id, 'name' => $task->project->name] : null,
+                'start_date' => $task->start_date?->toDateString(),
+                'due_date' => $task->due_date?->toDateString(),
+                'estimated_minutes' => $task->estimated_minutes ? (int) $task->estimated_minutes : null,
+            ];
+
+            if (! $task->estimated_minutes) {
+                // Carrying no estimate, so contributing nothing to any cell —
+                // which is exactly why they are worth showing beside one.
+                $unestimated[] = $shape;
+
+                continue;
+            }
+
+            $spread = self::spread($task, $user);
+
+            if ($spread === []) {
+                $undated[] = $shape;
+
+                continue;
+            }
+
+            // Only the part of the spread the grid is showing. A task running
+            // past the window still contributes its own days, not its whole
+            // estimate, or the breakdown would exceed the row it explains.
+            $inScope = collect($spread)->filter(fn ($minutes, $date) => $dayKey
+                ? $date === $dayKey
+                : $date >= $windowStart && $date <= $windowEnd);
+
+            if ($inScope->sum() === 0) {
+                continue;
+            }
+
+            $estimated[] = $shape + [
+                'minutes' => (int) $inScope->sum(),
+                'days_in_scope' => $inScope->count(),
+                'days_total' => count($spread),
+                'spread_from' => array_key_first($spread),
+                'spread_to' => array_key_last($spread),
+            ];
+        }
+
+        usort($estimated, fn ($a, $b) => $b['minutes'] <=> $a['minutes']);
+
+        // Work that is assigned and estimated but has no due date to place it
+        // on. The window query above cannot reach it — nothing about it
+        // overlaps a date — so it is fetched separately rather than left out.
+        // It is real work sitting outside every cell on the grid, which is
+        // exactly what somebody auditing a light-looking week wants to see.
+        $undated = array_merge($undated, Task::query()
+            ->where('assigned_to', $user->id)
+            ->whereNotIn('status', ['done', 'cancelled'])
+            ->whereNull('due_date')
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+            ->with('project:id,name')
+            ->get(['id', 'title', 'assigned_to', 'project_id', 'start_date', 'due_date', 'estimated_minutes', 'status'])
+            ->map(fn (Task $task) => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'status' => $task->status,
+                'project' => $task->project ? ['id' => $task->project->id, 'name' => $task->project->name] : null,
+                'start_date' => $task->start_date?->toDateString(),
+                'due_date' => null,
+                'estimated_minutes' => $task->estimated_minutes ? (int) $task->estimated_minutes : null,
+            ])->all());
+
+        return [
+            'estimated' => $estimated,
+            'unestimated' => $unestimated,
+            'undated' => $undated,
+            'total_minutes' => array_sum(array_column($estimated, 'minutes')),
+        ];
+    }
+
+    /**
      * Spread one task's estimate over the days it is being worked.
      *
      * Start and due date both set: evenly across the working days between them.

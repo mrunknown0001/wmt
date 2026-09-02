@@ -10,6 +10,7 @@ use App\Services\WorkloadService;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Http\JsonResponse;
 use Inertia\Response;
 
 class WorkloadController extends Controller
@@ -89,6 +90,63 @@ class WorkloadController extends Controller
         }
 
         return $named->isEmpty() ? null : $named->join(', ', ' and ');
+    }
+
+    /**
+     * What one number on the grid is made of.
+     *
+     * Answers for one person and, usually, one day: the tasks whose estimates
+     * add up to that cell, with how much of each landed there — plus the ones
+     * carrying no estimate at all, which is the question the grid raises and
+     * cannot answer.
+     */
+    public function breakdown(Request $request): JsonResponse
+    {
+        $viewer = $request->user();
+
+        abort_unless($viewer->canViewWorkload(), 403);
+
+        $validated = $request->validate([
+            'user' => ['required', 'integer'],
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date'],
+            'date' => ['nullable', 'date'],
+            'project' => ['nullable', 'integer'],
+        ]);
+
+        // Whose numbers this person may look at is the same question the grid
+        // answers; asking it again here stops the drill-down being a way round
+        // the scope the page applies.
+        $subject = User::where('is_active', true)
+            ->when(! OrgScope::seesEverything($viewer),
+                fn ($q) => $q->whereIn('id', OrgScope::manageablePeopleIds($viewer)))
+            ->find($validated['user']);
+
+        abort_unless($subject, 404);
+
+        $from = $this->parseDate($validated['from']) ?? now()->startOfWeek();
+        $to = $this->parseDate($validated['to']) ?? $from->copy()->addDays(13);
+
+        if ($to->lessThan($from)) {
+            $to = $from->copy()->addDays(13);
+        }
+
+        $day = isset($validated['date']) ? $this->parseDate($validated['date']) : null;
+
+        return response()->json([
+            'user' => ['id' => $subject->id, 'name' => $subject->name],
+            'date' => $day?->toDateString(),
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'daily_capacity_minutes' => (int) $subject->daily_capacity_minutes,
+            ...WorkloadService::breakdown(
+                $subject,
+                $from,
+                $to,
+                $validated['project'] ?? null,
+                $day,
+            ),
+        ]);
     }
 
     /**
