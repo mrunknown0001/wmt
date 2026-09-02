@@ -92,6 +92,10 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
 
     const isStatic = STATIC_TYPES.includes(field.type);
 
+    // Hovering Remove turns the card's highlight red. Deleting the wrong
+    // question is the mistake worth spending a colour on.
+    const [removeHovered, setRemoveHovered] = useState(false);
+
     const update = (key, value) => {
         onChange(fieldIndex, { ...field, [key]: value });
     };
@@ -117,7 +121,26 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
     const mappedCf = isCustomFieldMapped ? customFields?.find(cf => cf.id === field.custom_field_id) : null;
 
     return (
-        <div ref={setNodeRef} style={style} className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+        <div
+            ref={setNodeRef}
+            style={style}
+            // Which question the pointer is on, said plainly: a long form is a
+            // stack of near-identical rows, and expand, duplicate and remove all
+            // act on whichever one you happen to be over.
+            // Each state carries its own background rather than overriding a
+            // base one: two utilities for the same property are settled by the
+            // order they happen to sit in the stylesheet, which is how the red
+            // tint worked in dark mode and not in light.
+            className={`border rounded-lg transition-colors ${
+                removeHovered
+                    ? 'border-red-400 dark:border-red-500 ring-1 ring-red-300/60 dark:ring-red-500/40 bg-red-50 dark:bg-red-900/20'
+                    : isExpanded
+                        // The one being edited stays lit, so it is still obvious
+                        // after the pointer has moved off to a toolbar.
+                        ? 'border-primary-400 dark:border-primary-500 ring-1 ring-primary-300/50 dark:ring-primary-500/30 bg-primary-50/40 dark:bg-primary-900/10'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-primary-300 dark:hover:border-primary-600 hover:ring-1 hover:ring-primary-200/60 dark:hover:ring-primary-500/25 hover:bg-primary-50/40 dark:hover:bg-primary-900/10'
+            }`}
+        >
             {/* Collapsed Row */}
             <div className="flex items-center gap-2 px-3 py-2.5">
                     <Tooltip content="Drag to reorder">
@@ -181,6 +204,10 @@ function SortableFieldRow({ field, fieldIndex, isExpanded, onToggleExpand, onRem
                     <button
                         type="button"
                         onClick={() => onRemove(fieldIndex)}
+                        onMouseEnter={() => setRemoveHovered(true)}
+                        onMouseLeave={() => setRemoveHovered(false)}
+                        onFocus={() => setRemoveHovered(true)}
+                        onBlur={() => setRemoveHovered(false)}
                         className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
