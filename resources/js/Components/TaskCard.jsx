@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -25,6 +26,10 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
         opacity: isDragging ? 0.5 : 1,
     };
 
+    // Hovering Delete turns the card's outline red, as it does on a form's
+    // questions and a task row.
+    const [deleteHovered, setDeleteHovered] = useState(false);
+
     return (
         <div
             ref={setNodeRef}
@@ -33,7 +38,18 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
             {...listeners}
             onClick={(e) => { if ((e.ctrlKey || e.metaKey || e.shiftKey) && onToggleSelect) { e.preventDefault(); onToggleSelect(task.id, e); } }}
             onContextMenu={(e) => onContextMenu?.(e, task)}
-            className={`bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm card-hover cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'z-50 shadow-lg transform-none!' : ''} ${isSelected ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
+            // The same outline the questions and the list rows use. card-hover
+            // stays: the small lift is what says "pick me up", which is the one
+            // thing a board card should say that a row does not.
+            className={`rounded-lg border p-3 shadow-sm card-hover cursor-grab active:cursor-grabbing touch-none ${
+                isDragging ? 'z-50 shadow-lg transform-none!' : ''
+            } ${
+                isSelected
+                    ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700 bg-primary-50 dark:bg-primary-900/20'
+                    : deleteHovered
+                        ? 'border-red-400 dark:border-red-500 ring-1 ring-red-300/60 dark:ring-red-500/40 bg-red-50 dark:bg-red-900/20'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-primary-300 dark:hover:border-primary-600 hover:ring-1 hover:ring-primary-200/60 dark:hover:ring-primary-500/25 hover:bg-primary-50/40 dark:hover:bg-primary-900/10'
+            }`}
         >
             <div className="flex items-start gap-2 mb-2">
                     <Tooltip content={isDone ? 'Mark incomplete' : 'Mark complete'}>
@@ -71,6 +87,10 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                                     <Tooltip content="Delete">
                                     <button
                                         onClick={() => onDelete(task.id, task.title)}
+                                        onMouseEnter={() => setDeleteHovered(true)}
+                                        onMouseLeave={() => setDeleteHovered(false)}
+                                        onFocus={() => setDeleteHovered(true)}
+                                        onBlur={() => setDeleteHovered(false)}
                                         className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                                     >
                                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
