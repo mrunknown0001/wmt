@@ -180,6 +180,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/projects/{project}/tasks/{task}/duplicate', [TaskController::class, 'duplicate'])->name('projects.tasks.duplicate');
     Route::get('/projects/{project}/tasks/{task}/detail', [TaskController::class, 'show'])->name('projects.tasks.detail');
     Route::patch('/projects/{project}/tasks/{task}/patch', [TaskController::class, 'patchField'])->name('projects.tasks.patch');
+    // Start the clock by hand, for work picked up before the status moved.
+    Route::patch('/projects/{project}/tasks/{task}/start', [TaskController::class, 'start'])->name('projects.tasks.start');
     Route::get('/projects/{project}/tasks/{task}/timeline', [TaskController::class, 'timeline'])->name('projects.tasks.timeline');
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
     Route::put('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'update'])->name('tasks.comments.update');

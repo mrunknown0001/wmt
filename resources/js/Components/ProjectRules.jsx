@@ -4,7 +4,7 @@ import Checkbox from './Checkbox';
  * Per-project rules that constrain how tasks in the project behave.
  * Shared by the project Create and Edit forms.
  */
-export default function ProjectRules({ requireAttachment, onChange, hideCompleted, onHideCompletedChange }) {
+export default function ProjectRules({ requireAttachment, onChange, hideCompleted, onHideCompletedChange, showTimeInMotion, onShowTimeInMotionChange }) {
     return (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Project Rules</h3>
@@ -24,6 +24,23 @@ export default function ProjectRules({ requireAttachment, onChange, hideComplete
                 either on the task itself (including files submitted through a form) or on one
                 of its comments. Useful when completion needs proof of work.
             </p>
+
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Checkbox
+                    label="Track time in motion"
+                    id="show_time_in_motion"
+                    checked={!!showTimeInMotion}
+                    onChange={(e) => onShowTimeInMotionChange(e.target.checked)}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-6">
+                    Adds <span className="font-medium">Date Started</span> and
+                    <span className="font-medium"> In Motion</span> to the task list, beside
+                    Date Completed. A task is stamped as started when it moves into In
+                    Progress, or by the <span className="font-medium">Start</span> button on
+                    the task itself. In Motion is the elapsed time between the two — which is
+                    how long the work was open, not how much effort was logged against it.
+                </p>
+            </div>
 
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Checkbox

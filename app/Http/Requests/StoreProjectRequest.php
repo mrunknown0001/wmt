@@ -32,6 +32,7 @@ class StoreProjectRequest extends FormRequest
             }],
             'due_date' => ['nullable', 'date'],
             'require_comment_attachment_on_close' => ['sometimes', 'boolean'],
+            'show_time_in_motion' => ['sometimes', 'boolean'],
             'hide_completed_tasks' => ['sometimes', 'boolean'],
             'task_series_enabled' => ['sometimes', 'boolean'],
             'task_series_prefix' => ['nullable', 'string', 'max:20', 'regex:/^[A-Za-z0-9][A-Za-z0-9\-_\/]*$/'],

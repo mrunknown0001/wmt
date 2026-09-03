@@ -26,6 +26,7 @@ export default function Create() {
         folder_id: defaultFolderId || '',
         due_date: '',
         require_comment_attachment_on_close: false,
+        show_time_in_motion: false,
         hide_completed_tasks: false,
         task_series_enabled: false,
         task_series_prefix: '',
@@ -96,6 +97,8 @@ export default function Create() {
                             onChange={(val) => setData('require_comment_attachment_on_close', val)}
                             hideCompleted={data.hide_completed_tasks}
                             onHideCompletedChange={(val) => setData('hide_completed_tasks', val)}
+                            showTimeInMotion={data.show_time_in_motion}
+                            onShowTimeInMotionChange={(val) => setData('show_time_in_motion', val)}
                         />
 
                         <TaskSeriesConfig

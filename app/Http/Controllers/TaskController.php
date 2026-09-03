@@ -538,6 +538,32 @@ class TaskController extends Controller
         ]);
     }
 
+    /**
+     * Record that work on this task has begun, now.
+     *
+     * The status hook stamps this on the way into progress, which covers the
+     * usual path. This is the button for the other one: somebody who has picked
+     * a task up without moving it yet, and wants the clock to start from the
+     * truth rather than from whenever they remember to drag it.
+     *
+     * Idempotent on purpose — a second press does not reset the clock, because
+     * the first press was when the work actually started.
+     */
+    public function start(Request $request, Project $project, Task $task): JsonResponse
+    {
+        abort_if($task->project_id !== $project->id, 404);
+        $this->authorize('update', $task);
+
+        if (! $task->started_at) {
+            $task->forceFill(['started_at' => now()])->save();
+        }
+
+        return response()->json([
+            'started_at' => $task->started_at?->toIso8601String(),
+            'time_in_motion_minutes' => $task->timeInMotionMinutes(),
+        ]);
+    }
+
     public function patchField(PatchTaskRequest $request, Project $project, Task $task): JsonResponse
     {
         $oldValues = $task->only(['title', 'description', 'status', 'priority', 'assigned_to', 'start_date', 'due_date']);

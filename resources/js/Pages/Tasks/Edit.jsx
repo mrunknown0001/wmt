@@ -16,6 +16,7 @@ import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import RecurrenceOptions from '../../Components/RecurrenceOptions';
 import EstimateInput from '../../Components/EstimateInput';
+import TimeInMotion from '../../Components/TimeInMotion';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
 import OverdueNotice from '../../Components/OverdueNotice';
@@ -759,6 +760,21 @@ export default function Edit() {
                                 disabled={!canManageTaskDetails}
                             />
                                 </div>
+
+                                {/* Only for projects that asked for it: a task
+                                    that nobody tracks this way would just show
+                                    two empty dates and a dash. */}
+                                {!isStandalone && project?.show_time_in_motion && (
+                                    <div className="mt-3">
+                                        <TimeInMotion
+                                            projectId={project.id}
+                                            taskId={task.id}
+                                            startedAt={task.started_at}
+                                            completedAt={task.completed_at}
+                                            canEdit={canManageTaskDetails}
+                                        />
+                                    </div>
+                                )}
                                 {!showStartDate && canManageTaskDetails && (
                                     <button
                                         type="button"
