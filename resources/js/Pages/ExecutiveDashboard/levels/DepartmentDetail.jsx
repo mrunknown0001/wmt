@@ -1,13 +1,19 @@
 import MetricCards from '../components/MetricCards';
+import { formatMinutes } from '../../../utils';
+import EffortCard from '../components/EffortCard';
 import OrgUnitCard from '../components/OrgUnitCard';
 import ActivityTrendChart from '../components/ActivityTrendChart';
 import WorkloadChart from '../components/WorkloadChart';
 import AtRiskItems from '../components/AtRiskItems';
 
-export default function DepartmentDetail({ metrics, units, activityTrend, workload, atRiskItems, entity }) {
+export default function DepartmentDetail({ metrics, units, activityTrend, workload, atRiskItems, entity, effort }) {
     return (
         <div className="space-y-6">
             <MetricCards data={metrics} scope="department" scopeId={entity?.id} />
+
+            <div className="mt-6">
+                <EffortCard effort={effort} />
+            </div>
 
             {units?.length > 0 && (
                 <div>
@@ -22,6 +28,7 @@ export default function DepartmentDetail({ metrics, units, activityTrend, worklo
                                     { label: 'Members', value: team.members_count },
                                     { label: 'Tasks', value: team.total_tasks },
                                     { label: 'Done', value: team.completed_tasks },
+                                    { label: 'logged', value: team.logged_minutes > 0 ? formatMinutes(team.logged_minutes) : '—' },
                                 ]}
                             />
                         ))}

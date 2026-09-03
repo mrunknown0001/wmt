@@ -1,13 +1,18 @@
 import MetricCards from '../components/MetricCards';
+import EffortCard from '../components/EffortCard';
 import MemberTable from '../components/MemberTable';
 import ActivityFeed from '../../../Components/Dashboard/ActivityFeed';
 import DonutChart from '../../../Components/Dashboard/DonutChart';
 import BarChart from '../../../Components/Dashboard/BarChart';
 
-export default function TeamDetail({ metrics, members, distributions, activityFeed, entity }) {
+export default function TeamDetail({ metrics, members, distributions, activityFeed, entity, effort }) {
     return (
         <div className="space-y-6">
             <MetricCards data={metrics} scope="team" scopeId={entity?.id} />
+
+            <div className="mt-6">
+                <EffortCard effort={effort} />
+            </div>
 
             <MemberTable members={members} />
 

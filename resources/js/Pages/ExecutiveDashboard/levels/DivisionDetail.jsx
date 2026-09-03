@@ -1,13 +1,19 @@
 import MetricCards from '../components/MetricCards';
+import { formatMinutes } from '../../../utils';
+import EffortCard from '../components/EffortCard';
 import OrgUnitCard from '../components/OrgUnitCard';
 import ActivityTrendChart from '../components/ActivityTrendChart';
 import WorkloadChart from '../components/WorkloadChart';
 import AtRiskItems from '../components/AtRiskItems';
 
-export default function DivisionDetail({ metrics, units, activityTrend, workload, atRiskItems, entity }) {
+export default function DivisionDetail({ metrics, units, activityTrend, workload, atRiskItems, entity, effort }) {
     return (
         <div className="space-y-6">
             <MetricCards data={metrics} scope="division" scopeId={entity?.id} />
+
+            <div className="mt-6">
+                <EffortCard effort={effort} />
+            </div>
 
             {units?.length > 0 && (
                 <div>
@@ -22,6 +28,7 @@ export default function DivisionDetail({ metrics, units, activityTrend, workload
                                     { label: 'Teams', value: dept.teams_count },
                                     { label: 'Members', value: dept.members_count },
                                     { label: 'Tasks', value: dept.total_tasks },
+                                    { label: 'logged', value: dept.logged_minutes > 0 ? formatMinutes(dept.logged_minutes) : '—' },
                                 ]}
                             />
                         ))}
