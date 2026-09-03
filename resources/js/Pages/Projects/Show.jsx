@@ -678,12 +678,22 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 function timeInMotion(task) {
     if (!task.started_at) return null;
 
+    // Closed with no recorded end — a cancelled task. Only 'done' stamps a
+    // completion time, and counting a cancelled task up to now would invent a
+    // span nobody worked.
+    if (!task.completed_at && ['done', 'cancelled'].includes(task.status)) return null;
+
     const started = new Date(task.started_at);
     const ended = task.completed_at ? new Date(task.completed_at) : new Date();
     const minutes = Math.round((ended - started) / 60000);
 
     // A completion recorded before the start is somebody fixing data by hand.
     return minutes < 0 ? null : minutes;
+}
+
+/** Is this task's clock still running? */
+function isInMotion(task) {
+    return !!task.started_at && !task.completed_at && !['done', 'cancelled'].includes(task.status);
 }
 
 const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'completion', 'estimate', 'logged'];
@@ -2145,6 +2155,28 @@ export default function Show() {
     // has the column switched on — a decision for the owner or a project admin,
     // made on the project's edit page. Leaving it out of the id list entirely
     // means nothing downstream has to know about the setting.
+    // The In Motion column counts up while work is open, but its cells are
+    // computed at render — without a heartbeat they sit at whatever they said
+    // when the page loaded, while the same figure on the task itself moves.
+    //
+    // Only while something is actually running: a project with nothing in
+    // motion should not redraw its whole task table every minute to show a
+    // column of unchanged dashes.
+    const [, setMotionTick] = useState(0);
+
+    const anythingInMotion = useMemo(
+        () => !!project.show_time_in_motion && localTasks.some(isInMotion),
+        [project.show_time_in_motion, localTasks],
+    );
+
+    useEffect(() => {
+        if (!anythingInMotion) return undefined;
+
+        const id = setInterval(() => setMotionTick((n) => n + 1), 60000);
+
+        return () => clearInterval(id);
+    }, [anythingInMotion]);
+
     const showSeriesColumn = !!project.task_series_enabled && project.show_task_series_column !== false;
 
     const effectiveColumnOrder = useMemo(() => {
