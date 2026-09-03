@@ -19,6 +19,10 @@ export default function TaskTimePanel({
     // long the task has actually been running.
     showControls = true,
     elapsedMinutes = null,
+    // The quick view wants the duration and nothing else: no logged total, no
+    // estimate bar, no list of entries. Those belong on the task itself, where
+    // there is room to read them.
+    elapsedOnly = false,
 }) {
     const [logs, setLogs] = useState([]);
     const [total, setTotal] = useState(0);
@@ -46,7 +50,12 @@ export default function TaskTimePanel({
         }
     }, [taskId]);
 
-    useEffect(() => { setLoading(true); load(); }, [load]);
+    useEffect(() => {
+        if (elapsedOnly) { setLoading(false); return; }
+
+        setLoading(true);
+        load();
+    }, [load, elapsedOnly]);
 
     // Another task's panel, or the header, stopped our timer.
     useEffect(() => {
@@ -120,6 +129,10 @@ export default function TaskTimePanel({
     const pct = estimatedMinutes > 0 ? Math.min(100, Math.round((total / estimatedMinutes) * 100)) : null;
     const over = estimatedMinutes > 0 && total > estimatedMinutes;
 
+    // A heading with nothing under it is worse than no section: when there is
+    // no elapsed time to report, this mode has nothing to say.
+    if (elapsedOnly && elapsedMinutes === null) return null;
+
     return (
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-2">
@@ -150,16 +163,18 @@ export default function TaskTimePanel({
                 )}
             </div>
 
-            <div className="flex items-baseline gap-2 text-sm">
-                <span className={`font-medium ${over ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                    {formatMinutes(total)}
-                </span>
-                <span className="text-xs text-gray-400">
-                    {estimatedMinutes > 0 ? `logged of ${formatMinutes(estimatedMinutes)} estimated` : 'logged · no estimate set'}
-                </span>
-            </div>
+            {!elapsedOnly && (
+                <div className="flex items-baseline gap-2 text-sm">
+                    <span className={`font-medium ${over ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                        {formatMinutes(total)}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                        {estimatedMinutes > 0 ? `logged of ${formatMinutes(estimatedMinutes)} estimated` : 'logged · no estimate set'}
+                    </span>
+                </div>
+            )}
 
-            {pct !== null && (
+            {!elapsedOnly && pct !== null && (
                 <div className="mt-1.5 h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                     <div
                         className={`h-full rounded-full ${over ? 'bg-red-500' : pct > 85 ? 'bg-amber-500' : 'bg-green-500'}`}
@@ -168,7 +183,7 @@ export default function TaskTimePanel({
                 </div>
             )}
 
-            {running && (
+            {!elapsedOnly && running && (
                 <p className="mt-2 text-xs text-primary-600 dark:text-primary-400">
                     Running since {timeAgo(running.started_at)}
                 </p>
@@ -179,7 +194,7 @@ export default function TaskTimePanel({
                 spent, this is how long the task has been open, and it is
                 normally the larger of the two. */}
             {elapsedMinutes !== null && (
-                <div className="mt-2 flex items-baseline gap-2 text-sm">
+                <div className={`${elapsedOnly ? '' : 'mt-2 '}flex items-baseline gap-2 text-sm`}>
                     <span className="font-medium text-gray-900 dark:text-gray-100 tabular-nums">
                         {formatElapsed(elapsedMinutes)}
                     </span>
@@ -187,7 +202,7 @@ export default function TaskTimePanel({
                 </div>
             )}
 
-            {!loading && logs.length > 0 && (
+            {!elapsedOnly && !loading && logs.length > 0 && (
                 <ul className="mt-3 space-y-1.5">
                     {logs.filter((l) => !l.running).map((log) => (
                         <li key={log.id} className="group flex items-center gap-2 text-xs">

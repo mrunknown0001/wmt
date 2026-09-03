@@ -720,6 +720,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                             currentUserId={auth.user?.id}
                             showControls={false}
                             elapsedMinutes={elapsedMinutes}
+                            elapsedOnly
                         />
 
                         {/* Collaborators */}
