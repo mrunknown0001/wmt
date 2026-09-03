@@ -470,7 +470,7 @@ class TaskController extends Controller
             ->with('success', 'Task deleted successfully.');
     }
 
-    public function show(Project $project, Task $task): JsonResponse
+    public function show(Request $request, Project $project, Task $task): JsonResponse
     {
         $this->authorize('update', $task);
 
@@ -535,6 +535,14 @@ class TaskController extends Controller
             'customFields' => $customFields,
             'customFieldValues' => $customFieldValues,
             'subtasks' => $subtasks,
+            // The quick view shows the same time-in-motion panel as the task
+            // page, and needs the project's setting to know whether to.
+            'showTimeInMotion' => (bool) $project->show_time_in_motion,
+            // The panel reads this to decide whether to offer the buttons that
+            // change something. Only the full editor sent it before, so the
+            // quick view treated everybody as a viewer and hid its Start timer
+            // and Start now buttons from people who could use them.
+            'canManageTaskDetails' => $project->userCanManageTasks($request->user()),
         ]);
     }
 

@@ -171,6 +171,29 @@ class TimeInMotionTest extends TestCase
         $this->assertTrue((bool) $project->fresh()->show_time_in_motion);
     }
 
+    public function test_the_quick_view_is_told_whether_to_show_the_panel_and_who_may_use_it(): void
+    {
+        $owner = $this->owner();
+        $project = $this->project($owner, ['show_time_in_motion' => true]);
+        $task = $this->task($project);
+
+        // The panel hides its Start buttons unless it is told the viewer can
+        // manage the task — which only the full editor used to say.
+        $this->actingAs($owner)
+            ->getJson("/projects/{$project->id}/tasks/{$task->id}/detail")
+            ->assertOk()
+            ->assertJsonPath('showTimeInMotion', true)
+            ->assertJsonPath('canManageTaskDetails', true);
+
+        $quiet = $this->project($owner, ['name' => 'Untracked']);
+        $quietTask = $this->task($quiet);
+
+        $this->actingAs($owner)
+            ->getJson("/projects/{$quiet->id}/tasks/{$quietTask->id}/detail")
+            ->assertOk()
+            ->assertJsonPath('showTimeInMotion', false);
+    }
+
     public function test_somebody_who_cannot_update_the_task_cannot_start_its_clock(): void
     {
         $project = $this->project($this->owner());

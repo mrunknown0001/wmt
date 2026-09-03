@@ -9,6 +9,11 @@ import { apiFetch, formatDate, formatElapsed } from '../utils';
  * begins before anybody moves a card — hence the button, which starts the clock
  * from the truth rather than from whenever the status caught up.
  *
+ * It sits at the top of the task, above the fields, because a button that has
+ * to be hunted for before work starts is a button nobody presses. Until it is
+ * pressed it glows, for the same reason; once pressed there is nothing left to
+ * press, so the strip goes quiet and just reports.
+ *
  * Pressing it twice does nothing the second time: the first press was when the
  * work started, and resetting that would quietly shorten the span.
  *
@@ -56,54 +61,53 @@ export default function TimeInMotion({ projectId, taskId, startedAt, completedAt
             .finally(() => setSaving(false));
     };
 
-    return (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-            <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Time in motion</h3>
-                {!started && canEdit && (
+    // Not started: the whole strip is an invitation, so it carries the accent
+    // colour rather than sitting quietly among the fields.
+    if (!started) {
+        return (
+            <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/60 dark:bg-primary-900/20 px-3 py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Not started yet</p>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        Starts by itself when this moves into In&nbsp;Progress.
+                    </p>
+                    {error && <p className="text-[11px] text-red-600 dark:text-red-400">{error}</p>}
+                </div>
+
+                {canEdit && (
                     <button
                         type="button"
                         onClick={start}
                         disabled={saving}
-                        className="px-2.5 py-1 text-xs font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                        className="shrink-0 px-3.5 py-1.5 text-sm font-semibold rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:animate-none transition-colors animate-pulse-glow"
                     >
                         {saving ? 'Starting…' : 'Start now'}
                     </button>
                 )}
             </div>
+        );
+    }
 
-            <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                <div>
-                    <dt className="text-gray-500 dark:text-gray-400">Started</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">
-                        {started ? formatDate(started) : <span className="text-gray-400">Not yet</span>}
-                    </dd>
-                </div>
-                <div>
-                    <dt className="text-gray-500 dark:text-gray-400">Completed</dt>
-                    <dd className="text-gray-900 dark:text-gray-100">
-                        {completedAt ? formatDate(completedAt) : <span className="text-gray-400">Open</span>}
-                    </dd>
-                </div>
-                <div>
-                    <dt className="text-gray-500 dark:text-gray-400">Elapsed</dt>
-                    <dd className={completedAt
-                        ? 'text-gray-900 dark:text-gray-100 tabular-nums'
-                        : 'text-primary-600 dark:text-primary-400 tabular-nums'}>
-                        {minutes === null ? <span className="text-gray-400">—</span> : formatElapsed(minutes)}
-                    </dd>
-                </div>
-            </dl>
+    // Running or finished: a line of facts, no glow — there is nothing to press.
+    return (
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Time in motion</span>
 
-            {error && (
-                <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">{error}</p>
-            )}
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+                Started <span className="text-gray-900 dark:text-gray-100">{formatDate(started)}</span>
+            </span>
 
-            {!started && (
-                <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
-                    Stamped automatically when this task moves into In&nbsp;Progress.
-                </p>
-            )}
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+                {completedAt
+                    ? <>Completed <span className="text-gray-900 dark:text-gray-100">{formatDate(completedAt)}</span></>
+                    : <span className="text-primary-600 dark:text-primary-400">Still open</span>}
+            </span>
+
+            <span className={`text-xs font-semibold tabular-nums ml-auto ${
+                completedAt ? 'text-gray-900 dark:text-gray-100' : 'text-primary-600 dark:text-primary-400'
+            }`}>
+                {minutes === null ? '—' : formatElapsed(minutes)}
+            </span>
         </div>
     );
 }
