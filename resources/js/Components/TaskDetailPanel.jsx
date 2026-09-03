@@ -618,6 +618,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                     taskId={taskData.id}
                                     startedAt={taskData.started_at}
                                     completedAt={taskData.completed_at}
+                                    status={taskData.status}
                                     canEdit={canEdit && !projectIsClosed}
                                 />
                             </div>

@@ -20,7 +20,11 @@ import { apiFetch, formatDate, formatElapsed } from '../utils';
  * Not the same measure as the time logs beside it. Those record effort spent;
  * this records elapsed time, and is normally the larger number.
  */
-export default function TimeInMotion({ projectId, taskId, startedAt, completedAt, canEdit = true }) {
+export default function TimeInMotion({ projectId, taskId, startedAt, completedAt, status = null, canEdit = true }) {
+    // Finished work is not waiting to be started. Cancelled counts as finished
+    // even though it carries no completion time — only 'done' is stamped — and
+    // a cancelled task wants a Start button least of all.
+    const finished = !!completedAt || ['done', 'cancelled'].includes(status);
     const [started, setStarted] = useState(startedAt || null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
@@ -31,15 +35,19 @@ export default function TimeInMotion({ projectId, taskId, startedAt, completedAt
     useEffect(() => setStarted(startedAt || null), [startedAt]);
 
     useEffect(() => {
-        if (!started || completedAt) return undefined;
+        if (!started || finished) return undefined;
 
         const id = setInterval(() => setTick((n) => n + 1), 60000);
 
         return () => clearInterval(id);
-    }, [started, completedAt]);
+    }, [started, finished]);
 
     const minutes = (() => {
         if (!started) return null;
+        // Closed with no recorded end — a cancelled task. The span is genuinely
+        // unknown, and counting it up to now would invent one.
+        if (finished && !completedAt) return null;
+
         const from = new Date(started);
         const to = completedAt ? new Date(completedAt) : new Date();
         const mins = Math.round((to - from) / 60000);
@@ -60,6 +68,25 @@ export default function TimeInMotion({ projectId, taskId, startedAt, completedAt
             .catch(() => setError('The clock could not be started.'))
             .finally(() => setSaving(false));
     };
+
+    // Never started and never going to be: the task was closed without anybody
+    // recording a start. Worth saying, so the empty columns are explained, but
+    // there is nothing here to press.
+    if (!started && finished) {
+        return (
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Time in motion</span>
+                <span className="text-xs text-gray-600 dark:text-gray-300">
+                    Started <span className="text-gray-400">not recorded</span>
+                </span>
+                <span className="text-xs text-gray-600 dark:text-gray-300">
+                    {completedAt
+                        ? <>Completed <span className="text-gray-900 dark:text-gray-100">{formatDate(completedAt)}</span></>
+                        : 'Closed'}
+                </span>
+            </div>
+        );
+    }
 
     // Not started: the whole strip is an invitation, so it carries the accent
     // colour rather than sitting quietly among the fields.
@@ -100,11 +127,13 @@ export default function TimeInMotion({ projectId, taskId, startedAt, completedAt
             <span className="text-xs text-gray-600 dark:text-gray-300">
                 {completedAt
                     ? <>Completed <span className="text-gray-900 dark:text-gray-100">{formatDate(completedAt)}</span></>
-                    : <span className="text-primary-600 dark:text-primary-400">Still open</span>}
+                    : finished
+                        ? 'Closed'
+                        : <span className="text-primary-600 dark:text-primary-400">Still open</span>}
             </span>
 
             <span className={`text-xs font-semibold tabular-nums ml-auto ${
-                completedAt ? 'text-gray-900 dark:text-gray-100' : 'text-primary-600 dark:text-primary-400'
+                finished ? 'text-gray-900 dark:text-gray-100' : 'text-primary-600 dark:text-primary-400'
             }`}>
                 {minutes === null ? '—' : formatElapsed(minutes)}
             </span>
