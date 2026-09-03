@@ -228,6 +228,32 @@ class TimeInMotionTest extends TestCase
             ->assertOk();
     }
 
+    public function test_a_finished_task_cannot_have_its_clock_started(): void
+    {
+        $owner = $this->owner();
+        $project = $this->project($owner, ['show_time_in_motion' => true]);
+
+        // Done carries a completion time; cancelled does not, and both are
+        // finished with as far as starting work goes.
+        foreach (['done', 'cancelled'] as $status) {
+            $task = $this->task($project, ['title' => "Closed as {$status}", 'status' => $status]);
+
+            $this->actingAs($owner)
+                ->patchJson("/projects/{$project->id}/tasks/{$task->id}/start")
+                ->assertStatus(422);
+
+            $this->assertNull($task->fresh()->started_at);
+        }
+
+        $open = $this->task($project, ['title' => 'Still to do']);
+
+        $this->actingAs($owner)
+            ->patchJson("/projects/{$project->id}/tasks/{$open->id}/start")
+            ->assertOk();
+
+        $this->assertNotNull($open->fresh()->started_at);
+    }
+
     public function test_somebody_who_cannot_update_the_task_cannot_start_its_clock(): void
     {
         $project = $this->project($this->owner());

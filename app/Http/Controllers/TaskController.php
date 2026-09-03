@@ -568,6 +568,14 @@ class TaskController extends Controller
         // same rule for anybody who reaches the endpoint another way.
         abort_if($project->isClosed(), 422, 'This project is closed, so work cannot be started on its tasks.');
 
+        // Nor on a task that is already finished with. Cancelled counts even
+        // though it carries no completion time — only 'done' is stamped.
+        abort_if(
+            $task->completed_at !== null || in_array($task->status, ['done', 'cancelled'], true),
+            422,
+            'This task is already finished, so work cannot be started on it.'
+        );
+
         if (! $task->started_at) {
             $task->forceFill(['started_at' => now()])->save();
         }
