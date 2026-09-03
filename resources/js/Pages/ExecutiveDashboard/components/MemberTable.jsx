@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import Card from '../../../Components/Card';
 import Avatar from '../../../Components/Avatar';
+import { formatMinutes } from '../../../utils';
 
 export default function MemberTable({ members }) {
     if (!members?.length) {
@@ -26,6 +27,7 @@ export default function MemberTable({ members }) {
                             <th className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Completed</th>
                             <th className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Active</th>
                             <th className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Overdue</th>
+                            <th className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Logged</th>
                             <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3 w-40">Completion</th>
                         </tr>
                     </thead>
@@ -58,6 +60,14 @@ export default function MemberTable({ members }) {
                                     <span className={member.overdue_tasks_count > 0 ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}>
                                         {member.overdue_tasks_count}
                                     </span>
+                                </td>
+                                {/* A dash rather than 0h where nothing was
+                                    recorded: an empty log says nobody wrote the
+                                    time down, not that no time was spent. */}
+                                <td className="text-center text-sm px-4 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+                                    {member.logged_minutes > 0
+                                        ? formatMinutes(member.logged_minutes)
+                                        : <span className="text-gray-300 dark:text-gray-600">—</span>}
                                 </td>
                                 <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">

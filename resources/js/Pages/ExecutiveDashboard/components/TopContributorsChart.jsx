@@ -1,5 +1,6 @@
 import Card from '../../../Components/Card';
 import Avatar from '../../../Components/Avatar';
+import { formatMinutes } from '../../../utils';
 
 export default function TopContributorsChart({ data }) {
     if (!data?.length) {
@@ -29,6 +30,13 @@ export default function TopContributorsChart({ data }) {
                                 <span className="text-xs font-medium text-white">{user.count}</span>
                             </div>
                         </div>
+                        {/* Hours beside the count, because a count alone treats a
+                            five-minute task and a three-day one alike. A dash
+                            where nothing was logged: zero would read as "spent
+                            no time", which is not what an empty log means. */}
+                        <span className="w-14 shrink-0 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                            {user.minutes > 0 ? formatMinutes(user.minutes) : '—'}
+                        </span>
                     </div>
                 ))}
             </div>

@@ -1,14 +1,20 @@
 import MetricCards from '../components/MetricCards';
+import { formatMinutes } from '../../../utils';
+import EffortCard from '../components/EffortCard';
 import OrgUnitCard from '../components/OrgUnitCard';
 import ActivityTrendChart from '../components/ActivityTrendChart';
 import TopContributorsChart from '../components/TopContributorsChart';
 import TopPerformers from '../../../Components/Dashboard/TopPerformers';
 import AtRiskItems from '../components/AtRiskItems';
 
-export default function OrgOverview({ metrics, divisions, activityTrend, topContributors, topTeams, topDepartments, atRiskItems }) {
+export default function OrgOverview({ metrics, divisions, activityTrend, topContributors, topTeams, topDepartments, atRiskItems, effort }) {
     return (
         <div className="space-y-6">
             <MetricCards data={metrics} />
+
+            <div className="mt-6">
+                <EffortCard effort={effort} />
+            </div>
 
             {divisions?.length > 0 && (
                 <div>
@@ -24,6 +30,7 @@ export default function OrgOverview({ metrics, divisions, activityTrend, topCont
                                     { label: 'Teams', value: div.teams_count },
                                     { label: 'Members', value: div.members_count },
                                     { label: 'Projects', value: div.active_projects },
+                                    { label: 'logged', value: div.logged_minutes > 0 ? formatMinutes(div.logged_minutes) : '—' },
                                 ]}
                             />
                         ))}

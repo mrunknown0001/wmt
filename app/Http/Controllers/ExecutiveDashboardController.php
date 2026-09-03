@@ -7,9 +7,11 @@ use App\Models\Department;
 use App\Models\Division;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskTimeLog;
 use App\Models\TaskActivity;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ReportService;
 use App\Services\OrgScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -135,6 +137,140 @@ class ExecutiveDashboardController extends Controller
         ];
     }
 
+    /**
+     * Effort these people recorded, and how it compared with their estimates.
+     *
+     * Dated by logged_on — the day the work happened rather than the day it was
+     * typed — so a manual entry for last Tuesday lands in last Tuesday's
+     * window. That is a different column from the task filters above, which run
+     * on created_at, because a time entry and a task are dated by different
+     * events.
+     *
+     * Scoped by who logged the time, not by who the task is assigned to: the
+     * question a unit head is asking is what their own people spent, and people
+     * log time on work assigned to others.
+     *
+     * estimated_not_logged is carried deliberately. Accuracy needs a task to
+     * have both an estimate and some logged time, and an org-wide ratio drawn
+     * from a self-selected handful can mislead a decision far more than a
+     * per-project one. If that count is the larger, the ratio is not the
+     * picture.
+     */
+    private function effortSummary(Collection $userIds, ?string $dateFrom, ?string $dateTo): array
+    {
+        if ($userIds->isEmpty()) {
+            return ['total_minutes' => 0, 'entries' => 0, 'running' => 0, 'accuracy' => self::emptyAccuracy()];
+        }
+
+        $logs = TaskTimeLog::whereIn('user_id', $userIds);
+
+        if ($dateFrom) {
+            $logs->where('logged_on', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $logs->where('logged_on', '<=', $dateTo);
+        }
+
+        // A timer still running has no duration yet, so it cannot be summed —
+        // reported apart rather than dropped without a word.
+        $running = (clone $logs)->whereNull('minutes')->count();
+        $finished = (clone $logs)->whereNotNull('minutes');
+
+        return [
+            'total_minutes' => (int) (clone $finished)->sum('minutes'),
+            'entries' => (clone $finished)->count(),
+            'running' => $running,
+            'accuracy' => $this->accuracyFor($userIds, $dateFrom, $dateTo),
+        ];
+    }
+
+    /**
+     * Minutes logged by each of these people, keyed by user id.
+     *
+     * One query for the whole set: the contributors table would otherwise ask
+     * the same question once per row.
+     */
+    private function minutesByPerson(Collection $userIds, ?string $dateFrom, ?string $dateTo): Collection
+    {
+        if ($userIds->isEmpty()) {
+            return collect();
+        }
+
+        $logs = TaskTimeLog::whereIn('user_id', $userIds)->whereNotNull('minutes');
+
+        if ($dateFrom) {
+            $logs->where('logged_on', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $logs->where('logged_on', '<=', $dateTo);
+        }
+
+        return $logs->groupBy('user_id')
+            ->selectRaw('user_id, SUM(minutes) as minutes')
+            ->pluck('minutes', 'user_id');
+    }
+
+    /**
+     * How the estimates on these people's finished work compared with the
+     * effort it took.
+     *
+     * Completed inside the window, an estimate set, and some time logged
+     * against it. The median is reported rather than the mean, for the reason
+     * the reports page gives: one runaway task drags an average somewhere no
+     * real task ever was.
+     */
+    private function accuracyFor(Collection $userIds, ?string $dateFrom, ?string $dateTo): array
+    {
+        if ($userIds->isEmpty()) {
+            return self::emptyAccuracy();
+        }
+
+        $tasks = Task::whereIn('assigned_to', $userIds)
+            ->whereNotNull('completed_at')
+            ->where('estimated_minutes', '>', 0)
+            ->when($dateFrom, fn ($q, $d) => $q->where('completed_at', '>=', $d))
+            ->when($dateTo, fn ($q, $d) => $q->where('completed_at', '<=', $d . ' 23:59:59'))
+            ->withSum(['timeLogs as logged_minutes' => fn ($q) => $q->whereNotNull('minutes')], 'minutes')
+            ->limit(ReportService::SAMPLE_CAP)
+            ->get(['id', 'estimated_minutes']);
+
+        $compared = $tasks->filter(fn ($t) => (int) $t->logged_minutes > 0)->values();
+
+        if ($compared->isEmpty()) {
+            return array_merge(self::emptyAccuracy(), ['estimated_not_logged' => $tasks->count()]);
+        }
+
+        $ratios = $compared->map(fn ($t) => $t->logged_minutes / $t->estimated_minutes)->sort()->values();
+        $mid = intdiv($ratios->count(), 2);
+        $median = $ratios->count() % 2 === 1
+            ? $ratios[$mid]
+            : ($ratios[$mid - 1] + $ratios[$mid]) / 2;
+
+        return [
+            'count' => $compared->count(),
+            'estimated_not_logged' => $tasks->count() - $compared->count(),
+            'median_ratio' => round($median, 2),
+            'over' => $compared->filter(fn ($t) => ($t->logged_minutes / $t->estimated_minutes) > 1.1)->count(),
+            'within' => $compared->filter(fn ($t) => abs(($t->logged_minutes / $t->estimated_minutes) - 1) <= 0.1)->count(),
+            'estimated_minutes' => (int) $compared->sum('estimated_minutes'),
+            'logged_minutes' => (int) $compared->sum('logged_minutes'),
+        ];
+    }
+
+    /** Nulls rather than zeros: "nobody logged" and "a ratio of nought" differ. */
+    private static function emptyAccuracy(): array
+    {
+        return [
+            'count' => 0,
+            'estimated_not_logged' => 0,
+            'median_ratio' => null,
+            'over' => 0,
+            'within' => 0,
+            'estimated_minutes' => 0,
+            'logged_minutes' => 0,
+        ];
+    }
+
     private function activityTrend(Collection $userIds): array
     {
         return ActivityLog::whereIn('user_id', $userIds)
@@ -146,19 +282,37 @@ class ExecutiveDashboardController extends Controller
             ->toArray();
     }
 
-    private function topContributors(Collection $userIds, int $limit = 10): array
-    {
-        return Task::whereIn('assigned_to', $userIds)
+    /**
+     * Who finished the most work — and how long they spent on it.
+     *
+     * Ranked by task count still, because that is what the column says, but the
+     * hours sit beside it: a count alone treats a five-minute task and a
+     * three-day one as the same contribution, and the two numbers read together
+     * say something neither says alone.
+     */
+    private function topContributors(
+        Collection $userIds,
+        int $limit = 10,
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+    ): array {
+        $rows = Task::whereIn('assigned_to', $userIds)
             ->where('status', 'done')
             ->select('assigned_to', DB::raw('COUNT(*) as completed_count'))
             ->groupBy('assigned_to')
             ->orderByDesc('completed_count')
             ->limit($limit)
-            ->get()
+            ->get();
+
+        $names = User::whereIn('id', $rows->pluck('assigned_to'))->pluck('name', 'id');
+        $minutes = $this->minutesByPerson($rows->pluck('assigned_to'), $dateFrom, $dateTo);
+
+        return $rows
             ->map(fn ($row) => [
                 'user_id' => $row->assigned_to,
-                'name' => User::find($row->assigned_to)?->name ?? 'Unknown',
+                'name' => $names[$row->assigned_to] ?? 'Unknown',
                 'count' => $row->completed_count,
+                'minutes' => (int) ($minutes[$row->assigned_to] ?? 0),
             ])
             ->toArray();
     }
@@ -471,7 +625,7 @@ class ExecutiveDashboardController extends Controller
         $divisions = Division::with('head')
             ->withCount('departments')
             ->get()
-            ->map(function ($div) {
+            ->map(function ($div) use ($filters) {
                 $deptIds = $div->departments()->pluck('id');
                 $userIds = User::whereIn('department_id', $deptIds)->where('is_active', true)->pluck('id');
                 $teamCount = Team::whereIn('department_id', $deptIds)->count();
@@ -480,6 +634,8 @@ class ExecutiveDashboardController extends Controller
                 $activeProjects = Project::whereIn('id',
                     Task::whereIn('assigned_to', $userIds)->distinct()->pluck('project_id')
                 )->where('status', 'active')->count();
+
+                $effort = $this->effortSummary($userIds, $filters['date_from'], $filters['date_to']);
 
                 return [
                     'id' => $div->id,
@@ -490,6 +646,9 @@ class ExecutiveDashboardController extends Controller
                     'members_count' => $userIds->count(),
                     'completion_rate' => $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0,
                     'active_projects' => $activeProjects,
+                    'logged_minutes' => $effort['total_minutes'],
+                    'accuracy_ratio' => $effort['accuracy']['median_ratio'],
+                    'estimated_not_logged' => $effort['accuracy']['estimated_not_logged'],
                 ];
             });
 
@@ -498,7 +657,8 @@ class ExecutiveDashboardController extends Controller
             'metrics' => $metrics,
             'divisions' => $divisions,
             'activityTrend' => $this->activityTrend($allActiveUserIds),
-            'topContributors' => $this->topContributors($allActiveUserIds),
+            'topContributors' => $this->topContributors($allActiveUserIds, 10, $filters['date_from'], $filters['date_to']),
+            'effort' => $this->effortSummary($allActiveUserIds, $filters['date_from'], $filters['date_to']),
             'topTeams' => $this->rankUnits(
                 Team::with('department:id,name')
                     ->withCount(['members' => fn ($q) => $q->where('is_active', true)])
@@ -529,10 +689,12 @@ class ExecutiveDashboardController extends Controller
             ->with('head')
             ->withCount('teams')
             ->get()
-            ->map(function ($dept) {
+            ->map(function ($dept) use ($filters) {
                 $deptUserIds = User::where('department_id', $dept->id)->where('is_active', true)->pluck('id');
                 $totalTasks = Task::whereIn('assigned_to', $deptUserIds)->count();
                 $completedTasks = Task::whereIn('assigned_to', $deptUserIds)->where('status', 'done')->count();
+
+                $effort = $this->effortSummary($deptUserIds, $filters['date_from'], $filters['date_to']);
 
                 return [
                     'id' => $dept->id,
@@ -543,6 +705,9 @@ class ExecutiveDashboardController extends Controller
                     'total_tasks' => $totalTasks,
                     'completed_tasks' => $completedTasks,
                     'completion_rate' => $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0,
+                    'logged_minutes' => $effort['total_minutes'],
+                    'accuracy_ratio' => $effort['accuracy']['median_ratio'],
+                    'estimated_not_logged' => $effort['accuracy']['estimated_not_logged'],
                 ];
             });
 
@@ -557,6 +722,7 @@ class ExecutiveDashboardController extends Controller
             'units' => $departments,
             'activityTrend' => $this->activityTrend($userIds),
             'workload' => $this->workloadDistribution($userIds),
+            'effort' => $this->effortSummary($userIds, $filters['date_from'], $filters['date_to']),
             'atRiskItems' => $this->atRiskItems($userIds),
             'filters' => $filters,
             'breadcrumbs' => [
@@ -578,10 +744,12 @@ class ExecutiveDashboardController extends Controller
         $teams = Team::where('department_id', $department->id)
             ->with('leader')
             ->get()
-            ->map(function ($team) {
+            ->map(function ($team) use ($filters) {
                 $teamUserIds = User::where('team_id', $team->id)->where('is_active', true)->pluck('id');
                 $totalTasks = Task::whereIn('assigned_to', $teamUserIds)->count();
                 $completedTasks = Task::whereIn('assigned_to', $teamUserIds)->where('status', 'done')->count();
+
+                $effort = $this->effortSummary($teamUserIds, $filters['date_from'], $filters['date_to']);
 
                 return [
                     'id' => $team->id,
@@ -591,6 +759,9 @@ class ExecutiveDashboardController extends Controller
                     'total_tasks' => $totalTasks,
                     'completed_tasks' => $completedTasks,
                     'completion_rate' => $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0,
+                    'logged_minutes' => $effort['total_minutes'],
+                    'accuracy_ratio' => $effort['accuracy']['median_ratio'],
+                    'estimated_not_logged' => $effort['accuracy']['estimated_not_logged'],
                 ];
             });
 
@@ -605,6 +776,7 @@ class ExecutiveDashboardController extends Controller
             'units' => $teams,
             'activityTrend' => $this->activityTrend($userIds),
             'workload' => $this->workloadDistribution($userIds),
+            'effort' => $this->effortSummary($userIds, $filters['date_from'], $filters['date_to']),
             'atRiskItems' => $this->atRiskItems($userIds),
             'filters' => $filters,
             'breadcrumbs' => [
@@ -623,6 +795,10 @@ class ExecutiveDashboardController extends Controller
 
         $userIds = User::where('team_id', $team->id)->where('is_active', true)->pluck('id');
         $metrics = $this->buildMetrics($userIds, $filters['date_from'], $filters['date_to']);
+
+        // The unit below a team is a person, so effort per member is the same
+        // "by unit" breakdown the levels above show.
+        $memberMinutes = $this->minutesByPerson($userIds, $filters['date_from'], $filters['date_to']);
 
         $members = User::whereIn('id', $userIds)
             ->select('id', 'name', 'position')
@@ -644,6 +820,7 @@ class ExecutiveDashboardController extends Controller
                 'completed_tasks_count' => $u->completed_tasks_count,
                 'overdue_tasks_count' => $u->overdue_tasks_count,
                 'active_tasks_count' => $u->active_tasks_count,
+                'logged_minutes' => (int) ($memberMinutes[$u->id] ?? 0),
                 'completion_rate' => $u->assigned_tasks_count > 0
                     ? round(($u->completed_tasks_count / $u->assigned_tasks_count) * 100)
                     : 0,
@@ -681,6 +858,7 @@ class ExecutiveDashboardController extends Controller
             ],
             'metrics' => $metrics,
             'members' => $members,
+            'effort' => $this->effortSummary($userIds, $filters['date_from'], $filters['date_to']),
             'distributions' => $distributions,
             'activityFeed' => $recentActivity,
             'filters' => $filters,
