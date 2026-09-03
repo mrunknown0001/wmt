@@ -42,6 +42,8 @@ class ReportController extends Controller
             'cycleTime' => ReportService::cycleTime($user, $from, $to, $filters),
             'onTime' => ReportService::onTime($user, $from, $to, $filters),
             'throughput' => ReportService::throughput($user, $from, $to, $filters),
+            'effort' => ReportService::effort($user, $from, $to, $filters),
+            'estimateAccuracy' => ReportService::estimateAccuracy($user, $from, $to, $filters),
             'approvals' => ReportService::approvalTurnaround($user, $from, $to, $filters),
             'approvers' => ReportService::approverTurnaround($from, $to, $filters),
             'escalations' => ReportService::escalations($user, $filters),
