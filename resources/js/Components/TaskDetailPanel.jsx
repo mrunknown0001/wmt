@@ -6,6 +6,7 @@ import Avatar from './Avatar';
 import RichTextEditor from './RichTextEditor';
 import { COMMENT_LIMIT } from '../limits';
 import Tooltip from './Tooltip';
+import { ConfirmModal } from './Modal';
 import SearchableSelect from './SearchableSelect';
 import TaskTimePanel from './TaskTimePanel';
 import OverdueNotice from './OverdueNotice';
@@ -140,15 +141,17 @@ function CollaboratorEditor({ collaborators, users, assigneeId, onUpdate }) {
 
 function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpdated, onDeleted }) {
     const [deleting, setDeleting] = useState(false);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editBody, setEditBody] = useState('');
     const [saving, setSaving] = useState(false);
 
     const commentUrl = `/api/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
 
+    // Asked in the app's own dialog rather than the browser's, which sits
+    // outside the page, ignores the theme, and cannot say which comment.
     const handleDelete = async () => {
-        console.log('Delete comment URL:', commentUrl, { projectId, taskId, commentId: item.id });
-        if (!confirm('Delete this comment?')) return;
+        setConfirmingDelete(false);
         setDeleting(true);
         try {
             const res = await apiFetch(commentUrl, { method: 'DELETE' });
@@ -209,7 +212,7 @@ function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpd
                             </Tooltip>
                             <Tooltip content="Delete">
                                 <button
-                                    onClick={handleDelete}
+                                    onClick={() => setConfirmingDelete(true)}
                                     disabled={deleting}
                                     className="p-1 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
                                 >
@@ -273,6 +276,14 @@ function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpd
                     </div>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={confirmingDelete}
+                onClose={() => setConfirmingDelete(false)}
+                onConfirm={handleDelete}
+                title="Delete comment"
+                message="Delete this comment? Any files attached to it go with it, and this cannot be undone."
+            />
         </div>
     );
 }
