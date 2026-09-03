@@ -49,6 +49,7 @@ import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
 import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, formatElapsed, isCompletedLate } from '../../utils';
+import useRunningTimer from '../../useRunningTimer';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import { orderSections, moveSection } from '../../sectionTree';
@@ -389,6 +390,8 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     // Hovering Delete turns the row's outline red, the way it does on a form's
     // questions. Declared before stickyBg, which reads it.
     const [deleteHovered, setDeleteHovered] = useState(false);
+    // Only the viewer's own timer — nothing here knows about anybody else's.
+    const isBeingTimed = useRunningTimer() === task.id;
 
     const stickyBg = isDragging
         ? 'bg-blue-50 dark:bg-blue-900/30'
@@ -428,7 +431,20 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                 const over = task.estimated_minutes > 0 && task.logged_minutes > task.estimated_minutes;
                 return (
                     <td key="logged" className={`px-6 py-3 text-sm text-center overflow-hidden tabular-nums ${over ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-300'}`} style={cStyle}>
-                        {task.logged_minutes ? formatMinutes(task.logged_minutes) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        <span className="inline-flex items-center gap-1.5">
+                            {/* A running timer contributes nothing to the total
+                                until it is stopped, so without this a task being
+                                timed right now looks exactly like an idle one. */}
+                            {isBeingTimed && (
+                                <Tooltip content="You have a timer running on this task">
+                                    <span className="relative flex h-2 w-2 shrink-0">
+                                        <span className="absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75 animate-ping" />
+                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-600" />
+                                    </span>
+                                </Tooltip>
+                            )}
+                            {task.logged_minutes ? formatMinutes(task.logged_minutes) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        </span>
                     </td>
                 );
             }
@@ -950,6 +966,8 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     // Hovering Delete turns the row's outline red, the way it does on a form's
     // questions. Declared before stickyBg, which reads it.
     const [deleteHovered, setDeleteHovered] = useState(false);
+    // Only the viewer's own timer — nothing here knows about anybody else's.
+    const isBeingTimed = useRunningTimer() === task.id;
 
     const stickyBg = isDragging
         ? 'bg-blue-50 dark:bg-blue-900/30'
@@ -991,7 +1009,20 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 const over = task.estimated_minutes > 0 && task.logged_minutes > task.estimated_minutes;
                 return (
                     <td key="logged" className={`px-6 py-3 text-sm text-center overflow-hidden tabular-nums ${over ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-300'}`} style={cStyle}>
-                        {task.logged_minutes ? formatMinutes(task.logged_minutes) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        <span className="inline-flex items-center gap-1.5">
+                            {/* A running timer contributes nothing to the total
+                                until it is stopped, so without this a task being
+                                timed right now looks exactly like an idle one. */}
+                            {isBeingTimed && (
+                                <Tooltip content="You have a timer running on this task">
+                                    <span className="relative flex h-2 w-2 shrink-0">
+                                        <span className="absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75 animate-ping" />
+                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-600" />
+                                    </span>
+                                </Tooltip>
+                            )}
+                            {task.logged_minutes ? formatMinutes(task.logged_minutes) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        </span>
                     </td>
                 );
             }
