@@ -13,6 +13,15 @@ const duration = (hours) => {
     return `${(hours / 24).toFixed(1)}d`;
 };
 
+/** Logged effort arrives in minutes; hours read better past an hour. */
+const effortTime = (minutes) => {
+    if (minutes === null || minutes === undefined) return '—';
+    if (minutes === 0) return '0m';
+    if (minutes < 60) return `${minutes}m`;
+    const hours = minutes / 60;
+    return hours < 100 ? `${hours.toFixed(1)}h` : `${Math.round(hours)}h`;
+};
+
 /**
  * A headline figure with the sample it came from.
  *
@@ -59,6 +68,8 @@ function Bars({ rows, labelKey = 'label', valueKey = 'total' }) {
 export default function ReportsIndex() {
     const {
         cycleTime, onTime, throughput = [], approvals, approvers = [], escalations,
+        effort = { total_minutes: 0, entries: 0, people: [], running: 0 },
+        estimateAccuracy = { count: 0 },
         filters, projects = [], approvalProjects = [], people = [], maxDays,
     } = usePage().props;
 
@@ -253,6 +264,82 @@ export default function ReportsIndex() {
                     Measured from a step becoming active to it being decided. Steps still open are
                     counted separately rather than averaged in — leaving them out of the average is
                     what stops a stuck approval from looking like a fast one.
+                </p>
+            </Card>
+
+            {/* Logged effort */}
+            <Card className="mt-6">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Effort logged</h3>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Stat
+                        label="Time logged" value={effortTime(effort.total_minutes)}
+                        sub={`${effort.entries} ${effort.entries === 1 ? 'entry' : 'entries'} in this window`}
+                    />
+                    <Stat
+                        label="People logging" value={effort.people.length}
+                        sub={effort.people.length === 0 ? 'nobody recorded time' : 'recorded time in this window'}
+                    />
+                    <Stat
+                        label="Estimate vs actual"
+                        value={estimateAccuracy.median_ratio === null || estimateAccuracy.median_ratio === undefined
+                            ? '—'
+                            : `${estimateAccuracy.median_ratio.toFixed(2)}×`}
+                        tone={estimateAccuracy.median_ratio == null
+                            ? 'default'
+                            : estimateAccuracy.median_ratio > 1.1 ? 'bad' : estimateAccuracy.median_ratio < 0.9 ? 'warn' : 'good'}
+                        sub={estimateAccuracy.count > 0
+                            ? `median across ${estimateAccuracy.count} finished ${estimateAccuracy.count === 1 ? 'task' : 'tasks'}`
+                            : 'nothing to compare'}
+                    />
+                    <Stat
+                        label="Estimated, never logged" value={estimateAccuracy.estimated_not_logged ?? 0}
+                        tone={(estimateAccuracy.estimated_not_logged ?? 0) > estimateAccuracy.count ? 'warn' : 'default'}
+                        sub="finished with no time recorded"
+                    />
+                </div>
+
+                {effort.people.length > 0 && (
+                    <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Hours by person</p>
+                            <Bars rows={effort.people.map((p) => ({
+                                label: p.name,
+                                total: Math.round((p.minutes / 60) * 10) / 10,
+                            }))} />
+                        </div>
+                        {estimateAccuracy.count > 0 && (
+                            <div>
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">How estimates landed</p>
+                                <Bars rows={[
+                                    { label: 'Over estimate', total: estimateAccuracy.over },
+                                    { label: 'Within 10%', total: estimateAccuracy.within_10pct },
+                                    { label: 'Under estimate', total: estimateAccuracy.under },
+                                ]} />
+                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                                    {effortTime(estimateAccuracy.estimated_minutes)} estimated ·{' '}
+                                    {effortTime(estimateAccuracy.logged_minutes)} actually logged
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    Effort is dated by the day the work happened, not the day it was typed in, so a
+                    manual entry lands where it belongs.
+                    {effort.running > 0 && (
+                        <> {effort.running} {effort.running === 1 ? 'timer is' : 'timers are'} still
+                        running and {effort.running === 1 ? 'is' : 'are'} not in the total — a timer
+                        that has not stopped has no duration yet.</>
+                    )}
+                    {estimateAccuracy.estimated_not_logged > 0 && (
+                        <> Accuracy is measured only on finished tasks carrying both an estimate and
+                        some logged time; {estimateAccuracy.estimated_not_logged} finished{' '}
+                        {estimateAccuracy.estimated_not_logged === 1 ? 'task was' : 'tasks were'}{' '}
+                        estimated but never logged against, and {estimateAccuracy.estimated_not_logged === 1 ? 'says' : 'say'}{' '}
+                        nothing either way.</>
+                    )}
                 </p>
             </Card>
 

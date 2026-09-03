@@ -273,6 +273,117 @@ class ReportService
             ->all();
     }
 
+    /**
+     * Effort recorded in the window: who spent time, and how much.
+     *
+     * Dated by logged_on, not by when the entry was typed and not by the task's
+     * completion — effort accrues on work that is still open, and a manual
+     * entry exists precisely so yesterday's site visit lands on yesterday.
+     *
+     * Running timers are excluded, because a timer still going has no duration
+     * yet. They are counted separately rather than silently dropped: an hour
+     * that is missing from a total should say so.
+     */
+    public static function effort(User $user, Carbon $from, Carbon $to, array $filters = []): array
+    {
+        $base = self::visibleTimeLogs($user, $filters)
+            ->whereBetween('task_time_logs.logged_on', [$from->toDateString(), $to->toDateString()]);
+
+        $running = (clone $base)->whereNull('task_time_logs.minutes')->count();
+
+        $entries = (clone $base)
+            ->whereNotNull('task_time_logs.minutes')
+            ->with('user:id,name')
+            ->limit(self::SAMPLE_CAP)
+            ->get(['task_time_logs.id', 'task_time_logs.user_id', 'task_time_logs.minutes', 'task_time_logs.logged_on']);
+
+        $people = $entries
+            ->groupBy('user_id')
+            ->map(fn (Collection $rows) => [
+                'user_id' => $rows->first()->user_id,
+                'name' => $rows->first()->user?->name ?? 'Unknown',
+                'minutes' => (int) $rows->sum('minutes'),
+                'entries' => $rows->count(),
+            ])
+            ->sortByDesc('minutes')
+            ->values()
+            ->all();
+
+        return [
+            'total_minutes' => (int) $entries->sum('minutes'),
+            'entries' => $entries->count(),
+            'people' => $people,
+            'running' => $running,
+            'partial' => $entries->count() >= self::SAMPLE_CAP,
+        ];
+    }
+
+    /**
+     * How estimates compared with the effort they actually took.
+     *
+     * Only tasks finished in the window that carry both an estimate and some
+     * logged time — the ratio is meaningless without both.
+     *
+     * The two exclusion counts are the point rather than a footnote. A task
+     * estimated but never logged against says nothing about accuracy, and if
+     * most of them are like that then this figure describes a self-selected
+     * handful rather than the team. A reader who cannot see that will read it
+     * as the whole picture.
+     */
+    public static function estimateAccuracy(User $user, Carbon $from, Carbon $to, array $filters = []): array
+    {
+        $estimated = self::completedTasks($user, $from, $to, $filters)
+            ->where('tasks.estimated_minutes', '>', 0);
+
+        $rows = (clone $estimated)
+            ->withSum(['timeLogs as logged_minutes' => fn ($q) => $q->whereNotNull('minutes')], 'minutes')
+            ->limit(self::SAMPLE_CAP)
+            ->get(['tasks.id', 'tasks.estimated_minutes']);
+
+        $compared = $rows->filter(fn (Task $t) => (int) $t->logged_minutes > 0)->values();
+
+        // Ratio of effort to estimate: 1.0 is exact, 2.0 took twice as long.
+        $ratios = $compared
+            ->map(fn (Task $t) => round($t->logged_minutes / $t->estimated_minutes, 3))
+            ->sort()
+            ->values();
+
+        $within = $compared->filter(fn (Task $t) => abs(($t->logged_minutes / $t->estimated_minutes) - 1) <= 0.1)->count();
+        $over = $compared->filter(fn (Task $t) => ($t->logged_minutes / $t->estimated_minutes) > 1.1)->count();
+
+        return [
+            'count' => $compared->count(),
+            // Estimated but never logged against — the size of the blind spot.
+            'estimated_not_logged' => $rows->count() - $compared->count(),
+            'median_ratio' => $ratios->isEmpty() ? null : self::percentile($ratios, 0.5, 2),
+            'average_ratio' => $ratios->isEmpty() ? null : round($ratios->avg(), 2),
+            'within_10pct' => $within,
+            'over' => $over,
+            'under' => $compared->count() - $within - $over,
+            'estimated_minutes' => (int) $compared->sum('estimated_minutes'),
+            'logged_minutes' => (int) $compared->sum('logged_minutes'),
+            'partial' => $rows->count() >= self::SAMPLE_CAP,
+        ];
+    }
+
+    /**
+     * Time entries on tasks this person may see, filtered like every other
+     * report on the page.
+     *
+     * Scoped through the task rather than the entry: whether you may read
+     * somebody's logged hours follows from whether you may open the work they
+     * logged them against.
+     */
+    private static function visibleTimeLogs(User $user, array $filters = []): Builder
+    {
+        return \App\Models\TaskTimeLog::query()
+            ->whereHas('task', function ($t) use ($user, $filters) {
+                self::scopeVisible($t, $user)
+                    ->when($filters['project_id'] ?? null, fn ($q, $id) => $q->where('tasks.project_id', $id))
+                    ->when($filters['assigned_to'] ?? null, fn ($q, $id) => $q->where('tasks.assigned_to', $id));
+            });
+    }
+
     /** Finished tasks in the window, scoped and filtered the same way everywhere. */
     private static function completedTasks(User $user, Carbon $from, Carbon $to, array $filters = []): Builder
     {
@@ -330,7 +441,14 @@ class ReportService
         ];
     }
 
-    private static function percentile(Collection $sorted, float $p): float
+    /**
+     * $precision is a parameter because these figures are not all the same
+     * shape: one decimal is plenty for a span in hours, while a ratio near 1
+     * carries its meaning in the second — 1.05 and 1.1 are "about right" and
+     * "ten percent over", and rounding the first into the second says
+     * something the data did not.
+     */
+    private static function percentile(Collection $sorted, float $p, int $precision = 1): float
     {
         $count = $sorted->count();
 
@@ -343,14 +461,14 @@ class ReportService
         $high = (int) ceil($index);
 
         if ($low === $high) {
-            return round((float) $sorted[$low], 1);
+            return round((float) $sorted[$low], $precision);
         }
 
         // Interpolate, so an even-sized set gets a real midpoint rather than
         // whichever neighbour happened to be picked.
         $weight = $index - $low;
 
-        return round($sorted[$low] * (1 - $weight) + $sorted[$high] * $weight, 1);
+        return round($sorted[$low] * (1 - $weight) + $sorted[$high] * $weight, $precision);
     }
 
     /** A rough shape of the distribution, which a median alone cannot show. */
