@@ -6,8 +6,10 @@ import Avatar from './Avatar';
 import RichTextEditor from './RichTextEditor';
 import { COMMENT_LIMIT } from '../limits';
 import Tooltip from './Tooltip';
+import { ConfirmModal } from './Modal';
 import SearchableSelect from './SearchableSelect';
 import TaskTimePanel from './TaskTimePanel';
+import TimeInMotion from './TimeInMotion';
 import OverdueNotice from './OverdueNotice';
 import CompletedNotice from './CompletedNotice';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom, isPastDue } from '../utils';
@@ -140,15 +142,17 @@ function CollaboratorEditor({ collaborators, users, assigneeId, onUpdate }) {
 
 function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpdated, onDeleted }) {
     const [deleting, setDeleting] = useState(false);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editBody, setEditBody] = useState('');
     const [saving, setSaving] = useState(false);
 
     const commentUrl = `/api/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
 
+    // Asked in the app's own dialog rather than the browser's, which sits
+    // outside the page, ignores the theme, and cannot say which comment.
     const handleDelete = async () => {
-        console.log('Delete comment URL:', commentUrl, { projectId, taskId, commentId: item.id });
-        if (!confirm('Delete this comment?')) return;
+        setConfirmingDelete(false);
         setDeleting(true);
         try {
             const res = await apiFetch(commentUrl, { method: 'DELETE' });
@@ -209,7 +213,7 @@ function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpd
                             </Tooltip>
                             <Tooltip content="Delete">
                                 <button
-                                    onClick={handleDelete}
+                                    onClick={() => setConfirmingDelete(true)}
                                     disabled={deleting}
                                     className="p-1 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
                                 >
@@ -273,6 +277,14 @@ function PanelCommentItem({ item, currentUserId, projectId, taskId, users, onUpd
                     </div>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={confirmingDelete}
+                onClose={() => setConfirmingDelete(false)}
+                onConfirm={handleDelete}
+                title="Delete comment"
+                message="Delete this comment? Any files attached to it go with it, and this cannot be undone."
+            />
         </div>
     );
 }
@@ -292,6 +304,8 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     const [customFields, setCustomFields] = useState([]);
     const [customFieldValues, setCustomFieldValues] = useState({});
     const [activeTab, setActiveTab] = useState('comments');
+    // Whether this task's project tracks when work actually began.
+    const [showTimeInMotion, setShowTimeInMotion] = useState(false);
     const [commentBody, setCommentBody] = useState('');
     const [commentFiles, setCommentFiles] = useState([]);
     const [submittingComment, setSubmittingComment] = useState(false);
@@ -319,6 +333,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
             setSubtasks(data.subtasks || []);
             setCustomFields(data.customFields || []);
             setCustomFieldValues(data.customFieldValues || {});
+            setShowTimeInMotion(!!data.showTimeInMotion);
         } catch (e) {
             console.error('Failed to load task detail:', e);
         } finally {
@@ -565,6 +580,21 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                             )}
                         </div>
 
+                        {/* Above the notices and the fields, exactly as on the
+                            task page — somebody opening this to start work
+                            should not have to scroll to say so. */}
+                        {showTimeInMotion && (
+                            <div className="px-6 pb-3">
+                                <TimeInMotion
+                                    projectId={projectId}
+                                    taskId={taskData.id}
+                                    startedAt={taskData.started_at}
+                                    completedAt={taskData.completed_at}
+                                    canEdit={canEdit}
+                                />
+                            </div>
+                        )}
+
                         {/* Same notice as the full editor, so the two views cannot
                             describe the same task differently. */}
                         <div className="px-6 pb-3">
@@ -650,20 +680,23 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                             </div>
                         </div>
 
+                        {/* Time sits above the collaborators rather than below
+                            them: logged effort is one of the first things
+                            somebody opens this panel to read, and it was far
+                            enough down to be missed. */}
+                        <TaskTimePanel
+                            taskId={taskData.id}
+                            estimatedMinutes={taskData.estimated_minutes}
+                            canEdit={canEdit}
+                            currentUserId={auth.user?.id}
+                        />
+
                         {/* Collaborators */}
                         <CollaboratorEditor
                             collaborators={taskData.collaborators || []}
                             users={users}
                             assigneeId={taskData.assigned_to}
                             onUpdate={(ids) => handleFieldUpdate('collaborator_ids', ids)}
-                        />
-
-                        {/* Time */}
-                        <TaskTimePanel
-                            taskId={taskData.id}
-                            estimatedMinutes={taskData.estimated_minutes}
-                            canEdit={canEdit}
-                            currentUserId={auth.user?.id}
                         />
 
                         {/* Custom Fields */}

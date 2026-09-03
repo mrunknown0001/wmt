@@ -19,6 +19,7 @@ import EstimateInput from '../../Components/EstimateInput';
 import TimeInMotion from '../../Components/TimeInMotion';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
+import { ConfirmModal } from '../../Components/Modal';
 import OverdueNotice from '../../Components/OverdueNotice';
 import CompletedNotice from '../../Components/CompletedNotice';
 import { formatLabel, formatDate, apiFetch, taskEditUrl, isPastDue, overdueDays } from '../../utils';
@@ -120,6 +121,7 @@ function formatFileSize(bytes) {
 
 function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, users }) {
     const [deleting, setDeleting] = useState(false);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editBody, setEditBody] = useState('');
     const [saving, setSaving] = useState(false);
@@ -128,8 +130,10 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, use
         ? `/tasks/${taskId}/comments/${item.id}`
         : `/projects/${projectId}/tasks/${taskId}/comments/${item.id}`;
 
+    // Asked in the app's own dialog rather than the browser's, which sits
+    // outside the page, ignores the theme, and cannot say which comment.
     const handleDelete = () => {
-        if (!confirm('Delete this comment?')) return;
+        setConfirmingDelete(false);
         setDeleting(true);
         router.delete(commentUrl, {
             preserveScroll: true,
@@ -181,7 +185,7 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, use
                             </Tooltip>
                             <Tooltip content="Delete">
                                 <button
-                                    onClick={handleDelete}
+                                    onClick={() => setConfirmingDelete(true)}
                                     disabled={deleting}
                                     className="p-1 rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
                                 >
@@ -288,6 +292,14 @@ function CommentItem({ item, currentUserId, projectId, taskId, isStandalone, use
                     </div>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={confirmingDelete}
+                onClose={() => setConfirmingDelete(false)}
+                onConfirm={handleDelete}
+                title="Delete comment"
+                message="Delete this comment? Any files attached to it go with it, and this cannot be undone."
+            />
         </div>
     );
 }
@@ -667,6 +679,22 @@ export default function Edit() {
                 {/* Task Form */}
                 <div className="lg:col-span-2 min-w-0">
                     <Card>
+                        {/* First thing on the task, above even the notices:
+                            a Start button further down is a Start button
+                            nobody presses. Only for projects that asked to
+                            track this — anywhere else it would be two empty
+                            dates and a dash. */}
+                        {!isStandalone && project?.show_time_in_motion && (
+                            <div className="mb-5">
+                                <TimeInMotion
+                                    projectId={project.id}
+                                    taskId={task.id}
+                                    startedAt={task.started_at}
+                                    completedAt={task.completed_at}
+                                    canEdit={canManageTaskDetails}
+                                />
+                            </div>
+                        )}
                         <OverdueNotice task={task} className="mb-5" />
                         <CompletedNotice task={task} className="mb-5" />
                         {task.parent && (
@@ -767,20 +795,6 @@ export default function Edit() {
                             />
                                 </div>
 
-                                {/* Only for projects that asked for it: a task
-                                    that nobody tracks this way would just show
-                                    two empty dates and a dash. */}
-                                {!isStandalone && project?.show_time_in_motion && (
-                                    <div className="mt-3">
-                                        <TimeInMotion
-                                            projectId={project.id}
-                                            taskId={task.id}
-                                            startedAt={task.started_at}
-                                            completedAt={task.completed_at}
-                                            canEdit={canManageTaskDetails}
-                                        />
-                                    </div>
-                                )}
                                 {!showStartDate && canManageTaskDetails && (
                                     <button
                                         type="button"

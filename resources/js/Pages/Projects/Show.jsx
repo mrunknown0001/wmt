@@ -3386,7 +3386,29 @@ export default function Show() {
 
             const current = (activeTask.custom_field_values || [])
                 .find((v) => v.custom_field_id === boardField.id)?.value_option_id ?? null;
-            if (String(current) === String(targetCol.optionId)) return;   // same column
+
+            // Same column: the field value is not changing, so this is a
+            // rearrange. Reordering only ever meant "status board" before, and
+            // a card dropped among its own neighbours here simply sprang back.
+            if (String(current) === String(targetCol.optionId)) {
+                if (overId.startsWith('column-')) return;   // dropped on empty space
+
+                const columnTasks = inDisplayOrder(targetCol.tasks);
+                const oldIdx = columnTasks.findIndex((t) => t.id === active.id);
+                const newIdx = columnTasks.findIndex((t) => t.id === over.id);
+                if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
+
+                const reordered = arrayMove(columnTasks, oldIdx, newIdx);
+                const updated = localTasks.map((t) => ({ ...t }));
+                reordered.forEach((t, i) => {
+                    const idx = updated.findIndex((u) => u.id === t.id);
+                    if (idx !== -1) updated[idx].position = i;
+                });
+
+                setLocalTasks(updated);
+                persistReorder(reordered);
+                return;
+            }
 
             persistBoardFieldMove(activeTask, targetCol.optionId);
             return;
@@ -3474,7 +3496,7 @@ export default function Show() {
 
         setLocalTasks(updated);
         if (toPersist) persistReorder(toPersist);
-    }, [localTasks, persistReorder, boardField, boardColumns, persistBoardFieldMove]);
+    }, [localTasks, persistReorder, boardField, boardColumns, persistBoardFieldMove, inDisplayOrder]);
 
     const handleDragStart = useCallback((event) => {
         setActiveId(event.active.id);

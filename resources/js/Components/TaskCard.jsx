@@ -107,10 +107,15 @@ export default function TaskCard({ task, projectId, canEdit, canDelete, onDelete
                 <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500 mb-0.5">{task.series_number}</p>
             )}
             <div className={`flex items-start gap-1 mb-2 ${isDone ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+                {/* No stopPropagation on pointerdown here, unlike the small
+                    controls above. The title is the largest thing on the card
+                    and the obvious place to grab it, and swallowing the press
+                    meant a card picked up by its title would not move at all.
+                    The sensor's 5px activation distance already keeps a click
+                    from being read as a drag, so the title still opens. */}
                 <button
-                    className="text-sm font-medium line-clamp-2 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                    className="text-sm font-medium line-clamp-2 text-left hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-grab active:cursor-grabbing"
                     onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
-                    onPointerDown={(e) => e.stopPropagation()}
                 >
                     {task.title}
                 </button>

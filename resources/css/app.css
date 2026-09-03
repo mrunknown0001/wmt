@@ -208,6 +208,30 @@ html.dark, html.dark body {
     animation: tooltip-in var(--duration-fast) var(--ease-out);
 }
 
+/*
+ * A slow outward glow, for the one button on a screen that wants pressing —
+ * today the Start button on a task that has not begun.
+ *
+ * The ring is drawn with box-shadow rather than a scaling transform, so it
+ * spreads past the button without moving it or nudging anything beside it,
+ * and a hover shadow is not fighting an animation for the same property.
+ */
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-500, #6366f1) 55%, transparent); }
+    50%      { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-primary-500, #6366f1) 0%, transparent); }
+}
+
+.animate-pulse-glow {
+    animation: pulse-glow 2s var(--ease-in-out, ease-in-out) infinite;
+}
+
+/* A button that will not stop glowing is a button that will not stop asking. */
+@media (prefers-reduced-motion: reduce) {
+    .animate-pulse-glow {
+        animation: none;
+    }
+}
+
 /* Shimmer skeleton loader */
 .skeleton {
     background: linear-gradient(90deg, rgb(229 231 235) 25%, rgb(243 244 246) 50%, rgb(229 231 235) 75%);
