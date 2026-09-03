@@ -40,6 +40,31 @@ fi
 export HOST_UID="$(id -u)"
 export HOST_GID="$(id -g)"
 
+# --- reclaim disposable docker storage --------------------------------------
+# Every deploy leaves layers and build cache behind and nothing removed them,
+# so the disk filled up until a build died half-way through with "no space left
+# on device". Staging kept serving the old build, but the deploy was stuck.
+#
+# Old cache only: the last few days are what makes an incremental build quick,
+# and throwing that away would turn every deploy into a from-scratch compile of
+# the PHP extensions. Dangling images are the untagged leftovers of previous
+# builds and are always safe to drop.
+#
+# Deliberately not `image prune -a`: other stacks live on this box and that
+# would delete images they still need.
+echo "==> Reclaiming old docker build cache…"
+docker builder prune -f --filter until=72h >/dev/null || true
+docker image prune -f >/dev/null || true
+
+# Still tight? Then the rest of the cache goes too. A slow build beats one that
+# runs out of room three minutes in.
+AVAIL_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+if [ "${AVAIL_GB:-0}" -lt 20 ]; then
+    echo "    only ${AVAIL_GB}G free — clearing the whole build cache."
+    docker builder prune -a -f >/dev/null || true
+fi
+echo "    $(df -h / | awk 'NR==2 {print $4" free of "$2}')."
+
 echo "==> Building images (this bakes code + assets in)…"
 $COMPOSE build
 
