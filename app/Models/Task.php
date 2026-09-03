@@ -51,6 +51,7 @@ class Task extends Model
         'due_time',
         'estimated_minutes',
         'completed_at',
+        'started_at',
         'position',
         'is_recurring',
         'recurrence_frequency',
@@ -76,6 +77,7 @@ class Task extends Model
             'start_date' => 'date:Y-m-d',
             'due_date' => 'date:Y-m-d',
             'completed_at' => 'datetime',
+            'started_at' => 'datetime',
             'position' => 'integer',
             'is_recurring' => 'boolean',
             'recurrence_interval' => 'integer',
@@ -180,8 +182,39 @@ class Task extends Model
                 } elseif ($oldStatus === 'done' && $newStatus !== 'done') {
                     $task->completed_at = null;
                 }
+
+                // The moment work actually began. Stamped on the way into
+                // progress and then left alone: a task pushed back to To Do and
+                // picked up again still started when it first started, and
+                // rewriting that would quietly shorten every span it appears in.
+                if ($newStatus === 'in_progress' && ! $task->started_at) {
+                    $task->started_at = now();
+                }
             }
         });
+    }
+
+    /**
+     * Wall-clock minutes between work starting and finishing.
+     *
+     * Null until the task has actually started. Still running counts up to now,
+     * which is what somebody watching a board wants to see; once closed it
+     * freezes at the span it took.
+     *
+     * Not the same as logged time: this is how long the task was in motion, not
+     * how much effort went into it, and it is normally the larger of the two.
+     */
+    public function timeInMotionMinutes(): ?int
+    {
+        if (! $this->started_at) {
+            return null;
+        }
+
+        $end = $this->completed_at ?? now();
+
+        // A completion recorded before the start is somebody correcting data by
+        // hand; report nothing rather than a negative span.
+        return $end->lessThan($this->started_at) ? null : (int) $this->started_at->diffInMinutes($end);
     }
 
     /** The statuses that close a task: "completed" and "unable to complete". */

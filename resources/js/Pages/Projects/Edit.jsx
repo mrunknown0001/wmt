@@ -26,6 +26,7 @@ export default function Edit() {
         folder_id: project.folder_id || '',
         due_date: project.due_date ? project.due_date.split('T')[0] : '',
         require_comment_attachment_on_close: project.require_comment_attachment_on_close ?? false,
+        show_time_in_motion: project.show_time_in_motion ?? false,
         hide_completed_tasks: project.hide_completed_tasks ?? false,
         task_series_enabled: project.task_series_enabled ?? false,
         task_series_prefix: project.task_series_prefix || '',
@@ -97,6 +98,8 @@ export default function Edit() {
                             onChange={(val) => setData('require_comment_attachment_on_close', val)}
                             hideCompleted={data.hide_completed_tasks}
                             onHideCompletedChange={(val) => setData('hide_completed_tasks', val)}
+                            showTimeInMotion={data.show_time_in_motion}
+                            onShowTimeInMotionChange={(val) => setData('show_time_in_motion', val)}
                         />
 
                         <TaskSeriesConfig

@@ -211,6 +211,16 @@ export const formatMinutes = (minutes) => {
 };
 
 /**
+ * Elapsed wall-clock time, where zero is a fact rather than an absence.
+ *
+ * formatMinutes reads a zero as "nothing logged" and prints a dash, which is
+ * right for effort but wrong for a clock that has only just been started — that
+ * task has been running for zero minutes, and saying so beats an em dash that
+ * looks like the start never took.
+ */
+export const formatElapsed = (minutes) => (Number(minutes) === 0 ? '0m' : formatMinutes(minutes));
+
+/**
  * Read a typed duration: "1.5", "1:30" or "90m" all mean ninety minutes.
  * Returns null when it cannot be read, so callers can show an error rather
  * than silently storing a zero.

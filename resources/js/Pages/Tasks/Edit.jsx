@@ -16,6 +16,7 @@ import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import RecurrenceOptions from '../../Components/RecurrenceOptions';
 import EstimateInput from '../../Components/EstimateInput';
+import TimeInMotion from '../../Components/TimeInMotion';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
 import OverdueNotice from '../../Components/OverdueNotice';
@@ -493,13 +494,19 @@ export default function Edit() {
             'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
             'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv', 'video/webm',
             'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ];
+        // Some browsers hand over a blank or generic type for Office files, so
+        // the extension gets the final say rather than the file being refused
+        // for something the server would have accepted.
+        const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'mp4', 'mov', 'avi', 'wmv', 'webm', 'xls', 'xlsx', 'csv', 'docx'];
+        const extensionOf = (name) => (name.split('.').pop() || '').toLowerCase();
 
         setAttachmentError('');
 
         for (const file of files) {
-            if (!allowedTypes.includes(file.type)) {
-                setAttachmentError(`"${file.name}" is not supported. Allowed: images, PDF, videos, Excel, CSV.`);
+            if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(extensionOf(file.name))) {
+                setAttachmentError(`"${file.name}" is not supported. Allowed: images, PDF, Word, videos, Excel, CSV.`);
                 e.target.value = '';
                 return;
             }
@@ -759,6 +766,21 @@ export default function Edit() {
                                 disabled={!canManageTaskDetails}
                             />
                                 </div>
+
+                                {/* Only for projects that asked for it: a task
+                                    that nobody tracks this way would just show
+                                    two empty dates and a dash. */}
+                                {!isStandalone && project?.show_time_in_motion && (
+                                    <div className="mt-3">
+                                        <TimeInMotion
+                                            projectId={project.id}
+                                            taskId={task.id}
+                                            startedAt={task.started_at}
+                                            completedAt={task.completed_at}
+                                            canEdit={canManageTaskDetails}
+                                        />
+                                    </div>
+                                )}
                                 {!showStartDate && canManageTaskDetails && (
                                     <button
                                         type="button"
@@ -1250,7 +1272,7 @@ export default function Edit() {
                                                 <input
                                                     type="file"
                                                     multiple
-                                                    accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4,.mov,.avi,.wmv,.webm,.xls,.xlsx,.csv"
+                                                    accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.mp4,.mov,.avi,.wmv,.webm,.xls,.xlsx,.csv"
                                                     onChange={handleFileSelect}
                                                     className="hidden"
                                                 />

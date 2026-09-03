@@ -196,7 +196,7 @@ export default function ApprovalItemComments({ project, item, comments, auth, re
                                 multiple
                                 onChange={handleFileSelect}
                                 className="hidden"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.webm,.3gp,.mkv,.xlsx,.xls,.csv"
+                                accept=".pdf,.docx,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.webm,.3gp,.mkv,.xlsx,.xls,.csv"
                             />
                         </label>
                         <button

@@ -48,7 +48,7 @@ import ShareProjectModal from '../../Components/ShareProjectModal';
 import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
-import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, isCompletedLate } from '../../utils';
+import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, formatElapsed, isCompletedLate } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import { orderSections, moveSection } from '../../sectionTree';
@@ -522,6 +522,32 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                             : <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </td>
                 );
+            case 'started':
+                return (
+                    <td key="started" className="px-6 py-3 text-sm text-center overflow-hidden text-gray-600 dark:text-gray-300" style={cStyle}>
+                        {task.started_at
+                            ? <span className="text-xs truncate">{formatDate(task.started_at)}</span>
+                            : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    </td>
+                );
+            case 'motion': {
+                const inMotion = timeInMotion(task);
+                return (
+                    <td key="motion" className="px-6 py-3 text-sm text-center overflow-hidden tabular-nums" style={cStyle}>
+                        {inMotion === null
+                            ? <span className="text-gray-300 dark:text-gray-600">—</span>
+                            : (
+                                // Still open, so the number is still moving —
+                                // coloured to say so rather than reading as final.
+                                <span className={task.completed_at
+                                    ? 'text-xs text-gray-600 dark:text-gray-300'
+                                    : 'text-xs text-primary-600 dark:text-primary-400'}>
+                                    {formatElapsed(inMotion)}
+                                </span>
+                            )}
+                    </td>
+                );
+            }
             case 'completion': {
                 // Derived, never entered: subtasks if there are any, otherwise
                 // the task's own status. The bar makes a column of numbers
@@ -642,6 +668,24 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
 }
 
 // Default reorderable column IDs (excluding sticky checkbox, title, actions)
+/**
+ * How long a task has been in motion: wall-clock from the moment work started
+ * to the moment it finished, or to now while it is still open.
+ *
+ * Deliberately not the logged time, which measures effort rather than elapsed
+ * time and is normally the smaller number.
+ */
+function timeInMotion(task) {
+    if (!task.started_at) return null;
+
+    const started = new Date(task.started_at);
+    const ended = task.completed_at ? new Date(task.completed_at) : new Date();
+    const minutes = Math.round((ended - started) / 60000);
+
+    // A completion recorded before the start is somebody fixing data by hand.
+    return minutes < 0 ? null : minutes;
+}
+
 const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'completion', 'estimate', 'logged'];
 
 // What each built-in column means, shown on hover. Worth having because several
@@ -655,6 +699,8 @@ const COLUMN_DESCRIPTIONS = {
     assignee: 'The person responsible for the task.',
     dates: 'When the task is due. Overdue dates are shown in red.',
     completed: 'When the task was closed. Empty until it is.',
+    started: 'When work actually began — stamped on the way into In Progress, or by the Start button.',
+    motion: 'Elapsed time from starting to finishing, still counting while the task is open. Not the same as logged effort.',
     completion: 'Progress. Taken from subtasks when there are any, otherwise from status.',
     estimate: 'How long the task was expected to take.',
     logged: 'Time actually tracked. Turns red once it passes the estimate.',
@@ -1041,6 +1087,32 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             : <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </td>
                 );
+            case 'started':
+                return (
+                    <td key="started" className="px-6 py-4 text-sm text-center overflow-hidden text-gray-600 dark:text-gray-300" style={cStyle}>
+                        {task.started_at
+                            ? <span className="truncate">{formatDate(task.started_at)}</span>
+                            : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    </td>
+                );
+            case 'motion': {
+                const inMotion = timeInMotion(task);
+                return (
+                    <td key="motion" className="px-6 py-4 text-sm text-center overflow-hidden tabular-nums" style={cStyle}>
+                        {inMotion === null
+                            ? <span className="text-gray-300 dark:text-gray-600">—</span>
+                            : (
+                                // Still open, so the number is still moving —
+                                // coloured to say so rather than reading as final.
+                                <span className={task.completed_at
+                                    ? 'text-xs text-gray-600 dark:text-gray-300'
+                                    : 'text-xs text-primary-600 dark:text-primary-400'}>
+                                    {formatElapsed(inMotion)}
+                                </span>
+                            )}
+                    </td>
+                );
+            }
             case 'completion': {
                 // Derived, never entered: subtasks if there are any, otherwise
                 // the task's own status. The bar makes a column of numbers
@@ -2077,12 +2149,30 @@ export default function Show() {
 
     const effectiveColumnOrder = useMemo(() => {
         const cfIds = localCustomFields.map(cf => `cf-${cf.id}`);
-        const allIds = [...(showSeriesColumn ? ['series'] : []), ...DEFAULT_COLUMN_IDS, ...cfIds];
+        // Started and In Motion only exist for projects that track when work
+        // begins. Inserted beside Date Completed rather than appended, because
+        // started, finished and elapsed are one thought and belong together.
+        const motionIds = project.show_time_in_motion ? ['started', 'motion'] : [];
+        const base = motionIds.length
+            ? DEFAULT_COLUMN_IDS.flatMap((id) => (id === 'completed' ? ['started', id, 'motion'] : [id]))
+            : DEFAULT_COLUMN_IDS;
+        const allIds = [...(showSeriesColumn ? ['series'] : []), ...base, ...cfIds];
         if (!columnOrder) return allIds;
         const valid = columnOrder.filter(id => allIds.includes(id));
         const missing = allIds.filter(id => !valid.includes(id));
+        // Anything new normally lands at the end, which is where a fresh custom
+        // field belongs. The motion columns do not: somebody who arranged their
+        // columns months ago should still find them framing Date Completed
+        // rather than stranded past Actions.
+        if (motionIds.length && missing.some(id => motionIds.includes(id)) && valid.includes('completed')) {
+            const rest = missing.filter(id => !motionIds.includes(id));
+            const placed = valid.flatMap(id => (id === 'completed'
+                ? [...(missing.includes('started') ? ['started'] : []), id, ...(missing.includes('motion') ? ['motion'] : [])]
+                : [id]));
+            return [...placed, ...rest];
+        }
         return [...valid, ...missing];
-    }, [columnOrder, localCustomFields, showSeriesColumn]);
+    }, [columnOrder, localCustomFields, showSeriesColumn, project.show_time_in_motion]);
 
     // Visible column order (filtered by hidden)
     const visibleColumnOrder = useMemo(() => {
@@ -2103,6 +2193,8 @@ export default function Show() {
             case 'assignee': return 'Assignee';
             case 'dates': return 'Due date';
             case 'completed': return 'Date Completed';
+            case 'started': return 'Date Started';
+            case 'motion': return 'In Motion';
             case 'completion': return 'Completion %';
             default:
                 if (colId.startsWith('cf-')) {
