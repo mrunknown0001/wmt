@@ -691,7 +691,7 @@ export default function Edit() {
                                     taskId={task.id}
                                     startedAt={task.started_at}
                                     completedAt={task.completed_at}
-                                    canEdit={canManageTaskDetails}
+                                    canEdit={canManageTaskDetails && !['completed', 'archived'].includes(project.status)}
                                 />
                             </div>
                         )}

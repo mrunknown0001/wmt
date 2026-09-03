@@ -543,6 +543,8 @@ class TaskController extends Controller
             // quick view treated everybody as a viewer and hid its Start timer
             // and Start now buttons from people who could use them.
             'canManageTaskDetails' => $project->userCanManageTasks($request->user()),
+            // A finished project invites nobody to start work on it.
+            'projectIsClosed' => $project->isClosed(),
         ]);
     }
 
@@ -561,6 +563,10 @@ class TaskController extends Controller
     {
         abort_if($task->project_id !== $project->id, 404);
         $this->authorize('update', $task);
+
+        // The button is hidden on a completed or archived project; this is the
+        // same rule for anybody who reaches the endpoint another way.
+        abort_if($project->isClosed(), 422, 'This project is closed, so work cannot be started on its tasks.');
 
         if (! $task->started_at) {
             $task->forceFill(['started_at' => now()])->save();
