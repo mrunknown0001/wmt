@@ -306,6 +306,12 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     const [activeTab, setActiveTab] = useState('comments');
     // Whether this task's project tracks when work actually began.
     const [showTimeInMotion, setShowTimeInMotion] = useState(false);
+    // A completed or archived project still reports its elapsed time; it just
+    // does not invite anybody to start more work.
+    const [projectIsClosed, setProjectIsClosed] = useState(false);
+    // Ticks while a started task is still open, so the elapsed figure in the
+    // Time section keeps up rather than freezing at page load.
+    const [, setElapsedTick] = useState(0);
     const [commentBody, setCommentBody] = useState('');
     const [commentFiles, setCommentFiles] = useState([]);
     const [submittingComment, setSubmittingComment] = useState(false);
@@ -317,6 +323,27 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     const [showSubtaskInput, setShowSubtaskInput] = useState(false);
     const panelRef = useRef(null);
     const fileInputRef = useRef(null);
+
+    // Wall-clock since work began, for the Time section. Null when the project
+    // does not track it or the task has not started, so the panel simply leaves
+    // the line out rather than printing a dash.
+    const startedAt = taskData?.started_at;
+    const completedAt = taskData?.completed_at;
+
+    useEffect(() => {
+        if (!showTimeInMotion || !startedAt || completedAt) return undefined;
+
+        const id = setInterval(() => setElapsedTick((n) => n + 1), 60000);
+
+        return () => clearInterval(id);
+    }, [showTimeInMotion, startedAt, completedAt]);
+
+    const elapsedMinutes = (() => {
+        if (!showTimeInMotion || !startedAt) return null;
+        const mins = Math.round(((completedAt ? new Date(completedAt) : new Date()) - new Date(startedAt)) / 60000);
+
+        return mins < 0 ? null : mins;
+    })();
 
     const fetchTask = useCallback(async () => {
         setLoading(true);
@@ -334,6 +361,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
             setCustomFields(data.customFields || []);
             setCustomFieldValues(data.customFieldValues || {});
             setShowTimeInMotion(!!data.showTimeInMotion);
+            setProjectIsClosed(!!data.projectIsClosed);
         } catch (e) {
             console.error('Failed to load task detail:', e);
         } finally {
@@ -590,7 +618,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                     taskId={taskData.id}
                                     startedAt={taskData.started_at}
                                     completedAt={taskData.completed_at}
-                                    canEdit={canEdit}
+                                    canEdit={canEdit && !projectIsClosed}
                                 />
                             </div>
                         )}
@@ -689,6 +717,8 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                             estimatedMinutes={taskData.estimated_minutes}
                             canEdit={canEdit}
                             currentUserId={auth.user?.id}
+                            showControls={false}
+                            elapsedMinutes={elapsedMinutes}
                         />
 
                         {/* Collaborators */}

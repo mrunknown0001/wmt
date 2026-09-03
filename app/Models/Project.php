@@ -57,6 +57,18 @@ class Project extends Model
     public const SERIES_MAX_PADDING = 10;
 
     /** True once numbering is switched on for this project's tasks. */
+    /**
+     * Is this project finished with?
+     *
+     * Completed and archived are both "no more work happens here". Nothing
+     * that invites somebody to begin work — the Start button on a task's time
+     * in motion, above all — belongs on a project in either state.
+     */
+    public function isClosed(): bool
+    {
+        return in_array($this->status, ['completed', 'archived'], true);
+    }
+
     public function hasTaskSeries(): bool
     {
         return (bool) $this->task_series_enabled;

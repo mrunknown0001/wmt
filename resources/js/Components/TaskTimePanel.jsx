@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Tooltip from './Tooltip';
-import { apiFetch, formatMinutes, parseMinutes, timeAgo, toast } from '../utils';
+import { apiFetch, formatMinutes, formatElapsed, parseMinutes, timeAgo, toast } from '../utils';
 
 /**
  * Estimate, logged time and the timer for one task.
@@ -9,7 +9,17 @@ import { apiFetch, formatMinutes, parseMinutes, timeAgo, toast } from '../utils'
  * follows along without either component knowing about the other — the same
  * pattern the notification bell already uses.
  */
-export default function TaskTimePanel({ taskId, estimatedMinutes, canEdit, currentUserId }) {
+export default function TaskTimePanel({
+    taskId,
+    estimatedMinutes,
+    canEdit,
+    currentUserId,
+    // The quick view reports time rather than collecting it: no timer, no
+    // manual entry, just the totals and — where the project tracks it — how
+    // long the task has actually been running.
+    showControls = true,
+    elapsedMinutes = null,
+}) {
     const [logs, setLogs] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -114,7 +124,7 @@ export default function TaskTimePanel({ taskId, estimatedMinutes, canEdit, curre
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Time</h4>
-                {canEdit && (
+                {canEdit && showControls && (
                     <button
                         type="button"
                         onClick={toggleTimer}
@@ -164,6 +174,19 @@ export default function TaskTimePanel({ taskId, estimatedMinutes, canEdit, curre
                 </p>
             )}
 
+            {/* Elapsed time, where the project records when work began. A
+                different measure from the logged total above it: that is effort
+                spent, this is how long the task has been open, and it is
+                normally the larger of the two. */}
+            {elapsedMinutes !== null && (
+                <div className="mt-2 flex items-baseline gap-2 text-sm">
+                    <span className="font-medium text-gray-900 dark:text-gray-100 tabular-nums">
+                        {formatElapsed(elapsedMinutes)}
+                    </span>
+                    <span className="text-xs text-gray-400">elapsed since work started</span>
+                </div>
+            )}
+
             {!loading && logs.length > 0 && (
                 <ul className="mt-3 space-y-1.5">
                     {logs.filter((l) => !l.running).map((log) => (
@@ -192,7 +215,7 @@ export default function TaskTimePanel({ taskId, estimatedMinutes, canEdit, curre
                 </ul>
             )}
 
-            {canEdit && !adding && (
+            {canEdit && showControls && !adding && (
                 <button
                     type="button"
                     onClick={() => setAdding(true)}
@@ -202,7 +225,7 @@ export default function TaskTimePanel({ taskId, estimatedMinutes, canEdit, curre
                 </button>
             )}
 
-            {canEdit && adding && (
+            {canEdit && showControls && adding && (
                 <form onSubmit={addManual} className="mt-3 space-y-2">
                     <div className="flex gap-2">
                         <input

@@ -194,6 +194,40 @@ class TimeInMotionTest extends TestCase
             ->assertJsonPath('showTimeInMotion', false);
     }
 
+    public function test_a_finished_project_does_not_invite_anybody_to_start_work(): void
+    {
+        $owner = $this->owner();
+
+        foreach (['completed', 'archived'] as $status) {
+            $project = $this->project($owner, ['name' => "Done {$status}", 'status' => $status, 'show_time_in_motion' => true]);
+            $task = $this->task($project);
+
+            $this->actingAs($owner)
+                ->getJson("/projects/{$project->id}/tasks/{$task->id}/detail")
+                ->assertOk()
+                ->assertJsonPath('projectIsClosed', true);
+
+            // Hiding the button is not the whole rule: the endpoint refuses too.
+            $this->actingAs($owner)
+                ->patchJson("/projects/{$project->id}/tasks/{$task->id}/start")
+                ->assertStatus(422);
+
+            $this->assertNull($task->fresh()->started_at);
+        }
+
+        $open = $this->project($owner, ['name' => 'Still going', 'show_time_in_motion' => true]);
+        $openTask = $this->task($open);
+
+        $this->actingAs($owner)
+            ->getJson("/projects/{$open->id}/tasks/{$openTask->id}/detail")
+            ->assertOk()
+            ->assertJsonPath('projectIsClosed', false);
+
+        $this->actingAs($owner)
+            ->patchJson("/projects/{$open->id}/tasks/{$openTask->id}/start")
+            ->assertOk();
+    }
+
     public function test_somebody_who_cannot_update_the_task_cannot_start_its_clock(): void
     {
         $project = $this->project($this->owner());
