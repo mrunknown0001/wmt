@@ -17,6 +17,8 @@ class CommentAttachmentFile implements ValidationRule
 
     private const SPREADSHEET_EXTENSIONS = ['xlsx', 'xls', 'csv'];
 
+    private const DOCUMENT_EXTENSIONS = ['docx'];
+
     private const OTHER_EXTENSIONS = ['pdf'];
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
@@ -33,10 +35,11 @@ class CommentAttachmentFile implements ValidationRule
         $isVideo = in_array($extension, self::VIDEO_EXTENSIONS) || str_starts_with($mimeType, 'video/');
         $isImage = in_array($extension, self::IMAGE_EXTENSIONS);
         $isSpreadsheet = in_array($extension, self::SPREADSHEET_EXTENSIONS);
+        $isDocument = in_array($extension, self::DOCUMENT_EXTENSIONS);
         $isOther = in_array($extension, self::OTHER_EXTENSIONS);
 
-        if (!$isVideo && !$isImage && !$isSpreadsheet && !$isOther) {
-            $fail('Only images (JPG, PNG, WebP), PDF, videos (MP4, MOV, WebM, 3GP, MKV), and spreadsheets (XLSX, XLS, CSV) are allowed.');
+        if (!$isVideo && !$isImage && !$isSpreadsheet && !$isDocument && !$isOther) {
+            $fail('Only images (JPG, PNG, WebP), PDF, Word (DOCX), videos (MP4, MOV, WebM, 3GP, MKV), and spreadsheets (XLSX, XLS, CSV) are allowed.');
             return;
         }
 
