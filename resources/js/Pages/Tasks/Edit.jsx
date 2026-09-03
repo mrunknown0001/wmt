@@ -16,6 +16,7 @@ import Avatar from '../../Components/Avatar';
 import UserMultiSelect from '../../Components/UserMultiSelect';
 import RecurrenceOptions from '../../Components/RecurrenceOptions';
 import EstimateInput from '../../Components/EstimateInput';
+import TaskTimePanel from '../../Components/TaskTimePanel';
 import TimeInMotion from '../../Components/TimeInMotion';
 import CustomFieldValueEditor from '../../Components/CustomFieldValueEditor';
 import Tooltip from '../../Components/Tooltip';
@@ -1040,6 +1041,20 @@ export default function Edit() {
                             <Button type="submit" form="task-edit-form" processing={processing} processingText="Saving...">Save Changes</Button>
                         </div>
                     </div>
+
+                    {/* Time: the timer, manual entries and the running total.
+                        Its home is here rather than the quick view, which shows
+                        the elapsed figure alone — a glance at a task does not
+                        want a ledger, and this is where there is room for one. */}
+                    <Card className="mt-6">
+                        <TaskTimePanel
+                            taskId={task.id}
+                            estimatedMinutes={data.estimated_minutes}
+                            canEdit={canManageTaskDetails}
+                            currentUserId={auth?.user?.id}
+                            className=""
+                        />
+                    </Card>
 
                     {/* Subtasks — only for parent tasks */}
                     {!task.parent_id && (
