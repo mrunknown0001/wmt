@@ -11,8 +11,12 @@ import { useState, useRef, useEffect } from 'react';
  * `value` is an array of the chosen option values; `onChange` is handed the new
  * array. Nothing is selected means "all", which is why the empty state reads as
  * the plural rather than as a blank.
+ *
+ * `align` decides which edge the popover hangs from. It is wider than the
+ * button, so one sitting at the right of a card would otherwise open off the
+ * side of it.
  */
-export default function MultiSelectFilter({ label, noun, options = [], value = [], onChange }) {
+export default function MultiSelectFilter({ label, noun, options = [], value = [], onChange, align = 'left' }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
     const ref = useRef(null);
@@ -68,7 +72,7 @@ export default function MultiSelectFilter({ label, noun, options = [], value = [
             </button>
 
             {open && (
-                <div className="absolute z-40 mt-1 w-64 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                <div className={`absolute z-40 mt-1 w-64 ${align === 'right' ? 'right-0' : ''} rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg`}>
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                         <input
                             autoFocus

@@ -32,10 +32,12 @@ class ReportController extends Controller
             $from = $to->copy()->subDays(self::MAX_DAYS)->startOfDay();
         }
 
+        // Lists, not single ids: every one of these filters takes several at
+        // once, and a bookmark carrying a single id is just a list of one.
         $filters = [
-            'project_id' => $request->query('project') ? (int) $request->query('project') : null,
-            'approval_project_id' => $request->query('approval_project') ? (int) $request->query('approval_project') : null,
-            'assigned_to' => $request->query('assignee') ? (int) $request->query('assignee') : null,
+            'project_ids' => self::idList($request, 'project'),
+            'approval_project_ids' => self::idList($request, 'approval_project'),
+            'assigned_to' => self::idList($request, 'assignee'),
         ];
 
         return Inertia::render('Reports/Index', [
@@ -51,8 +53,8 @@ class ReportController extends Controller
             'filters' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
-                'project' => $filters['project_id'],
-                'approval_project' => $filters['approval_project_id'],
+                'project' => $filters['project_ids'],
+                'approval_project' => $filters['approval_project_ids'],
                 'assignee' => $filters['assigned_to'],
             ],
             'projects' => $this->visibleProjects($user),
@@ -60,6 +62,23 @@ class ReportController extends Controller
             'people' => User::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'maxDays' => self::MAX_DAYS,
         ]);
+    }
+
+    /**
+     * A comma-joined list of ids from the query string.
+     *
+     * Tolerant of an old single-value link: "3" parses to [3] just as "3,7"
+     * parses to [3, 7], so a bookmark saved before the filters went multiple
+     * still lands on the same report.
+     */
+    private static function idList(Request $request, string $key): array
+    {
+        return collect(explode(',', (string) $request->query($key)))
+            ->map(fn ($v) => (int) trim($v))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function visibleProjects(User $user)
