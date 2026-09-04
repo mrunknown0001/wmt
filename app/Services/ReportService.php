@@ -221,9 +221,10 @@ class ReportService
      */
     public static function escalations(User $user, array $filters = []): array
     {
-        $base = self::scopeVisible(Task::query(), $user)
-            ->where('escalation_level', '>', 0)
-            ->when($filters['project_ids'] ?? null, fn ($q, $ids) => $q->whereIn('project_id', $ids));
+        $base = self::scopeProjects(
+            self::scopeVisible(Task::query(), $user)->where('escalation_level', '>', 0),
+            $filters,
+        );
 
         $byLevel = (clone $base)
             ->selectRaw('escalation_level, COUNT(*) as total')
@@ -445,19 +446,49 @@ class ReportService
         return \App\Models\TaskTimeLog::query()
             ->whereHas('task', function ($t) use ($user, $filters) {
                 self::scopeVisible($t, $user)
-                    ->when($filters['project_ids'] ?? null, fn ($q, $ids) => $q->whereIn('tasks.project_id', $ids))
                     ->when($filters['assigned_to'] ?? null, fn ($q, $ids) => $q->whereIn('tasks.assigned_to', $ids));
+
+                self::scopeProjects($t, $filters, 'tasks.project_id');
             });
+    }
+
+    /**
+     * Narrow a task query to the chosen projects.
+     *
+     * "No project" is one of the choices, not the absence of one: a standalone
+     * task belongs to nobody's project and would otherwise sit in the totals
+     * while matching no filter, so the parts never added up to the whole.
+     * Grouped rather than chained, or the OR would escape the filter and pull
+     * every personal task past the visibility scope beside it.
+     */
+    private static function scopeProjects(Builder $query, array $filters, string $column = 'project_id'): Builder
+    {
+        $ids = $filters['project_ids'] ?? [];
+        $none = $filters['project_none'] ?? false;
+
+        if (!$ids && !$none) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($ids, $none, $column) {
+            if ($ids) {
+                $q->whereIn($column, $ids);
+            }
+            if ($none) {
+                $q->orWhereNull($column);
+            }
+        });
     }
 
     /** Finished tasks in the window, scoped and filtered the same way everywhere. */
     private static function completedTasks(User $user, Carbon $from, Carbon $to, array $filters = []): Builder
     {
-        return self::scopeVisible(Task::query(), $user)
+        $query = self::scopeVisible(Task::query(), $user)
             ->whereNotNull('completed_at')
             ->whereBetween('completed_at', [$from, $to])
-            ->when($filters['project_ids'] ?? null, fn ($q, $ids) => $q->whereIn('project_id', $ids))
             ->when($filters['assigned_to'] ?? null, fn ($q, $ids) => $q->whereIn('assigned_to', $ids));
+
+        return self::scopeProjects($query, $filters);
     }
 
     /**

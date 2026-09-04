@@ -17,6 +17,9 @@ class ReportController extends Controller
     /** Longest window a single report will cover. */
     private const MAX_DAYS = 366;
 
+    /** What the project filter calls the tasks that belong to no project. */
+    private const NO_PROJECT = 'none';
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -34,8 +37,14 @@ class ReportController extends Controller
 
         // Lists, not single ids: every one of these filters takes several at
         // once, and a bookmark carrying a single id is just a list of one.
+        //
+        // "none" among the projects means the tasks that belong to no project —
+        // the standalone ones. They are in the totals either way; without a way
+        // to ask for them, picking every project still came up short of the
+        // unfiltered figure with nothing on the page to explain the gap.
         $filters = [
             'project_ids' => self::idList($request, 'project'),
+            'project_none' => self::hasNone($request, 'project'),
             'approval_project_ids' => self::idList($request, 'approval_project'),
             'assigned_to' => self::idList($request, 'assignee'),
         ];
@@ -53,7 +62,12 @@ class ReportController extends Controller
             'filters' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
-                'project' => $filters['project_ids'],
+                // Handed back the way the page sent it, sentinel and all, so
+                // the filter can show "No project" as chosen.
+                'project' => array_merge(
+                    $filters['project_ids'],
+                    $filters['project_none'] ? [self::NO_PROJECT] : [],
+                ),
                 'approval_project' => $filters['approval_project_ids'],
                 'assignee' => $filters['assigned_to'],
             ],
@@ -71,6 +85,14 @@ class ReportController extends Controller
      * parses to [3, 7], so a bookmark saved before the filters went multiple
      * still lands on the same report.
      */
+    /** Whether the "no project" sentinel is among the chosen values. */
+    private static function hasNone(Request $request, string $key): bool
+    {
+        return collect(explode(',', (string) $request->query($key)))
+            ->map(fn ($v) => trim($v))
+            ->contains(self::NO_PROJECT);
+    }
+
     private static function idList(Request $request, string $key): array
     {
         return collect(explode(',', (string) $request->query($key)))

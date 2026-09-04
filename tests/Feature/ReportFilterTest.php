@@ -122,4 +122,62 @@ class ReportFilterTest extends TestCase
         $this->assertSame(2, $this->completedCount('project=&assignee='));
         $this->assertSame(2, $this->completedCount('project=abc'));
     }
+
+    public function test_tasks_belonging_to_no_project_can_be_asked_for(): void
+    {
+        $this->standalone();
+
+        // Three finished tasks now: one in each project, one in neither.
+        $this->assertSame(3, $this->completedCount(''));
+        $this->assertSame(1, $this->completedCount('project=none'));
+        $this->assertSame(2, $this->completedCount("project={$this->alpha->id},{$this->beta->id}"));
+    }
+
+    public function test_no_project_can_be_chosen_alongside_projects(): void
+    {
+        $this->standalone();
+
+        $this->assertSame(2, $this->completedCount("project={$this->alpha->id},none"));
+        $this->assertSame(3, $this->completedCount("project={$this->alpha->id},{$this->beta->id},none"));
+    }
+
+    public function test_picking_every_project_and_no_project_reaches_the_unfiltered_total(): void
+    {
+        $this->standalone();
+
+        $everything = $this->completedCount('');
+        $this->assertSame($everything, $this->completedCount("project={$this->alpha->id},{$this->beta->id},none"));
+    }
+
+    public function test_the_sentinel_comes_back_to_the_page_with_the_ids(): void
+    {
+        $props = $this->actingAs($this->admin)
+            ->get("/reports?project={$this->alpha->id},none")
+            ->assertOk()
+            ->viewData('page')['props'];
+
+        $this->assertSame([$this->alpha->id, 'none'], $props['filters']['project']);
+    }
+
+    public function test_no_project_narrows_with_assignee_rather_than_widening_past_it(): void
+    {
+        $this->standalone();
+
+        // The standalone task is Ada's; asking for it as Bo's matches none.
+        $this->assertSame(0, $this->completedCount("project=none&assignee={$this->bo->id}"));
+        $this->assertSame(1, $this->completedCount("project=none&assignee={$this->admin->id}"));
+    }
+
+    /** A finished task belonging to no project at all — the standalone kind. */
+    private function standalone(): Task
+    {
+        return Task::create([
+            'project_id' => null,
+            'title' => 'A personal errand',
+            'status' => 'done',
+            'priority' => 'medium',
+            'assigned_to' => $this->admin->id,
+            'completed_at' => Carbon::create(2026, 8, 10, 12),
+        ]);
+    }
 }
