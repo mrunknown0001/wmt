@@ -5227,7 +5227,10 @@ export default function Show() {
                         if (!fromDate || !toDate) return;
                         edges.push({
                             key: `${dep.id}-${t.id}`,
-                            x1: xFor(fromDate) + (from.is_milestone ? 0 : PX_PER_DAY),
+                            // Milestones carry bars now, so an arrow leaves one from
+                            // the same place it leaves any other task: the far
+                            // edge of its final day.
+                            x1: xFor(fromDate) + PX_PER_DAY,
                             y1: rowIndex.get(dep.id) * ROW_H + ROW_H / 2,
                             x2: xFor(toDate),
                             y2: rowIndex.get(t.id) * ROW_H + ROW_H / 2,
@@ -5397,7 +5400,11 @@ export default function Show() {
                                                 const isMilestone = !!task.is_milestone;
                                                 const startStr = task.start_date || task.due_date;
                                                 const endStr = task.due_date || task.start_date;
-                                                const left = xFor(isMilestone ? endStr : startStr);
+                                                // Milestones start where every other bar starts. They were
+                                                // pinned to the end date and drawn as a lone diamond, so a
+                                                // task with a real span lost its bar the moment it was
+                                                // flagged as one.
+                                                const left = xFor(startStr);
                                                 const spanDays = Math.max(((dayOf(endStr) - dayOf(startStr)) / MS_DAY) + 1, 1);
                                                 // Below about 6px a bar stops reading as a bar; at month
                                                 // scale a one-day task would otherwise be 3px of nothing.
@@ -5499,23 +5506,28 @@ export default function Show() {
                                                                 );
                                                             })}
 
-                                                            {isMilestone ? (
-                                                                <Tooltip content={`${task.title} — ${tooltipDate} — milestone`}>
+                                                            {/* Every task gets its bar, milestone or not — being a milestone
+                                                                says when something lands, not that the work took no time. */}
+                                                            <Tooltip content={`${task.title} — ${tooltipDate} — ${isMilestone ? 'milestone' : formatLabel(task.status)}`}>
+                                                                <Link
+                                                                    href={`/projects/${project.id}/tasks/${task.id}/edit`}
+                                                                    className={`absolute h-5 rounded ${barColor} ${opacityCls} hover:brightness-110 transition-all z-20`}
+                                                                    style={{ left: `${left}px`, width: `${barWidth}px`, top: `${ROW_H / 2 - 10}px` }}
+                                                                />
+                                                            </Tooltip>
+
+                                                            {/* The diamond marks the finish, not the start: a milestone is the
+                                                                moment the work lands. Centred on the bar's right edge, so half of
+                                                                it overhangs the final day the way a Gantt marker is drawn. */}
+                                                            {isMilestone && (
+                                                                <Tooltip content={`${task.title} — ${formatDate(endStr)} — milestone`}>
                                                                     <Link
                                                                         href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                                        className={`absolute z-20 ${opacityCls}`}
-                                                                        style={{ left: `${left - 6}px`, top: `${ROW_H / 2 - 6}px` }}
+                                                                        className={`absolute z-30 ${opacityCls}`}
+                                                                        style={{ left: `${left + barWidth - 6}px`, top: `${ROW_H / 2 - 6}px` }}
                                                                     >
-                                                                        <span className="block w-3 h-3 bg-purple-600 rotate-45 hover:scale-110 transition-transform" />
+                                                                        <span className="block w-3 h-3 bg-purple-600 rotate-45 ring-1 ring-white dark:ring-gray-900 hover:scale-110 transition-transform" />
                                                                     </Link>
-                                                                </Tooltip>
-                                                            ) : (
-                                                                <Tooltip content={`${task.title} — ${tooltipDate} — ${formatLabel(task.status)}`}>
-                                                                    <Link
-                                                                        href={`/projects/${project.id}/tasks/${task.id}/edit`}
-                                                                        className={`absolute h-5 rounded ${barColor} ${opacityCls} hover:brightness-110 transition-all z-20`}
-                                                                        style={{ left: `${left}px`, width: `${barWidth}px`, top: `${ROW_H / 2 - 10}px` }}
-                                                                    />
                                                                 </Tooltip>
                                                             )}
                                                         </div>

@@ -140,13 +140,14 @@ class Task extends Model
         });
 
         static::saving(function (Task $task) {
-            // A milestone marks a moment, not a span, so its dates are held
-            // equal. Collapsing here rather than validating means a caller can
-            // simply tick the box: every write path lands on the same rule, and
-            // the UI has nothing to keep in sync.
-            if ($task->is_milestone) {
-                $task->start_date = $task->due_date;
-            }
+            // A milestone used to collapse its own dates — start was forced to
+            // follow due, so flagging a task threw away its span. That made a
+            // milestone a moment and nothing else, and a normal piece of work
+            // could not be one without ceasing to be a stretch of work.
+            //
+            // It keeps its dates now. The flag says when something lands, which
+            // the Gantt draws as a diamond at the end of the bar; it does not
+            // claim the work took no time.
 
             // Stamp who granted the exemption and when, at the same choke point
             // that enforces the rule. Any path that can set the flag — form,

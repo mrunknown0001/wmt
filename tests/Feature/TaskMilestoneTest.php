@@ -17,7 +17,7 @@ class TaskMilestoneTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_marking_a_task_a_milestone_collapses_its_dates(): void
+    public function test_marking_a_task_a_milestone_leaves_its_span_alone(): void
     {
         $task = Task::factory()->create([
             'project_id' => Project::factory()->create()->id,
@@ -28,11 +28,24 @@ class TaskMilestoneTest extends TestCase
         $task->update(['is_milestone' => true]);
 
         $fresh = $task->fresh();
-        $this->assertSame(
-            $fresh->due_date->toDateString(),
-            $fresh->start_date->toDateString(),
-            'A milestone spans no time, so its start must follow its due date.'
-        );
+        $this->assertSame('2026-05-12', $fresh->start_date->toDateString(),
+            'Flagging a milestone must not throw away when the work started.');
+        $this->assertSame('2026-05-23', $fresh->due_date->toDateString());
+        $this->assertTrue((bool) $fresh->is_milestone);
+    }
+
+    public function test_a_milestone_with_one_date_still_has_just_the_one(): void
+    {
+        $task = Task::factory()->create([
+            'project_id' => Project::factory()->create()->id,
+            'start_date' => null,
+            'due_date' => '2026-05-23',
+            'is_milestone' => true,
+        ]);
+
+        $fresh = $task->fresh();
+        $this->assertNull($fresh->start_date, 'Nothing invents a start date that was never given.');
+        $this->assertSame('2026-05-23', $fresh->due_date->toDateString());
     }
 
     public function test_an_ordinary_task_keeps_its_span(): void
