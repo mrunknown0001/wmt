@@ -44,6 +44,7 @@ class ReportController extends Controller
             'throughput' => ReportService::throughput($user, $from, $to, $filters),
             'effort' => ReportService::effort($user, $from, $to, $filters),
             'estimateAccuracy' => ReportService::estimateAccuracy($user, $from, $to, $filters),
+            'elapsedAccuracy' => ReportService::elapsedAccuracy($user, $from, $to, $filters),
             'approvals' => ReportService::approvalTurnaround($user, $from, $to, $filters),
             'approvers' => ReportService::approverTurnaround($from, $to, $filters),
             'escalations' => ReportService::escalations($user, $filters),

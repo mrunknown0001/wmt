@@ -70,6 +70,7 @@ export default function ReportsIndex() {
         cycleTime, onTime, throughput = [], approvals, approvers = [], escalations,
         effort = { total_minutes: 0, entries: 0, people: [], running: 0 },
         estimateAccuracy = { count: 0 },
+        elapsedAccuracy = { count: 0 },
         filters, projects = [], approvalProjects = [], people = [], maxDays,
     } = usePage().props;
 
@@ -271,7 +272,7 @@ export default function ReportsIndex() {
             <Card className="mt-6">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Effort logged</h3>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                     <Stat
                         label="Time logged" value={effortTime(effort.total_minutes)}
                         sub={`${effort.entries} ${effort.entries === 1 ? 'entry' : 'entries'} in this window`}
@@ -291,6 +292,21 @@ export default function ReportsIndex() {
                         sub={estimateAccuracy.count > 0
                             ? `median across ${estimateAccuracy.count} finished ${estimateAccuracy.count === 1 ? 'task' : 'tasks'}`
                             : 'nothing to compare'}
+                    />
+                    {/* The same question asked of the calendar rather than of
+                        anybody's timesheet. Elapsed time is stamped automatically,
+                        so this fills in where the effort ratio cannot. */}
+                    <Stat
+                        label="Estimate vs elapsed"
+                        value={elapsedAccuracy.median_ratio === null || elapsedAccuracy.median_ratio === undefined
+                            ? '—'
+                            : `${elapsedAccuracy.median_ratio.toFixed(2)}×`}
+                        tone={elapsedAccuracy.median_ratio == null
+                            ? 'default'
+                            : elapsedAccuracy.median_ratio > 1.1 ? 'bad' : elapsedAccuracy.median_ratio < 0.9 ? 'warn' : 'good'}
+                        sub={elapsedAccuracy.count > 0
+                            ? `median across ${elapsedAccuracy.count} finished ${elapsedAccuracy.count === 1 ? 'task' : 'tasks'}`
+                            : 'nothing started and finished'}
                     />
                     <Stat
                         label="Estimated, never logged" value={estimateAccuracy.estimated_not_logged ?? 0}
@@ -326,7 +342,19 @@ export default function ReportsIndex() {
                 )}
 
                 <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                    Effort is dated by the day the work happened, not the day it was typed in, so a
+                    The two ratios answer different questions and will not agree.{' '}
+                    <em>Estimate vs actual</em> weighs the estimate against effort somebody logged;{' '}
+                    <em>estimate vs elapsed</em> weighs it against the calendar — from the task being
+                    picked up to it being closed — which is stamped automatically and so needs nobody
+                    to remember anything. A job started on Monday and finished on Friday is four days
+                    elapsed whether it took four days of work or twenty minutes.
+                    {elapsedAccuracy.estimated_not_started > 0 && (
+                        <> {elapsedAccuracy.estimated_not_started} finished{' '}
+                        {elapsedAccuracy.estimated_not_started === 1 ? 'task carries' : 'tasks carry'} an
+                        estimate but was never stamped as started, so {elapsedAccuracy.estimated_not_started === 1 ? 'it has' : 'they have'}{' '}
+                        no span to measure.</>
+                    )}
+                    {' '}Effort is dated by the day the work happened, not the day it was typed in, so a
                     manual entry lands where it belongs.
                     {effort.running > 0 && (
                         <> {effort.running} {effort.running === 1 ? 'timer is' : 'timers are'} still

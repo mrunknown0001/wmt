@@ -212,6 +212,72 @@ class ReportEffortTest extends TestCase
         $this->assertNull($accuracy['average_ratio']);
     }
 
+    public function test_elapsed_accuracy_measures_the_calendar_not_the_timesheet(): void
+    {
+        // Estimated an hour, sat open for two — and nobody logged a minute
+        // against it, which is exactly the case the effort ratio cannot see.
+        $slow = $this->task(['estimated_minutes' => 60, 'status' => 'done']);
+        Task::whereKey($slow->id)->update([
+            'started_at' => '2026-08-10 09:00:00',
+            'completed_at' => '2026-08-10 11:00:00',
+        ]);
+
+        // Estimated an hour, closed within the hour.
+        $brisk = $this->task(['estimated_minutes' => 60, 'status' => 'done']);
+        Task::whereKey($brisk->id)->update([
+            'started_at' => '2026-08-11 09:00:00',
+            'completed_at' => '2026-08-11 10:00:00',
+        ]);
+
+        [$from, $to] = $this->window();
+        $elapsed = ReportService::elapsedAccuracy($this->admin, $from, $to);
+
+        $this->assertSame(2, $elapsed['count']);
+        $this->assertSame(1.5, $elapsed['median_ratio'], 'midpoint of taking twice as long and bang on');
+        $this->assertSame(1, $elapsed['over']);
+        $this->assertSame(1, $elapsed['within_10pct']);
+        $this->assertSame(180, $elapsed['elapsed_minutes']);
+
+        // And it needed no logged time at all to say any of that.
+        $this->assertSame(0, ReportService::estimateAccuracy($this->admin, $from, $to)['count']);
+    }
+
+    public function test_work_that_was_never_started_has_no_span_to_measure(): void
+    {
+        $measured = $this->task(['estimated_minutes' => 60, 'status' => 'done']);
+        Task::whereKey($measured->id)->update([
+            'started_at' => '2026-08-12 09:00:00',
+            'completed_at' => '2026-08-12 10:00:00',
+        ]);
+
+        // Estimated and finished, but it never passed through In Progress.
+        $unstamped = $this->task(['estimated_minutes' => 60, 'status' => 'done']);
+        Task::whereKey($unstamped->id)->update(['completed_at' => '2026-08-12 10:00:00']);
+
+        [$from, $to] = $this->window();
+        $elapsed = ReportService::elapsedAccuracy($this->admin, $from, $to);
+
+        $this->assertSame(1, $elapsed['count']);
+        $this->assertSame(1, $elapsed['estimated_not_started'], 'counted apart rather than dropped');
+    }
+
+    public function test_a_completion_before_the_start_is_left_out(): void
+    {
+        // Somebody correcting dates by hand can leave a task finishing before
+        // it began. A negative span is not a fast task.
+        $backwards = $this->task(['estimated_minutes' => 60, 'status' => 'done']);
+        Task::whereKey($backwards->id)->update([
+            'started_at' => '2026-08-14 10:00:00',
+            'completed_at' => '2026-08-13 09:00:00',
+        ]);
+
+        [$from, $to] = $this->window();
+        $elapsed = ReportService::elapsedAccuracy($this->admin, $from, $to);
+
+        $this->assertSame(0, $elapsed['count']);
+        $this->assertNull($elapsed['median_ratio']);
+    }
+
     public function test_the_reports_page_carries_both_figures(): void
     {
         $task = $this->task();
@@ -223,6 +289,7 @@ class ReportEffortTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('effort')
                 ->has('estimateAccuracy')
+                ->has('elapsedAccuracy')
                 ->where('effort.total_minutes', 90));
     }
 }

@@ -274,6 +274,72 @@ class ReportService
     }
 
     /**
+     * How estimates compared with the calendar, rather than with effort.
+     *
+     * estimateAccuracy() needs somebody to have logged their hours. This does
+     * not: a task is stamped as started on its way into In Progress, and
+     * completed_at is written when it closes, so the span between them costs
+     * nobody a keystroke.
+     *
+     * It answers a different question, and the difference matters. Elapsed time
+     * is how long a task sat open, not how long anyone worked on it — a job
+     * started Monday and finished Friday reads as four days whether it took
+     * four days of work or twenty minutes. Read it as "did this take longer
+     * than we planned, in calendar terms", never as effort.
+     */
+    public static function elapsedAccuracy(User $user, Carbon $from, Carbon $to, array $filters = []): array
+    {
+        $estimated = self::completedTasks($user, $from, $to, $filters)
+            ->where('tasks.estimated_minutes', '>', 0);
+
+        $rows = (clone $estimated)
+            ->limit(self::SAMPLE_CAP)
+            ->get(['tasks.id', 'tasks.estimated_minutes', 'tasks.started_at', 'tasks.completed_at']);
+
+        $compared = $rows
+            ->filter(fn (Task $t) => $t->started_at && $t->completed_at && $t->completed_at->greaterThanOrEqualTo($t->started_at))
+            ->values();
+
+        if ($compared->isEmpty()) {
+            return [
+                'count' => 0,
+                'estimated_not_started' => $rows->count(),
+                'median_ratio' => null,
+                'average_ratio' => null,
+                'over' => 0,
+                'within_10pct' => 0,
+                'under' => 0,
+                'estimated_minutes' => 0,
+                'elapsed_minutes' => 0,
+                'partial' => false,
+            ];
+        }
+
+        $elapsedOf = fn (Task $t) => (int) $t->started_at->diffInMinutes($t->completed_at);
+        $ratioOf = fn (Task $t) => $elapsedOf($t) / $t->estimated_minutes;
+
+        $ratios = $compared->map($ratioOf)->sort()->values();
+
+        $within = $compared->filter(fn (Task $t) => abs($ratioOf($t) - 1) <= 0.1)->count();
+        $over = $compared->filter(fn (Task $t) => $ratioOf($t) > 1.1)->count();
+
+        return [
+            'count' => $compared->count(),
+            // Finished and estimated, but never stamped as started — nothing to
+            // measure a span against.
+            'estimated_not_started' => $rows->count() - $compared->count(),
+            'median_ratio' => self::percentile($ratios, 0.5, 2),
+            'average_ratio' => round($ratios->avg(), 2),
+            'over' => $over,
+            'within_10pct' => $within,
+            'under' => $compared->count() - $within - $over,
+            'estimated_minutes' => (int) $compared->sum('estimated_minutes'),
+            'elapsed_minutes' => (int) $compared->sum($elapsedOf),
+            'partial' => $rows->count() >= self::SAMPLE_CAP,
+        ];
+    }
+
+    /**
      * Effort recorded in the window: who spent time, and how much.
      *
      * Dated by logged_on, not by when the entry was typed and not by the task's
