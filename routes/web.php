@@ -60,6 +60,7 @@ use App\Http\Controllers\MyPersonnelController;
 use App\Http\Controllers\TaskDelegationController;
 use App\Http\Controllers\MyApprovalsController;
 use App\Http\Controllers\MyRequestsController;
+use App\Http\Controllers\TimeCorrectionController;
 use Illuminate\Support\Facades\Route;
 
 // Guest routes
@@ -269,6 +270,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/approval-delegations', [ApprovalDelegationController::class, 'store'])->name('approval-delegations.store');
     Route::delete('/approval-delegations/{approvalDelegation}', [ApprovalDelegationController::class, 'destroy'])->name('approval-delegations.destroy');
     Route::get('/my-requests', [MyRequestsController::class, 'index'])->name('my-requests.index');
+
+    // Time corrections: the queue of amendments to decide, and the ones you
+    // raised. The decisions themselves go through the API endpoints, so this is
+    // the listing and nothing else.
+    Route::get('/time-corrections', [TimeCorrectionController::class, 'index'])->name('time-corrections.index');
 
     // The people a head or leader oversees, arranged as the org chart is.
     Route::get('/my-personnel', [MyPersonnelController::class, 'index'])->name('my-personnel.index');

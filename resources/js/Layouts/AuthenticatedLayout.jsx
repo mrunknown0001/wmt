@@ -113,6 +113,12 @@ const MyRequestsIcon = () => (
     </svg>
 );
 
+const TimeCorrectionIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6l3.5 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
 const SettingsIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z" />
@@ -121,7 +127,7 @@ const SettingsIcon = () => (
 );
 
 export default function AuthenticatedLayout({ children, title, contained = false }) {
-    const { auth, flash, settings, unreadNotificationsCount, pendingApprovalsCount } = usePage().props;
+    const { auth, flash, settings, unreadNotificationsCount, pendingApprovalsCount, pendingTimeCorrectionsCount } = usePage().props;
     const currentUrl = usePage().url;
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -366,6 +372,21 @@ export default function AuthenticatedLayout({ children, title, contained = false
                         </NavLink>
                     </div>
                 )}
+
+                {/* Time corrections. Everybody can raise one from a task, so
+                    everybody has a page; the badge only appears for the people
+                    who have some to decide. */}
+                <div className="space-y-0.5">
+                    <NavLink
+                        href="/time-corrections"
+                        icon={<TimeCorrectionIcon />}
+                        active={isActive('/time-corrections')}
+                        badge={pendingTimeCorrectionsCount || null}
+                        collapsed={collapsed}
+                    >
+                        Time Corrections
+                    </NavLink>
+                </div>
 
                 {/* Organization structure is an admin concern — Divisions,
                     Departments and Teams are shown to admins only, regardless of

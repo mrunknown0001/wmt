@@ -64,6 +64,31 @@ class TimeLogAmendment extends Model
         return $query->where('status', self::PENDING);
     }
 
+    /**
+     * The corrections this person decides.
+     *
+     * The same rule as TimeLogAmendmentController::canReview — whoever runs the
+     * project — asked of a whole list rather than one row at a time. Kept in SQL
+     * because an inbox cannot afford to load every amendment in the system and
+     * then filter them in PHP.
+     */
+    public function scopeDecidableBy(Builder $query, User $user): Builder
+    {
+        // Project managers run every project, so the only condition left is
+        // that the entry belongs to one at all: a standalone task has no owner
+        // to decide anything.
+        if ($user->can('manage-projects')) {
+            return $query->whereHas('timeLog.task', fn ($q) => $q->whereNotNull('project_id'));
+        }
+
+        return $query->whereHas('timeLog.task.project', function ($q) use ($user) {
+            $q->where('owner_id', $user->id)
+                ->orWhereHas('members', fn ($m) => $m
+                    ->where('users.id', $user->id)
+                    ->where('project_members.role', 'admin'));
+        });
+    }
+
     public function isPending(): bool
     {
         return $this->status === self::PENDING;
