@@ -830,8 +830,8 @@ export default function Edit() {
                                         <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Milestone</span>
                                     </label>
                                     <p className="mt-1.5 ml-6 text-xs text-gray-500 dark:text-gray-400">
-                                        A moment rather than a stretch of work. The Gantt shows it as a diamond, and the
-                                        start date follows the due date.
+                                        Marks when this lands. The Gantt keeps the task's bar and puts a diamond at
+                                        its end, so a stretch of work can carry a milestone without becoming a single day.
                                     </p>
                                     {errors.is_milestone && <p className="mt-1 ml-6 text-xs text-red-600">{errors.is_milestone}</p>}
                                 </div>
