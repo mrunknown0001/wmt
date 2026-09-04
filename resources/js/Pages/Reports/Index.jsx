@@ -124,9 +124,16 @@ export default function ReportsIndex() {
                             className="rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1.5 text-sm"
                         />
                     </div>
+                    {/* "No project" is a choice, not a gap. Standalone tasks are
+                        in every figure on this page but belong to no project, so
+                        without it a reader could tick every project in the list
+                        and still not reach the unfiltered total. */}
                     <MultiSelectFilter
                         label="Project" noun="projects"
-                        options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                        options={[
+                            ...projects.map((p) => ({ value: p.id, label: p.name })),
+                            { value: 'none', label: 'No project' },
+                        ]}
                         value={filters.project || []}
                         onChange={(ids) => go({ project: asParam(ids) })}
                     />
@@ -140,7 +147,9 @@ export default function ReportsIndex() {
                 </div>
                 <p className="mt-3 text-xs text-gray-400">
                     Windows are capped at {maxDays} days. Project and assignee narrow the task
-                    figures; approvals carry their own filter, on that card.
+                    figures; approvals carry their own filter, on that card. Tasks that belong to
+                    no project — the standalone ones — are counted here too, and the project
+                    filter lists them as <em>No project</em>.
                 </p>
             </Card>
 
