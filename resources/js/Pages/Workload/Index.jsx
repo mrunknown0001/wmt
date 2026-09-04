@@ -7,6 +7,7 @@ import Avatar from '../../Components/Avatar';
 import Tooltip from '../../Components/Tooltip';
 import { formatMinutes } from '../../utils';
 import WorkloadBreakdown from '../../Components/WorkloadBreakdown';
+import MultiSelectFilter from '../../Components/MultiSelectFilter';
 
 /**
  * Load per person per day.
@@ -45,13 +46,25 @@ export default function WorkloadIndex() {
         date: cell ? cell.date : null,
         from: filters.from,
         to: filters.to,
-        project: filters.project || undefined,
+        // The same project filter the grid is under, as a comma list.
+        project: (filters.project || []).join(',') || undefined,
     });
 
-    const go = (params) => router.get('/workload', { ...filters, ...params }, {
+    const go = (params) => router.get('/workload', { ...serialisedFilters, ...params }, {
         preserveState: true,
         preserveScroll: true,
     });
+
+    // filters holds arrays; the query string wants comma-joined ids, and an
+    // empty selection should drop the param rather than send "".
+    const asParam = (ids) => (ids && ids.length ? ids.join(',') : undefined);
+    const serialisedFilters = {
+        from: filters.from,
+        to: filters.to,
+        team: asParam(filters.team),
+        department: asParam(filters.department),
+        project: asParam(filters.project),
+    };
 
     const shift = (days) => {
         const from = new Date(`${filters.from}T00:00:00`);
@@ -109,41 +122,29 @@ export default function WorkloadIndex() {
                     </div>
 
                     {teams.length > 0 && (
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Team</label>
-                        <select
-                            value={filters.team || ''} onChange={(e) => go({ team: e.target.value || undefined })}
-                            className="rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1.5 text-sm"
-                        >
-                            <option value="">All teams</option>
-                            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                    </div>
+                        <MultiSelectFilter
+                            label="Team" noun="teams"
+                            options={teams.map((t) => ({ value: t.id, label: t.name }))}
+                            value={filters.team || []}
+                            onChange={(ids) => go({ team: asParam(ids) })}
+                        />
                     )}
 
                     {departments.length > 0 && (
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Department</label>
-                        <select
-                            value={filters.department || ''} onChange={(e) => go({ department: e.target.value || undefined })}
-                            className="rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1.5 text-sm"
-                        >
-                            <option value="">All departments</option>
-                            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                        </select>
-                    </div>
+                        <MultiSelectFilter
+                            label="Department" noun="departments"
+                            options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                            value={filters.department || []}
+                            onChange={(ids) => go({ department: asParam(ids) })}
+                        />
                     )}
 
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Project</label>
-                        <select
-                            value={filters.project || ''} onChange={(e) => go({ project: e.target.value || undefined })}
-                            className="rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1.5 text-sm"
-                        >
-                            <option value="">All projects</option>
-                            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
+                    <MultiSelectFilter
+                        label="Project" noun="projects"
+                        options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                        value={filters.project || []}
+                        onChange={(ids) => go({ project: asParam(ids) })}
+                    />
                 </div>
 
                 {rows.length === 0 ? (

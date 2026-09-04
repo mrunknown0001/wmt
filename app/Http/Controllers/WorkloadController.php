@@ -32,20 +32,22 @@ class WorkloadController extends Controller
 
         $users = $this->visiblePeople($viewer, $request);
 
-        $projectId = $request->query('project') ? (int) $request->query('project') : null;
+        $projectIds = self::idList($request, 'project');
 
         // The filter lists are the viewer's own units, so the page can never
         // offer a department they are not entitled to look inside.
         $units = OrgScope::visibleUnits($viewer);
 
         return Inertia::render('Workload/Index', [
-            'workload' => WorkloadService::build($users, $from, $to, $projectId),
+            'workload' => WorkloadService::build($users, $from, $to, $projectIds),
             'filters' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
-                'team' => $request->query('team'),
-                'department' => $request->query('department'),
-                'project' => $request->query('project'),
+                // Arrays now — the page filters on several of each at once,
+                // and a single id in the query string is just a list of one.
+                'team' => self::idList($request, 'team'),
+                'department' => self::idList($request, 'department'),
+                'project' => $projectIds,
             ],
             'teams' => $units['teams']->map->only(['id', 'name'])->values(),
             'departments' => $units['departments']->map->only(['id', 'name'])->values(),
@@ -111,7 +113,9 @@ class WorkloadController extends Controller
             'from' => ['required', 'date'],
             'to' => ['required', 'date'],
             'date' => ['nullable', 'date'],
-            'project' => ['nullable', 'integer'],
+            // The grid's project filter is a list now, sent as "1,2,3"; a lone
+            // id from an older link still parses as a list of one.
+            'project' => ['nullable', 'string'],
         ]);
 
         // Whose numbers this person may look at is the same question the grid
@@ -143,7 +147,7 @@ class WorkloadController extends Controller
                 $subject,
                 $from,
                 $to,
-                $validated['project'] ?? null,
+                self::idList($request, 'project'),
                 $day,
             ),
         ]);
@@ -166,12 +170,12 @@ class WorkloadController extends Controller
 
         $query = User::where('is_active', true)->orderBy('name');
 
-        if ($request->query('team')) {
-            $query->where('team_id', (int) $request->query('team'));
+        if ($teamIds = self::idList($request, 'team')) {
+            $query->whereIn('team_id', $teamIds);
         }
 
-        if ($request->query('department')) {
-            $query->where('department_id', (int) $request->query('department'));
+        if ($departmentIds = self::idList($request, 'department')) {
+            $query->whereIn('department_id', $departmentIds);
         }
 
         if (OrgScope::seesEverything($viewer)) {
@@ -199,6 +203,23 @@ class WorkloadController extends Controller
         }
 
         return $query->get(['id', 'name']);
+    }
+
+    /**
+     * The chosen ids for one filter, read from a comma-separated query value.
+     *
+     * The multi-select sends "team=1,2,3"; a bookmarked single-value link still
+     * works, since one id is a list of one. Non-numeric junk is dropped rather
+     * than trusted — these go straight into whereIn.
+     */
+    private static function idList(Request $request, string $key): array
+    {
+        return collect(explode(',', (string) $request->query($key)))
+            ->map(fn ($v) => (int) trim($v))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function parseDate(?string $value): ?Carbon
