@@ -4,6 +4,7 @@ import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Tooltip from '../../Components/Tooltip';
+import MultiSelectFilter from '../../Components/MultiSelectFilter';
 
 /** Hours read better as days once they run past a couple of working weeks. */
 const duration = (hours) => {
@@ -76,7 +77,18 @@ export default function ReportsIndex() {
 
     const [range, setRange] = useState({ from: filters.from, to: filters.to });
 
-    const go = (params) => router.get('/reports', { ...filters, ...params }, {
+    // filters holds arrays; the query string wants comma-joined ids, and an
+    // empty selection should drop the param rather than send "".
+    const asParam = (ids) => (ids && ids.length ? ids.join(',') : undefined);
+    const serialisedFilters = {
+        from: filters.from,
+        to: filters.to,
+        project: asParam(filters.project),
+        assignee: asParam(filters.assignee),
+        approval_project: asParam(filters.approval_project),
+    };
+
+    const go = (params) => router.get('/reports', { ...serialisedFilters, ...params }, {
         preserveState: true,
         preserveScroll: true,
     });
@@ -84,20 +96,6 @@ export default function ReportsIndex() {
     const onTimeTone = onTime.rate === null ? 'default'
         : onTime.rate >= 90 ? 'good'
         : onTime.rate >= 70 ? 'warn' : 'bad';
-
-    const select = (label, value, options, onChange, allLabel) => (
-        <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</label>
-            <select
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value || undefined)}
-                className="rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1.5 text-sm"
-            >
-                <option value="">{allLabel}</option>
-                {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
-        </div>
-    );
 
     return (
         <AuthenticatedLayout title="Reports">
@@ -126,12 +124,24 @@ export default function ReportsIndex() {
                             className="rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1.5 text-sm"
                         />
                     </div>
-                    {select('Project', filters.project, projects, (v) => go({ project: v }), 'All projects')}
-                    {select('Assignee', filters.assignee, people, (v) => go({ assignee: v }), 'Everyone')}
-                    {approvalProjects.length > 0 &&
-                        select('Approval project', filters.approval_project, approvalProjects, (v) => go({ approval_project: v }), 'All')}
+                    <MultiSelectFilter
+                        label="Project" noun="projects"
+                        options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                        value={filters.project || []}
+                        onChange={(ids) => go({ project: asParam(ids) })}
+                    />
+
+                    <MultiSelectFilter
+                        label="Assignee" noun="people"
+                        options={people.map((p) => ({ value: p.id, label: p.name }))}
+                        value={filters.assignee || []}
+                        onChange={(ids) => go({ assignee: asParam(ids) })}
+                    />
                 </div>
-                <p className="mt-3 text-xs text-gray-400">Windows are capped at {maxDays} days.</p>
+                <p className="mt-3 text-xs text-gray-400">
+                    Windows are capped at {maxDays} days. Project and assignee narrow the task
+                    figures; approvals carry their own filter, on that card.
+                </p>
             </Card>
 
             {/* Tasks */}
@@ -186,9 +196,26 @@ export default function ReportsIndex() {
                 </p>
             </Card>
 
-            {/* Approvals */}
+            {/* Approvals.
+
+                The approval-project filter lives up here rather than in the bar
+                at the top of the page: an approval project is a different thing
+                from a project, it narrows nothing but this card, and sitting in
+                the same row as the task filters made the two look like one
+                choice. Beside the numbers it governs, it needs no explaining. */}
             <Card className="mt-6">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Approval turnaround</h3>
+                <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Approval turnaround</h3>
+
+                    {approvalProjects.length > 0 && (
+                        <MultiSelectFilter
+                            label="Approval project" noun="approval projects" align="right"
+                            options={approvalProjects.map((a) => ({ value: a.id, label: a.name }))}
+                            value={filters.approval_project || []}
+                            onChange={(ids) => go({ approval_project: asParam(ids) })}
+                        />
+                    )}
+                </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <Stat label="Steps cleared" value={approvals.count} sub="in this window" />
@@ -264,7 +291,9 @@ export default function ReportsIndex() {
                 <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
                     Measured from a step becoming active to it being decided. Steps still open are
                     counted separately rather than averaged in — leaving them out of the average is
-                    what stops a stuck approval from looking like a fast one.
+                    what stops a stuck approval from looking like a fast one. This card follows the
+                    date range at the top of the page, but not the project or assignee filters —
+                    approvals hang off approval projects, which are a separate list.
                 </p>
             </Card>
 

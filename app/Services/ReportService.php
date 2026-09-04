@@ -129,8 +129,8 @@ class ReportService
             ->whereNotNull('activated_at')
             ->whereNotNull('completed_at')
             ->whereBetween('completed_at', [$from, $to])
-            ->when($filters['approval_project_id'] ?? null,
-                fn ($q, $id) => $q->whereHas('item', fn ($i) => $i->where('approval_project_id', $id)));
+            ->when($filters['approval_project_ids'] ?? null,
+                fn ($q, $ids) => $q->whereHas('item', fn ($i) => $i->whereIn('approval_project_id', $ids)));
 
         $rows = (clone $base)
             ->with('step:id,name')
@@ -154,8 +154,8 @@ class ReportService
             ->take(15);
 
         $stillOpen = ApprovalStepInstance::where('status', 'active')
-            ->when($filters['approval_project_id'] ?? null,
-                fn ($q, $id) => $q->whereHas('item', fn ($i) => $i->where('approval_project_id', $id)))
+            ->when($filters['approval_project_ids'] ?? null,
+                fn ($q, $ids) => $q->whereHas('item', fn ($i) => $i->whereIn('approval_project_id', $ids)))
             ->count();
 
         return array_merge(self::summarise($hours), [
@@ -177,9 +177,9 @@ class ReportService
         $rows = DB::table('approval_step_decisions as d')
             ->join('approval_step_instances as i', 'i.id', '=', 'd.approval_step_instance_id')
             ->join('users as u', 'u.id', '=', 'd.decided_by')
-            ->when($filters['approval_project_id'] ?? null, function ($q, $id) {
+            ->when($filters['approval_project_ids'] ?? null, function ($q, $ids) {
                 $q->join('approval_items as it', 'it.id', '=', 'i.approval_item_id')
-                    ->where('it.approval_project_id', $id);
+                    ->whereIn('it.approval_project_id', $ids);
             })
             ->whereNotNull('i.activated_at')
             ->whereNotNull('d.decided_at')
@@ -223,7 +223,7 @@ class ReportService
     {
         $base = self::scopeVisible(Task::query(), $user)
             ->where('escalation_level', '>', 0)
-            ->when($filters['project_id'] ?? null, fn ($q, $id) => $q->where('project_id', $id));
+            ->when($filters['project_ids'] ?? null, fn ($q, $ids) => $q->whereIn('project_id', $ids));
 
         $byLevel = (clone $base)
             ->selectRaw('escalation_level, COUNT(*) as total')
@@ -445,8 +445,8 @@ class ReportService
         return \App\Models\TaskTimeLog::query()
             ->whereHas('task', function ($t) use ($user, $filters) {
                 self::scopeVisible($t, $user)
-                    ->when($filters['project_id'] ?? null, fn ($q, $id) => $q->where('tasks.project_id', $id))
-                    ->when($filters['assigned_to'] ?? null, fn ($q, $id) => $q->where('tasks.assigned_to', $id));
+                    ->when($filters['project_ids'] ?? null, fn ($q, $ids) => $q->whereIn('tasks.project_id', $ids))
+                    ->when($filters['assigned_to'] ?? null, fn ($q, $ids) => $q->whereIn('tasks.assigned_to', $ids));
             });
     }
 
@@ -456,8 +456,8 @@ class ReportService
         return self::scopeVisible(Task::query(), $user)
             ->whereNotNull('completed_at')
             ->whereBetween('completed_at', [$from, $to])
-            ->when($filters['project_id'] ?? null, fn ($q, $id) => $q->where('project_id', $id))
-            ->when($filters['assigned_to'] ?? null, fn ($q, $id) => $q->where('assigned_to', $id));
+            ->when($filters['project_ids'] ?? null, fn ($q, $ids) => $q->whereIn('project_id', $ids))
+            ->when($filters['assigned_to'] ?? null, fn ($q, $ids) => $q->whereIn('assigned_to', $ids));
     }
 
     /**
