@@ -20,7 +20,18 @@ import { apiFetch, formatDate, formatElapsed } from '../utils';
  * Not the same measure as the time logs beside it. Those record effort spent;
  * this records elapsed time, and is normally the larger number.
  */
-export default function TimeInMotion({ projectId, taskId, startedAt, completedAt, status = null, canEdit = true }) {
+export default function TimeInMotion({
+    projectId,
+    taskId,
+    startedAt,
+    completedAt,
+    status = null,
+    canEdit = true,
+    // Starting the clock also moves the task into In Progress, and the rest of
+    // the page is showing that status — so it is told rather than left to
+    // disagree with the server until the next reload.
+    onStarted = null,
+}) {
     // Finished work is not waiting to be started. Cancelled counts as finished
     // even though it carries no completion time — only 'done' is stamped — and
     // a cancelled task wants a Start button least of all.
@@ -64,7 +75,10 @@ export default function TimeInMotion({ projectId, taskId, startedAt, completedAt
         // JSON reply, so the button appeared to do nothing at all.
         apiFetch(`/projects/${projectId}/tasks/${taskId}/start`, { method: 'PATCH' })
             .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-            .then((json) => setStarted(json.started_at))
+            .then((json) => {
+                setStarted(json.started_at);
+                onStarted?.(json);
+            })
             .catch(() => setError('The clock could not be started.'))
             .finally(() => setSaving(false));
     };

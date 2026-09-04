@@ -3096,7 +3096,10 @@ export default function Show() {
     }, [project.id, serverSections]);
 
     // Inline field update (optimistic)
-    const handleInlineUpdate = useCallback((taskId, field, value) => {
+    // persist:false is for a change the server has already made — starting a
+    // task's clock moves it into In Progress server-side, and re-sending that
+    // as an edit would write it twice and log it twice for one press.
+    const handleInlineUpdate = useCallback((taskId, field, value, { persist = true } = {}) => {
         setLocalTasks((prev) => prev.map((t) => {
             if (t.id !== taskId) return t;
             const updated = { ...t, [field]: value };
@@ -3105,6 +3108,8 @@ export default function Show() {
             }
             return updated;
         }));
+
+        if (!persist) return;
 
         apiFetch(`/projects/${project.id}/tasks/${taskId}/patch`, {
             method: 'PATCH',
@@ -6206,8 +6211,8 @@ export default function Show() {
                     projectId={project.id}
                     taskId={detailTaskId}
                     onClose={() => setDetailTaskId(null)}
-                    onTaskUpdate={(taskId, field, value) => {
-                        handleInlineUpdate(taskId, field, value);
+                    onTaskUpdate={(taskId, field, value, options) => {
+                        handleInlineUpdate(taskId, field, value, options);
                     }}
                     onSubtaskCreated={(parentId, newSubtask) => {
                         setLocalTasks(prev => prev.map(t => {

@@ -576,12 +576,31 @@ class TaskController extends Controller
             'This task is already finished, so work cannot be started on it.'
         );
 
+        $changed = false;
+
         if (! $task->started_at) {
-            $task->forceFill(['started_at' => now()])->save();
+            $task->started_at = now();
+            $changed = true;
+        }
+
+        // Pressing Start is somebody saying they have picked the work up, so
+        // the board should say so too rather than leaving it sitting in To Do
+        // with a running clock. Saved through the model, not forced onto the
+        // row, so the status change is logged and announced like any other.
+        if ($task->status !== 'in_progress') {
+            $task->status = 'in_progress';
+            $changed = true;
+        }
+
+        // A second press changes nothing — the clock already started and the
+        // task is already in progress — so it writes nothing either.
+        if ($changed) {
+            $task->save();
         }
 
         return response()->json([
             'started_at' => $task->started_at?->toIso8601String(),
+            'status' => $task->status,
             'time_in_motion_minutes' => $task->timeInMotionMinutes(),
         ]);
     }
