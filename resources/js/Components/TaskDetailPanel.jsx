@@ -12,7 +12,7 @@ import TaskTimePanel from './TaskTimePanel';
 import TimeInMotion from './TimeInMotion';
 import OverdueNotice from './OverdueNotice';
 import CompletedNotice from './CompletedNotice';
-import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom, isPastDue } from '../utils';
+import { formatLabel, formatDate, apiFetch, taskEditUrl, timeAgo, toast, errorMessageFrom, isPastDue, motionMinutes } from '../utils';
 import { request } from '../apiClient';
 import { computeAllFormulas, formatFormulaResult } from '../formulaEngine';
 import { weekOfYearLabel } from '../weekOfYear';
@@ -331,19 +331,17 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
     const completedAt = taskData?.completed_at;
 
     useEffect(() => {
-        if (!showTimeInMotion || !startedAt || completedAt) return undefined;
+        if (!showTimeInMotion || !startedAt || completedAt || taskData?.motion_paused_at) return undefined;
 
         const id = setInterval(() => setElapsedTick((n) => n + 1), 60000);
 
         return () => clearInterval(id);
-    }, [showTimeInMotion, startedAt, completedAt]);
+    }, [showTimeInMotion, startedAt, completedAt, taskData?.motion_paused_at]);
 
-    const elapsedMinutes = (() => {
-        if (!showTimeInMotion || !startedAt) return null;
-        const mins = Math.round(((completedAt ? new Date(completedAt) : new Date()) - new Date(startedAt)) / 60000);
-
-        return mins < 0 ? null : mins;
-    })();
+    // Pauses come out of it: a task left in motion over a weekend was not being
+    // worked all weekend. Same helper the list and the task page use, so the
+    // three cannot drift apart.
+    const elapsedMinutes = showTimeInMotion ? motionMinutes(taskData || {}) : null;
 
     const fetchTask = useCallback(async () => {
         setLoading(true);
@@ -619,7 +617,16 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                     startedAt={taskData.started_at}
                                     completedAt={taskData.completed_at}
                                     status={taskData.status}
+                                    motionPausedAt={taskData.motion_paused_at}
+                                    motionResumedAt={taskData.motion_resumed_at}
+                                    motionPausedMinutes={taskData.motion_paused_minutes}
                                     canEdit={canEdit && !projectIsClosed}
+                                    onMotionChange={(json) => setTaskData((prev) => (prev ? {
+                                        ...prev,
+                                        motion_paused_at: json.motion_paused_at,
+                                        motion_resumed_at: json.motion_resumed_at,
+                                        motion_paused_minutes: json.motion_paused_minutes,
+                                    } : prev))}
                                     onStarted={(json) => {
                                         const status = json.status || 'in_progress';
                                         setTaskData((prev) => (prev ? { ...prev, status, started_at: json.started_at } : prev));

@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\NotificationPreferenceController;
 use App\Http\Controllers\Api\PersonalTodoController;
 use App\Http\Controllers\TaskTimeLogController;
+use App\Http\Controllers\TimeLogAmendmentController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\WebhookNotificationController;
@@ -112,6 +113,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/tasks/{task}/time-logs', [TaskTimeLogController::class, 'index']);
     Route::post('/tasks/{task}/time-logs', [TaskTimeLogController::class, 'store']);
     Route::delete('/time-logs/{timeLog}', [TaskTimeLogController::class, 'destroy']);
+
+    // Corrections to an entry already recorded, decided by whoever runs the
+    // project. Nothing rewrites a time log without one of these behind it.
+    Route::post('/time-logs/{timeLog}/amendments', [TimeLogAmendmentController::class, 'store']);
+    Route::post('/time-log-amendments/{amendment}/approve', [TimeLogAmendmentController::class, 'approve']);
+    Route::post('/time-log-amendments/{amendment}/reject', [TimeLogAmendmentController::class, 'reject']);
 
     Route::get('/personal-todos', [PersonalTodoController::class, 'index']);
     Route::post('/personal-todos', [PersonalTodoController::class, 'store']);

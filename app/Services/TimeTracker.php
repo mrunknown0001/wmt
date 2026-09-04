@@ -81,6 +81,105 @@ class TimeTracker
         return $running->fresh();
     }
 
+    /**
+     * How long today's stretch of work has been, for the Pause box to offer.
+     *
+     * Measured from whichever is later: when this stretch began, or midnight.
+     * A task in motion since last week has not been worked since last week, so
+     * counting from its start would offer a preposterous number — and a task
+     * resumed at nine this morning should offer the time since nine.
+     *
+     * Capped at the person's own working day, because the only thing an
+     * uncapped figure can do is talk somebody into logging the hours they were
+     * asleep. It is a suggestion, not a reading: whoever presses Pause can say
+     * what they actually worked.
+     *
+     * @return array{minutes: int, from: \Illuminate\Support\Carbon}
+     */
+    public static function suggestedDayMinutes(Task $task, User $user): array
+    {
+        $from = $task->motionSegmentStartedAt() ?? now();
+        $dayStart = now()->copy()->startOfDay();
+
+        if ($from->lessThan($dayStart)) {
+            $from = $dayStart;
+        }
+
+        $minutes = $from->greaterThan(now()) ? 0 : (int) $from->diffInMinutes(now());
+
+        $cap = (int) ($user->daily_capacity_minutes ?: TaskTimeLog::MAX_MINUTES);
+        $cap = max(1, min($cap, TaskTimeLog::MAX_MINUTES));
+
+        return ['minutes' => min($minutes, $cap), 'from' => $from];
+    }
+
+    /**
+     * Put the clock down for the day, recording what was worked.
+     *
+     * Two things at once, because they are one thought: the day's work becomes
+     * an ordinary time log dated today, and the motion clock stops so the night
+     * ahead is not counted as time in motion.
+     *
+     * Zero minutes is a legitimate answer — a task picked up and put down again
+     * without progress — and writes no entry rather than an empty one.
+     *
+     * @return array{task: Task, log: ?TaskTimeLog}
+     */
+    public static function pauseDay(Task $task, User $user, int $minutes, ?string $note = null): array
+    {
+        if (! $task->motionIsRunning()) {
+            throw ValidationException::withMessages([
+                'minutes' => 'This task is not in motion, so there is nothing to pause.',
+            ]);
+        }
+
+        if ($task->motionIsPaused()) {
+            throw ValidationException::withMessages([
+                'minutes' => 'This task is already paused.',
+            ]);
+        }
+
+        if ($minutes < 0 || $minutes > TaskTimeLog::MAX_MINUTES) {
+            throw ValidationException::withMessages([
+                'minutes' => 'Enter between 0 minutes and 24 hours.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($task, $user, $minutes, $note) {
+            $log = $minutes > 0
+                ? self::log($task, $user, $minutes, now()->toDateString(), $note)
+                : null;
+
+            $task->motion_paused_at = now();
+            $task->save();
+
+            return ['task' => $task->fresh(), 'log' => $log];
+        });
+    }
+
+    /**
+     * Pick the clock back up.
+     *
+     * The pause just ended is added to the total the task has spent stopped,
+     * and the new stretch starts now — which is what the next Pause will
+     * measure from.
+     */
+    public static function resumeMotion(Task $task): Task
+    {
+        if (! $task->motionIsPaused()) {
+            return $task;
+        }
+
+        $paused = (int) $task->motion_paused_at->diffInMinutes(now());
+
+        $task->motion_paused_minutes = (int) $task->motion_paused_minutes + max(0, $paused);
+        $task->motion_paused_at = null;
+        $task->motion_resumed_at = now();
+        $task->save();
+
+        return $task->fresh();
+    }
+
     /** Record work by hand, for time that was never on a timer. */
     public static function log(Task $task, User $user, int $minutes, ?string $date = null, ?string $note = null): TaskTimeLog
     {

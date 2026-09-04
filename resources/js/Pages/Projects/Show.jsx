@@ -48,7 +48,7 @@ import ShareProjectModal from '../../Components/ShareProjectModal';
 import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
-import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, formatElapsed, isCompletedLate } from '../../utils';
+import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, formatElapsed, isCompletedLate, motionMinutes } from '../../utils';
 import useRunningTimer from '../../useRunningTimer';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
@@ -555,9 +555,16 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                             : (
                                 // Still open, so the number is still moving —
                                 // coloured to say so rather than reading as final.
-                                <span className={task.completed_at
-                                    ? 'text-xs text-gray-600 dark:text-gray-300'
-                                    : 'text-xs text-primary-600 dark:text-primary-400'}>
+                                // A paused task's figure has stopped moving too,
+                                // and saying so beats a live colour on a number
+                                // that will read the same tomorrow.
+                                <span
+                                    title={task.motion_paused_at ? 'Paused' : undefined}
+                                    className={task.completed_at
+                                        ? 'text-xs text-gray-600 dark:text-gray-300'
+                                        : task.motion_paused_at
+                                            ? 'text-xs text-amber-600 dark:text-amber-400'
+                                            : 'text-xs text-primary-600 dark:text-primary-400'}>
                                     {formatElapsed(inMotion)}
                                 </span>
                             )}
@@ -692,24 +699,18 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
  * time and is normally the smaller number.
  */
 function timeInMotion(task) {
-    if (!task.started_at) return null;
-
-    // Closed with no recorded end — a cancelled task. Only 'done' stamps a
-    // completion time, and counting a cancelled task up to now would invent a
-    // span nobody worked.
-    if (!task.completed_at && ['done', 'cancelled'].includes(task.status)) return null;
-
-    const started = new Date(task.started_at);
-    const ended = task.completed_at ? new Date(task.completed_at) : new Date();
-    const minutes = Math.round((ended - started) / 60000);
-
-    // A completion recorded before the start is somebody fixing data by hand.
-    return minutes < 0 ? null : minutes;
+    // Wall-clock less whatever the task spent paused. The rule lives in utils
+    // because the task page and the quick view answer the same question, and
+    // three copies of it would eventually disagree.
+    return motionMinutes(task);
 }
 
 /** Is this task's clock still running? */
 function isInMotion(task) {
-    return !!task.started_at && !task.completed_at && !['done', 'cancelled'].includes(task.status);
+    return !!task.started_at
+        && !task.completed_at
+        && !task.motion_paused_at
+        && !['done', 'cancelled'].includes(task.status);
 }
 
 const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'completion', 'estimate', 'logged'];
@@ -1145,9 +1146,16 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                             : (
                                 // Still open, so the number is still moving —
                                 // coloured to say so rather than reading as final.
-                                <span className={task.completed_at
-                                    ? 'text-xs text-gray-600 dark:text-gray-300'
-                                    : 'text-xs text-primary-600 dark:text-primary-400'}>
+                                // A paused task's figure has stopped moving too,
+                                // and saying so beats a live colour on a number
+                                // that will read the same tomorrow.
+                                <span
+                                    title={task.motion_paused_at ? 'Paused' : undefined}
+                                    className={task.completed_at
+                                        ? 'text-xs text-gray-600 dark:text-gray-300'
+                                        : task.motion_paused_at
+                                            ? 'text-xs text-amber-600 dark:text-amber-400'
+                                            : 'text-xs text-primary-600 dark:text-primary-400'}>
                                     {formatElapsed(inMotion)}
                                 </span>
                             )}

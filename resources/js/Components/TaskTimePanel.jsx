@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Tooltip from './Tooltip';
-import { apiFetch, formatMinutes, formatElapsed, parseMinutes, timeAgo, toast } from '../utils';
+import { apiFetch, errorMessageFrom, formatMinutes, formatElapsed, parseMinutes, timeAgo, toast } from '../utils';
 
 /**
  * Estimate, logged time and the timer for one task.
@@ -36,6 +36,11 @@ export default function TaskTimePanel({
     const [duration, setDuration] = useState('');
     const [note, setNote] = useState('');
     const [loggedOn, setLoggedOn] = useState(() => new Date().toISOString().slice(0, 10));
+    // Corrections: whether this reader decides them, whether this task can have
+    // them at all, and which entry is being corrected right now.
+    const [canReview, setCanReview] = useState(false);
+    const [amendmentsAvailable, setAmendmentsAvailable] = useState(false);
+    const [amending, setAmending] = useState(null);   // { logId, duration, reason }
 
     const running = logs.find((l) => l.running && l.user_id === currentUserId);
 
@@ -46,6 +51,8 @@ export default function TaskTimePanel({
             const data = await res.json();
             setLogs(data.logs || []);
             setTotal(data.total_minutes || 0);
+            setCanReview(!!data.can_review_amendments);
+            setAmendmentsAvailable(!!data.amendments_available);
         } catch {
             // A failed load leaves the panel empty rather than breaking the
             // whole task view around it.
@@ -112,6 +119,59 @@ export default function TaskTimePanel({
             await load();
         } catch {
             toast('Could not save that entry.', 'error');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    /**
+     * Ask for an entry to be corrected.
+     *
+     * Nothing changes on the strength of the request: the figure stands until
+     * whoever runs the project decides. Unless the person asking is that
+     * somebody, in which case there is nobody left to ask and it applies.
+     */
+    const submitAmendment = async (e) => {
+        e.preventDefault();
+
+        if (parseMinutes(amending.duration) === null) {
+            toast('Enter a duration like 1.5, 1:30 or 90m.', 'error');
+            return;
+        }
+
+        setBusy(true);
+        try {
+            const res = await apiFetch(`/api/time-logs/${amending.logId}/amendments`, {
+                method: 'POST',
+                body: JSON.stringify({ duration: amending.duration, reason: amending.reason }),
+            });
+            if (!res.ok) throw new Error(await errorMessageFrom(res, 'Could not send that correction.'));
+
+            const data = await res.json();
+            setAmending(null);
+            await load();
+            announce();
+            toast(data.applied
+                ? 'Entry corrected.'
+                : 'Correction sent for approval.', 'success');
+        } catch (err) {
+            toast(err.message || 'Could not send that correction.', 'error');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const decide = async (amendmentId, verdict) => {
+        setBusy(true);
+        try {
+            const res = await apiFetch(`/api/time-log-amendments/${amendmentId}/${verdict}`, { method: 'POST' });
+            if (!res.ok) throw new Error(await errorMessageFrom(res, 'Could not record that decision.'));
+
+            await load();
+            announce();
+            toast(verdict === 'approve' ? 'Correction approved.' : 'Correction turned down.', 'success');
+        } catch (err) {
+            toast(err.message || 'Could not record that decision.', 'error');
         } finally {
             setBusy(false);
         }
@@ -208,29 +268,143 @@ export default function TaskTimePanel({
 
             {!elapsedOnly && !loading && logs.length > 0 && (
                 <ul className="mt-3 space-y-1.5">
-                    {logs.filter((l) => !l.running).map((log) => (
-                        <li key={log.id} className="group flex items-center gap-2 text-xs">
-                            <span className="w-14 shrink-0 tabular-nums text-gray-900 dark:text-gray-100">{log.duration}</span>
-                            <span className="w-20 shrink-0 text-gray-400">{log.logged_on}</span>
-                            <span className="flex-1 min-w-0 truncate text-gray-500 dark:text-gray-400">
-                                {log.user}{log.note ? ` — ${log.note}` : ''}
-                            </span>
-                            {(log.user_id === currentUserId || canEdit) && (
-                                <Tooltip content="Delete entry">
-                                    <button
-                                        type="button"
-                                        onClick={() => remove(log.id)}
-                                        disabled={busy}
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500"
-                                    >
-                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </Tooltip>
+                    {logs.filter((l) => !l.running).map((log) => {
+                        // Yours to correct, or anyone's if you run the project.
+                        // Never on a task with no project: there would be
+                        // nobody to approve it.
+                        const mine = log.user_id === currentUserId;
+                        const canAmend = amendmentsAvailable && (mine || canReview) && !log.pending_amendment;
+
+                        return (
+                        <li key={log.id} className="group text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="w-14 shrink-0 tabular-nums text-gray-900 dark:text-gray-100">{log.duration}</span>
+                                <span className="w-20 shrink-0 text-gray-400">{log.logged_on}</span>
+                                <span className="flex-1 min-w-0 truncate text-gray-500 dark:text-gray-400">
+                                    {log.user}{log.note ? ` — ${log.note}` : ''}
+                                    {/* An amended figure should not pass for an
+                                        untouched one. */}
+                                    {log.amended && <span className="ml-1 text-[10px] text-gray-400">(amended)</span>}
+                                </span>
+                                {canAmend && (
+                                    <Tooltip content="Ask for this entry to be corrected">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAmending({ logId: log.id, duration: '', reason: '' })}
+                                            disabled={busy}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
+                                        >
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                        </button>
+                                    </Tooltip>
+                                )}
+                                {(mine || canEdit) && (
+                                    <Tooltip content="Delete entry">
+                                        <button
+                                            type="button"
+                                            onClick={() => remove(log.id)}
+                                            disabled={busy}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500"
+                                        >
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </Tooltip>
+                                )}
+                            </div>
+
+                            {/* A correction waiting on a decision. Shown to
+                                everybody who can see the entry — the person who
+                                asked needs to know it is still pending, and the
+                                person who decides needs somewhere to decide. */}
+                            {log.pending_amendment && (
+                                <div className="mt-1 ml-1 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-900/20 px-2 py-1.5">
+                                    <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                                        <span className="font-medium">{log.pending_amendment.requester || 'Someone'}</span>
+                                        {' asks for '}
+                                        <span className="font-medium">{log.pending_amendment.original_duration}</span>
+                                        {' → '}
+                                        <span className="font-medium">{log.pending_amendment.requested_duration}</span>
+                                    </p>
+                                    <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90 mt-0.5">
+                                        {log.pending_amendment.reason}
+                                    </p>
+                                    {canReview ? (
+                                        <div className="mt-1.5 flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => decide(log.pending_amendment.id, 'approve')}
+                                                disabled={busy}
+                                                className="px-2 py-0.5 rounded-md bg-green-600 text-white text-[11px] font-medium hover:bg-green-700 disabled:opacity-50"
+                                            >
+                                                Approve
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => decide(log.pending_amendment.id, 'reject')}
+                                                disabled={busy}
+                                                className="px-2 py-0.5 rounded-md border border-gray-300 dark:border-gray-600 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                                            >
+                                                Turn down
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <p className="mt-0.5 text-[11px] text-amber-600/80 dark:text-amber-400/70">
+                                            Waiting on the project owner.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* What it should say instead, and why. The reason
+                                is required: it is the whole record of a figure
+                                that no longer matches what the timer saw. */}
+                            {amending?.logId === log.id && (
+                                <form onSubmit={submitAmendment} className="mt-1 ml-1 rounded-md border border-gray-200 dark:border-gray-700 px-2 py-2 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] text-gray-500 dark:text-gray-400">Should be</span>
+                                        <input
+                                            type="text"
+                                            value={amending.duration}
+                                            onChange={(e) => setAmending({ ...amending, duration: e.target.value })}
+                                            placeholder="1.5, 1:30, 90m"
+                                            autoFocus
+                                            className="w-28 text-xs rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1 px-2"
+                                        />
+                                        <span className="text-[11px] text-gray-400">instead of {log.duration}</span>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={amending.reason}
+                                        onChange={(e) => setAmending({ ...amending, reason: e.target.value })}
+                                        placeholder="Why — e.g. forgot to stop the timer"
+                                        maxLength={1000}
+                                        className="w-full text-xs rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1 px-2"
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="submit"
+                                            disabled={busy || !amending.duration.trim() || !amending.reason.trim()}
+                                            className="px-2.5 py-1 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 disabled:opacity-50"
+                                        >
+                                            {canReview ? 'Correct entry' : 'Ask for approval'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAmending(null)}
+                                            className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
                             )}
                         </li>
-                    ))}
+                        );
+                    })}
                 </ul>
             )}
 

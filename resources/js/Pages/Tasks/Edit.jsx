@@ -397,6 +397,13 @@ export default function Edit() {
     };
 
     const [showStartDate, setShowStartDate] = useState(!!task.start_date);
+    // Pausing and resuming the clock change the task record; kept here so the
+    // strip redraws from the server's answer rather than a page reload.
+    const [motion, setMotion] = useState({
+        paused_at: task.motion_paused_at || null,
+        resumed_at: task.motion_resumed_at || null,
+        paused_minutes: task.motion_paused_minutes || 0,
+    });
     const [activeTab, setActiveTab] = useState('comments');
 
     // Switching tabs moves the page to what was asked for. Minutes take the full
@@ -693,8 +700,16 @@ export default function Edit() {
                                     startedAt={task.started_at}
                                     completedAt={task.completed_at}
                                     status={data.status}
+                                    motionPausedAt={motion.paused_at}
+                                    motionResumedAt={motion.resumed_at}
+                                    motionPausedMinutes={motion.paused_minutes}
                                     canEdit={canManageTaskDetails && !['completed', 'archived'].includes(project.status)}
                                     onStarted={(json) => setData('status', json.status || 'in_progress')}
+                                    onMotionChange={(json) => setMotion({
+                                        paused_at: json.motion_paused_at,
+                                        resumed_at: json.motion_resumed_at,
+                                        paused_minutes: json.motion_paused_minutes,
+                                    })}
                                 />
                             </div>
                         )}
