@@ -141,6 +141,86 @@ class WorkloadBreakdownTest extends TestCase
         $this->assertSame(5, $row['days_in_scope']);
     }
 
+    public function test_a_task_spanning_days_reports_what_it_costs_per_day(): void
+    {
+        $admin = $this->admin();
+        $worker = $this->worker();
+
+        $monday = Carbon::parse('2026-09-07');
+
+        // Ten hours across a working week: two hours a day.
+        $this->task($worker, [
+            'title' => 'Even across the week',
+            'start_date' => $monday->toDateString(),
+            'due_date' => $monday->copy()->addDays(4)->toDateString(),
+            'estimated_minutes' => 600,
+        ]);
+
+        $row = $this->breakdown($admin, [
+            'user' => $worker->id,
+            'from' => $monday->toDateString(),
+            'to' => $monday->copy()->addDays(4)->toDateString(),
+        ])->assertOk()->json('estimated.0');
+
+        $this->assertSame(5, $row['days_total']);
+        $this->assertSame(120, $row['per_day_minutes'], 'Ten hours over five days is two hours a day.');
+    }
+
+    public function test_the_daily_share_averages_out_a_remainder(): void
+    {
+        $admin = $this->admin();
+        $worker = $this->worker();
+
+        $monday = Carbon::parse('2026-09-07');
+
+        // 100 minutes over three days divides unevenly — the spread hands the
+        // spare minutes to the earliest days, so no single day is the average.
+        $this->task($worker, [
+            'title' => 'Awkward division',
+            'start_date' => $monday->toDateString(),
+            'due_date' => $monday->copy()->addDays(2)->toDateString(),
+            'estimated_minutes' => 100,
+        ]);
+
+        $row = $this->breakdown($admin, [
+            'user' => $worker->id,
+            'from' => $monday->toDateString(),
+            'to' => $monday->copy()->addDays(2)->toDateString(),
+        ])->assertOk()->json('estimated.0');
+
+        $this->assertSame(3, $row['days_total']);
+        $this->assertSame(33, $row['per_day_minutes'], '100 over 3 rounds to 33, not 34.');
+
+        // Whatever the rate says, the parts still add back to the estimate.
+        $this->assertSame(100, $row['minutes']);
+    }
+
+    public function test_a_single_day_task_has_a_days_total_of_one(): void
+    {
+        $admin = $this->admin();
+        $worker = $this->worker();
+
+        $monday = Carbon::parse('2026-09-07');
+
+        // Nothing to spread: the UI shows a dash rather than a rate, because
+        // the estimate is simply what the day costs.
+        $this->task($worker, [
+            'title' => 'One day only',
+            'start_date' => $monday->toDateString(),
+            'due_date' => $monday->toDateString(),
+            'estimated_minutes' => 180,
+        ]);
+
+        $row = $this->breakdown($admin, [
+            'user' => $worker->id,
+            'from' => $monday->toDateString(),
+            'to' => $monday->toDateString(),
+        ])->assertOk()->json('estimated.0');
+
+        $this->assertSame(1, $row['days_total']);
+        $this->assertSame(180, $row['per_day_minutes']);
+    }
+
     public function test_unestimated_and_undated_work_is_listed_separately(): void
     {
         $admin = $this->admin();
