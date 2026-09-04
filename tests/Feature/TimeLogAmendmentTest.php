@@ -272,20 +272,6 @@ class TimeLogAmendmentTest extends TestCase
         ])->assertStatus(403);
     }
 
-    public function test_a_running_timer_has_no_figure_to_amend(): void
-    {
-        $running = TaskTimeLog::create([
-            'task_id' => $this->task->id,
-            'user_id' => $this->worker->id,
-            'started_at' => now(),
-            'logged_on' => now()->toDateString(),
-        ]);
-
-        $this->actingAs($this->worker)->postJson("/api/time-logs/{$running->id}/amendments", [
-            'duration' => '3h', 'reason' => 'Too soon.',
-        ])->assertStatus(422);
-    }
-
     public function test_the_panel_carries_the_pending_correction_and_who_may_decide_it(): void
     {
         $log = $this->log(120);

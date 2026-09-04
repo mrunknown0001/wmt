@@ -7,12 +7,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Services\MotionEffortGenerator;
 
 /**
- * Work recorded against a task.
+ * Work recorded against a task, on one day, for one person.
  *
- * A row is either finished (minutes set) or running (started_at set, minutes
- * null). One person may only have one running row at a time — see TimeTracker.
+ * Most rows are the effort generator's: worked out from the task's clock and
+ * recalculated whenever the evidence changes. The rest are statements — what
+ * somebody said at a pause, or a correction they argued for and had approved —
+ * and those are never revised on their author's behalf. `source` says which,
+ * and `amended_at` marks a figure that has been through an approval.
  */
 class TaskTimeLog extends Model
 {
@@ -25,17 +29,18 @@ class TaskTimeLog extends Model
         'task_id',
         'user_id',
         'minutes',
-        'started_at',
+        'source',
         'logged_on',
         'note',
+        'amended_at',
     ];
 
     protected function casts(): array
     {
         return [
             'minutes' => 'integer',
-            'started_at' => 'datetime',
             'logged_on' => 'date:Y-m-d',
+            'amended_at' => 'datetime',
         ];
     }
 
@@ -60,29 +65,25 @@ class TaskTimeLog extends Model
         return $this->amendments()->pending()->latest('id')->first();
     }
 
-    public function isRunning(): bool
-    {
-        return $this->started_at !== null && $this->minutes === null;
-    }
-
-    public function scopeRunning(Builder $query): Builder
-    {
-        return $query->whereNotNull('started_at')->whereNull('minutes');
-    }
-
-    /** Only finished entries carry a duration, so only these can be summed. */
+    /**
+     * Every row carries a duration now that nothing is left running, but the
+     * scope stays: reports and totals were written against it, and "the entries
+     * that can be summed" is still the right idea to express at a call site.
+     */
     public function scopeCompleted(Builder $query): Builder
     {
         return $query->whereNotNull('minutes');
     }
 
-    /** Minutes elapsed so far on a running timer. */
-    public function elapsedMinutes(): int
+    /** Worked out from the clock, and so open to being worked out again. */
+    public function isGenerated(): bool
     {
-        if (!$this->isRunning()) {
-            return (int) $this->minutes;
-        }
+        return $this->source === MotionEffortGenerator::MOTION && $this->amended_at === null;
+    }
 
-        return (int) $this->started_at->diffInMinutes(now());
+    /** Said by a person: a pause figure, or a correction that was approved. */
+    public function isStated(): bool
+    {
+        return ! $this->isGenerated();
     }
 }

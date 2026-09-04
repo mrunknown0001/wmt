@@ -62,9 +62,15 @@ class TimeCorrectionController extends Controller
                 'timeLog:id,task_id,user_id,minutes,logged_on,note',
                 'timeLog.task:id,title,project_id',
                 'timeLog.task.project:id,name',
+                // An addition names its task directly — there is no entry to
+                // reach it through until the day it is approved.
+                'task:id,title,project_id',
+                'task.project:id,name',
             ])
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
-            ->when($projectId, fn ($q, $id) => $q->whereHas('timeLog.task', fn ($t) => $t->where('project_id', $id)))
+            ->when($projectId, fn ($q, $id) => $q->where(fn ($w) => $w
+                ->whereHas('timeLog.task', fn ($t) => $t->where('project_id', $id))
+                ->orWhereHas('task', fn ($t) => $t->where('project_id', $id))))
             // Oldest first while they are waiting — a queue is worked from the
             // front. Decided ones read newest first, which is a history.
             ->orderBy('created_at', $status === TimeLogAmendment::PENDING ? 'asc' : 'desc');
@@ -75,9 +81,9 @@ class TimeCorrectionController extends Controller
         // the unfiltered set so choosing one never empties the dropdown that
         // chose it.
         $projectIds = (clone $base())
-            ->with('timeLog.task:id,project_id')
+            ->with(['timeLog.task:id,project_id', 'task:id,project_id'])
             ->get()
-            ->pluck('timeLog.task.project_id')
+            ->map(fn (TimeLogAmendment $a) => $a->timeLog?->task?->project_id ?? $a->task?->project_id)
             ->filter()
             ->unique();
 
@@ -102,10 +108,11 @@ class TimeCorrectionController extends Controller
     private function row(TimeLogAmendment $amendment): array
     {
         $log = $amendment->timeLog;
-        $task = $log?->task;
+        $task = $amendment->subjectTask();
 
         return [
             'id' => $amendment->id,
+            'kind' => $amendment->kind,
             'status' => $amendment->status,
             'reason' => $amendment->reason,
             'requester' => $amendment->requester?->name,
@@ -119,7 +126,7 @@ class TimeCorrectionController extends Controller
             // What the entry says now, which is the requested figure once the
             // correction is approved and the original after a refusal.
             'current_duration' => TimeTracker::formatMinutes($log?->minutes),
-            'logged_on' => $log?->logged_on?->toDateString(),
+            'logged_on' => ($amendment->logged_on ?? $log?->logged_on)?->toDateString(),
             'note' => $log?->note,
             'task_id' => $task?->id,
             'task_title' => $task?->title,

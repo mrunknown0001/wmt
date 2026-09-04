@@ -14,7 +14,6 @@ import GlobalSearch from '../Components/GlobalSearch';
 // list and message rendering should not be downloaded by every page view.
 const AiChatWidget = lazy(() => import('../Components/AiChat/AiChatWidget'));
 import TodoMenu from '../Components/TodoMenu';
-import RunningTimer from '../Components/RunningTimer';
 import Tooltip from '../Components/Tooltip';
 
 const HomeIcon = () => (
@@ -522,7 +521,6 @@ export default function AuthenticatedLayout({ children, title, contained = false
                         <div className="flex-1 flex justify-center">
                             <GlobalSearch />
                         </div>
-                        <RunningTimer />
                         <ThemeToggle className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
                         <Tooltip content="Notes">
                             <Link

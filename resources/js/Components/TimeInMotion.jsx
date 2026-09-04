@@ -32,6 +32,10 @@ export default function TimeInMotion({
     motionPausedAt = null,
     motionResumedAt = null,
     motionPausedMinutes = 0,
+    // Whether the clock has run past the day it started on. Answered by the
+    // server, which owns the application's timezone — the browser's own idea of
+    // where a day ends belongs to whoever is looking, not to the work.
+    motionSpansDays = null,
     canEdit = true,
     // Starting the clock also moves the task into In Progress, and the rest of
     // the page is showing that status — so it is told rather than left to
@@ -80,9 +84,11 @@ export default function TimeInMotion({
 
     // Only offered once the task has run past the day it began on: work that
     // starts and finishes inside a day needs no per-day capture, because the
-    // whole span is the day.
-    const spansDays = !!started
-        && new Date(started).toDateString() !== new Date(completedAt || Date.now()).toDateString();
+    // whole span is the day. Falls back to the browser's reckoning only when
+    // the server has not said — an older page, or a caller that predates it.
+    const spansDays = motionSpansDays !== null && motionSpansDays !== undefined
+        ? !!motionSpansDays
+        : (!!started && new Date(started).toDateString() !== new Date(completedAt || Date.now()).toDateString());
 
     const applyMotion = (json) => {
         setPaused(json.motion_paused_at || null);

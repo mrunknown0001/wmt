@@ -9,78 +9,19 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Starting, stopping and recording work against tasks.
+ * Putting the clock down for the day, and picking it back up.
  *
- * The one rule the rest of the app relies on: a person has at most one running
- * timer. Two would double-count the same hour, and there is no way to tell
- * afterwards which was the real one.
+ * There is no timer to start any more, and no box to type an afternoon into.
+ * A task's clock is the record — it starts when the work starts and stops when
+ * the work stops — and effort is worked out from it by MotionEffortGenerator.
+ *
+ * What is left here is the human end of that: the pause, where somebody says
+ * what today was actually worth, and the resume that puts them back to work.
+ * A pause figure is a statement rather than an inference, so it is recorded as
+ * one and the generator works around it.
  */
 class TimeTracker
 {
-    /** A timer left running past this is a forgotten one, not a long day. */
-    public const MAX_RUNNING_HOURS = 24;
-
-    public static function running(User $user): ?TaskTimeLog
-    {
-        return TaskTimeLog::running()->where('user_id', $user->id)->latest('started_at')->first();
-    }
-
-    /**
-     * Start the clock on a task, stopping whatever was already running.
-     *
-     * Switching tasks is the common case, so it stops the previous timer rather
-     * than refusing — being told "stop the other one first" every time is how
-     * people give up on time tracking.
-     *
-     * @return array{started: TaskTimeLog, stopped: ?TaskTimeLog}
-     */
-    public static function start(Task $task, User $user): array
-    {
-        return DB::transaction(function () use ($task, $user) {
-            $stopped = self::stop($user);
-
-            $started = TaskTimeLog::create([
-                'task_id' => $task->id,
-                'user_id' => $user->id,
-                'started_at' => now(),
-                'logged_on' => now()->toDateString(),
-            ]);
-
-            return ['started' => $started, 'stopped' => $stopped];
-        });
-    }
-
-    /**
-     * Stop the running timer and turn it into a finished entry.
-     *
-     * A timer left running overnight is capped rather than recorded: nobody
-     * worked nineteen hours, and an outlier that large distorts every average
-     * built on top of it.
-     */
-    public static function stop(User $user): ?TaskTimeLog
-    {
-        $running = self::running($user);
-
-        if (!$running) {
-            return null;
-        }
-
-        $minutes = min(
-            $running->elapsedMinutes(),
-            self::MAX_RUNNING_HOURS * 60,
-        );
-
-        $running->update([
-            'minutes' => max(1, $minutes), // a sub-minute timer still happened
-            'started_at' => null,
-            // Credited to the day it began, so a shift crossing midnight lands
-            // on the day the person would say they worked it.
-            'logged_on' => $running->started_at->toDateString(),
-        ]);
-
-        return $running->fresh();
-    }
-
     /**
      * How long today's stretch of work has been, for the Pause box to offer.
      *
@@ -91,14 +32,16 @@ class TimeTracker
      *
      * Capped at the person's own working day, because the only thing an
      * uncapped figure can do is talk somebody into logging the hours they were
-     * asleep. It is a suggestion, not a reading: whoever presses Pause can say
-     * what they actually worked.
+     * asleep. It is a suggestion, not a reading: whoever presses Pause knows
+     * what they actually did.
      *
      * @return array{minutes: int, from: \Illuminate\Support\Carbon}
      */
     public static function suggestedDayMinutes(Task $task, User $user): array
     {
-        $from = $task->motionSegmentStartedAt() ?? now();
+        $segment = MotionClock::current($task);
+
+        $from = $segment?->started_at?->copy() ?? $task->motionSegmentStartedAt() ?? now();
         $dayStart = now()->copy()->startOfDay();
 
         if ($from->lessThan($dayStart)) {
@@ -107,7 +50,7 @@ class TimeTracker
 
         $minutes = $from->greaterThan(now()) ? 0 : (int) $from->diffInMinutes(now());
 
-        $cap = (int) ($user->daily_capacity_minutes ?: TaskTimeLog::MAX_MINUTES);
+        $cap = (int) ($user->daily_capacity_minutes ?: MotionEffortGenerator::DEFAULT_CAPACITY_MINUTES);
         $cap = max(1, min($cap, TaskTimeLog::MAX_MINUTES));
 
         return ['minutes' => min($minutes, $cap), 'from' => $from];
@@ -116,12 +59,15 @@ class TimeTracker
     /**
      * Put the clock down for the day, recording what was worked.
      *
-     * Two things at once, because they are one thought: the day's work becomes
-     * an ordinary time log dated today, and the motion clock stops so the night
-     * ahead is not counted as time in motion.
+     * Three things at once, because they are one thought: the stretch of work
+     * ends, the day's figure is recorded as a statement, and the clock stops so
+     * the night ahead is not counted as time in motion.
      *
      * Zero minutes is a legitimate answer — a task picked up and put down again
-     * without progress — and writes no entry rather than an empty one.
+     * without progress — and is recorded rather than skipped. Saying "none" is
+     * still saying: without the statement on the record the generator would
+     * look at a clock that ran all day and infer a day's work from it, which is
+     * the opposite of what was just said.
      *
      * @return array{task: Task, log: ?TaskTimeLog}
      */
@@ -145,24 +91,28 @@ class TimeTracker
             ]);
         }
 
-        return DB::transaction(function () use ($task, $user, $minutes, $note) {
-            $log = $minutes > 0
-                ? self::log($task, $user, $minutes, now()->toDateString(), $note)
-                : null;
+        $result = DB::transaction(function () use ($task, $user, $minutes, $note) {
+            $log = self::declare($task, $user, $minutes, now()->toDateString(), $note);
 
             $task->motion_paused_at = now();
             $task->save();
 
-            return ['task' => $task->fresh(), 'log' => $log];
+            return ['task' => $task, 'log' => $log];
         });
+
+        // After the statement is on record, so the generator shares out what is
+        // left of the day rather than what was left before the pause.
+        MotionClock::close($task);
+
+        return ['task' => $result['task']->fresh(), 'log' => $result['log']];
     }
 
     /**
      * Pick the clock back up.
      *
      * The pause just ended is added to the total the task has spent stopped,
-     * and the new stretch starts now — which is what the next Pause will
-     * measure from.
+     * and a new stretch starts now — which is what the next Pause will measure
+     * from, and what the generator will share out for the rest of the day.
      */
     public static function resumeMotion(Task $task): Task
     {
@@ -177,13 +127,31 @@ class TimeTracker
         $task->motion_resumed_at = now();
         $task->save();
 
+        MotionClock::open($task);
+
         return $task->fresh();
     }
 
-    /** Record work by hand, for time that was never on a timer. */
-    public static function log(Task $task, User $user, int $minutes, ?string $date = null, ?string $note = null): TaskTimeLog
-    {
-        if ($minutes < 1 || $minutes > TaskTimeLog::MAX_MINUTES) {
+    /**
+     * Record a figure somebody stated: a pause, or an approved correction.
+     *
+     * Distinct from anything the clock inferred. The generator subtracts these
+     * from the day and leaves their tasks alone, so a statement is never
+     * quietly recalculated into something its author did not say.
+     */
+    public static function declare(
+        Task $task,
+        User $user,
+        int $minutes,
+        ?string $date = null,
+        ?string $note = null,
+        string $source = MotionEffortGenerator::DECLARED,
+    ): TaskTimeLog {
+        // Nothing is an answer when somebody is closing their own day; it is
+        // not an answer when they are asking for an entry to be created.
+        $floor = $source === MotionEffortGenerator::DECLARED ? 0 : 1;
+
+        if ($minutes < $floor || $minutes > TaskTimeLog::MAX_MINUTES) {
             throw ValidationException::withMessages([
                 'minutes' => 'Enter between 1 minute and 24 hours.',
             ]);
@@ -193,6 +161,7 @@ class TimeTracker
             'task_id' => $task->id,
             'user_id' => $user->id,
             'minutes' => $minutes,
+            'source' => $source,
             'logged_on' => $date ?: now()->toDateString(),
             'note' => $note,
         ]);

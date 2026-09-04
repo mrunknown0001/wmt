@@ -1,13 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import Tooltip from './Tooltip';
-import { apiFetch, errorMessageFrom, formatMinutes, formatElapsed, parseMinutes, timeAgo, toast } from '../utils';
+import { apiFetch, errorMessageFrom, formatMinutes, formatElapsed, parseMinutes, toast } from '../utils';
 
 /**
- * Estimate, logged time and the timer for one task.
+ * Estimate and recorded time for one task.
  *
- * Timer changes are announced on `wmt:timer-changed` so the header indicator
- * follows along without either component knowing about the other — the same
- * pattern the notification bell already uses.
+ * Nothing here starts a clock or types in an afternoon any more. The figures
+ * are worked out from the task's own clock — see the Time in motion strip — and
+ * this reports them, says which of them a person stood behind, and offers the
+ * two ways to argue with them: correct an entry, or ask for one on a day the
+ * clock never ran.
+ *
+ * Changes are announced on `wmt:timer-changed`, which the motion strip also
+ * raises when it pauses, so the two stay in step without either knowing about
+ * the other.
  */
 export default function TaskTimePanel({
     taskId,
@@ -32,17 +38,20 @@ export default function TaskTimePanel({
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
+    // Asking for an entry on a day with none: the replacement for typing one
+    // straight in.
     const [adding, setAdding] = useState(false);
     const [duration, setDuration] = useState('');
-    const [note, setNote] = useState('');
-    const [loggedOn, setLoggedOn] = useState(() => new Date().toISOString().slice(0, 10));
+    const [reason, setReason] = useState('');
+    // Today according to the application, not to the browser: those are
+    // different days for anybody whose timezone is not the server's.
+    const [today, setToday] = useState(null);
+    const [loggedOn, setLoggedOn] = useState('');
     // Corrections: whether this reader decides them, whether this task can have
     // them at all, and which entry is being corrected right now.
     const [canReview, setCanReview] = useState(false);
     const [amendmentsAvailable, setAmendmentsAvailable] = useState(false);
     const [amending, setAmending] = useState(null);   // { logId, duration, reason }
-
-    const running = logs.find((l) => l.running && l.user_id === currentUserId);
 
     const load = useCallback(async () => {
         try {
@@ -53,6 +62,10 @@ export default function TaskTimePanel({
             setTotal(data.total_minutes || 0);
             setCanReview(!!data.can_review_amendments);
             setAmendmentsAvailable(!!data.amendments_available);
+            if (data.today) {
+                setToday(data.today);
+                setLoggedOn((prev) => prev || data.today);
+            }
         } catch {
             // A failed load leaves the panel empty rather than breaking the
             // whole task view around it.
@@ -77,27 +90,14 @@ export default function TaskTimePanel({
 
     const announce = () => window.dispatchEvent(new CustomEvent('wmt:timer-changed'));
 
-    const toggleTimer = async () => {
-        setBusy(true);
-        try {
-            const url = running ? '/api/timer/stop' : `/api/tasks/${taskId}/timer/start`;
-            const res = await apiFetch(url, { method: 'POST' });
-            if (!res.ok) throw new Error();
-
-            const data = await res.json();
-            if (!running && data.stopped) {
-                toast(`Stopped the timer on ${data.stopped.task_title || 'the previous task'}.`);
-            }
-            await load();
-            announce();
-        } catch {
-            toast('Could not change the timer.', 'error');
-        } finally {
-            setBusy(false);
-        }
-    };
-
-    const addManual = async (e) => {
+    /**
+     * Ask for an entry on a day the clock never ran.
+     *
+     * Goes through the same approval as a correction, and lands as a figure the
+     * generator will not revise. Somebody who runs the project is not asking
+     * anybody, so theirs takes effect at once.
+     */
+    const requestEntry = async (e) => {
         e.preventDefault();
 
         if (parseMinutes(duration) === null) {
@@ -107,18 +107,21 @@ export default function TaskTimePanel({
 
         setBusy(true);
         try {
-            const res = await apiFetch(`/api/tasks/${taskId}/time-logs`, {
+            const res = await apiFetch(`/api/tasks/${taskId}/time-log-amendments`, {
                 method: 'POST',
-                body: JSON.stringify({ duration, logged_on: loggedOn, note: note || null }),
+                body: JSON.stringify({ duration, logged_on: loggedOn, reason }),
             });
-            if (!res.ok) throw new Error();
+            if (!res.ok) throw new Error(await errorMessageFrom(res, 'Could not send that request.'));
 
+            const data = await res.json();
             setDuration('');
-            setNote('');
+            setReason('');
             setAdding(false);
             await load();
-        } catch {
-            toast('Could not save that entry.', 'error');
+            announce();
+            toast(data.applied ? 'Entry added.' : 'Entry sent for approval.', 'success');
+        } catch (err) {
+            toast(err.message || 'Could not send that request.', 'error');
         } finally {
             setBusy(false);
         }
@@ -201,30 +204,6 @@ export default function TaskTimePanel({
         <div className={className}>
             <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Time</h4>
-                {canEdit && showControls && (
-                    <button
-                        type="button"
-                        onClick={toggleTimer}
-                        disabled={busy}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-                            running
-                                ? 'bg-red-600 text-white hover:bg-red-700'
-                                : 'bg-primary-600 text-white hover:bg-primary-700'
-                        }`}
-                    >
-                        {running ? (
-                            <>
-                                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>
-                                Stop
-                            </>
-                        ) : (
-                            <>
-                                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                                Start timer
-                            </>
-                        )}
-                    </button>
-                )}
             </div>
 
             {!elapsedOnly && (
@@ -233,7 +212,7 @@ export default function TaskTimePanel({
                         {formatMinutes(total)}
                     </span>
                     <span className="text-xs text-gray-400">
-                        {estimatedMinutes > 0 ? `logged of ${formatMinutes(estimatedMinutes)} estimated` : 'logged · no estimate set'}
+                        {estimatedMinutes > 0 ? `recorded of ${formatMinutes(estimatedMinutes)} estimated` : 'recorded · no estimate set'}
                     </span>
                 </div>
             )}
@@ -245,12 +224,6 @@ export default function TaskTimePanel({
                         style={{ width: `${pct}%` }}
                     />
                 </div>
-            )}
-
-            {!elapsedOnly && running && (
-                <p className="mt-2 text-xs text-primary-600 dark:text-primary-400">
-                    Running since {timeAgo(running.started_at)}
-                </p>
             )}
 
             {/* Elapsed time, where the project records when work began. A
@@ -268,7 +241,7 @@ export default function TaskTimePanel({
 
             {!elapsedOnly && !loading && logs.length > 0 && (
                 <ul className="mt-3 space-y-1.5">
-                    {logs.filter((l) => !l.running).map((log) => {
+                    {logs.map((log) => {
                         // Yours to correct, or anyone's if you run the project.
                         // Never on a task with no project: there would be
                         // nobody to approve it.
@@ -285,6 +258,11 @@ export default function TaskTimePanel({
                                     {/* An amended figure should not pass for an
                                         untouched one. */}
                                     {log.amended && <span className="ml-1 text-[10px] text-gray-400">(amended)</span>}
+                                    {!log.amended && (
+                                        <span className="ml-1 text-[10px] text-gray-400">
+                                            {log.generated ? '(from the clock)' : '(entered)'}
+                                        </span>
+                                    )}
                                 </span>
                                 {canAmend && (
                                     <Tooltip content="Ask for this entry to be corrected">
@@ -300,7 +278,7 @@ export default function TaskTimePanel({
                                         </button>
                                     </Tooltip>
                                 )}
-                                {(mine || canEdit) && (
+                                {(mine || canEdit) && !log.generated && (
                                     <Tooltip content="Delete entry">
                                         <button
                                             type="button"
@@ -408,18 +386,21 @@ export default function TaskTimePanel({
                 </ul>
             )}
 
-            {canEdit && showControls && !adding && (
+            {/* The clock cannot record what it never saw. This is the way back
+                in for a day spent away from it — and it goes through the same
+                approval as any other change to the record. */}
+            {canEdit && showControls && amendmentsAvailable && !adding && (
                 <button
                     type="button"
                     onClick={() => setAdding(true)}
                     className="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline"
                 >
-                    + Log time manually
+                    + Ask for an entry
                 </button>
             )}
 
             {canEdit && showControls && adding && (
-                <form onSubmit={addManual} className="mt-3 space-y-2">
+                <form onSubmit={requestEntry} className="mt-3 space-y-2">
                     <div className="flex gap-2">
                         <input
                             type="text" value={duration} onChange={(e) => setDuration(e.target.value)}
@@ -427,21 +408,23 @@ export default function TaskTimePanel({
                             className="w-28 text-xs rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
                         />
                         <input
-                            type="date" value={loggedOn} onChange={(e) => setLoggedOn(e.target.value)}
+                            type="date" value={loggedOn} max={today || undefined}
+                            onChange={(e) => setLoggedOn(e.target.value)}
                             className="text-xs rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
                         />
                     </div>
                     <input
-                        type="text" value={note} onChange={(e) => setNote(e.target.value)}
-                        placeholder="Note (optional)" maxLength={255}
+                        type="text" value={reason} onChange={(e) => setReason(e.target.value)}
+                        placeholder="Why the clock missed it — e.g. on site, no laptop"
+                        maxLength={1000}
                         className="w-full text-xs rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5 px-2"
                     />
                     <div className="flex gap-2">
-                        <button type="submit" disabled={busy || !duration.trim()}
+                        <button type="submit" disabled={busy || !duration.trim() || !reason.trim()}
                             className="px-2.5 py-1 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 disabled:opacity-50">
-                            Save
+                            {canReview ? 'Add entry' : 'Ask for approval'}
                         </button>
-                        <button type="button" onClick={() => { setAdding(false); setDuration(''); setNote(''); }}
+                        <button type="button" onClick={() => { setAdding(false); setDuration(''); setReason(''); setLoggedOn(today || ''); }}
                             className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
                             Cancel
                         </button>

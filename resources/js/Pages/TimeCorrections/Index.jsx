@@ -73,8 +73,8 @@ export default function TimeCorrectionsIndex({ amendments, projects = [], filter
                 <PageHeader
                     title="Time corrections"
                     description={mine
-                        ? 'Changes you have asked for on time already recorded, and where they got to.'
-                        : 'Requests to change recorded time on projects you run. Approving writes the new figure onto the entry; turning one down leaves it exactly as it was.'}
+                        ? 'Changes you have asked for on your recorded time, and where they got to.'
+                        : 'Requests to change recorded time on projects you run — corrections to what the clock worked out, and entries for days it never saw. Approving writes the figure; turning one down leaves the record exactly as it was.'}
                     breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Time corrections' }]}
                 />
 
@@ -169,16 +169,26 @@ export default function TimeCorrectionsIndex({ amendments, projects = [], filter
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 {/* The change itself, first and biggest: it is what
-                                                    the decision is about. */}
-                                                <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400 line-through">
-                                                    {a.original_duration}
-                                                </span>
-                                                <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                                </svg>
-                                                <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-                                                    {a.requested_duration}
-                                                </span>
+                                                    the decision is about. An addition has nothing to
+                                                    strike through — there was no entry. */}
+                                                {a.kind === 'add' ? (
+                                                    <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                                                        <span className="font-normal text-gray-500 dark:text-gray-400">New entry </span>
+                                                        {a.requested_duration}
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400 line-through">
+                                                            {a.original_duration}
+                                                        </span>
+                                                        <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                                        </svg>
+                                                        <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                                                            {a.requested_duration}
+                                                        </span>
+                                                    </>
+                                                )}
                                                 <span className="text-xs text-gray-400">on {a.logged_on ? formatDate(a.logged_on) : '—'}</span>
                                                 <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${statusChip(a.status)}`}>
                                                     {statusWord[a.status] || a.status}
@@ -209,7 +219,7 @@ export default function TimeCorrectionsIndex({ amendments, projects = [], filter
                                                     {statusWord[a.status]} by {a.reviewer || 'someone'}
                                                     {a.reviewed_at ? ` ${timeAgo(a.reviewed_at)}` : ''}
                                                     {a.review_note ? ` — ${a.review_note}` : ''}
-                                                    {a.status === 'rejected' && ` · entry still reads ${a.current_duration}`}
+                                                    {a.status === 'rejected' && a.kind !== 'add' && ` · entry still reads ${a.current_duration}`}
                                                 </p>
                                             )}
                                         </div>
@@ -253,7 +263,7 @@ export default function TimeCorrectionsIndex({ amendments, projects = [], filter
                                                     onClick={() => decide(a.id, 'approve', deciding.note)}
                                                     className="px-2.5 py-1 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 disabled:opacity-50"
                                                 >
-                                                    Approve — make it {a.requested_duration}
+                                                    {a.kind === 'add' ? `Approve — add ${a.requested_duration}` : `Approve — make it ${a.requested_duration}`}
                                                 </button>
                                                 <button
                                                     type="button"

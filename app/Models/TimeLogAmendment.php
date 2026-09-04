@@ -19,12 +19,19 @@ class TimeLogAmendment extends Model
 {
     use HasFactory;
 
+    /** Change what an entry says, or add one that was never recorded. */
+    public const AMEND = 'amend';
+    public const ADD = 'add';
+
     public const PENDING = 'pending';
     public const APPROVED = 'approved';
     public const REJECTED = 'rejected';
 
     protected $fillable = [
         'task_time_log_id',
+        'kind',
+        'task_id',
+        'logged_on',
         'requested_by',
         'original_minutes',
         'requested_minutes',
@@ -40,6 +47,7 @@ class TimeLogAmendment extends Model
         return [
             'original_minutes' => 'integer',
             'requested_minutes' => 'integer',
+            'logged_on' => 'date:Y-m-d',
             'reviewed_at' => 'datetime',
         ];
     }
@@ -47,6 +55,11 @@ class TimeLogAmendment extends Model
     public function timeLog(): BelongsTo
     {
         return $this->belongsTo(TaskTimeLog::class, 'task_time_log_id');
+    }
+
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
     }
 
     public function requester(): BelongsTo
@@ -77,20 +90,42 @@ class TimeLogAmendment extends Model
         // Project managers run every project, so the only condition left is
         // that the entry belongs to one at all: a standalone task has no owner
         // to decide anything.
-        if ($user->can('manage-projects')) {
-            return $query->whereHas('timeLog.task', fn ($q) => $q->whereNotNull('project_id'));
-        }
+        // An addition names its task directly; an amendment reaches one through
+        // the entry it corrects. Both have to be matched, or half the queue
+        // would go missing.
+        $runsIt = function ($q) use ($user) {
+            if ($user->can('manage-projects')) {
+                $q->whereNotNull('project_id');
 
-        return $query->whereHas('timeLog.task.project', function ($q) use ($user) {
-            $q->where('owner_id', $user->id)
-                ->orWhereHas('members', fn ($m) => $m
-                    ->where('users.id', $user->id)
-                    ->where('project_members.role', 'admin'));
-        });
+                return;
+            }
+
+            $q->whereHas('project', function ($p) use ($user) {
+                $p->where('owner_id', $user->id)
+                    ->orWhereHas('members', fn ($m) => $m
+                        ->where('users.id', $user->id)
+                        ->where('project_members.role', 'admin'));
+            });
+        };
+
+        return $query->where(fn ($q) => $q
+            ->whereHas('timeLog.task', $runsIt)
+            ->orWhereHas('task', $runsIt));
     }
 
     public function isPending(): bool
     {
         return $this->status === self::PENDING;
+    }
+
+    public function isAddition(): bool
+    {
+        return $this->kind === self::ADD;
+    }
+
+    /** The task this concerns, whether through an entry or on its own. */
+    public function subjectTask(): ?Task
+    {
+        return $this->timeLog?->task ?? $this->task;
     }
 }
