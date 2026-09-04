@@ -168,6 +168,44 @@ class ReportFilterTest extends TestCase
         $this->assertSame(1, $this->completedCount("project=none&assignee={$this->admin->id}"));
     }
 
+    public function test_archived_projects_are_offered_and_sort_after_the_live_ones(): void
+    {
+        $this->beta->update(['status' => 'archived']);
+        $gamma = Project::create(['name' => 'Gamma', 'status' => 'active', 'owner_id' => $this->admin->id]);
+
+        $projects = $this->actingAs($this->admin)
+            ->get('/reports')
+            ->assertOk()
+            ->viewData('page')['props']['projects'];
+
+        $names = collect($projects)->pluck('name')->all();
+        $this->assertSame(['Alpha', 'Gamma', 'Beta'], $names, 'archived projects sort last');
+        $this->assertSame('archived', collect($projects)->firstWhere('name', 'Beta')['status']);
+
+        $gamma->delete();
+    }
+
+    public function test_an_archived_project_can_still_be_filtered_by(): void
+    {
+        $this->beta->update(['status' => 'archived']);
+
+        // Archiving does not unfinish the task, so the figure does not move.
+        $this->assertSame(1, $this->completedCount("project={$this->beta->id}"));
+        $this->assertSame(2, $this->completedCount(''));
+    }
+
+    public function test_every_project_plus_no_project_reaches_the_total_even_with_archived_ones(): void
+    {
+        $this->beta->update(['status' => 'archived']);
+        $this->standalone();
+
+        $everything = $this->completedCount('');
+        $this->assertSame(
+            $everything,
+            $this->completedCount("project={$this->alpha->id},{$this->beta->id},none"),
+        );
+    }
+
     /** A finished task belonging to no project at all — the standalone kind. */
     private function standalone(): Task
     {

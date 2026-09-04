@@ -103,9 +103,19 @@ class ReportController extends Controller
             ->all();
     }
 
+    /**
+     * The projects this person may filter by, archived ones included.
+     *
+     * Archiving a project does not unfinish its tasks: they stay in every total
+     * on this page, so leaving them off the list left work that was counted but
+     * could not be asked for. They sort after the live projects and carry their
+     * status, because most of the time the reader wants the current ones first.
+     */
     private function visibleProjects(User $user)
     {
-        $query = Project::where('status', '!=', 'archived')->orderBy('name');
+        $query = Project::query()
+            ->orderByRaw("CASE WHEN status = 'archived' THEN 1 ELSE 0 END")
+            ->orderBy('name');
 
         if (!$user->can('manage-projects') && !$user->hasRole('executive')) {
             $overseen = FolderService::overseenFolderIds($user);
@@ -118,7 +128,7 @@ class ReportController extends Controller
             });
         }
 
-        return $query->get(['id', 'name']);
+        return $query->get(['id', 'name', 'status']);
     }
 
     private function visibleApprovalProjects(User $user)

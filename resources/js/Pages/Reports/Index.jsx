@@ -131,7 +131,12 @@ export default function ReportsIndex() {
                     <MultiSelectFilter
                         label="Project" noun="projects"
                         options={[
-                            ...projects.map((p) => ({ value: p.id, label: p.name })),
+                            // Archived ones are named as such rather than left off:
+                            // their finished tasks are still in the totals.
+                            ...projects.map((p) => ({
+                                value: p.id,
+                                label: p.status === 'archived' ? `${p.name} (archived)` : p.name,
+                            })),
                             { value: 'none', label: 'No project' },
                         ]}
                         value={filters.project || []}
@@ -147,9 +152,9 @@ export default function ReportsIndex() {
                 </div>
                 <p className="mt-3 text-xs text-gray-400">
                     Windows are capped at {maxDays} days. Project and assignee narrow the task
-                    figures; approvals carry their own filter, on that card. Tasks that belong to
-                    no project — the standalone ones — are counted here too, and the project
-                    filter lists them as <em>No project</em>.
+                    figures; approvals carry their own filter, on that card. Everything counted here
+                    can be asked for: archived projects are listed as such, and tasks belonging to
+                    no project — the standalone ones — appear as <em>No project</em>.
                 </p>
             </Card>
 
