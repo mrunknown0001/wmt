@@ -102,12 +102,13 @@ class TimeInMotionTest extends TestCase
             ->patchJson("/projects/{$project->id}/tasks/{$task->id}/start")
             ->assertOk()
             ->assertJsonPath('started_at', now()->toIso8601String())
+            ->assertJsonPath('status', 'in_progress')
             ->assertJsonPath('time_in_motion_minutes', 0);
 
         $first = $task->fresh()->started_at;
         $this->assertNotNull($first);
-        // Still To Do: starting the clock is not a status change.
-        $this->assertSame('to_do', $task->fresh()->status);
+        // Pressing Start says the work has been picked up, so the board says so.
+        $this->assertSame('in_progress', $task->fresh()->status);
 
         Carbon::setTestNow('2026-09-02 09:00:00');
         $this->actingAs($owner)
@@ -115,6 +116,44 @@ class TimeInMotionTest extends TestCase
             ->assertOk();
 
         $this->assertTrue($first->equalTo($task->fresh()->started_at));
+        Carbon::setTestNow();
+    }
+
+    public function test_starting_the_clock_moves_the_task_into_progress(): void
+    {
+        $owner = $this->owner();
+        $project = $this->project($owner);
+
+        foreach (['backlog', 'to_do', 'in_review'] as $from) {
+            $task = $this->task($project, ['title' => "From {$from}", 'status' => $from]);
+
+            $this->actingAs($owner)
+                ->patchJson("/projects/{$project->id}/tasks/{$task->id}/start")
+                ->assertOk()
+                ->assertJsonPath('status', 'in_progress');
+
+            $this->assertSame('in_progress', $task->fresh()->status, "a task in {$from} should be picked up");
+            $this->assertNotNull($task->fresh()->started_at);
+        }
+    }
+
+    public function test_a_second_press_writes_nothing(): void
+    {
+        $owner = $this->owner();
+        $project = $this->project($owner);
+        $task = $this->task($project);
+
+        $this->actingAs($owner)->patchJson("/projects/{$project->id}/tasks/{$task->id}/start")->assertOk();
+
+        $touchedAt = $task->fresh()->updated_at;
+
+        Carbon::setTestNow(now()->addHour());
+
+        $this->actingAs($owner)->patchJson("/projects/{$project->id}/tasks/{$task->id}/start")->assertOk();
+
+        // Nothing changed, so nothing was saved — no second row in the activity
+        // log for one press of one button.
+        $this->assertTrue($touchedAt->equalTo($task->fresh()->updated_at));
         Carbon::setTestNow();
     }
 

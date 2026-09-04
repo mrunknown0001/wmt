@@ -620,6 +620,15 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                     completedAt={taskData.completed_at}
                                     status={taskData.status}
                                     canEdit={canEdit && !projectIsClosed}
+                                    onStarted={(json) => {
+                                        const status = json.status || 'in_progress';
+                                        setTaskData((prev) => (prev ? { ...prev, status, started_at: json.started_at } : prev));
+                                        // The list behind the panel is showing the old
+                                        // status too. persist:false because the server
+                                        // has already made this change — sending it
+                                        // back as an edit would write it twice.
+                                        onTaskUpdate?.(taskData.id, 'status', status, { persist: false });
+                                    }}
                                 />
                             </div>
                         )}

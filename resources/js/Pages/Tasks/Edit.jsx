@@ -692,8 +692,9 @@ export default function Edit() {
                                     taskId={task.id}
                                     startedAt={task.started_at}
                                     completedAt={task.completed_at}
-                                    status={task.status}
+                                    status={data.status}
                                     canEdit={canManageTaskDetails && !['completed', 'archived'].includes(project.status)}
+                                    onStarted={(json) => setData('status', json.status || 'in_progress')}
                                 />
                             </div>
                         )}
