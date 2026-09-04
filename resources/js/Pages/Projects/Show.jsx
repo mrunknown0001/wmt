@@ -5067,7 +5067,12 @@ export default function Show() {
                 const scale = SCALES[ganttScale] || SCALES.day;
                 const PX_PER_DAY = scale.pxPerDay;
                 const ROW_H = 44;          // fixed, so arrows can be positioned by row index
-                const LABEL_W = 240;       // matches the w-60 name column
+                const NAME_W = 240;        // matches the w-60 name column
+                const DATE_W = 104;        // one date column: "Sep 12, 2026" fits at 11px
+                // Everything left of the timeline. The arrow overlay and the
+                // scroll width are both measured from here, so widening the
+                // pane cannot leave them behind.
+                const LABEL_W = NAME_W + DATE_W * 3;
                 const MS_DAY = 1000 * 60 * 60 * 24;
 
                 const dayOf = (v) => new Date(String(v).split('T')[0] + 'T00:00:00');
@@ -5191,6 +5196,30 @@ export default function Show() {
                 /** The value a task holds for one of those fields, if any. */
                 const dateValueOf = (task, fieldId) => (task.custom_field_values || [])
                     .find((v) => v.custom_field_id === fieldId)?.value_date || null;
+
+                // The three dates a Gantt row is read against: what was planned,
+                // and when the work actually landed. Kept beside the bars rather
+                // than only in a tooltip, so a column of them can be scanned.
+                const DATE_COLS = [
+                    { key: 'start', label: 'Start', value: (t) => t.start_date },
+                    { key: 'due', label: 'Due', value: (t) => t.due_date },
+                    { key: 'completed', label: 'Completed', value: (t) => t.completed_at },
+                ];
+
+                const dateCells = (task) => DATE_COLS.map((c) => {
+                    const val = c.value(task);
+                    return (
+                        <div
+                            key={c.key}
+                            style={{ width: `${DATE_W}px` }}
+                            className="shrink-0 px-2 py-2 flex items-center justify-center border-r border-gray-200 dark:border-gray-700 text-[11px] text-gray-600 dark:text-gray-300 whitespace-nowrap overflow-hidden"
+                        >
+                            {val
+                                ? formatDate(val)
+                                : <span className="text-gray-300 dark:text-gray-600">&mdash;</span>}
+                        </div>
+                    );
+                });
 
                 const todayX = xFor(new Date().toISOString());
                 const showToday = todayX >= 0 && todayX <= totalWidth;
@@ -5344,6 +5373,15 @@ export default function Show() {
                                         {/* Header: month (or year) row */}
                                         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                                             <div className="w-60 shrink-0 px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-r border-gray-200 dark:border-gray-700">Task</div>
+                                            {DATE_COLS.map((c) => (
+                                                <div
+                                                    key={c.key}
+                                                    style={{ width: `${DATE_W}px` }}
+                                                    className="shrink-0 px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-r border-gray-200 dark:border-gray-700 text-center"
+                                                >
+                                                    {c.label}
+                                                </div>
+                                            ))}
                                             <div className="flex">
                                                 {groups.map((g) => (
                                                     <div key={g.key} style={{ width: `${g.width}px` }} className="text-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 py-1 border-r border-gray-200 dark:border-gray-700">{g.label}</div>
@@ -5353,7 +5391,7 @@ export default function Show() {
 
                                         {/* Header: unit row */}
                                         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                                            <div className="w-60 shrink-0 border-r border-gray-200 dark:border-gray-700" />
+                                            <div style={{ width: `${LABEL_W}px` }} className="shrink-0 border-r border-gray-200 dark:border-gray-700" />
                                             <div className="flex">
                                                 {columns.map((col, i) => {
                                                     const isWeekend = scale.step === 'day' && (col.start.getDay() === 0 || col.start.getDay() === 6);
@@ -5441,6 +5479,7 @@ export default function Show() {
                                                                 {task.assignee && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate">{task.assignee.name}</span>}
                                                             </div>
                                                         </div>
+                                                        {dateCells(task)}
                                                         <div className="relative" style={{ width: `${totalWidth}px` }}>
                                                             {/* Grid lines */}
                                                             <div className="absolute inset-0 flex">
@@ -5543,7 +5582,7 @@ export default function Show() {
                                         {tasksNoDate.length > 0 && (
                                             <>
                                                 <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30">
-                                                    <div className="w-60 shrink-0 px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700">No Dates</div>
+                                                    <div style={{ width: `${LABEL_W}px` }} className="shrink-0 px-3 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-700">No Dates</div>
                                                     <div className="flex-1" />
                                                 </div>
                                                 {tasksNoDate.map((task) => (
@@ -5559,6 +5598,7 @@ export default function Show() {
                                                                 {task.title}
                                                             </button>
                                                         </div>
+                                                        {dateCells(task)}
                                                         <div className="flex-1 flex items-center px-4">
                                                             <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">No dates set</span>
                                                         </div>
