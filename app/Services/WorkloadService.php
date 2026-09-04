@@ -198,6 +198,12 @@ class WorkloadService
                 'minutes' => (int) $inScope->sum(),
                 'days_in_scope' => $inScope->count(),
                 'days_total' => count($spread),
+                // What the task asks of a day. The spread gives whole minutes
+                // and hands the remainder to the earliest days, so individual
+                // days can differ by a minute; this is the even share those
+                // days average out to, which is the rate people mean when they
+                // ask how much a job costs them per day.
+                'per_day_minutes' => (int) round(array_sum($spread) / max(count($spread), 1)),
                 'spread_from' => array_key_first($spread),
                 'spread_to' => array_key_last($spread),
             ];

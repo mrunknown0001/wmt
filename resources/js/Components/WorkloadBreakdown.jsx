@@ -163,6 +163,9 @@ export default function WorkloadBreakdown({ open, onClose, params }) {
                                         <th className="sticky top-0 bg-gray-50 dark:bg-gray-700 px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Dates</th>
                                         <th className="sticky top-0 bg-gray-50 dark:bg-gray-700 px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">Estimate</th>
                                         {tab === 'estimated' && (
+                                            <th className="sticky top-0 bg-gray-50 dark:bg-gray-700 px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">Per day</th>
+                                        )}
+                                        {tab === 'estimated' && (
                                             <th className="sticky top-0 bg-gray-50 dark:bg-gray-700 px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
                                                 {params?.date ? 'This day' : 'In window'}
                                             </th>
@@ -192,6 +195,24 @@ export default function WorkloadBreakdown({ open, onClose, params }) {
                                                 {task.estimated_minutes ? formatMinutes(task.estimated_minutes) : '—'}
                                             </td>
                                             {tab === 'estimated' && (
+                                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-gray-600 dark:text-gray-300">
+                                                    {/* Only for work that actually spans days. A task
+                                                        living on one day has no rate to speak of — its
+                                                        estimate is the day's cost, and printing that
+                                                        again as "per day" would invent a distinction. */}
+                                                    {task.days_total > 1 ? (
+                                                        <>
+                                                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                                                                {formatMinutes(task.per_day_minutes)}
+                                                            </span>
+                                                            <span className="text-[11px] text-gray-400"> /day</span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                                                    )}
+                                                </td>
+                                            )}
+                                            {tab === 'estimated' && (
                                                 <td className="px-3 py-2 text-right tabular-nums font-medium text-gray-900 dark:text-gray-100">
                                                     {formatMinutes(task.minutes)}
                                                     {task.days_total > 1 && (
@@ -207,7 +228,7 @@ export default function WorkloadBreakdown({ open, onClose, params }) {
                                 {tab === 'estimated' && rows.length > 0 && (
                                     <tfoot>
                                         <tr className="border-t border-gray-200 dark:border-gray-700">
-                                            <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
+                                            <td colSpan={5} className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
                                                 Total
                                             </td>
                                             <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-900 dark:text-gray-100">
