@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Work recorded against a task.
@@ -46,6 +47,17 @@ class TaskTimeLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function amendments(): HasMany
+    {
+        return $this->hasMany(TimeLogAmendment::class);
+    }
+
+    /** The correction waiting on a decision, if one is. */
+    public function pendingAmendment(): ?TimeLogAmendment
+    {
+        return $this->amendments()->pending()->latest('id')->first();
     }
 
     public function isRunning(): bool

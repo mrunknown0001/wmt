@@ -182,6 +182,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('/projects/{project}/tasks/{task}/patch', [TaskController::class, 'patchField'])->name('projects.tasks.patch');
     // Start the clock by hand, for work picked up before the status moved.
     Route::patch('/projects/{project}/tasks/{task}/start', [TaskController::class, 'start'])->name('projects.tasks.start');
+    // Put the clock down for the day, recording what was worked, and pick it
+    // back up again. The preview is what the Pause box offers before it is
+    // pressed, so the day's figure is worked out in one place.
+    Route::get('/projects/{project}/tasks/{task}/pause-preview', [TaskController::class, 'pausePreview'])->name('projects.tasks.pause-preview');
+    Route::patch('/projects/{project}/tasks/{task}/pause', [TaskController::class, 'pause'])->name('projects.tasks.pause');
+    Route::patch('/projects/{project}/tasks/{task}/resume', [TaskController::class, 'resume'])->name('projects.tasks.resume');
     Route::get('/projects/{project}/tasks/{task}/timeline', [TaskController::class, 'timeline'])->name('projects.tasks.timeline');
     Route::post('/projects/{project}/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
     Route::put('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'update'])->name('tasks.comments.update');

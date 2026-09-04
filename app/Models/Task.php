@@ -52,6 +52,9 @@ class Task extends Model
         'estimated_minutes',
         'completed_at',
         'started_at',
+        'motion_paused_at',
+        'motion_resumed_at',
+        'motion_paused_minutes',
         'position',
         'is_recurring',
         'recurrence_frequency',
@@ -78,6 +81,9 @@ class Task extends Model
             'due_date' => 'date:Y-m-d',
             'completed_at' => 'datetime',
             'started_at' => 'datetime',
+            'motion_paused_at' => 'datetime',
+            'motion_resumed_at' => 'datetime',
+            'motion_paused_minutes' => 'integer',
             'position' => 'integer',
             'is_recurring' => 'boolean',
             'recurrence_interval' => 'integer',
@@ -215,7 +221,82 @@ class Task extends Model
 
         // A completion recorded before the start is somebody correcting data by
         // hand; report nothing rather than a negative span.
-        return $end->lessThan($this->started_at) ? null : (int) $this->started_at->diffInMinutes($end);
+        if ($end->lessThan($this->started_at)) {
+            return null;
+        }
+
+        $span = (int) $this->started_at->diffInMinutes($end);
+
+        // Nights and weekends the task spent paused are not time in motion.
+        // Never below zero: a pause total larger than the span means the dates
+        // have been edited by hand, and a negative elapsed is worse than a flat
+        // one.
+        return max(0, $span - $this->pausedMinutes($end));
+    }
+
+    /**
+     * Minutes this task has spent paused, up to $upTo.
+     *
+     * The closed pauses are already summed on the row; an open one is measured
+     * to the moment asked about, so a task paused and then finished counts the
+     * pause only as far as its completion rather than up to now.
+     */
+    public function pausedMinutes(?\Illuminate\Support\Carbon $upTo = null): int
+    {
+        $total = (int) ($this->motion_paused_minutes ?? 0);
+
+        if ($this->motion_paused_at) {
+            $end = $upTo ?? now();
+
+            if ($end->greaterThan($this->motion_paused_at)) {
+                $total += (int) $this->motion_paused_at->diffInMinutes($end);
+            }
+        }
+
+        return $total;
+    }
+
+    /** Is the clock down at the moment? */
+    public function motionIsPaused(): bool
+    {
+        return $this->motion_paused_at !== null;
+    }
+
+    /** Started, not finished, not closed — the clock is meant to be running. */
+    public function motionIsRunning(): bool
+    {
+        return $this->started_at !== null
+            && $this->completed_at === null
+            && ! in_array($this->status, self::CLOSING_STATUSES, true);
+    }
+
+    /**
+     * Has this task been in motion across two or more calendar days?
+     *
+     * The question the Pause button is offered on: work that begins and ends
+     * within a day needs no per-day capture, because the whole span is the day.
+     */
+    public function motionSpansMultipleDays(): bool
+    {
+        if (! $this->started_at) {
+            return false;
+        }
+
+        $end = $this->completed_at ?? now();
+
+        return $this->started_at->toDateString() !== $end->toDateString();
+    }
+
+    /**
+     * When the present stretch of work began.
+     *
+     * The last resume if there has been one, otherwise the original start —
+     * which is what "since when have I been at this" means to the person
+     * pressing Pause.
+     */
+    public function motionSegmentStartedAt(): ?\Illuminate\Support\Carbon
+    {
+        return $this->motion_resumed_at ?? $this->started_at;
     }
 
     /** The statuses that close a task: "completed" and "unable to complete". */

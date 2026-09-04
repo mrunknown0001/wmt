@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Task;
 use App\Models\TaskTimeLog;
+use App\Models\TimeLogAmendment;
 use App\Services\TimeTracker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,12 +17,20 @@ class TaskTimeLogController extends Controller
     {
         $this->authorize('view', $task);
 
-        $logs = $task->timeLogs()->with('user:id,name')->latest('logged_on')->latest('id')->get();
+        $logs = $task->timeLogs()
+            ->with(['user:id,name', 'amendments' => fn ($q) => $q->latest('id')->with('requester:id,name', 'reviewer:id,name')])
+            ->latest('logged_on')->latest('id')->get();
 
         return response()->json([
             'logs' => $logs->map(fn (TaskTimeLog $log) => $this->payload($log)),
             'total_minutes' => $task->loggedMinutes(),
             'estimated_minutes' => $task->estimated_minutes,
+            // Whether the person reading this decides corrections, so the panel
+            // knows to offer Approve and Reject rather than "waiting".
+            'can_review_amendments' => TimeLogAmendmentController::canReviewTask($request->user(), $task),
+            // Amendments need somewhere to go: a standalone task has no project
+            // and therefore nobody to approve one.
+            'amendments_available' => $task->project_id !== null,
         ]);
     }
 
@@ -109,6 +118,10 @@ class TaskTimeLogController extends Controller
 
     private function payload(TaskTimeLog $log): array
     {
+        $pending = $log->relationLoaded('amendments')
+            ? $log->amendments->firstWhere('status', TimeLogAmendment::PENDING)
+            : null;
+
         return [
             'id' => $log->id,
             'task_id' => $log->task_id,
@@ -123,6 +136,12 @@ class TaskTimeLogController extends Controller
             'started_at' => $log->started_at?->toIso8601String(),
             'logged_on' => $log->logged_on?->toDateString(),
             'note' => $log->note,
+            // The correction waiting on a decision, and whether this entry has
+            // ever been corrected — an amended figure should not pass for an
+            // untouched one.
+            'pending_amendment' => $pending ? TimeLogAmendmentController::payload($pending) : null,
+            'amended' => $log->relationLoaded('amendments')
+                && $log->amendments->contains('status', TimeLogAmendment::APPROVED),
         ];
     }
 }

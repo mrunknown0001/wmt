@@ -18,6 +18,7 @@ use App\Services\AutomationRuleEngine;
 use App\Services\CustomFieldDefaults;
 use App\Services\RecurringTaskService;
 use App\Services\TaskActivityLogger;
+use App\Services\TimeTracker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -603,6 +604,84 @@ class TaskController extends Controller
             'status' => $task->status,
             'time_in_motion_minutes' => $task->timeInMotionMinutes(),
         ]);
+    }
+
+    /**
+     * What the Pause box should offer for today, before anybody presses it.
+     *
+     * Asked of the server rather than worked out in the browser: the cap is the
+     * person's own working day, which the page does not carry, and the rule for
+     * where the day's stretch begins belongs in one place.
+     */
+    public function pausePreview(Request $request, Project $project, Task $task): JsonResponse
+    {
+        abort_if($task->project_id !== $project->id, 404);
+        $this->authorize('update', $task);
+
+        $suggestion = TimeTracker::suggestedDayMinutes($task, $request->user());
+
+        return response()->json([
+            'suggested_minutes' => $suggestion['minutes'],
+            'from' => $suggestion['from']->toIso8601String(),
+            'already_logged_today' => (int) $task->timeLogs()
+                ->completed()
+                ->where('user_id', $request->user()->id)
+                ->whereDate('logged_on', now()->toDateString())
+                ->sum('minutes'),
+        ]);
+    }
+
+    /**
+     * Stop the clock for the day, recording what was actually worked.
+     *
+     * The elapsed figure counts wall-clock, so a task left in motion over a
+     * fortnight claims a fortnight of work. This is the button that says what
+     * of it was real: today's hours become a time log, and the clock stops
+     * until somebody picks the task up again.
+     */
+    public function pause(Request $request, Project $project, Task $task): JsonResponse
+    {
+        abort_if($task->project_id !== $project->id, 404);
+        $this->authorize('update', $task);
+
+        abort_if($project->isClosed(), 422, 'This project is closed, so its tasks cannot be paused.');
+
+        $data = $request->validate([
+            'minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $result = TimeTracker::pauseDay($task, $request->user(), (int) $data['minutes'], $data['note'] ?? null);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+        }
+
+        return response()->json($this->motionPayload($result['task'], $result['log']));
+    }
+
+    /** Pick the clock back up after a pause. */
+    public function resume(Request $request, Project $project, Task $task): JsonResponse
+    {
+        abort_if($task->project_id !== $project->id, 404);
+        $this->authorize('update', $task);
+
+        abort_if($project->isClosed(), 422, 'This project is closed, so work cannot be resumed on its tasks.');
+
+        return response()->json($this->motionPayload(TimeTracker::resumeMotion($task)));
+    }
+
+    /** The motion state both buttons hand back, so the strip can redraw. */
+    private function motionPayload(Task $task, $log = null): array
+    {
+        return [
+            'started_at' => $task->started_at?->toIso8601String(),
+            'motion_paused_at' => $task->motion_paused_at?->toIso8601String(),
+            'motion_resumed_at' => $task->motion_resumed_at?->toIso8601String(),
+            'motion_paused_minutes' => (int) $task->motion_paused_minutes,
+            'time_in_motion_minutes' => $task->timeInMotionMinutes(),
+            'logged_minutes' => $log?->minutes,
+        ];
     }
 
     public function patchField(PatchTaskRequest $request, Project $project, Task $task): JsonResponse

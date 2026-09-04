@@ -221,6 +221,49 @@ export const formatMinutes = (minutes) => {
 export const formatElapsed = (minutes) => (Number(minutes) === 0 ? '0m' : formatMinutes(minutes));
 
 /**
+ * Minutes a task has spent paused, up to `upTo` (default now).
+ *
+ * The closed pauses are already totalled on the row; an open one is measured to
+ * the moment asked about, so a task paused and then finished counts that pause
+ * only as far as its completion.
+ */
+const pausedMinutes = (task, upTo) => {
+    let total = Number(task.motion_paused_minutes) || 0;
+
+    if (task.motion_paused_at) {
+        const from = new Date(task.motion_paused_at);
+        if (upTo > from) total += Math.round((upTo - from) / 60000);
+    }
+
+    return total;
+};
+
+/**
+ * How long a task has actually been in motion.
+ *
+ * Wall-clock from the moment work started, less the stretches the clock was
+ * put down — otherwise a task open for a fortnight claims a fortnight of work,
+ * nights and weekends included.
+ *
+ * Null when there is nothing honest to report: never started, or closed without
+ * a completion time (a cancelled task), where counting up to now would invent a
+ * span nobody worked. Mirrors Task::timeInMotionMinutes() on the server.
+ */
+export const motionMinutes = (task) => {
+    if (!task?.started_at) return null;
+
+    if (!task.completed_at && ['done', 'cancelled'].includes(task.status)) return null;
+
+    const started = new Date(task.started_at);
+    const ended = task.completed_at ? new Date(task.completed_at) : new Date();
+    const span = Math.round((ended - started) / 60000);
+
+    if (span < 0) return null;
+
+    return Math.max(0, span - pausedMinutes(task, ended));
+};
+
+/**
  * Read a typed duration: "1.5", "1:30" or "90m" all mean ninety minutes.
  * Returns null when it cannot be read, so callers can show an error rather
  * than silently storing a zero.
