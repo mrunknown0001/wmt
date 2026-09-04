@@ -52,7 +52,7 @@ class WorkloadService
      * @param  Collection<int, User>  $users
      * @return array{days: array, rows: array}
      */
-    public static function build(Collection $users, Carbon $from, Carbon $to, ?int $projectId = null): array
+    public static function build(Collection $users, Carbon $from, Carbon $to, array $projectIds = []): array
     {
         if ($from->diffInDays($to) > self::MAX_DAYS) {
             $to = $from->copy()->addDays(self::MAX_DAYS);
@@ -61,7 +61,7 @@ class WorkloadService
         $dates = collect(CarbonPeriod::create($from->copy()->startOfDay(), $to->copy()->startOfDay()))
             ->map(fn ($d) => Carbon::instance($d));
 
-        $tasks = self::openTasksFor($users->pluck('id'), $from, $to, $projectId);
+        $tasks = self::openTasksFor($users->pluck('id'), $from, $to, $projectIds);
         $byUser = $tasks->groupBy('assigned_to');
 
         $rows = $users->map(function (User $user) use ($byUser, $dates) {
@@ -143,9 +143,9 @@ class WorkloadService
      * @param  $day  one day to explain, or null for the whole window
      * @return array{estimated: array, unestimated: array, undated: array, total_minutes: int}
      */
-    public static function breakdown(User $user, Carbon $from, Carbon $to, ?int $projectId = null, ?Carbon $day = null): array
+    public static function breakdown(User $user, Carbon $from, Carbon $to, array $projectIds = [], ?Carbon $day = null): array
     {
-        $tasks = self::openTasksFor(collect([$user->id]), $from, $to, $projectId)
+        $tasks = self::openTasksFor(collect([$user->id]), $from, $to, $projectIds)
             ->load('project:id,name');
 
         $windowStart = $from->toDateString();
@@ -220,7 +220,7 @@ class WorkloadService
             ->where('assigned_to', $user->id)
             ->whereNotIn('status', ['done', 'cancelled'])
             ->whereNull('due_date')
-            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+            ->when($projectIds, fn ($q) => $q->whereIn('project_id', $projectIds))
             ->with('project:id,name')
             ->get(['id', 'title', 'assigned_to', 'project_id', 'start_date', 'due_date', 'estimated_minutes', 'status'])
             ->map(fn (Task $task) => [
@@ -290,12 +290,12 @@ class WorkloadService
     }
 
     /** Open tasks that could touch the window, for the given people. */
-    private static function openTasksFor(Collection $userIds, Carbon $from, Carbon $to, ?int $projectId): Collection
+    private static function openTasksFor(Collection $userIds, Carbon $from, Carbon $to, array $projectIds = []): Collection
     {
         return Task::query()
             ->whereIn('assigned_to', $userIds)
             ->whereNotIn('status', ['done', 'cancelled'])
-            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+            ->when($projectIds, fn ($q) => $q->whereIn('project_id', $projectIds))
             ->where(function ($q) use ($from, $to) {
                 // Anything whose start..due window overlaps the range, plus
                 // overdue work, which is still someone's problem today.

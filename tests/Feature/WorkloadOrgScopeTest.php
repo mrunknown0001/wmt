@@ -247,6 +247,62 @@ class WorkloadOrgScopeTest extends TestCase
         $this->assertFalse($leader->fresh()->canViewWorkload());
     }
 
+    public function test_several_departments_can_be_filtered_at_once(): void
+    {
+        $org = $this->org();
+        Role::findOrCreate('admin')->syncPermissions(['manage-users', 'view-workload']);
+        $admin = $this->person('admin');
+        $admin->assignRole('admin');
+
+        // One department: only its people.
+        $this->assertSame(
+            ['department-only', 'in-team'],
+            collect($this->peopleSeenBy($admin, ['department' => $org['support']->id]))
+                ->reject(fn ($n) => $n === 'admin')->sort()->values()->all()
+        );
+
+        // Two, comma-joined the way the multi-select sends them: the union.
+        $seen = $this->peopleSeenBy($admin, [
+            'department' => "{$org['support']->id},{$org['logistics']->id}",
+        ]);
+        $this->assertContains('department-only', $seen);
+        $this->assertContains('sibling-department', $seen);   // the second department
+        $this->assertNotContains('other-division', $seen);    // neither was chosen
+    }
+
+    public function test_a_lone_id_still_works_like_a_list_of_one(): void
+    {
+        $org = $this->org();
+        Role::findOrCreate('admin')->syncPermissions(['manage-users', 'view-workload']);
+        $admin = $this->person('admin');
+        $admin->assignRole('admin');
+
+        // A bookmarked single-value link from before the change.
+        $seen = $this->peopleSeenBy($admin, ['team' => (string) $org['frontline']->id]);
+
+        $this->assertContains('in-team', $seen);
+        $this->assertContains('team-without-department', $seen);
+        $this->assertNotContains('sibling-department', $seen);
+    }
+
+    public function test_the_chosen_filters_come_back_as_arrays(): void
+    {
+        $org = $this->org();
+        Role::findOrCreate('admin')->syncPermissions(['manage-users', 'view-workload']);
+        $admin = $this->person('admin');
+        $admin->assignRole('admin');
+
+        $response = $this->actingAs($admin)->get('/workload?'.http_build_query([
+            'department' => "{$org['support']->id},{$org['logistics']->id}",
+        ]));
+        $filters = $response->viewData('page')['props']['filters'];
+
+        // The page binds the multi-select to these, so they must be arrays of
+        // ints — not the raw "1,2" string, which would select nothing.
+        $this->assertSame([$org['support']->id, $org['logistics']->id], $filters['department']);
+        $this->assertSame([], $filters['team']);
+    }
+
     /** Appointing somebody mid-session must not leave them locked out by a cache. */
     public function test_a_new_head_is_let_in_without_waiting_for_the_cache(): void
     {
