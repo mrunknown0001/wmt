@@ -367,6 +367,10 @@ class ProjectController extends Controller
                     // value — an N+1 across every task on the page.
                     'customFieldValues.selectedOption', 'customFieldValues.customField',
                     'subtasks.customFieldValues.selectedOption', 'subtasks.customFieldValues.customField',
+                    // Labels ride along with the rows: the list filters by them
+                    // in the browser, so asking for them per task would be an
+                    // N+1 across the whole board.
+                    'tags:id,name,slug', 'subtasks.tags:id,name,slug',
                     // Just the ends of each edge: the Gantt needs an id to draw an
                     // arrow to, and a status to know whether it is still blocking.
                     'dependencies' => fn ($q) => $q->select('tasks.id', 'title', 'status'),
@@ -395,6 +399,10 @@ class ProjectController extends Controller
                     'subtasks.assignee', 'subtasks.collaborators',
                     'customFieldValues.selectedOption', 'customFieldValues.customField',
                     'subtasks.customFieldValues.selectedOption', 'subtasks.customFieldValues.customField',
+                    // Labels ride along with the rows: the list filters by them
+                    // in the browser, so asking for them per task would be an
+                    // N+1 across the whole board.
+                    'tags:id,name,slug', 'subtasks.tags:id,name,slug',
                     // Just the ends of each edge: the Gantt needs an id to draw an
                     // arrow to, and a status to know whether it is still blocking.
                     'dependencies' => fn ($q) => $q->select('tasks.id', 'title', 'status'),
