@@ -49,7 +49,6 @@ import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
 import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, formatElapsed, isCompletedLate, motionMinutes } from '../../utils';
-import useRunningTimer from '../../useRunningTimer';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import { orderSections, moveSection } from '../../sectionTree';
@@ -391,7 +390,10 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
     // questions. Declared before stickyBg, which reads it.
     const [deleteHovered, setDeleteHovered] = useState(false);
     // Only the viewer's own timer — nothing here knows about anybody else's.
-    const isBeingTimed = useRunningTimer() === task.id;
+    // Today's figure is worked out from the clock and is not settled until the
+    // day is, so a task still running says so rather than passing for a final
+    // number.
+    const clockRunning = isInMotion(task);
 
     const stickyBg = isDragging
         ? 'bg-blue-50 dark:bg-blue-900/30'
@@ -432,11 +434,11 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                 return (
                     <td key="logged" className={`px-6 py-3 text-sm text-center overflow-hidden tabular-nums ${over ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-300'}`} style={cStyle}>
                         <span className="inline-flex items-center gap-1.5">
-                            {/* A running timer contributes nothing to the total
-                                until it is stopped, so without this a task being
-                                timed right now looks exactly like an idle one. */}
-                            {isBeingTimed && (
-                                <Tooltip content="You have a timer running on this task">
+                            {/* The clock is still running, so this figure is
+                                today's share of a day that is not over — it can
+                                still move before the day is settled. */}
+                            {clockRunning && (
+                                <Tooltip content="The clock is running — today's share is not settled yet">
                                     <span className="relative flex h-2 w-2 shrink-0">
                                         <span className="absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75 animate-ping" />
                                         <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-600" />
@@ -968,7 +970,10 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
     // questions. Declared before stickyBg, which reads it.
     const [deleteHovered, setDeleteHovered] = useState(false);
     // Only the viewer's own timer — nothing here knows about anybody else's.
-    const isBeingTimed = useRunningTimer() === task.id;
+    // Today's figure is worked out from the clock and is not settled until the
+    // day is, so a task still running says so rather than passing for a final
+    // number.
+    const clockRunning = isInMotion(task);
 
     const stickyBg = isDragging
         ? 'bg-blue-50 dark:bg-blue-900/30'
@@ -1011,11 +1016,11 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                 return (
                     <td key="logged" className={`px-6 py-3 text-sm text-center overflow-hidden tabular-nums ${over ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-300'}`} style={cStyle}>
                         <span className="inline-flex items-center gap-1.5">
-                            {/* A running timer contributes nothing to the total
-                                until it is stopped, so without this a task being
-                                timed right now looks exactly like an idle one. */}
-                            {isBeingTimed && (
-                                <Tooltip content="You have a timer running on this task">
+                            {/* The clock is still running, so this figure is
+                                today's share of a day that is not over — it can
+                                still move before the day is settled. */}
+                            {clockRunning && (
+                                <Tooltip content="The clock is running — today's share is not settled yet">
                                     <span className="relative flex h-2 w-2 shrink-0">
                                         <span className="absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75 animate-ping" />
                                         <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-600" />

@@ -50,11 +50,13 @@ function notificationMessage(data) {
         case 'approval_item_shared':
             return <><strong>{data.shared_by}</strong> shared the request <strong>{data.item_title}</strong> with you</>;
         case 'time_log_amendment_requested':
-            return <><strong>{data.requested_by}</strong> asks to change {data.logged_on} on <strong>{data.task_title}</strong> from {data.from_duration} to {data.to_duration}</>;
+            return data.kind === 'add'
+                ? <><strong>{data.requested_by}</strong> asks to record {data.to_duration} on {data.logged_on} for <strong>{data.task_title}</strong></>
+                : <><strong>{data.requested_by}</strong> asks to change {data.logged_on} on <strong>{data.task_title}</strong> from {data.from_duration} to {data.to_duration}</>;
         case 'time_log_amendment_decided':
             return data.status === 'approved'
-                ? <>Your time correction on <strong>{data.task_title}</strong> was approved — now {data.to_duration}</>
-                : <>Your time correction on <strong>{data.task_title}</strong> was turned down{data.decided_by ? <> by {data.decided_by}</> : null}</>;
+                ? <>Your time {data.kind === 'add' ? 'entry' : 'correction'} on <strong>{data.task_title}</strong> was approved — {data.to_duration}</>
+                : <>Your time {data.kind === 'add' ? 'entry' : 'correction'} on <strong>{data.task_title}</strong> was turned down{data.decided_by ? <> by {data.decided_by}</> : null}</>;
         case 'task_delegation_started':
             return <>{data.message || <>You are covering <strong>{data.owner_name}</strong>{data.task_count ? <> — {data.task_count} task{data.task_count === 1 ? '' : 's'}</> : null}</>}</>;
         case 'task_delegation_returned':

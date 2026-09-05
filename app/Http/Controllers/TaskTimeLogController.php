@@ -5,14 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\Task;
 use App\Models\TaskTimeLog;
 use App\Models\TimeLogAmendment;
+use App\Services\MotionEffortGenerator;
 use App\Services\TimeTracker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
+/**
+ * The time recorded against a task.
+ *
+ * Reading and removing only. Nothing here writes an entry any more: effort is
+ * worked out from the task's clock by MotionEffortGenerator, and the two ways a
+ * person can put a figure of their own on the record — pausing for the day, and
+ * asking for a correction — live with the clock and with the corrections queue
+ * respectively.
+ */
 class TaskTimeLogController extends Controller
 {
-    /** Entries on a task, newest first, with the running one flagged. */
+    /** Entries on a task, newest first. */
     public function index(Request $request, Task $task): JsonResponse
     {
         $this->authorize('view', $task);
@@ -31,77 +40,21 @@ class TaskTimeLogController extends Controller
             // Amendments need somewhere to go: a standalone task has no project
             // and therefore nobody to approve one.
             'amendments_available' => $task->project_id !== null,
+            // What day it is here. The browser's own answer is the viewer's
+            // timezone, which put somebody in Manila a day behind all morning
+            // and offered them yesterday's date by default.
+            'today' => now()->toDateString(),
         ]);
     }
 
-    public function store(Request $request, Task $task): JsonResponse
-    {
-        // Logging work is part of doing the task, so anyone who can update it
-        // can record time against it.
-        $this->authorize('update', $task);
-
-        $data = $request->validate([
-            'duration' => ['required', 'string', 'max:20'],
-            'logged_on' => ['nullable', 'date'],
-            'note' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $minutes = TimeTracker::parseMinutes($data['duration']);
-
-        if ($minutes === null) {
-            throw ValidationException::withMessages([
-                'duration' => 'Enter a duration like 1.5, 1:30 or 90m.',
-            ]);
-        }
-
-        $log = TimeTracker::log(
-            $task,
-            $request->user(),
-            $minutes,
-            $data['logged_on'] ?? null,
-            $data['note'] ?? null,
-        );
-
-        return response()->json([
-            'log' => $this->payload($log->load('user:id,name')),
-            'total_minutes' => $task->loggedMinutes(),
-        ], 201);
-    }
-
-    public function startTimer(Request $request, Task $task): JsonResponse
-    {
-        $this->authorize('update', $task);
-
-        $result = TimeTracker::start($task, $request->user());
-
-        return response()->json([
-            'running' => $this->payload($result['started']->load('user:id,name', 'task:id,title,project_id')),
-            'stopped' => $result['stopped']
-                ? $this->payload($result['stopped']->load('task:id,title,project_id'))
-                : null,
-        ]);
-    }
-
-    public function stopTimer(Request $request): JsonResponse
-    {
-        $stopped = TimeTracker::stop($request->user());
-
-        return response()->json([
-            'stopped' => $stopped ? $this->payload($stopped->load('task:id,title,project_id')) : null,
-            'total_minutes' => $stopped?->task?->loggedMinutes(),
-        ]);
-    }
-
-    /** What the header timer polls for on page load. */
-    public function current(Request $request): JsonResponse
-    {
-        $running = TimeTracker::running($request->user());
-
-        return response()->json([
-            'running' => $running ? $this->payload($running->load('task:id,title,project_id')) : null,
-        ]);
-    }
-
+    /**
+     * Remove an entry somebody put there.
+     *
+     * Only a stated one — a pause figure or an approved addition. A generated
+     * entry is not a record of anybody's decision, so deleting it would say
+     * nothing and the next recalculation would put it straight back; the way to
+     * disagree with the clock is a correction.
+     */
     public function destroy(Request $request, TaskTimeLog $timeLog): JsonResponse
     {
         // Your own entries, or anyone's if you can manage the project's tasks —
@@ -110,8 +63,22 @@ class TaskTimeLogController extends Controller
 
         abort_unless($ownsIt || $request->user()->can('update', $timeLog->task), 403);
 
+        abort_if(
+            $timeLog->isGenerated(),
+            422,
+            'This entry comes from the task clock. Ask for a correction instead of deleting it.',
+        );
+
         $task = $timeLog->task;
+        $owner = $timeLog->user;
+        $day = $timeLog->logged_on;
         $timeLog->delete();
+
+        // That day had a statement in it that is now gone, so what the clock is
+        // allowed to infer about the rest of the day has changed.
+        if ($owner && $day) {
+            MotionEffortGenerator::forDay($owner, $day);
+        }
 
         return response()->json(['total_minutes' => $task?->loggedMinutes() ?? 0]);
     }
@@ -131,11 +98,15 @@ class TaskTimeLogController extends Controller
             'user' => $log->relationLoaded('user') ? $log->user?->name : null,
             'user_id' => $log->user_id,
             'minutes' => $log->minutes,
-            'duration' => TimeTracker::formatMinutes($log->minutes),
-            'running' => $log->isRunning(),
-            'started_at' => $log->started_at?->toIso8601String(),
+            // "none" rather than a dash: somebody said this day was worth
+            // nothing on this task, which is different from having no figure.
+            'duration' => $log->minutes === 0 ? 'none' : TimeTracker::formatMinutes($log->minutes),
             'logged_on' => $log->logged_on?->toDateString(),
             'note' => $log->note,
+            // Where the figure came from, so a reader can tell a number the
+            // clock worked out from one a person stood behind.
+            'source' => $log->source,
+            'generated' => $log->isGenerated(),
             // The correction waiting on a decision, and whether this entry has
             // ever been corrected — an amended figure should not pass for an
             // untouched one.

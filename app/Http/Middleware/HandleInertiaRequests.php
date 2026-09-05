@@ -77,6 +77,15 @@ class HandleInertiaRequests extends Middleware
                     ->count()
                 : 0,
             'personalTodosCount' => fn () => $request->user()?->personalTodos()->incomplete()->count() ?? 0,
+            // Time corrections waiting on this person's decision, for the
+            // sidebar badge. One indexed count per request, in the company of
+            // the approvals and to-do counts above it.
+            'pendingTimeCorrectionsCount' => fn () => $request->user()
+                ? \App\Models\TimeLogAmendment::query()
+                    ->decidableBy($request->user())
+                    ->pending()
+                    ->count()
+                : 0,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

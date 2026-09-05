@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Observers\TaskObserver;
+use App\Services\MotionClock;
 
 #[ObservedBy(TaskObserver::class)]
 class Task extends Model
@@ -31,7 +32,7 @@ class Task extends Model
         4 => ['days' => 14, 'label' => 'Executives'],
     ];
 
-    protected $appends = ['due_time_label'];
+    protected $appends = ['due_time_label', 'motion_spans_days'];
 
     protected $fillable = [
         'project_id',
@@ -199,6 +200,29 @@ class Task extends Model
                 }
             }
         });
+
+        // The clock's stretches follow the task's life without every caller
+        // having to remember: work begins, work is finished, work is paused,
+        // work is picked up again.
+        //
+        // Stated as a reconciliation rather than a list of reactions — should
+        // this task's clock be running, and is it? — because the reactions kept
+        // missing cases. A task created straight into In Progress changes no
+        // attribute on the way in (wasChanged is empty after an insert), and a
+        // status moved by a bulk update, an automation or an import arrives by
+        // a different door each time. One question, asked after every save,
+        // cannot miss any of them.
+        //
+        // Both halves are idempotent: opening does nothing when a stretch is
+        // already running, closing does nothing when none is.
+        static::saved(function (Task $task) {
+            $shouldBeRunning = $task->started_at
+                && ! $task->motion_paused_at
+                && ! $task->completed_at
+                && ! in_array($task->status, self::CLOSING_STATUSES, true);
+
+            $shouldBeRunning ? MotionClock::open($task) : MotionClock::close($task);
+        });
     }
 
     /**
@@ -273,9 +297,16 @@ class Task extends Model
     /**
      * Has this task been in motion across two or more calendar days?
      *
-     * The question the Pause button is offered on: work that begins and ends
-     * within a day needs no per-day capture, because the whole span is the day.
+     * Carried to the browser rather than worked out there, because "which day
+     * is it" is the application's question and not the viewer's: a browser in
+     * another timezone drew a different day boundary and hid the Pause button
+     * on a task that had plainly been running since yesterday.
      */
+    public function getMotionSpansDaysAttribute(): bool
+    {
+        return $this->motionSpansMultipleDays();
+    }
+
     public function motionSpansMultipleDays(): bool
     {
         if (! $this->started_at) {

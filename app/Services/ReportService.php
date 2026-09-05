@@ -343,13 +343,14 @@ class ReportService
     /**
      * Effort recorded in the window: who spent time, and how much.
      *
-     * Dated by logged_on, not by when the entry was typed and not by the task's
-     * completion — effort accrues on work that is still open, and a manual
-     * entry exists precisely so yesterday's site visit lands on yesterday.
+     * Dated by the day the work happened rather than the day it reached the
+     * record — effort accrues on work that is still open, and an entry approved
+     * a week late still belongs to the day it describes.
      *
-     * Running timers are excluded, because a timer still going has no duration
-     * yet. They are counted separately rather than silently dropped: an hour
-     * that is missing from a total should say so.
+     * Most of these figures are worked out from the task clocks and shared
+     * across whatever was running that day; the rest are what people stated at
+     * a pause or had approved afterwards. The running count is kept because
+     * today's share is not settled until the day is over.
      */
     public static function effort(User $user, Carbon $from, Carbon $to, array $filters = []): array
     {

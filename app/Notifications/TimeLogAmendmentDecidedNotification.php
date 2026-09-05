@@ -35,7 +35,7 @@ class TimeLogAmendmentDecidedNotification extends Notification implements Should
 
     public function toArray(object $notifiable): array
     {
-        $task = $this->amendment->timeLog?->task;
+        $task = $this->amendment->subjectTask();
 
         return [
             'type' => 'time_log_amendment_decided',
@@ -45,7 +45,8 @@ class TimeLogAmendmentDecidedNotification extends Notification implements Should
             'task_title' => $task?->title,
             'project_id' => $task?->project_id,
             'decided_by' => $this->decidedBy->name,
-            'logged_on' => $this->amendment->timeLog?->logged_on?->toDateString(),
+            'kind' => $this->amendment->kind,
+            'logged_on' => ($this->amendment->logged_on ?? $this->amendment->timeLog?->logged_on)?->toDateString(),
             'to_duration' => TimeTracker::formatMinutes($this->amendment->requested_minutes),
             'review_note' => $this->amendment->review_note,
         ];

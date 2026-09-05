@@ -703,6 +703,7 @@ export default function Edit() {
                                     motionPausedAt={motion.paused_at}
                                     motionResumedAt={motion.resumed_at}
                                     motionPausedMinutes={motion.paused_minutes}
+                                    motionSpansDays={task.motion_spans_days}
                                     canEdit={canManageTaskDetails && !['completed', 'archived'].includes(project.status)}
                                     onStarted={(json) => setData('status', json.status || 'in_progress')}
                                     onMotionChange={(json) => setMotion({

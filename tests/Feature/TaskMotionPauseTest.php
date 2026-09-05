@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskMotionSegment;
 use App\Models\TaskTimeLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,8 +62,12 @@ class TaskMotionPauseTest extends TestCase
         ], $attributes));
 
         // Written past the model so the status hook does not stamp its own
-        // times over the ones a test is setting up.
+        // times over the ones a test is setting up. The stretch of work the
+        // task opened on the way into progress is moved back with it: it is the
+        // record of when the clock started, so leaving it at "now" would make a
+        // task that began last week look like one that began this second.
         Task::whereKey($task->id)->update(['started_at' => '2026-09-02 09:00:00']);
+        TaskMotionSegment::where('task_id', $task->id)->update(['started_at' => '2026-09-02 09:00:00']);
 
         return $task->fresh();
     }
@@ -76,11 +81,14 @@ class TaskMotionPauseTest extends TestCase
             ->assertOk()
             ->assertJson(['logged_minutes' => 300]);
 
-        $log = TaskTimeLog::where('task_id', $task->id)->sole();
+        // Today is what the pause was about. The days before it were settled
+        // at the same time — the clock ran through them — so this asks about
+        // the day rather than the only entry on the task.
+        $log = TaskTimeLog::where('task_id', $task->id)->whereDate('logged_on', '2026-09-04')->sole();
         $this->assertSame(300, $log->minutes);
-        $this->assertSame('2026-09-04', $log->logged_on->toDateString(), 'credited to the day it was worked');
         $this->assertSame('Ran the second line', $log->note);
         $this->assertSame($this->worker->id, $log->user_id);
+        $this->assertSame('declared', $log->source, 'a figure somebody stated, not one the clock inferred');
 
         $this->assertNotNull($task->fresh()->motion_paused_at, 'the clock is down');
     }
@@ -135,6 +143,7 @@ class TaskMotionPauseTest extends TestCase
 
         // Resumed at two this afternoon: three hours, and no cap needed.
         Task::whereKey($task->id)->update(['motion_resumed_at' => '2026-09-04 14:00:00']);
+        TaskMotionSegment::where('task_id', $task->id)->update(['started_at' => '2026-09-04 14:00:00']);
 
         $this->actingAs($this->worker)
             ->getJson("/projects/{$this->project->id}/tasks/{$task->id}/pause-preview")
@@ -142,7 +151,7 @@ class TaskMotionPauseTest extends TestCase
             ->assertJson(['suggested_minutes' => 180]);
     }
 
-    public function test_zero_minutes_pauses_without_inventing_an_entry(): void
+    public function test_saying_the_day_was_worth_nothing_is_recorded_as_nothing(): void
     {
         $task = $this->task();
 
@@ -150,7 +159,12 @@ class TaskMotionPauseTest extends TestCase
             ->patchJson("/projects/{$this->project->id}/tasks/{$task->id}/pause", ['minutes' => 0])
             ->assertOk();
 
-        $this->assertSame(0, TaskTimeLog::where('task_id', $task->id)->count());
+        // The statement goes on the record even though it is zero. Without it
+        // the generator would see a clock that ran all day and infer a day's
+        // work from it — the opposite of what was just said.
+        $log = TaskTimeLog::where('task_id', $task->id)->whereDate('logged_on', '2026-09-04')->sole();
+        $this->assertSame(0, $log->minutes);
+        $this->assertSame('declared', $log->source);
         $this->assertNotNull($task->fresh()->motion_paused_at);
     }
 
@@ -175,8 +189,8 @@ class TaskMotionPauseTest extends TestCase
             ->patchJson("/projects/{$this->project->id}/tasks/{$unstarted->id}/pause", ['minutes' => 60])
             ->assertStatus(422);
 
-        // And only one entry was ever written — the refusals wrote nothing.
-        $this->assertSame(1, TaskTimeLog::count());
+        // And today was recorded once — the refusals wrote nothing.
+        $this->assertSame(1, TaskTimeLog::whereDate('logged_on', '2026-09-04')->count());
     }
 
     public function test_somebody_with_no_claim_on_the_task_cannot_pause_it(): void

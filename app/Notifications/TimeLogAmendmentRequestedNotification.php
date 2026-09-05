@@ -2,7 +2,6 @@
 
 namespace App\Notifications;
 
-use App\Models\TaskTimeLog;
 use App\Models\TimeLogAmendment;
 use App\Services\TimeTracker;
 use Illuminate\Bus\Queueable;
@@ -26,7 +25,6 @@ class TimeLogAmendmentRequestedNotification extends Notification implements Shou
 
     public function __construct(
         public TimeLogAmendment $amendment,
-        public TaskTimeLog $timeLog,
     ) {}
 
     public function via(object $notifiable): array
@@ -42,17 +40,19 @@ class TimeLogAmendmentRequestedNotification extends Notification implements Shou
 
     public function toArray(object $notifiable): array
     {
-        $task = $this->timeLog->task;
+        $task = $this->amendment->subjectTask();
+        $loggedOn = $this->amendment->logged_on ?? $this->amendment->timeLog?->logged_on;
 
         return [
             'type' => 'time_log_amendment_requested',
             'amendment_id' => $this->amendment->id,
+            'kind' => $this->amendment->kind,
             'task_id' => $task?->id,
             'task_title' => $task?->title,
             'project_id' => $task?->project_id,
             'project_name' => $task?->project?->name,
             'requested_by' => $this->amendment->requester?->name,
-            'logged_on' => $this->timeLog->logged_on?->toDateString(),
+            'logged_on' => $loggedOn?->toDateString(),
             'from_duration' => TimeTracker::formatMinutes($this->amendment->original_minutes),
             'to_duration' => TimeTracker::formatMinutes($this->amendment->requested_minutes),
         ];

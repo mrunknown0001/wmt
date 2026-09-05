@@ -620,6 +620,7 @@ export default function TaskDetailPanel({ projectId, taskId, onClose, onTaskUpda
                                     motionPausedAt={taskData.motion_paused_at}
                                     motionResumedAt={taskData.motion_resumed_at}
                                     motionPausedMinutes={taskData.motion_paused_minutes}
+                                    motionSpansDays={taskData.motion_spans_days}
                                     canEdit={canEdit && !projectIsClosed}
                                     onMotionChange={(json) => setTaskData((prev) => (prev ? {
                                         ...prev,

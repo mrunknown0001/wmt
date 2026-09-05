@@ -313,15 +313,15 @@ export default function ReportsIndex() {
 
             {/* Logged effort */}
             <Card className="mt-6">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Effort logged</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Effort recorded</h3>
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                     <Stat
-                        label="Time logged" value={effortTime(effort.total_minutes)}
+                        label="Time recorded" value={effortTime(effort.total_minutes)}
                         sub={`${effort.entries} ${effort.entries === 1 ? 'entry' : 'entries'} in this window`}
                     />
                     <Stat
-                        label="People logging" value={effort.people.length}
+                        label="People" value={effort.people.length}
                         sub={effort.people.length === 0 ? 'nobody recorded time' : 'recorded time in this window'}
                     />
                     <Stat
@@ -385,8 +385,12 @@ export default function ReportsIndex() {
                 )}
 
                 <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                    The two ratios answer different questions and will not agree.{' '}
-                    <em>Estimate vs actual</em> weighs the estimate against effort somebody logged;{' '}
+                    Effort comes from the task clocks: each person&rsquo;s day is shared out among
+                    the tasks that were running, capped at the day they had, and whatever they said
+                    themselves at a pause is taken as given. It is what the clocks support rather
+                    than a figure anybody typed.{' '}
+                    The two ratios below answer different questions and will not agree.{' '}
+                    <em>Estimate vs actual</em> weighs the estimate against that recorded effort;{' '}
                     <em>estimate vs elapsed</em> weighs it against the calendar — from the task being
                     picked up to it being closed — which is stamped automatically and so needs nobody
                     to remember anything. A job started on Monday and finished on Friday is four days

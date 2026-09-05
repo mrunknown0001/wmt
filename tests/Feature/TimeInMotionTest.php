@@ -194,20 +194,24 @@ class TimeInMotionTest extends TestCase
         $this->assertNull($task->timeInMotionMinutes());
     }
 
-    public function test_the_project_setting_is_off_until_it_is_asked_for(): void
+    public function test_the_project_setting_is_on_unless_a_project_opts_out(): void
     {
         $owner = $this->owner();
         $project = $this->project($owner);
 
-        $this->assertFalse((bool) $project->show_time_in_motion);
+        // On by default since effort is worked out from the clock: a project
+        // with it switched off records no effort at all, which is a decision
+        // somebody has to make rather than inherit. Read back from the database,
+        // because the default is the column's and not the model's.
+        $this->assertTrue((bool) $project->fresh()->show_time_in_motion);
 
         $this->actingAs($owner)->put("/projects/{$project->id}", [
             'name' => $project->name,
             'status' => 'active',
-            'show_time_in_motion' => true,
+            'show_time_in_motion' => false,
         ])->assertSessionHasNoErrors();
 
-        $this->assertTrue((bool) $project->fresh()->show_time_in_motion);
+        $this->assertFalse((bool) $project->fresh()->show_time_in_motion);
     }
 
     public function test_the_quick_view_is_told_whether_to_show_the_panel_and_who_may_use_it(): void
@@ -224,7 +228,7 @@ class TimeInMotionTest extends TestCase
             ->assertJsonPath('showTimeInMotion', true)
             ->assertJsonPath('canManageTaskDetails', true);
 
-        $quiet = $this->project($owner, ['name' => 'Untracked']);
+        $quiet = $this->project($owner, ['name' => 'Untracked', 'show_time_in_motion' => false]);
         $quietTask = $this->task($quiet);
 
         $this->actingAs($owner)

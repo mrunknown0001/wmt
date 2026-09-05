@@ -25,6 +25,12 @@ Schedule::command('automation:run-scheduled')->everyMinute()->withoutOverlapping
 // Approval SLAs are set in hours, so a daily check would miss most of them.
 Schedule::command('approvals:check-deadlines')->hourlyAt(10)->withoutOverlapping();
 
+// Effort is worked out from the task clocks, and a day cannot be settled until
+// it is over — starting a second task in the afternoon changes what the morning
+// was worth. Just after midnight, so yesterday is closed before anybody reads a
+// report on it, and after the delegation pass so cover is already in place.
+Schedule::command('motion:materialise')->dailyAt('00:20')->withoutOverlapping();
+
 Schedule::command('backup:run --only-db')->dailyAt('02:00');
 Schedule::command('backup:clean')->dailyAt('02:30');
 

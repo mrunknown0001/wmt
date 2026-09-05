@@ -105,18 +105,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notification-preferences', [NotificationPreferenceController::class, 'update']);
 
     // Personal to-dos
-    // Time tracking. The timer routes come before /time-logs/{timeLog} so
-    // "timer" is never read as an id.
-    Route::get('/timer', [TaskTimeLogController::class, 'current']);
-    Route::post('/timer/stop', [TaskTimeLogController::class, 'stopTimer']);
-    Route::post('/tasks/{task}/timer/start', [TaskTimeLogController::class, 'startTimer']);
+    // Time recorded against a task. Read-only apart from removing an entry
+    // somebody put there by hand: effort is worked out from the task's clock,
+    // and the clock is driven from the task routes in web.php.
     Route::get('/tasks/{task}/time-logs', [TaskTimeLogController::class, 'index']);
-    Route::post('/tasks/{task}/time-logs', [TaskTimeLogController::class, 'store']);
     Route::delete('/time-logs/{timeLog}', [TaskTimeLogController::class, 'destroy']);
 
-    // Corrections to an entry already recorded, decided by whoever runs the
-    // project. Nothing rewrites a time log without one of these behind it.
+    // Corrections, decided by whoever runs the project: change what an entry
+    // says, or ask for one on a day the clock never ran. Nothing else writes a
+    // figure a person chose.
     Route::post('/time-logs/{timeLog}/amendments', [TimeLogAmendmentController::class, 'store']);
+    Route::post('/tasks/{task}/time-log-amendments', [TimeLogAmendmentController::class, 'add']);
     Route::post('/time-log-amendments/{amendment}/approve', [TimeLogAmendmentController::class, 'approve']);
     Route::post('/time-log-amendments/{amendment}/reject', [TimeLogAmendmentController::class, 'reject']);
 
