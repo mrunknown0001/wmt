@@ -10,6 +10,7 @@ use App\Http\Controllers\PersonOpenTasksController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectViewPreferenceController;
 use App\Http\Controllers\StandaloneTaskController;
+use App\Http\Controllers\TagBrowseController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskMinutesController;
 use App\Http\Controllers\TaskDependencyController;
@@ -96,6 +97,10 @@ Route::middleware('auth')->group(function () {
     // their other machine.
     Route::patch('/projects/{project}/view-preferences', [ProjectViewPreferenceController::class, 'update'])
         ->name('projects.view-preferences.update');
+
+    // Labels, and everything filed under one. ?q= both filters the list and
+    // opens the label when it names one — which is what a chip sends.
+    Route::get('/tags', [TagBrowseController::class, 'index'])->name('tags.index');
 
     // Global search
     Route::get('/api/search', SearchController::class)->name('search');

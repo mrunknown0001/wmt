@@ -4,6 +4,7 @@ import { pickTaskDate } from '../../taskDates';
 import { COMMENT_LIMIT } from '../../limits';
 import TaskMinutes from '../../Components/TaskMinutes';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
+import TagInput from '../../Components/TagInput';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
 import Input from '../../Components/Input';
@@ -23,7 +24,7 @@ import Tooltip from '../../Components/Tooltip';
 import { ConfirmModal } from '../../Components/Modal';
 import OverdueNotice from '../../Components/OverdueNotice';
 import CompletedNotice from '../../Components/CompletedNotice';
-import { formatLabel, formatDate, apiFetch, taskEditUrl, isPastDue, overdueDays } from '../../utils';
+import { formatLabel, formatDate, apiFetch, taskEditUrl, isPastDue, overdueDays, searchTag } from '../../utils';
 import { request } from '../../apiClient';
 import echo from '../../echo';
 
@@ -714,6 +715,18 @@ export default function Edit() {
                                 />
                             </div>
                         )}
+                        {/* Saved as they are typed, not with the form: a tag is
+                            how somebody finds this again, and it should not wait
+                            on a form that may not be valid yet. */}
+                        <TagInput
+                            type="task"
+                            id={task.id}
+                            initial={task.tags || []}
+                            canEdit={canManageTaskDetails}
+                            onSearch={searchTag}
+                            className="mb-5"
+                        />
+
                         <OverdueNotice task={task} className="mb-5" />
                         <CompletedNotice task={task} className="mb-5" />
                         {task.parent && (

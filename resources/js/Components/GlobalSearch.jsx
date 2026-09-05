@@ -51,11 +51,54 @@ const ApprovalItemIcon = () => (
  * /api/search to how a row should look. Adding a searchable type means adding
  * one entry here plus the matching key in SearchController.
  */
+const MinutesIcon = () => (
+    <svg className="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
+);
+
+const TagIcon = () => (
+    <svg className="h-4 w-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 10V5a2 2 0 012-2z" />
+    </svg>
+);
+
+/** The labels on a result, so a match on one is visible rather than mysterious. */
+const TagChips = ({ tags, onOpen }) => (
+    tags && tags.length > 0 ? (
+        <span className="flex flex-wrap gap-1 mt-0.5">
+            {tags.slice(0, 4).map((t) => (
+                <span
+                    key={t}
+                    role="button"
+                    tabIndex={-1}
+                    title={`Everything tagged ${t}`}
+                    // The row is a button and this sits inside it, so the click
+                    // has to be stopped from also opening the row behind it.
+                    onClick={(e) => { e.stopPropagation(); onOpen?.(t); }}
+                    className="rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 px-1.5 py-px text-[10px] cursor-pointer"
+                >
+                    {t}
+                </span>
+            ))}
+            {tags.length > 4 && <span className="text-[10px] text-gray-400">+{tags.length - 4}</span>}
+        </span>
+    ) : null
+);
+
 const SECTIONS = [
+    {
+        // First, because a tag is the fastest way to the rest: choosing one
+        // narrows everything below to the work carrying it.
+        key: 'tags', label: 'Tags', Icon: TagIcon,
+        title: (r) => r.name,
+        subtitle: (r) => `${r.uses} ${r.uses === 1 ? 'thing' : 'things'} tagged`,
+    },
     {
         key: 'projects', label: 'Projects', Icon: ProjectIcon,
         title: (r) => r.name,
         subtitle: (r) => (r.owner ? `Owner: ${r.owner}` : null),
+        chips: (r) => r.tags,
         badge: (r) => <StatusBadge status={r.status} type="project" />,
     },
     {
@@ -69,7 +112,14 @@ const SECTIONS = [
         // The number goes in the subtitle rather than the title so it can't
         // push a long task name out of view on a narrow result row.
         subtitle: (r) => [r.series_number, r.project_name].filter(Boolean).join(' · '),
+        chips: (r) => r.tags,
         badge: (r) => <StatusBadge status={r.status} type="task" />,
+    },
+    {
+        key: 'minutes', label: 'Meeting Minutes', Icon: MinutesIcon,
+        title: (r) => r.title,
+        subtitle: (r) => [r.meeting_date, r.project_name, r.task_title].filter(Boolean).join(' · '),
+        chips: (r) => r.tags,
     },
     {
         key: 'approvalProjects', label: 'Approval Projects', Icon: ApprovalProjectIcon,
@@ -138,6 +188,25 @@ export default function GlobalSearch() {
         debounceRef.current = setTimeout(() => search(value), 300);
     };
 
+    /**
+     * Choosing a label opens it.
+     *
+     * Not a narrower search in the same dropdown: five rows of a label's
+     * contents is not what somebody who picked the label wanted, and re-running
+     * the search under their cursor reads as the click having missed.
+     */
+    const openTag = (name) => navigate(`/tags?q=${encodeURIComponent(name)}`);
+
+    const choose = (section, row) => {
+        if (section.key === 'tags') {
+            openTag(row.name);
+
+            return;
+        }
+
+        navigate(row.url);
+    };
+
     const navigate = (url) => {
         setIsOpen(false);
         setQuery('');
@@ -161,7 +230,8 @@ export default function GlobalSearch() {
             setActiveIndex((prev) => (prev > 0 ? prev - 1 : flatResults.length - 1));
         } else if (e.key === 'Enter' && activeIndex >= 0) {
             e.preventDefault();
-            navigate(flatResults[activeIndex].url);
+            const row = flatResults[activeIndex];
+            row.type === 'tags' ? openTag(row.name) : navigate(row.url);
         }
     };
 
@@ -238,7 +308,7 @@ export default function GlobalSearch() {
                                 return (
                                     <button
                                         key={`${section.key}-${row.id}`}
-                                        onClick={() => navigate(row.url)}
+                                        onClick={() => choose(section, row)}
                                         className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                                             activeIndex === idx ? 'bg-primary-50 dark:bg-primary-900/20' : ''
                                         }`}
@@ -251,6 +321,7 @@ export default function GlobalSearch() {
                                             {subtitle && (
                                                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{subtitle}</p>
                                             )}
+                                            <TagChips tags={section.chips?.(row)} onOpen={openTag} />
                                         </div>
                                         {section.badge?.(row)}
                                     </button>

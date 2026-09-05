@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use App\Models\Concerns\HasTags;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,6 +17,7 @@ use App\Observers\ProjectObserver;
 class Project extends Model
 {
     use HasFactory, SoftDeletes;
+    use HasTags;
 
     protected $fillable = [
         'name',

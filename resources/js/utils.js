@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 export const formatLabel = (value) =>
     value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -62,6 +63,23 @@ export async function errorMessageFrom(response, fallback = 'Something went wron
         return fallback;
     }
 }
+
+/**
+ * Open the page for a label.
+ *
+ * Clicking a tag used to re-run the search behind the dropdown, which from the
+ * outside looked like nothing happening: the same panel, slightly different
+ * rows. A label is a place — everything filed under it — so a chip goes there.
+ *
+ * The name is sent rather than a slug: the server already knows how a name
+ * reduces to a label, and the browser guessing at that rule is how the two come
+ * to disagree.
+ */
+export const searchTag = (name) => {
+    if (!name) return;
+
+    router.get('/tags', { q: String(name) });
+};
 
 /**
  * Turn a stored date into a Date the browser will read as the intended day.
