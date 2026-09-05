@@ -48,7 +48,7 @@ import ShareProjectModal from '../../Components/ShareProjectModal';
 import MemberAvatarStack from '../../Components/MemberAvatarStack';
 import Tooltip from '../../Components/Tooltip';
 import ProjectCharts from '../../Components/ProjectCharts';
-import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, formatElapsed, isCompletedLate, motionMinutes } from '../../utils';
+import { formatLabel, formatDate, apiFetch, isPastDue, formatMinutes, formatElapsed, isCompletedLate, motionMinutes, searchTag } from '../../utils';
 import { computeAllFormulas, formatFormulaResult } from '../../formulaEngine';
 import { weekOfYearLabel } from '../../weekOfYear';
 import { orderSections, moveSection } from '../../sectionTree';
@@ -450,6 +450,31 @@ function SortableSubtaskRow({ task, project, canEditTask, canManageTasks, canMan
                     </td>
                 );
             }
+            case 'tags':
+                return (
+                    <td key="tags" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
+                        {(task.tags || []).length === 0
+                            ? <span className="text-gray-300 dark:text-gray-600">—</span>
+                            : (
+                                <span className="flex flex-wrap gap-1">
+                                    {task.tags.map((tag) => (
+                                        <button
+                                            key={tag.id}
+                                            type="button"
+                                            // The row opens the task; a label is a
+                                            // different destination, so it stops
+                                            // the click going through to it.
+                                            onClick={(e) => { e.stopPropagation(); searchTag(tag.name); }}
+                                            title={`Everything tagged ${tag.name}`}
+                                            className="rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 px-1.5 py-px text-[10px] max-w-[8rem] truncate"
+                                        >
+                                            {tag.name}
+                                        </button>
+                                    ))}
+                                </span>
+                            )}
+                    </td>
+                );
             case 'series':
                 return (
                     <td key="series" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
@@ -715,7 +740,7 @@ function isInMotion(task) {
         && !['done', 'cancelled'].includes(task.status);
 }
 
-const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'completion', 'estimate', 'logged'];
+const DEFAULT_COLUMN_IDS = ['status', 'priority', 'assignee', 'dates', 'completed', 'completion', 'estimate', 'logged', 'tags'];
 
 // What each built-in column means, shown on hover. Worth having because several
 // of these are not self-evident from a one-word heading: two are derived rather
@@ -730,6 +755,7 @@ const COLUMN_DESCRIPTIONS = {
     completed: 'When the task was closed. Empty until it is.',
     started: 'When work actually began — stamped on the way into In Progress, or by the Start button.',
     motion: 'Elapsed time from starting to finishing, still counting while the task is open. Not the same as logged effort.',
+    tags: 'Labels on the task. Click one to see everything filed under it.',
     completion: 'Progress. Taken from subtasks when there are any, otherwise from status.',
     estimate: 'How long the task was expected to take.',
     logged: 'Time actually tracked. Turns red once it passes the estimate.',
@@ -1032,6 +1058,31 @@ function SortableRow({ task, project, canEditTask, canManageTasks, canManageTask
                     </td>
                 );
             }
+            case 'tags':
+                return (
+                    <td key="tags" className="px-6 py-3 text-sm overflow-hidden" style={cStyle}>
+                        {(task.tags || []).length === 0
+                            ? <span className="text-gray-300 dark:text-gray-600">—</span>
+                            : (
+                                <span className="flex flex-wrap gap-1">
+                                    {task.tags.map((tag) => (
+                                        <button
+                                            key={tag.id}
+                                            type="button"
+                                            // The row opens the task; a label is a
+                                            // different destination, so it stops
+                                            // the click going through to it.
+                                            onClick={(e) => { e.stopPropagation(); searchTag(tag.name); }}
+                                            title={`Everything tagged ${tag.name}`}
+                                            className="rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 px-1.5 py-px text-[10px] max-w-[8rem] truncate"
+                                        >
+                                            {tag.name}
+                                        </button>
+                                    ))}
+                                </span>
+                            )}
+                    </td>
+                );
             case 'series':
                 return (
                     <td key="series" className="px-6 py-3 text-sm text-center overflow-hidden" style={cStyle}>
@@ -2264,6 +2315,7 @@ export default function Show() {
             case 'series': return 'Series';
             case 'estimate': return 'Estimate';
             case 'logged': return 'Logged';
+            case 'tags': return 'Tags';
             case 'status': return 'Status';
             case 'priority': return 'Priority';
             case 'assignee': return 'Assignee';
@@ -2308,6 +2360,7 @@ export default function Show() {
             // Unset sorts last, as every other column here treats missing.
             case 'estimate': return task.estimated_minutes ?? Infinity;
             case 'logged': return task.logged_minutes ?? Infinity;
+            case 'tags': return (task.tags || []).map((t) => t.name).sort().join(', ') || '\uffff';
             case 'title': return task.title?.toLowerCase() || '';
             case 'status': return STATUS_ORDER[task.status] ?? 99;
             case 'priority': return PRIORITY_ORDER[task.priority] ?? 99;
@@ -2537,6 +2590,23 @@ export default function Show() {
         return Array.from(map, ([id, name]) => ({ id, name }));
     }, [localTasks]);
 
+    // Labels in use on this project's tasks. Taken from the tasks rather than
+    // the whole vocabulary: offering every tag in the organisation to filter one
+    // project's list is a longer list that mostly returns nothing.
+    const projectTagOptions = useMemo(() => {
+        const seen = new Map();
+
+        localTasks.forEach((t) => {
+            [t, ...(t.subtasks || [])].forEach((row) => {
+                (row.tags || []).forEach((tag) => {
+                    if (!seen.has(tag.slug)) seen.set(tag.slug, { id: tag.slug, label: tag.name });
+                });
+            });
+        });
+
+        return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+    }, [localTasks]);
+
     const filterableFields = useMemo(() => {
         const builtIn = [
             { id: 'status', name: 'Status', fieldType: 'select', options: TASK_STATUSES.map(s => ({ id: s, label: formatLabel(s) })) },
@@ -2549,12 +2619,15 @@ export default function Show() {
                 fieldType: 'select',
                 options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }],
             },
+            // A task carries several labels at once, so this behaves like a
+            // multi-select field: has any of, has all of, or none at all.
+            { id: 'tags', name: 'Tag', fieldType: 'multi_select', options: projectTagOptions },
         ];
         const custom = localCustomFields.filter(cf => !isDerivedField(cf.type)).map(cf => ({
             id: `cf_${cf.id}`, name: cf.name, fieldType: cf.type, options: cf.options, config: cf.config, cfId: cf.id,
         }));
         return [...builtIn, ...custom];
-    }, [localCustomFields, assignees]);
+    }, [localCustomFields, assignees, projectTagOptions]);
 
     // Filter tasks
     const matchesFilters = useCallback((t) => {
@@ -2590,6 +2663,16 @@ export default function Show() {
                 if (operator === 'is_not' && t.priority === value) return false;
                 if (operator === 'is_empty' && t.priority) return false;
                 if (operator === 'is_not_empty' && !t.priority) return false;
+                continue;
+            }
+            if (filter.fieldId === 'tags') {
+                const slugs = (t.tags || []).map((tag) => tag.slug);
+                const wanted = Array.isArray(value) ? value : [value];
+
+                if (operator === 'includes_any' && !wanted.some((w) => slugs.includes(w))) return false;
+                if (operator === 'includes_all' && !wanted.every((w) => slugs.includes(w))) return false;
+                if (operator === 'is_empty' && slugs.length > 0) return false;
+                if (operator === 'is_not_empty' && slugs.length === 0) return false;
                 continue;
             }
             if (filter.fieldId === 'assignee') {
