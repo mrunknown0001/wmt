@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import SearchableSelect from './SearchableSelect';
+import TagInput from './TagInput';
+import { searchTag } from '../utils';
 
 /**
  * Minutes for a meeting task, filled in by hand by the people who were there.
@@ -97,6 +99,9 @@ function RemoveRow({ onClick }) {
 }
 
 export default function TaskMinutes({ task, users = [], minutes, updatedBy, updatedAt, canEdit = true }) {
+    // Nothing to hang a label on until the minutes have been saved once: a tag
+    // belongs to the record, and there is no record yet.
+    const minuteId = minutes?.id ?? null;
     const [form, setForm] = useState(() => ({
         meeting_title: minutes?.meeting_title || '',
         meeting_date: (minutes?.meeting_date || '').slice(0, 10),
@@ -205,6 +210,26 @@ export default function TaskMinutes({ task, users = [], minutes, updatedBy, upda
                             <input type="text" className={input} value={form.meeting_title}
                                 onChange={(e) => set('meeting_title', e.target.value)} />
                         </Field>
+                        {/* Minutes are read by whoever is looking for what was
+                            decided about something, months later — which is a
+                            search by subject, not by meeting title. Only once
+                            there is a record to label: the tags are saved on
+                            their own, and cannot be attached to nothing. */}
+                        <div className="sm:col-span-2">
+                            {minuteId ? (
+                                <TagInput
+                                    type="minute"
+                                    id={minuteId}
+                                    initial={minutes?.tags || []}
+                                    canEdit={!readOnly}
+                                    onSearch={searchTag}
+                                />
+                            ) : (
+                                <p className="text-xs text-gray-400 dark:text-gray-500">
+                                    Tags can be added once these minutes are saved.
+                                </p>
+                            )}
+                        </div>
                         <Field label="Date">
                             <input type="date" className={input} value={form.meeting_date}
                                 onChange={(e) => set('meeting_date', e.target.value)} />

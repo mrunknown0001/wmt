@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\HasTags;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -19,6 +20,7 @@ use App\Services\MotionClock;
 class Task extends Model
 {
     use HasFactory, SoftDeletes;
+    use HasTags;
 
     public const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly', 'semi_annual', 'yearly'];
 

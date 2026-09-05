@@ -64,6 +64,19 @@ export async function errorMessageFrom(response, fallback = 'Something went wron
 }
 
 /**
+ * Search everything filed under a label.
+ *
+ * Raised as an event rather than a navigation because the search box lives in
+ * the layout, above every page that shows a tag. The "#" is what tells the
+ * server to match labels only.
+ */
+export const searchTag = (name) => {
+    if (!name) return;
+
+    window.dispatchEvent(new CustomEvent('wmt:search-tag', { detail: String(name) }));
+};
+
+/**
  * Turn a stored date into a Date the browser will read as the intended day.
  *
  * A bare "YYYY-MM-DD" is parsed by JavaScript as UTC midnight, so west of

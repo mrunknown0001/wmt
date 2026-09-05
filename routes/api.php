@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\MyTaskController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\NotificationPreferenceController;
 use App\Http\Controllers\Api\PersonalTodoController;
+use App\Http\Controllers\TagController;
 use App\Http\Controllers\TaskTimeLogController;
 use App\Http\Controllers\TimeLogAmendmentController;
 use App\Http\Controllers\Api\ProjectController;
@@ -105,6 +106,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notification-preferences', [NotificationPreferenceController::class, 'update']);
 
     // Personal to-dos
+    // Tags. One vocabulary across projects, tasks and meeting minutes, so the
+    // autocomplete is a single list and a label means the same thing wherever
+    // it is used.
+    Route::get('/tags', [TagController::class, 'index']);
+    Route::put('/tags/{type}/{id}', [TagController::class, 'update'])
+        ->whereIn('type', ['project', 'task', 'minute'])
+        ->whereNumber('id');
+
     // Time recorded against a task. Read-only apart from removing an entry
     // somebody put there by hand: effort is worked out from the task's clock,
     // and the clock is driven from the task routes in web.php.

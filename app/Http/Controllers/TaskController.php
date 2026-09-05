@@ -248,7 +248,7 @@ class TaskController extends Controller
     {
         $this->authorize('update', $task);
 
-        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'attachments', 'closeRuleExemptBy:id,name', 'minutes.updatedBy:id,name');
+        $task->load('assignee', 'creator', 'collaborators', 'parent:id,title', 'attachments', 'closeRuleExemptBy:id,name', 'minutes.updatedBy:id,name', 'tags:id,name,slug', 'minutes.tags:id,name,slug');
         $task->loadCount(['subtasks', 'subtasks as completed_subtasks_count' => fn ($q) => $q->where('status', 'done')]);
 
         $comments = $task->comments()->with('user', 'attachments')->latest()->take(10)->get()->map(fn ($c) => [

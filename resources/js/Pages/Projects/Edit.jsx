@@ -2,6 +2,8 @@ import { useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout';
 import PageHeader from '../../Components/PageHeader';
 import Card from '../../Components/Card';
+import TagInput from '../../Components/TagInput';
+import { searchTag } from '../../utils';
 import Input from '../../Components/Input';
 import Select from '../../Components/Select';
 import SearchableSelect from '../../Components/SearchableSelect';
@@ -63,6 +65,16 @@ export default function Edit() {
                 <Card>
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <Input label="Name" id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} error={errors.name} />
+
+                        {/* Outside the form's own save on purpose: tags are a
+                            filing decision, not a property of the project, and
+                            they save themselves the moment they are typed. */}
+                        <TagInput
+                            type="project"
+                            id={project.id}
+                            initial={project.tags || []}
+                            onSearch={searchTag}
+                        />
                         <RichTextEditor label="Description" id="description" value={data.description} onChange={(val) => setData('description', val)} error={errors.description} placeholder="Add a description..." />
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

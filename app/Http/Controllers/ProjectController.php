@@ -467,6 +467,8 @@ class ProjectController extends Controller
                 ? ['archived']
                 : ['active', 'on_hold', 'completed']);
 
+        $project->load('tags:id,name,slug');
+
         return Inertia::render('Projects/Edit', [
             'project' => array_merge($project->toArray(), [
                 // Drives the write-once lock on the prefix, and the "n existing
