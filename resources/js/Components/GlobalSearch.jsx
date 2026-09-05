@@ -64,11 +64,20 @@ const TagIcon = () => (
 );
 
 /** The labels on a result, so a match on one is visible rather than mysterious. */
-const TagChips = ({ tags }) => (
+const TagChips = ({ tags, onOpen }) => (
     tags && tags.length > 0 ? (
         <span className="flex flex-wrap gap-1 mt-0.5">
             {tags.slice(0, 4).map((t) => (
-                <span key={t} className="rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-1.5 py-px text-[10px]">
+                <span
+                    key={t}
+                    role="button"
+                    tabIndex={-1}
+                    title={`Everything tagged ${t}`}
+                    // The row is a button and this sits inside it, so the click
+                    // has to be stopped from also opening the row behind it.
+                    onClick={(e) => { e.stopPropagation(); onOpen?.(t); }}
+                    className="rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 px-1.5 py-px text-[10px] cursor-pointer"
+                >
                     {t}
                 </span>
             ))}
@@ -180,22 +189,17 @@ export default function GlobalSearch() {
     };
 
     /**
-     * Search by label.
+     * Choosing a label opens it.
      *
-     * The "#" is the server's signal to match tags only, so choosing "budget"
-     * from the list stops offering every task with "budget" in its title and
-     * returns the ones actually filed under it.
+     * Not a narrower search in the same dropdown: five rows of a label's
+     * contents is not what somebody who picked the label wanted, and re-running
+     * the search under their cursor reads as the click having missed.
      */
-    const searchTag = (name) => {
-        const q = `#${name}`;
-        setQuery(q);
-        setActiveIndex(-1);
-        search(q);
-    };
+    const openTag = (name) => navigate(`/tags?q=${encodeURIComponent(name)}`);
 
     const choose = (section, row) => {
         if (section.key === 'tags') {
-            searchTag(row.name);
+            openTag(row.name);
 
             return;
         }
@@ -227,27 +231,9 @@ export default function GlobalSearch() {
         } else if (e.key === 'Enter' && activeIndex >= 0) {
             e.preventDefault();
             const row = flatResults[activeIndex];
-            row.type === 'tags' ? searchTag(row.name) : navigate(row.url);
+            row.type === 'tags' ? openTag(row.name) : navigate(row.url);
         }
     };
-
-    // A tag chip anywhere on the page asks for its own search. The box is the
-    // one place a search can be run from, so it listens rather than exporting a
-    // handle to itself.
-    useEffect(() => {
-        const handler = (e) => {
-            const name = e.detail;
-            if (!name) return;
-
-            inputRef.current?.focus();
-            searchTag(name);
-        };
-
-        window.addEventListener('wmt:search-tag', handler);
-
-        return () => window.removeEventListener('wmt:search-tag', handler);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search]);
 
     // Click outside to close
     useEffect(() => {
@@ -335,7 +321,7 @@ export default function GlobalSearch() {
                                             {subtitle && (
                                                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{subtitle}</p>
                                             )}
-                                            <TagChips tags={section.chips?.(row)} />
+                                            <TagChips tags={section.chips?.(row)} onOpen={openTag} />
                                         </div>
                                         {section.badge?.(row)}
                                     </button>

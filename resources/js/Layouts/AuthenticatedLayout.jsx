@@ -112,6 +112,12 @@ const MyRequestsIcon = () => (
     </svg>
 );
 
+const TagNavIcon = () => (
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 10V5a2 2 0 012-2z" />
+    </svg>
+);
+
 const TimeCorrectionIcon = () => (
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6l3.5 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -346,6 +352,11 @@ export default function AuthenticatedLayout({ children, title, contained = false
                         </NavLink>
                         <NavLink href="/projects/archived" icon={<ArchiveIcon />} active={currentUrl.startsWith('/projects/archived')} collapsed={collapsed}>
                             Archived
+                        </NavLink>
+                        {/* Tags cross projects, tasks and minutes, so they sit
+                            with the work rather than under any one of them. */}
+                        <NavLink href="/tags" icon={<TagNavIcon />} active={isActive('/tags')} collapsed={collapsed}>
+                            Tags
                         </NavLink>
                     </div>
                 )}

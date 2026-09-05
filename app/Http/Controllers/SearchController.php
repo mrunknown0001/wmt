@@ -10,12 +10,17 @@ use App\Models\Tag;
 use App\Models\Task;
 use App\Models\TaskMinute;
 use App\Models\User;
+use App\Http\Controllers\Concerns\ScopesVisibleWork;
 use App\Services\FolderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SearchController extends Controller
 {
+    // Visibility is shared with the tag pages, which are the same question
+    // asked through a different door.
+    use ScopesVisibleWork;
+
     /** Sections always present in the payload, so the client can rely on the shape. */
     private const EMPTY_RESULTS = [
         'projects' => [],
@@ -100,20 +105,7 @@ class SearchController extends Controller
             $q->orWhereHas('tags', fn ($t) => $t->where('name', 'like', $like));
         });
 
-        // Minutes are part of their task, and inherit its visibility exactly.
-        if (! $this->seesAllProjects($user)) {
-            $query->whereHas('task', function ($t) use ($user) {
-                $t->whereHas('project', fn ($p) => $this->scopeVisibleProjects($p, $user))
-                    ->orWhere(function ($personal) use ($user) {
-                        $personal->whereNull('project_id')
-                            ->where(function ($mine) use ($user) {
-                                $mine->where('created_by', $user->id)
-                                    ->orWhere('assigned_to', $user->id)
-                                    ->orWhereHas('collaborators', fn ($c) => $c->where('users.id', $user->id));
-                            });
-                    });
-            });
-        }
+        $this->scopeVisibleMinutes($query, $user);
 
         return $query->with(['task:id,title,project_id', 'task.project:id,name', 'tags:id,name,slug'])
             ->orderBy('meeting_date', 'desc')
@@ -130,36 +122,6 @@ class SearchController extends Controller
                     ? "/projects/{$m->task->project_id}/tasks/{$m->task_id}/edit"
                     : "/tasks/{$m->task_id}/edit",
             ]);
-    }
-
-    /**
-     * True when the user sees every project, matching ProjectController::index.
-     * Admins and executives are unrestricted.
-     */
-    private function seesAllProjects(User $user): bool
-    {
-        return $user->can('manage-projects') || $user->hasRole('executive');
-    }
-
-    /**
-     * Constrain a Project query to what the user may see — the same clause
-     * ProjectController::index applies to the projects list: owned, a member of,
-     * holding one of their assigned tasks, or in an org folder they oversee.
-     */
-    private function scopeVisibleProjects($query, User $user): void
-    {
-        if ($this->seesAllProjects($user)) {
-            return;
-        }
-
-        $overseenFolderIds = FolderService::overseenFolderIds($user);
-
-        $query->where(function ($q) use ($user, $overseenFolderIds) {
-            $q->where('owner_id', $user->id)
-                ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id))
-                ->orWhereHas('tasks', fn ($t) => $t->where('assigned_to', $user->id))
-                ->orWhereIn('folder_id', $overseenFolderIds);
-        });
     }
 
     private function projects(User $user, string $like, bool $tagOnly = false)
@@ -234,19 +196,7 @@ class SearchController extends Controller
             $q->orWhereHas('tags', fn ($t) => $t->where('name', 'like', $like));
         });
 
-        if (!$this->seesAllProjects($user)) {
-            $query->where(function ($q) use ($user) {
-                $q->whereHas('project', fn ($p) => $this->scopeVisibleProjects($p, $user))
-                    ->orWhere(function ($personal) use ($user) {
-                        $personal->whereNull('project_id')
-                            ->where(function ($mine) use ($user) {
-                                $mine->where('created_by', $user->id)
-                                    ->orWhere('assigned_to', $user->id)
-                                    ->orWhereHas('collaborators', fn ($c) => $c->where('users.id', $user->id));
-                            });
-                    });
-            });
-        }
+        $this->scopeVisibleTasks($query, $user);
 
         return $query->with(['project:id,name', 'tags:id,name,slug'])
             ->select('id', 'title', 'series_number', 'status', 'priority', 'project_id')

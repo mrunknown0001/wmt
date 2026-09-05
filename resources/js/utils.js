@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 export const formatLabel = (value) =>
     value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -64,16 +65,20 @@ export async function errorMessageFrom(response, fallback = 'Something went wron
 }
 
 /**
- * Search everything filed under a label.
+ * Open the page for a label.
  *
- * Raised as an event rather than a navigation because the search box lives in
- * the layout, above every page that shows a tag. The "#" is what tells the
- * server to match labels only.
+ * Clicking a tag used to re-run the search behind the dropdown, which from the
+ * outside looked like nothing happening: the same panel, slightly different
+ * rows. A label is a place — everything filed under it — so a chip goes there.
+ *
+ * The name is sent rather than a slug: the server already knows how a name
+ * reduces to a label, and the browser guessing at that rule is how the two come
+ * to disagree.
  */
 export const searchTag = (name) => {
     if (!name) return;
 
-    window.dispatchEvent(new CustomEvent('wmt:search-tag', { detail: String(name) }));
+    router.get('/tags', { q: String(name) });
 };
 
 /**
