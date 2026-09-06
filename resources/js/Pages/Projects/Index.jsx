@@ -9,7 +9,8 @@ import LinkButton from '../../Components/LinkButton';
 import Button from '../../Components/Button';
 import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
-import { formatDate, formatLabel } from '../../utils';
+import { formatDate, formatLabel, searchTag } from '../../utils';
+import MultiSelectFilter from '../../Components/MultiSelectFilter';
 import { ConfirmModal } from '../../Components/Modal';
 import ProjectContextMenu from '../../Components/ProjectContextMenu';
 import DuplicateProjectModal from '../../Components/DuplicateProjectModal';
@@ -20,7 +21,7 @@ import MoveToFolderModal from '../../Components/MoveToFolderModal';
 const PROJECT_STATUSES = ['active', 'on_hold', 'completed'];
 
 export default function Index() {
-    const { projects, auth, filters, owners = [], folders = [] } = usePage().props;
+    const { projects, auth, filters, owners = [], folders = [], tags = [] } = usePage().props;
 
     // Hiding the button is courtesy, not the gate — ProjectPolicy::create and
     // StoreProjectRequest are what actually stop the request.
@@ -40,6 +41,7 @@ export default function Index() {
     const [search, setSearch] = useState(filters?.search || '');
     const [status, setStatus] = useState(filters?.status || '');
     const [owner, setOwner] = useState(filters?.owner || '');
+    const [tagFilter, setTagFilter] = useState(filters?.tag || []);
     const [draggedProject, setDraggedProject] = useState(null);
     const [toast, setToast] = useState(null);
     const debounceRef = useRef(null);
@@ -53,13 +55,17 @@ export default function Index() {
             search: overrides.search ?? search,
             status: overrides.status ?? status,
             owner: overrides.owner ?? owner,
+            // Comma-joined slugs, the shape the workload and report filters
+            // already use. An empty choice drops the parameter rather than
+            // sending "".
+            tag: (overrides.tag ?? tagFilter).join(',') || '',
             view: overrides.view ?? (view === 'folders' ? 'folders' : ''),
             folder: overrides.folder ?? (view === 'folders' ? selectedFolder : ''),
         };
         if (params.view !== 'folders') delete params.folder;
         Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; });
         router.get('/projects', params, { preserveState: true, preserveScroll: true });
-    }, [search, status, owner, view, selectedFolder]);
+    }, [search, status, owner, tagFilter, view, selectedFolder]);
 
     const handleSearchChange = (value) => {
         setSearch(value);
@@ -77,14 +83,20 @@ export default function Index() {
         applyFilters({ owner: value });
     };
 
+    const handleTagChange = (slugs) => {
+        setTagFilter(slugs);
+        applyFilters({ tag: slugs });
+    };
+
     const clearFilters = () => {
         setSearch('');
         setStatus('');
         setOwner('');
-        applyFilters({ search: '', status: '', owner: '' });
+        setTagFilter([]);
+        applyFilters({ search: '', status: '', owner: '', tag: [] });
     };
 
-    const hasActiveFilters = search || status || owner;
+    const hasActiveFilters = search || status || owner || tagFilter.length > 0;
 
     const handleDelete = () => {
         if (deleteTarget) {
@@ -278,6 +290,23 @@ export default function Index() {
                                                     )}
                                                     <span>{project.name}</span>
                                                 </div>
+                                                {project.tags?.length > 0 && (
+                                                    <span className="flex flex-wrap gap-1 mt-1">
+                                                        {project.tags.map((tag) => (
+                                                            <button
+                                                                key={tag.id}
+                                                                type="button"
+                                                                // The row opens the project; a label
+                                                                // is somewhere else entirely.
+                                                                onClick={(e) => { e.stopPropagation(); searchTag(tag.name); }}
+                                                                title={`Everything tagged ${tag.name}`}
+                                                                className="rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 px-1.5 py-px text-[10px] font-normal"
+                                                            >
+                                                                {tag.name}
+                                                            </button>
+                                                        ))}
+                                                    </span>
+                                                )}
                                             </td>
                                     <td className="px-6 py-4 text-sm">
                                         <StatusBadge status={project.status} type="project" />
@@ -399,6 +428,15 @@ export default function Index() {
                             <option key={o.id} value={o.id}>{o.name}</option>
                         ))}
                     </select>
+                    {tags.length > 0 && (
+                        <MultiSelectFilter
+                            label="" noun="tags"
+                            align="right"
+                            options={tags.map((t) => ({ value: t.slug, label: t.name }))}
+                            value={tagFilter}
+                            onChange={handleTagChange}
+                        />
+                    )}
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}

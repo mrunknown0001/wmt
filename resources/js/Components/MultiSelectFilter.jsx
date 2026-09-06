@@ -55,7 +55,11 @@ export default function MultiSelectFilter({ label, noun, options = [], value = [
 
     return (
         <div ref={ref} className="relative">
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</label>
+            {/* Optional: in a bar of bare selects a label would sit this control
+                a few pixels lower than everything beside it. */}
+            {label && (
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</label>
+            )}
             <button
                 type="button"
                 onClick={() => setOpen((o) => !o)}
