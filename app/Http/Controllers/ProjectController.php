@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Department;
 use App\Models\Folder;
 use App\Models\Project;
+use App\Models\Tag;
 use App\Models\ProjectEscalationRule;
 use App\Models\Setting;
 use App\Models\Task;
@@ -36,7 +37,7 @@ class ProjectController extends Controller
         $view = $request->input('view') === 'folders' ? 'folders' : 'all';
         $folderId = $request->input('folder');
 
-        $query = Project::with('owner', 'folder:id,name')
+        $query = Project::with('owner', 'folder:id,name', 'tags:id,name,slug')
             ->where('status', '!=', 'archived')
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
@@ -76,6 +77,15 @@ class ProjectController extends Controller
             $query->where('owner_id', $ownerId);
         }
 
+        // Labels, as a comma list of slugs — the same shape the workload and
+        // report filters use. Several mean "any of": asking for two piles is
+        // asking to see both, not their overlap.
+        $tagSlugs = self::tagSlugs($request);
+
+        if ($tagSlugs) {
+            $query->taggedWithAny($tagSlugs);
+        }
+
         $projects = $query->orderByDesc('is_pinned')
             ->orderBy('position')
             ->orderBy('created_at', 'desc')
@@ -101,13 +111,41 @@ class ProjectController extends Controller
                 'search' => $request->input('search', ''),
                 'status' => $request->input('status', ''),
                 'owner' => $request->input('owner', ''),
+                'tag' => $tagSlugs,
                 'view' => $view,
                 'folder' => $folderId ?: '',
             ],
             'owners' => User::whereHas('ownedProjects', fn ($q) => $q->where('status', '!=', 'archived'))
                 ->orderBy('name')->get(['id', 'name']),
+            'tags' => self::tagsInUse(fn ($q) => $q->where('status', '!=', 'archived')),
             'folders' => $this->folderTree($user),
         ]);
+    }
+
+    /** The slugs asked for, from a comma list. */
+    private static function tagSlugs(Request $request): array
+    {
+        return collect(explode(',', (string) $request->input('tag')))
+            ->map(fn ($slug) => Tag::slugFor(trim($slug)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Labels actually on the projects in this list.
+     *
+     * Not the whole vocabulary: a filter offering words that cannot narrow
+     * anything on the page in front of you is a longer list and a worse one.
+     * Deliberately unscoped by visibility — a label is a word, and the rows
+     * themselves decide who sees which project.
+     */
+    private static function tagsInUse(callable $scope)
+    {
+        return Tag::whereHas('projects', $scope)
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug']);
     }
 
     /** Reset the task-number counter and free the numbers held in the trash. */
@@ -222,7 +260,7 @@ class ProjectController extends Controller
         $user = $request->user();
         $userId = $user->id;
 
-        $query = Project::with('owner')
+        $query = Project::with('owner', 'tags:id,name,slug')
             ->where('status', 'archived')
             ->withCount('tasks')
             ->withCount(['tasks as completed_tasks_count' => fn ($q) => $q->where('status', 'done')]);
@@ -245,6 +283,15 @@ class ProjectController extends Controller
 
         if ($ownerId = $request->input('owner')) {
             $query->where('owner_id', $ownerId);
+        }
+
+        // Labels, as a comma list of slugs — the same shape the workload and
+        // report filters use. Several mean "any of": asking for two piles is
+        // asking to see both, not their overlap.
+        $tagSlugs = self::tagSlugs($request);
+
+        if ($tagSlugs) {
+            $query->taggedWithAny($tagSlugs);
         }
 
         $projects = $query->orderByDesc('is_pinned')
@@ -270,9 +317,11 @@ class ProjectController extends Controller
             'filters' => [
                 'search' => $request->input('search', ''),
                 'owner' => $request->input('owner', ''),
+                'tag' => $tagSlugs,
             ],
             'owners' => User::whereHas('ownedProjects', fn ($q) => $q->where('status', 'archived'))
                 ->orderBy('name')->get(['id', 'name']),
+            'tags' => self::tagsInUse(fn ($q) => $q->where('status', 'archived')),
         ]);
     }
 

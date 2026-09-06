@@ -6,13 +6,14 @@ import Card from '../../Components/Card';
 import Avatar from '../../Components/Avatar';
 import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
-import { formatDate, formatLabel } from '../../utils';
+import { formatDate, formatLabel, searchTag } from '../../utils';
+import MultiSelectFilter from '../../Components/MultiSelectFilter';
 import { ConfirmModal } from '../../Components/Modal';
 import ProjectContextMenu from '../../Components/ProjectContextMenu';
 import DuplicateProjectModal from '../../Components/DuplicateProjectModal';
 
 export default function Archived() {
-    const { projects, auth, filters, owners = [] } = usePage().props;
+    const { projects, auth, filters, owners = [], tags = [] } = usePage().props;
     const canManageAll = auth.user?.permissions?.includes('manage-projects');
     const canManage = (project) => canManageAll || project.owner_id === auth.user?.id || project.user_is_admin;
     // Unarchiving and deleting are the owner's (or a global manager's) — a
@@ -22,16 +23,18 @@ export default function Archived() {
     const [duplicateTarget, setDuplicateTarget] = useState(null);
     const [search, setSearch] = useState(filters?.search || '');
     const [owner, setOwner] = useState(filters?.owner || '');
+    const [tagFilter, setTagFilter] = useState(filters?.tag || []);
     const debounceRef = useRef(null);
 
     const applyFilters = useCallback((overrides = {}) => {
         const params = {
             search: overrides.search ?? search,
             owner: overrides.owner ?? owner,
+            tag: (overrides.tag ?? tagFilter).join(',') || '',
         };
         Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; });
         router.get('/projects/archived', params, { preserveState: true, preserveScroll: true });
-    }, [search, owner]);
+    }, [search, owner, tagFilter]);
 
     const handleSearchChange = (value) => {
         setSearch(value);
@@ -42,6 +45,11 @@ export default function Archived() {
     const handleOwnerChange = (value) => {
         setOwner(value);
         applyFilters({ owner: value });
+    };
+
+    const handleTagChange = (slugs) => {
+        setTagFilter(slugs);
+        applyFilters({ tag: slugs });
     };
 
     const handleDelete = () => {
@@ -87,9 +95,18 @@ export default function Archived() {
                             <option key={o.id} value={o.id}>{o.name}</option>
                         ))}
                     </select>
-                    {(search || owner) && (
+                    {tags.length > 0 && (
+                        <MultiSelectFilter
+                            label="" noun="tags"
+                            align="right"
+                            options={tags.map((t) => ({ value: t.slug, label: t.name }))}
+                            value={tagFilter}
+                            onChange={handleTagChange}
+                        />
+                    )}
+                    {(search || owner || tagFilter.length > 0) && (
                         <button
-                            onClick={() => { setSearch(''); setOwner(''); router.get('/projects/archived', {}, { preserveState: true, preserveScroll: true }); }}
+                            onClick={() => { setSearch(''); setOwner(''); setTagFilter([]); router.get('/projects/archived', {}, { preserveState: true, preserveScroll: true }); }}
                             className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
                         >
                             Clear
@@ -129,7 +146,24 @@ export default function Archived() {
                                             className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
                                             onClick={() => router.visit(`/projects/${project.id}`)}
                                         >
-                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{project.name}</td>
+                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                {project.name}
+                                                {project.tags?.length > 0 && (
+                                                    <span className="flex flex-wrap gap-1 mt-1">
+                                                        {project.tags.map((tag) => (
+                                                            <button
+                                                                key={tag.id}
+                                                                type="button"
+                                                                onClick={(e) => { e.stopPropagation(); searchTag(tag.name); }}
+                                                                title={`Everything tagged ${tag.name}`}
+                                                                className="rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/60 px-1.5 py-px text-[10px] font-normal"
+                                                            >
+                                                                {tag.name}
+                                                            </button>
+                                                        ))}
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
                                                 <div className="flex items-center gap-2">
                                                     {project.owner && <Avatar name={project.owner.name} size="sm" />}

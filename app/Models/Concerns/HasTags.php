@@ -54,6 +54,30 @@ trait HasTags
         return $query;
     }
 
+    /**
+     * Records carrying at least one of these tags.
+     *
+     * The other reading of a multiple choice, and the right one for a list of
+     * projects: asking for "budget" and "hatchery" together almost always means
+     * show me both piles, not the handful of things filed under both.
+     */
+    public function scopeTaggedWithAny(Builder $query, array $slugs): Builder
+    {
+        $slugs = collect($slugs)
+            ->filter()
+            ->map(fn ($slug) => Tag::slugFor((string) $slug))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (! $slugs) {
+            return $query;
+        }
+
+        return $query->whereHas('tags', fn ($t) => $t->whereIn('slug', $slugs));
+    }
+
     /** Records carrying a tag whose name looks like this. */
     public function scopeTagMatching(Builder $query, string $like): Builder
     {
