@@ -7,6 +7,8 @@ import Pagination from '../../Components/Pagination';
 import EmptyState from '../../Components/EmptyState';
 import Button from '../../Components/Button';
 import Tooltip from '../../Components/Tooltip';
+import NotificationGroup from '../../Components/NotificationGroup';
+import { ConfirmModal } from '../../Components/Modal';
 
 function timeAgo(dateString) {
     const date = new Date(dateString);
@@ -288,8 +290,12 @@ const emptyMessages = {
     archived: { title: 'No archived notifications', description: 'Archived notifications will appear here.' },
 };
 
-export default function Index({ notifications, filter = 'inbox' }) {
+export default function Index({ notifications, filter = 'inbox', groups = [], collapsedEntries = 4 }) {
     const [localNotifications, setLocalNotifications] = useState(notifications.data || []);
+    // A whole project's worth of notifications is enough to be worth asking
+    // about: marking read cannot be undone, and sixty-three of them by accident
+    // is not a mistake anybody can walk back.
+    const [confirming, setConfirming] = useState(null);   // { group, action }
 
     useEffect(() => {
         setLocalNotifications(notifications.data || []);
@@ -344,6 +350,24 @@ export default function Index({ notifications, filter = 'inbox' }) {
 
     function handleMarkAllAsRead() {
         router.post('/inbox/read-all', {}, { preserveScroll: true });
+    }
+
+    /** How many entries in a group before its buttons ask first. */
+    const CONFIRM_ABOVE = 10;
+
+    function runGroupAction(group, action) {
+        router.post(`/inbox/projects/${group.project_id}/${action}`, {}, { preserveScroll: true });
+        setConfirming(null);
+    }
+
+    function handleGroupAction(group, action) {
+        if (group.unread_count > CONFIRM_ABOVE) {
+            setConfirming({ group, action });
+
+            return;
+        }
+
+        runGroupAction(group, action);
     }
 
     function handleToggleBookmark(e, notification) {
@@ -408,8 +432,29 @@ export default function Index({ notifications, filter = 'inbox' }) {
             </div>
 
             <Card padding={false}>
-                {localNotifications.length > 0 ? (
+                {(groups.length > 0 || localNotifications.length > 0) ? (
                     <>
+                        {/* Gathered projects first: they are all unread, which is
+                            what an inbox is for, and one heading stands for what
+                            would otherwise be pages of near-identical rows. */}
+                        {groups.length > 0 && (
+                            <div className="divide-y divide-gray-100 dark:divide-gray-700 border-b border-gray-100 dark:border-gray-700">
+                                {groups.map((group) => (
+                                    <NotificationGroup
+                                        key={group.project_id}
+                                        group={group}
+                                        collapsedEntries={collapsedEntries}
+                                        renderMessage={notificationMessage}
+                                        renderIcon={notificationIcon}
+                                        timeAgo={timeAgo}
+                                        onEntryClick={handleNotificationClick}
+                                        onMarkAllRead={(g) => handleGroupAction(g, 'read')}
+                                        onArchiveAll={(g) => handleGroupAction(g, 'archive')}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
                         <div className="divide-y divide-gray-100 dark:divide-gray-700">
                             {localNotifications.map((notification) => (
                                 <div
@@ -494,6 +539,20 @@ export default function Index({ notifications, filter = 'inbox' }) {
                     />
                 )}
             </Card>
+
+            <ConfirmModal
+                isOpen={confirming !== null}
+                onClose={() => setConfirming(null)}
+                title={confirming?.action === 'archive' ? 'Archive them all?' : 'Mark them all as read?'}
+                message={confirming
+                    ? `${confirming.group.unread_count} notifications from ${confirming.group.project_name} will be ${
+                        confirming.action === 'archive' ? 'archived' : 'marked as read'
+                    }.${confirming.action === 'read' ? ' There is no way to mark them unread again.' : ''}`
+                    : ''}
+                confirmLabel={confirming?.action === 'archive' ? 'Archive all' : 'Mark all read'}
+                variant={confirming?.action === 'archive' ? 'secondary' : 'primary'}
+                onConfirm={() => runGroupAction(confirming.group, confirming.action)}
+            />
         </AuthenticatedLayout>
     );
 }

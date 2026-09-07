@@ -119,6 +119,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('/inbox/{id}/bookmark', [NotificationController::class, 'toggleBookmark'])->name('inbox.bookmark');
     Route::patch('/inbox/{id}/archive', [NotificationController::class, 'archive'])->name('inbox.archive');
     Route::patch('/inbox/{id}/unarchive', [NotificationController::class, 'unarchive'])->name('inbox.unarchive');
+    // A project's unread notifications, cleared or put away together — the
+    // buttons on the grouped heading in the inbox.
+    Route::post('/inbox/projects/{project}/read', [NotificationController::class, 'markProjectAsRead'])
+        ->whereNumber('project')->name('inbox.project.read');
+    Route::post('/inbox/projects/{project}/archive', [NotificationController::class, 'archiveProject'])
+        ->whereNumber('project')->name('inbox.project.archive');
 
     // My Tasks
     Route::get('/my-tasks', [MyTaskController::class, 'index'])->name('my-tasks');
